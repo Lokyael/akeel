@@ -109,7 +109,10 @@ See `config/presets.json` — the single source of truth for all protected paths
 
 ```bash
 # Command classification
-npx tsx extensions/security-gate/taxonomy.test.ts  # 1123 tests
+npx tsx extensions/security-gate/taxonomy.test.ts  # 1134 tests
+npx tsx extensions/security-gate/gate.test.ts       # 39 tests
+npx tsx extensions/security-gate/rules.test.ts      # 35 tests
+npx tsx extensions/security-gate/snapshots.test.ts  # 32 tests
 
 # Security gate end-to-end
 npx tsx extensions/security-gate/gate.test.ts       # 39 tests

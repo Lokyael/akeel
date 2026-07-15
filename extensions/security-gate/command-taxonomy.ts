@@ -55,6 +55,27 @@ const PRIORITY: Record<CommandCategory, number> = {
   "shell-write": 3, "privilege": 4, "destructive": 5, "remote-exec": 6,
 };
 
+// ─── Helpers ───
+
+/** Shortcut: read-only command rule. */
+function ro(cmd: string, description: string, opts?: { id?: string; sub?: RegExp }): CmdDef {
+  const def: CmdDef = { cmd, rule: { id: opts?.id || cmd, description, plan: "allow", build: "allow", category: "read-only", severity: "safe" } };
+  if (opts?.sub) def.sub = opts.sub;
+  return def;
+}
+
+/** Build package manager rules for npm/pnpm/yarn. IDs follow {cmd}-{operation}. */
+function pkgRules(cmd: string, subs: { readonly: RegExp; install: RegExp; remove: RegExp; update: RegExp; init: RegExp; publish: RegExp }): CmdDef[] {
+  return [
+    { cmd, sub: subs.readonly,  rule: { id: `${cmd}-readonly`, description: `${cmd} read-only operations`, plan: "allow", build: "allow", category: "read-only", severity: "safe" } },
+    { cmd, sub: subs.install,  rule: { id: `${cmd}-install`,  description: `Install ${cmd} packages`, plan: "block", build: "ask", category: "fs-mutate", severity: "dangerous" } },
+    { cmd, sub: subs.remove,   rule: { id: `${cmd}-remove`,   description: `Remove ${cmd} packages`, plan: "block", build: "ask", category: "fs-mutate", severity: "dangerous" } },
+    { cmd, sub: subs.update,   rule: { id: `${cmd}-update`,   description: `Update ${cmd} packages`, plan: "block", build: "ask", category: "fs-mutate", severity: "dangerous" } },
+    { cmd, sub: subs.init,     rule: { id: `${cmd}-init`,     description: "Create package.json", plan: "block", build: "ask", category: "fs-mutate", severity: "dangerous" } },
+    { cmd, sub: subs.publish,  rule: { id: `${cmd}-publish`,  description: "Publish a package", plan: "block", build: "block", category: "vcs-mutate", severity: "critical" } },
+  ];
+}
+
 // ─── Command definitions ───
 
 const CMDS: CmdDef[] = [
@@ -116,51 +137,14 @@ const CMDS: CmdDef[] = [
   { cmd: "git", sub: /^branch\s+-D\b/i,
     rule: { id: "git-branch-delete-force", description: "Force delete an unmerged branch", plan: "block", build: "block", category: "destructive", severity: "critical" } },
 
-  // ── npm / pnpm / yarn
+  // ── package managers ──
 
-  { cmd: "npm", sub: /^(test|run|ls|list|view|info|outdated)\b/,
-    rule: { id: "npm-readonly", description: "npm read-only operations", plan: "allow", build: "allow", category: "read-only", severity: "safe" } },
-  { cmd: "npm", sub: /^(install|i)\b/,
-    rule: { id: "npm-install", description: "Install npm packages", plan: "block", build: "ask", category: "fs-mutate", severity: "dangerous" } },
-  { cmd: "npm", sub: /^(uninstall|un|remove|rm)\b/,
-    rule: { id: "npm-uninstall", description: "Uninstall npm packages", plan: "block", build: "ask", category: "fs-mutate", severity: "dangerous" } },
-  { cmd: "npm", sub: /^update\b/,
-    rule: { id: "npm-update", description: "Update npm packages", plan: "block", build: "ask", category: "fs-mutate", severity: "dangerous" } },
-  { cmd: "npm", sub: /^init\b/,
-    rule: { id: "npm-init", description: "Create package.json", plan: "block", build: "ask", category: "fs-mutate", severity: "dangerous" } },
-  { cmd: "npm", sub: /^publish\b/,
-    rule: { id: "npm-publish", description: "Publish a package", plan: "block", build: "block", category: "vcs-mutate", severity: "critical" } },
+  ...pkgRules("npm",  { readonly: /^(test|run|ls|list|view|info|outdated)\b/, install: /^(install|i)\b/, remove: /^(uninstall|un|remove|rm)\b/, update: /^update\b/, init: /^init\b/, publish: /^publish\b/ }),
+  ...pkgRules("pnpm", { readonly: /^(test|run|ls|list)\b/,              install: /^(install|add)\b/, remove: /^(remove|rm|uninstall)\b/, update: /^update\b/, init: /^init\b/, publish: /^publish\b/ }),
+  ...pkgRules("yarn", { readonly: /^(test|run|list|info)\b/,             install: /^add\b/,          remove: /^remove\b/,             update: /^upgrade\b/, init: /^init\b/, publish: /^publish\b/ }),
 
-  { cmd: "pnpm", sub: /^(test|run|ls|list)\b/,
-    rule: { id: "pnpm-readonly", description: "pnpm read-only operations", plan: "allow", build: "allow", category: "read-only", severity: "safe" } },
-  { cmd: "pnpm", sub: /^(install|add)\b/,
-    rule: { id: "pnpm-install", description: "Install pnpm packages", plan: "block", build: "ask", category: "fs-mutate", severity: "dangerous" } },
-  { cmd: "pnpm", sub: /^(remove|rm|uninstall)\b/,
-    rule: { id: "pnpm-remove", description: "Remove pnpm packages", plan: "block", build: "ask", category: "fs-mutate", severity: "dangerous" } },
-  { cmd: "pnpm", sub: /^update\b/,
-    rule: { id: "pnpm-update", description: "Update pnpm packages", plan: "block", build: "ask", category: "fs-mutate", severity: "dangerous" } },
-  { cmd: "pnpm", sub: /^init\b/,
-    rule: { id: "pnpm-init", description: "Create package.json", plan: "block", build: "ask", category: "fs-mutate", severity: "dangerous" } },
-  { cmd: "pnpm", sub: /^publish\b/,
-    rule: { id: "pnpm-publish", description: "Publish a package", plan: "block", build: "block", category: "vcs-mutate", severity: "critical" } },
-
-  { cmd: "yarn", sub: /^(test|run|list|info)\b/,
-    rule: { id: "yarn-readonly", description: "yarn read-only operations", plan: "allow", build: "allow", category: "read-only", severity: "safe" } },
-  { cmd: "yarn", sub: /^add\b/,
-    rule: { id: "yarn-add", description: "Install yarn packages", plan: "block", build: "ask", category: "fs-mutate", severity: "dangerous" } },
-  { cmd: "yarn", sub: /^remove\b/,
-    rule: { id: "yarn-remove", description: "Remove yarn packages", plan: "block", build: "ask", category: "fs-mutate", severity: "dangerous" } },
-  { cmd: "yarn", sub: /^upgrade\b/,
-    rule: { id: "yarn-upgrade", description: "Upgrade yarn packages", plan: "block", build: "ask", category: "fs-mutate", severity: "dangerous" } },
-  { cmd: "yarn", sub: /^init\b/,
-    rule: { id: "yarn-init", description: "Create package.json", plan: "block", build: "ask", category: "fs-mutate", severity: "dangerous" } },
-  { cmd: "yarn", sub: /^publish\b/,
-    rule: { id: "yarn-publish", description: "Publish a package", plan: "block", build: "block", category: "vcs-mutate", severity: "critical" } },
-
-  { cmd: "cargo", sub: /^(test|check|build)\b/,
-    rule: { id: "cargo-readonly", description: "cargo read-only operations", plan: "allow", build: "allow", category: "read-only", severity: "safe" } },
-  { cmd: "go", sub: /^(test|vet|build)\b/,
-    rule: { id: "go-readonly", description: "go read-only operations", plan: "allow", build: "allow", category: "read-only", severity: "safe" } },
+  ro("cargo", "cargo build/test/check (read-only)", { id: "cargo-readonly", sub: /^(test|check|build)\b/ }),
+  ro("go", "go build/test/vet (read-only)", { id: "go-readonly", sub: /^(test|vet|build)\b/ }),
 
   // ── interpreters
 
@@ -177,39 +161,40 @@ const CMDS: CmdDef[] = [
   { cmd: "python3", sub: /^-c\b/,
     rule: { id: "python3-eval", description: "Python inline script execution", plan: "allow", build: "ask", category: "remote-exec", severity: "dangerous" } },
 
-  // ── read-only
+  // ── read-only ──
 
-  { cmd: "ls", rule: { id: "ls", description: "List directory contents", plan: "allow", build: "allow", category: "read-only", severity: "safe" } },
-  { cmd: "cat", rule: { id: "cat", description: "Print file contents", plan: "allow", build: "allow", category: "read-only", severity: "safe" } },
-  { cmd: "head", rule: { id: "head", description: "Output first part of files", plan: "allow", build: "allow", category: "read-only", severity: "safe" } },
-  { cmd: "tail", rule: { id: "tail", description: "Output last part of files", plan: "allow", build: "allow", category: "read-only", severity: "safe" } },
-  { cmd: "wc", rule: { id: "wc", description: "Print newline/word/byte counts", plan: "allow", build: "allow", category: "read-only", severity: "safe" } },
-  { cmd: "find", rule: { id: "find", description: "Search for files in a directory hierarchy", plan: "allow", build: "allow", category: "read-only", severity: "safe" } },
-  { cmd: "grep", rule: { id: "grep", description: "Print lines matching a pattern", plan: "allow", build: "allow", category: "read-only", severity: "safe" } },
-  { cmd: "rg", rule: { id: "rg", description: "ripgrep — recursively search directories", plan: "allow", build: "allow", category: "read-only", severity: "safe" } },
-  { cmd: "echo", rule: { id: "echo", description: "Display a line of text", plan: "allow", build: "allow", category: "read-only", severity: "safe" } },
-  { cmd: "cd", rule: { id: "cd", description: "Change working directory", plan: "allow", build: "allow", category: "read-only", severity: "safe" } },
-  { cmd: "pwd", rule: { id: "pwd", description: "Print working directory", plan: "allow", build: "allow", category: "read-only", severity: "safe" } },
-  { cmd: "which", rule: { id: "which", description: "Locate a command", plan: "allow", build: "allow", category: "read-only", severity: "safe" } },
-  { cmd: "type", rule: { id: "type", description: "Display information about command type", plan: "allow", build: "allow", category: "read-only", severity: "safe" } },
-  { cmd: "whoami", rule: { id: "whoami", description: "Print effective user ID", plan: "allow", build: "allow", category: "read-only", severity: "safe" } },
-  { cmd: "uname", rule: { id: "uname", description: "Print system information", plan: "allow", build: "allow", category: "read-only", severity: "safe" } },
-  { cmd: "df", rule: { id: "df", description: "Report filesystem disk space usage", plan: "allow", build: "allow", category: "read-only", severity: "safe" } },
-  { cmd: "du", rule: { id: "du", description: "Estimate file space usage", plan: "allow", build: "allow", category: "read-only", severity: "safe" } },
-  { cmd: "tree", rule: { id: "tree", description: "List contents of directories", plan: "allow", build: "allow", category: "read-only", severity: "safe" } },
-  { cmd: "file", rule: { id: "file", description: "Determine file type", plan: "allow", build: "allow", category: "read-only", severity: "safe" } },
-
-  { cmd: "sort", rule: { id: "sort", description: "Sort lines of text", plan: "allow", build: "allow", category: "read-only", severity: "safe" } },
-  { cmd: "uniq", rule: { id: "uniq", description: "Report or omit repeated lines", plan: "allow", build: "allow", category: "read-only", severity: "safe" } },
-  { cmd: "cut", rule: { id: "cut", description: "Remove sections from each line", plan: "allow", build: "allow", category: "read-only", severity: "safe" } },
-  { cmd: "tr", rule: { id: "tr", description: "Translate or delete characters", plan: "allow", build: "allow", category: "read-only", severity: "safe" } },
-  { cmd: "awk", rule: { id: "awk-readonly", description: "awk pattern scanning (non-inline)", plan: "allow", build: "allow", category: "read-only", severity: "safe" } },
-  { cmd: "sed", rule: { id: "sed-readonly", description: "sed stream editor (non-inline)", plan: "allow", build: "allow", category: "read-only", severity: "safe" } },
-  { cmd: "diff", rule: { id: "diff", description: "Compare files line by line", plan: "allow", build: "allow", category: "read-only", severity: "safe" } },
-  { cmd: "stat", rule: { id: "stat", description: "Display file or filesystem status", plan: "allow", build: "allow", category: "read-only", severity: "safe" } },
-  { cmd: "dirname", rule: { id: "dirname", description: "Strip last component from file name", plan: "allow", build: "allow", category: "read-only", severity: "safe" } },
-  { cmd: "basename", rule: { id: "basename", description: "Strip directory and suffix from filenames", plan: "allow", build: "allow", category: "read-only", severity: "safe" } },
-  { cmd: "realpath", rule: { id: "realpath", description: "Print resolved absolute file path", plan: "allow", build: "allow", category: "read-only", severity: "safe" } },
+  ...[
+    ["ls", "List directory contents"],
+    ["cat", "Print file contents"],
+    ["head", "Output first part of files"],
+    ["tail", "Output last part of files"],
+    ["wc", "Print newline/word/byte counts"],
+    ["find", "Search for files in a directory hierarchy"],
+    ["grep", "Print lines matching a pattern"],
+    ["rg", "ripgrep — recursively search directories"],
+    ["echo", "Display a line of text"],
+    ["cd", "Change working directory"],
+    ["pwd", "Print working directory"],
+    ["which", "Locate a command"],
+    ["type", "Display information about command type"],
+    ["whoami", "Print effective user ID"],
+    ["uname", "Print system information"],
+    ["df", "Report filesystem disk space usage"],
+    ["du", "Estimate file space usage"],
+    ["tree", "List contents of directories"],
+    ["file", "Determine file type"],
+    ["sort", "Sort lines of text"],
+    ["uniq", "Report or omit repeated lines"],
+    ["cut", "Remove sections from each line"],
+    ["tr", "Translate or delete characters"],
+    ["awk", "awk pattern scanning (non-inline)"],
+    ["sed", "sed stream editor (non-inline)"],
+    ["diff", "Compare files line by line"],
+    ["stat", "Display file or filesystem status"],
+    ["dirname", "Strip last component from file name"],
+    ["basename", "Strip directory and suffix from filenames"],
+    ["realpath", "Print resolved absolute file path"],
+  ].map(([c, d]) => ro(c, d!, c === "awk" || c === "sed" ? { id: `${c}-readonly` } : undefined)),
 
   // ── destructive / privileged / remote-exec
 

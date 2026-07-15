@@ -56,4 +56,4 @@ When a decision is hard, contentious, or likely needed by future explorers, offe
 
 ## Integration
 
-This skill is invoked automatically when running `/grill-docs`. It builds the domain model as decisions emerge from the grilling session.
+This skill is invoked automatically when running `/skill:grill-docs`. It builds the domain model as decisions emerge from the grilling session.

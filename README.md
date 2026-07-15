@@ -19,7 +19,7 @@ Principles and security activate automatically. Skills load on-demand. No config
 - **10 workflows** — user-invoked orchestration (brainstorming, grilling, implementing, rollback, handoff)
 - **5-layer security** — PLAN mode gate, threat scan, secret scan, shell-write detection, path protection (22 deny patterns)
 - **Rollback system** — automatic file snapshots before every write/edit, recoverable via `/rollback`
-- **Test coverage** — 1123 taxonomy tests + 39 gate tests
+- **Test coverage** — 1,134 taxonomy + 39 gate + 35 rules + 32 snapshots = 1,240 tests
 
 ## Documentation
 

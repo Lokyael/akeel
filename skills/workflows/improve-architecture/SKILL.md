@@ -42,6 +42,6 @@ End with a **Top recommendation** — which to tackle first and why.
 
 ### 3. Grilling Loop
 
-Once the user picks a candidate, run the `/grill-plan` skill to walk the decision tree — constraints, dependencies, the shape of the deepened module, what tests survive.
+Once the user picks a candidate, run the `/skill:grill-plan` skill to walk the decision tree — constraints, dependencies, the shape of the deepened module, what tests survive.
 
 Side effects happen inline as decisions crystallise: update `CONTEXT.md` for new terms, create ADRs for load-bearing decisions.

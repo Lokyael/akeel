@@ -3,18 +3,9 @@
  */
 
 import { existsSync, mkdirSync, appendFileSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { homedir } from "node:os";
+import { dirname } from "node:path";
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
-
-function getAgentDir(): string {
-  return process.env.PI_CODING_AGENT_DIR || join(homedir(), ".pi", "agent");
-}
-
-function resolveHome(path: string): string {
-  if (path.startsWith("~")) return join(homedir(), path.slice(1));
-  return path;
-}
+import { resolveHome } from "./utils";
 
 let resolvedLogPath: string | null = null;
 
@@ -38,9 +29,7 @@ export function audit(
 
   const entry = JSON.stringify({
     timestamp: new Date().toISOString(),
-    session: (ctx as Record<string, unknown>).sessionManager
-      ? ((ctx as Record<string, { getSessionId?: () => string }>).sessionManager).getSessionId?.() ?? "unknown"
-      : "unknown",
+    session: ctx.sessionManager?.getSessionId?.() ?? "unknown",
     surface,
     value: value.length > 200 ? value.slice(0, 197) + "..." : value,
     decision,

@@ -111,4 +111,4 @@ Fix issues inline. If a spec requirement has no task, add the task.
 
 ## Execution Handoff
 
-After saving: "Plan saved to `docs/plans/<filename>.md`. Ready to implement with `/implement-work`."
+After saving: "Plan saved to `docs/plans/<filename>.md`. Ready to implement with `/skill:implement-work`."

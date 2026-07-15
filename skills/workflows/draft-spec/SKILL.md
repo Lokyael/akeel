@@ -2,7 +2,6 @@
 name: draft-spec
 description: Turn the current conversation into a formal specification document — synthesizes what you've already discussed without re-interviewing. Use when you want to capture decisions as a spec.
 disable-model-invocation: true
-argument-hint: "Optional: specify where to publish the spec"
 ---
 
 Turn the current conversation into a formal specification document. Synthesize everything that's been discussed — requirements, constraints, design decisions, tradeoffs — into a single structured spec.

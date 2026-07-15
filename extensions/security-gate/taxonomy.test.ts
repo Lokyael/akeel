@@ -192,10 +192,17 @@ const positiveCases: Array<[string, string]> = [
   ["command-substitution", "echo $(whoami)"],
   // Package-mutate
   ["npm-install", "npm install express"],
-  ["npm-uninstall", "npm uninstall express"],
+  ["npm-remove", "npm uninstall express"],
+  ["npm-update", "npm update express"],
   ["npm-publish", "npm publish"],
   ["pnpm-install", "pnpm add express"],
-  ["yarn-add", "yarn add express"],
+  ["pnpm-remove", "pnpm remove express"],
+  ["pnpm-update", "pnpm update"],
+  ["yarn-install", "yarn add express"],
+  ["yarn-remove", "yarn remove express"],
+  ["yarn-update", "yarn upgrade express"],
+  ["yarn-init", "yarn init"],
+  ["yarn-publish", "yarn publish"],
   // Shell-write
   ["sed-inline", "sed -i 's/old/new/' file.txt"],
   ["redirect-overwrite", "echo hi > file.txt"],
@@ -259,6 +266,16 @@ assert(findRule("git branch -D feature")?.id === "git-branch-delete-force",
 // "git push --force" should match git-push-force, not git-push
 assert(findRule("git push --force")?.id === "git-push-force",
   "git push --force should match git-push-force, not git-push");
+
+// cargo/go: only build/test/check/vet are read-only, other subcommands are NOT
+assert(findRule("cargo publish")?.id !== "cargo-readonly",
+  "cargo publish should NOT match cargo-readonly");
+assert(findRule("cargo install")?.id !== "cargo-readonly",
+  "cargo install should NOT match cargo-readonly");
+assert(findRule("go run ./...")?.id !== "go-readonly",
+  "go run should NOT match go-readonly");
+assert(findRule("go install")?.id !== "go-readonly",
+  "go install should NOT match go-readonly");
 
 // ═══════════════════════════════════════════════════════════════
 // 3. PLAN mode: read-only allowed, everything else blocked

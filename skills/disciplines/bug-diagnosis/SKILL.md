@@ -79,4 +79,4 @@ If no correct seam exists, **that itself is the finding.** Note it. The architec
 - [ ] Throwaway prototypes deleted
 - [ ] Root cause stated in commit/PR message
 
-**Then ask: what would have prevented this bug?** If architectural change, hand off to `/improve-architecture`.
+**Then ask: what would have prevented this bug?** If architectural change, hand off to `/skill:improve-architecture`.

@@ -3,7 +3,7 @@
   "description": "Engineering skills and security system for pi — the keel that keeps AI coding steady",
   "license": "MIT",
   "scripts": {
-    "test": "npx tsx extensions/security-gate/taxonomy.test.ts && npx tsx extensions/security-gate/gate.test.ts"
+    "test": "npx tsx extensions/security-gate/taxonomy.test.ts && npx tsx extensions/security-gate/gate.test.ts && npx tsx extensions/security-gate/rules.test.ts && npx tsx extensions/security-gate/snapshots.test.ts"
   },
   "pi": {
     "extensions": [

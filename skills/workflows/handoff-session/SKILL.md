@@ -2,7 +2,6 @@
 name: handoff-session
 description: Compact the current conversation into a handoff document so another agent can continue the work. Reference existing artifacts by path rather than duplicating content. Redact sensitive information.
 disable-model-invocation: true
-argument-hint: "What will the next session be used for?"
 ---
 
 Write a handoff document summarising the current conversation so a fresh agent can continue the work. Save to the temporary directory of the user's OS — not the current workspace.

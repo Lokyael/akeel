@@ -2,7 +2,6 @@
 name: draft-tickets
 description: Break any plan, spec, or conversation into a set of tracer-bullet tickets, each declaring its blocking edges. Use after draft-spec or when you have a plan ready for decomposition.
 disable-model-invocation: true
-argument-hint: "Optional: specify the plan or spec to break into tickets"
 ---
 
 Break the plan or spec into independent, vertical-slice tickets. Each ticket should be a self-contained unit of work that delivers user-visible value.

@@ -42,7 +42,7 @@
 | | 4. **新增**：turn counter 机制，跟踪注入状态 |
 | **理由** | superpowers 的注入架构是正确的（compaction后重注入是关键），但注入内容过于强制。karpathy 原则更适合作为基线。移除 tool mapping 是冗余——pi 原生工具就是 `read/write/edit/bash`。 |
 
-### 4. extensions/security-gate.ts
+### 4. extensions/security-gate/（目录）
 
 | 维度 | 内容 |
 |------|------|
@@ -51,12 +51,13 @@
 | | - **cc-safety-net**：命令语义分析 → 已整合至 `command-taxonomy.ts` |
 | | - **pi-hermes-memory** `content-scanner.ts`：THREAT_PATTERNS 和 SECRET_PATTERNS（保留在 `patterns.ts`） |
 | | - **pi-landstrip**：沙箱策略格式（JSON 配置结构） |
-| **决策** | 单一 `tool_call` 事件处理器，bash 走逐段评估（`evaluateBashSegments`），非 bash 走权限管道（`evaluatePermission`）。加载顺序和多重弹窗问题已解决。 |
+| **决策** | 拆分为目录 + `pipeline/` 子目录。`index.ts` 仅 206 行负责事件注册和管道组装。五层管道分层为 `pipeline/plan-gate.ts`、`pipeline/bash.ts`、`pipeline/permission.ts`，每层独立可测。配置加载整合到 `config.ts`，共享工具提取到 `utils.ts`。 |
 | **设计要点** | |
 | | 1. **三级安全预设**：`strict/standard/permissive` |
 | | 2. **沙箱仅在 strict 级别启用**（Landlock, Linux 5.13+） |
 | | 3. **审计日志统一**：单一 `security-audit.jsonl` |
 | | 4. **/security 命令**：运行时查看/切换安全级别 |
+| | 5. **管道可独立测试**：每层输入/输出明确定义，不依赖主入口 |
 
 ### 5. extensions/security-gate/command-taxonomy.ts
 
@@ -316,7 +317,7 @@
 |------|------|
 | **来源** | **mattpocock/skills** `skills/productivity/grill-plan/SKILL.md`（100%） |
 | **决策** | 作为 grilling 引擎的薄包装，完整保留其"Run a `/grilling` session"的委托模式。 |
-| **变更** | 删除 mattpocock 原版的 `argument-hint` frontmatter 字段（pi 标准不支持）→ 保留在正文。 |
+| **变更** | 删除 `argument-hint` frontmatter 字段（pi 将忽略未知 frontmatter 字段）。 |
 | **理由** | 包装器模式是正确的——grill-plan 是用户入口，grilling 是可复用引擎。 |
 
 ### 23. skills/workflows/grill-docs/SKILL.md
@@ -437,41 +438,41 @@
 |---|------|---------|----------|----------|
 | 1 | package.json | superpowers | mattpocock | 20% |
 | 2 | README.md | superpowers | bigpowers | 30% |
-| 3 | bootstrap.ts | superpowers | karpathy | 30% |
-| 4 | security-gate.ts | permission-system | cc-safety-net + hermes-memory + landstrip | 30% |
+| 3 | bootstrap.ts + principles.md | superpowers | karpathy | 30% |
+| 4 | security-gate/（目录+管道） | permission-system | cc-safety-net + hermes-memory + landstrip | 30% |
 | 5 | command-taxonomy.ts | 原创统一 | 上述所有 + phase.ts 模式库 | — |
-| 5 | engineering-principles | karpathy | — | 5% |
-| 6 | evidence-first | superpowers | — | 10% |
-| 7 | test-driven-development/SKILL.md | mattpocock | superpowers | 15% |
-| 8 | test-driven-development/tests.md | mattpocock | superpowers | 15% |
-| 9 | test-driven-development/mocking.md | mattpocock | superpowers | 20% |
-| 10 | code-review | mattpocock | — | 15% |
-| 11 | systematic-debugging | superpowers | mattpocock | 20% |
-| 12 | bug-diagnosis | mattpocock | — | 5% |
-| 13 | security-review | bigpowers | mattpocock | 20% |
-| 14 | code-audit | bigpowers | karpathy | 30% |
-| 15 | domain-modeling | mattpocock | — | 10% |
-| 16 | codebase-design | mattpocock | Ousterhout | 20% |
-| 17 | plan-writing | superpowers | mattpocock + bigpowers | 25% |
-| 18 | fix-validation | bigpowers | superpowers | 30% |
-| 19 | bug-investigation | bigpowers | mattpocock | 20% |
-| 20 | brainstorm | superpowers | mattpocock | 30% |
-| 21 | grilling | mattpocock | — | 0% |
-| 22 | grill-plan | mattpocock | — | 5% |
-| 23 | grill-docs | mattpocock | bigpowers | 30% |
-| 24 | improve-architecture | mattpocock | — | 15% |
-| 25 | implement-work | mattpocock | — | 10% |
-| 26 | survey-context | bigpowers | mattpocock | 20% |
-| 27 | handoff-session | mattpocock | superpowers | 20% |
-| 28 | draft-spec | mattpocock | — | 10% |
-| 29 | draft-tickets | mattpocock | — | 15% |
-| 30 | presets.json | permission-system | landstrip | 40% |
+| 6 | engineering-principles | karpathy | — | 5% |
+| 7 | evidence-first | superpowers | — | 10% |
+| 8 | test-driven-development/SKILL.md | mattpocock | superpowers | 15% |
+| 9 | test-driven-development/tests.md | mattpocock | superpowers | 15% |
+| 10 | test-driven-development/mocking.md | mattpocock | superpowers | 20% |
+| 11 | code-review | mattpocock | — | 15% |
+| 12 | systematic-debugging | superpowers | mattpocock | 20% |
+| 13 | bug-diagnosis | mattpocock | — | 5% |
+| 14 | security-review | bigpowers | mattpocock | 20% |
+| 15 | code-audit | bigpowers | karpathy | 30% |
+| 16 | domain-modeling | mattpocock | — | 10% |
+| 17 | codebase-design | mattpocock | Ousterhout | 20% |
+| 18 | plan-writing | superpowers | mattpocock + bigpowers | 25% |
+| 19 | fix-validation | bigpowers | superpowers | 30% |
+| 20 | bug-investigation | bigpowers | mattpocock | 20% |
+| 21 | brainstorm | superpowers | mattpocock | 30% |
+| 22 | grilling | mattpocock | — | 0% |
+| 23 | grill-plan | mattpocock | — | 5% |
+| 24 | grill-docs | mattpocock | bigpowers | 30% |
+| 25 | improve-architecture | mattpocock | — | 15% |
+| 26 | implement-work | mattpocock | — | 10% |
+| 27 | survey-context | bigpowers | mattpocock | 20% |
+| 28 | handoff-session | mattpocock | superpowers | 20% |
+| 29 | draft-spec | mattpocock | — | 10% |
+| 30 | draft-tickets | mattpocock | — | 15% |
+| 31 | presets.json | permission-system | landstrip | 40% |
 
 **各来源贡献占比（按产物数，含融合贡献）：**
-- mattpocock/skills：20/30（67%）— 最大贡献者
-- superpowers：12/30（40%）
-- bigpowers：8/30（27%）
-- karpathy：3/30（10%）
+- mattpocock/skills：20/31（65%）— 最大贡献者
+- superpowers：12/31（39%）
+- bigpowers：8/31（26%）
+- karpathy：3/31（10%）
 - 原创/其他：体现在每个文件的变更中
 
 ---

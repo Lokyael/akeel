@@ -2,7 +2,6 @@
 name: rollback-session
 description: Guide the user through rolling back unwanted changes — file snapshots first, then session tree branching. Use when the user says "undo", "rollback", "revert", "go back", or when the agent has made changes the user wants to discard.
 disable-model-invocation: true
-argument-hint: "What do you want to roll back? (leave empty for guidance)"
 ---
 
 # Rollback Session

@@ -15,6 +15,7 @@
 | 9 | 移除 npm / docs / AGENTS.md | 项目组织 |
 | 10 | Shell 文件写入绕过防护 | 安全架构 |
 | 11 | 统一命令分类体系（command-taxonomy.ts） | 代码架构 |
+| 12 | Pipeline 拆解与 Bootstrap 简化 | 代码架构 |
 
 ---
 
@@ -103,8 +104,8 @@
 | 维度 | 内容 |
 |------|------|
 | **问题** | `security-gate.ts` 是 902 行巨石文件，混合了类型定义、4 组模式库、3 组预设配置、配置加载、规则评估、shell 检测、审计——8 个独立关注点。 |
-| **决策** | 拆分为 `extensions/security-gate/` 目录下 8 个模块：`types.ts`、`patterns.ts`、`presets.ts`、`rules.ts`、`detection.ts`、`audit.ts`、`snapshots.ts`、`command-taxonomy.ts`。主入口 `index.ts` 仅 274 行，只负责事件注册和模块组装。 |
-| **理由** | 1. 关注点分离——每个模块可独立理解和测试。2. `presets.ts` 从 `config/presets.json` 动态加载，消除 267 行配置重复。3. `audit.ts` 感知 `PI_CODING_AGENT_DIR` 环境变量。4. `command-taxonomy.ts` 统一命令分类（见 ADR-011）。 |
+| **决策** | 拆分为 `extensions/security-gate/` 目录下模块 + `pipeline/` 子目录。预置加载整合到 `config.ts`。管道分层为 `pipeline/plan-gate.ts`、`pipeline/bash.ts`、`pipeline/permission.ts`，每层独立可测。主入口 `index.ts` 仅 206 行，只负责事件注册和管道组装。 |
+| **理由** | 1. 关注点分离——每个模块可独立理解和测试。2. `config.ts` 从 `config/presets.json` 动态加载 + deepMerge，消除 267 行配置重复。3. `audit.ts` 感知 `PI_CODING_AGENT_DIR` 环境变量。4. `command-taxonomy.ts` 统一命令分类（见 ADR-011）。5. `bootstrap.ts` 注入内容外化到 `principles.md`，非程序员可直接编辑。 |
 | **后果** | 模块可独立测试。 |
 
 ---
@@ -118,7 +119,7 @@
 | **问题** | git 只能回滚已提交的代码。AI 修改了一堆文件但还没 commit、生成错误配置文件、批量 sed 替换搞坏代码——这些场景 git 帮不上忙。 |
 | **决策** | 三层回滚体系：(1) 文件快照——`write`/`edit` 操作前自动备份到 `.pi-keel/snapshots/`，提供 `/rollback` 命令恢复；(2) 会话回退——`rollback-session` 技能引导用户使用 pi 的 `/tree`；(3) 审计追踪——`.pi-keel/audit.jsonl` 记录每次快照。 |
 | **理由** | pi-keel 定位为"防止 AI 走偏的龙骨"，回滚能力是龙骨的另一半——走偏了能拉回来。三层从轻到重覆盖所有回退场景。 |
-| **后果** | 新增 `snapshots.ts` 模块（197 行）和 `rollback-session` 工作流技能。`.pi-keel/` 加入 `.gitignore`。`/security status` 显示快照数量。 |
+| **后果** | 新增 `snapshots.ts` 模块（manifest.jsonl + UUID 备份文件）。后续重构：文件名编码改为 manifest 系统（消除 basename 碰撞），旧快照自动清除。`rollback-session` 工作流技能引导用户。`.pi-keel/` 加入 `.gitignore`。 |
 
 ---
 
@@ -162,6 +163,19 @@
 | | 3. **shell-write 路径提取**：`category: "shell-write"` 的规则附带 `extractPath` 函数，`detectShellFileWrite()` 从此派生。 |
 | | 4. **presets.json 不参与命令分类**：bash 权限完全由 taxonomy 控制，presets 仅管理路径保护和工具权限。 |
 | **理由** | 单一真相源消除漂移。新增命令只需 1 行 taxonomy 规则。 |
-| **后果** | `command-taxonomy.ts` 约 380 行，含 ~55 条 CMDS 规则 + ~8 条 PATTERNS + 2 条 FULL_COMMAND_PATTERNS。`phase.ts` 直接调用 `findRule()`，`detection.ts` 用于 shell-write 路径提取和威胁扫描。presets.json 不参与命令分类。 |
+| **后果** | `command-taxonomy.ts` 约 361 行，含 ~65 条 CMDS 规则 + ~8 条 PATTERNS + 2 条 FULL_COMMAND_PATTERNS。通过 `ro()`（options 对象）/`pkgRules()` 工厂消除只读命令和包管理器的重复定义。`phase.ts` 直接调用 `findRule()`，`detection.ts` 用于 shell-write 路径提取和威胁扫描。presets.json 不参与命令分类。 |
+
+---
+
+## ADR-012: Pipeline 拆解与 Bootstrap 简化
+
+**分类：** 代码架构
+
+| 维度 | 内容 |
+|------|------|
+| **问题** | (1) ADR-007 拆出的 `index.ts`（445 行）在后续演进中重新膨胀为 God Object，混合了配置加载、deepMerge、命令注册、5 层管道编排、bash 分段评估等 8 个关注点。(2) `bootstrap.ts` 注入状态机用 3 个变量（`needsInjection`、`injectedInTurn`、`currentTurn`）+ `agent_end` handler 跟踪注入状态，但实际语义只是"是否已注入"——1 个 boolean 就够。 |
+| **决策** | (1) 管道拆为 `pipeline/` 子目录，每层独立函数：`plan-gate.ts`（PLAN 门控）、`bash.ts`（bash 威胁→密钥→shell-write→分段评估）、`permission.ts`（路径保护→规则构建→用户确认）。`index.ts` 仅 206 行负责事件注册和管道组装。(2) 注入内容外化：`CORE_PRINCIPLES` 模板字面量（100+ 行）移至 `principles.md`，`readFileSync` 加载。(3) 状态机 3 变量 + 4 handler → 1 boolean + 3 handler，删除 `agent_end` handler。 |
+| **理由** | 1. 管道层独立可测——每层输入/输出明确定义，不依赖主入口。2. 内容外化——改原则不需改 TypeScript 源码。3. 状态机简化是严格等价变换：`bootstrapAlreadyPresent()` 阻止重复注入，`needsInjection` boolean 在 session_start/compact 时设为 true，首次 context 触发注入后设为 false，与旧逻辑无行为差异。 |
+| **后果** | 新增 `pipeline/` 目录（3 文件 272 行）、`config.ts`（78 行）、`utils.ts`（17 行）、`principles.md`（99 行）。删除 `presets.ts`（20 行）。规则构建逻辑从 `permission.ts` 收敛到 `rules.ts` 的 `buildRuleset()`。新增 `rules.test.ts`（35 条单元测试）覆盖之前仅通过端到端测试的模块。 |
 
 ---

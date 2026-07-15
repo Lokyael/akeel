@@ -3,7 +3,7 @@
  * Unified Rule model inspired by @gotgenes/pi-permission-system.
  */
 
-import type { PermissionAction, Rule } from "./types";
+import type { PermissionAction, Rule, SecurityConfig, SessionRule } from "./types";
 
 /**
  * Glob-to-regex matching. Supports * (any chars) and ? (single char).
@@ -21,6 +21,31 @@ export function wildcardMatch(pattern: string, value: string): boolean {
  * Evaluate permission for a (surface, value) pair against the composed ruleset.
  * Last matching rule wins. Semantic IDs are checked as a fallback dimension.
  */
+/** Build composed ruleset: default → path → tool-specific → session. */
+export function buildRuleset(
+  surface: string,
+  config: SecurityConfig,
+  sessionRules: SessionRule[],
+): Rule[] {
+  const rules: Rule[] = [];
+  rules.push({ surface: "*", pattern: "*", action: config.permission["*"], source: "default" });
+  for (const [pattern, action] of Object.entries(config.permission.path)) {
+    rules.push({ surface: "path", pattern, action, source: "config" });
+  }
+  if (["read", "write", "edit"].includes(surface)) {
+    const toolRules = config.permission[surface as "read" | "write" | "edit"];
+    if (typeof toolRules === "object" && !Array.isArray(toolRules)) {
+      for (const [pattern, action] of Object.entries(toolRules as Record<string, PermissionAction>)) {
+        rules.push({ surface, pattern, action, source: "config" });
+      }
+    } else if (typeof toolRules === "string") {
+      rules.push({ surface, pattern: "*", action: toolRules as PermissionAction, source: "config" });
+    }
+  }
+  for (const sr of sessionRules) rules.push(sr);
+  return rules;
+}
+
 export function evaluatePermission(
   surface: string,
   value: string,
