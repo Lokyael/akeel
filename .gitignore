@@ -1,0 +1,36 @@
+# Dependencies
+node_modules/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build artifacts
+dist/
+*.tsbuildinfo
+
+# Test artifacts
+coverage/
+.vitest/
+
+# Environment
+.env
+.env.*
+
+# Logs
+logs/
+*.log
+
+# Pi runtime artifacts
+.pi/
+.pi-keel/
+
+# Local development (not pushed)
+AGENTS.md
