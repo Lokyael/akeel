@@ -9,45 +9,76 @@
  */
 
 import { readFileSync, readdirSync, existsSync, statSync } from "node:fs";
-import { join, basename } from "node:path";
+import { join } from "node:path";
+import { parseDocument } from "yaml";
 
 const SKILLS_ROOT = join(import.meta.dirname!, "..", "skills");
+const SKILL_LAYERS = ["foundations", "disciplines", "workflows"] as const;
+
+interface FrontmatterResult {
+  values: Record<string, unknown>;
+  error?: string;
+}
 
 interface SkillMeta {
-  /** Full path to SKILL.md */
-  filePath: string;
   /** Directory name (e.g. "codebase-design") */
   dirName: string;
   /** Layer: foundations, disciplines, or workflows */
   layer: string;
+  /** Frontmatter parsing error, if present */
+  frontmatterError?: string;
   /** Parsed frontmatter name */
   name: string;
   /** Parsed frontmatter description */
   description: string;
+  /** Complete SKILL.md content */
+  content: string;
   /** SKILL.md line count */
   lineCount: number;
 }
 
 // ─── Frontmatter parser ───
 
-function parseFrontmatter(content: string): Record<string, string> {
-  const match = content.match(/^---\n([\s\S]*?)\n---/);
-  if (!match) return {};
-  const result: Record<string, string> = {};
-  for (const line of match[1].split("\n")) {
-    const kv = line.match(/^(\w[\w-]*):\s*(.*)$/);
-    if (kv) result[kv[1]] = kv[2].trim();
+function parseFrontmatter(content: string): FrontmatterResult {
+  const lines = content.split(/\r?\n/);
+  const opening = lines[0]?.replace(/^\uFEFF/, "");
+  if (opening !== "---") {
+    return { values: {}, error: 'missing opening "---" delimiter' };
   }
-  return result;
+
+  const closingIndex = lines.findIndex(
+    (line, index) => index > 0 && (line === "---" || line === "..."),
+  );
+  if (closingIndex === -1) {
+    return { values: {}, error: 'missing closing "---" delimiter' };
+  }
+
+  try {
+    const document = parseDocument(lines.slice(1, closingIndex).join("\n"));
+    if (document.errors.length > 0) {
+      return { values: {}, error: document.errors[0].message };
+    }
+
+    const value = document.toJSON();
+    if (!value || typeof value !== "object" || Array.isArray(value)) {
+      return { values: {}, error: "frontmatter must be a YAML mapping" };
+    }
+
+    return { values: value as Record<string, unknown> };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return { values: {}, error: `unable to parse YAML: ${message}` };
+  }
 }
 
 // ─── Collect all SKILL.md files ───
 
 function collectSkills(): SkillMeta[] {
   const skills: SkillMeta[] = [];
-  for (const layer of ["foundations", "disciplines", "workflows"]) {
+  for (const layer of SKILL_LAYERS) {
     const layerDir = join(SKILLS_ROOT, layer);
     if (!existsSync(layerDir)) continue;
+
     for (const entry of readdirSync(layerDir)) {
       const entryPath = join(layerDir, entry);
       if (!statSync(entryPath).isDirectory()) continue;
@@ -56,15 +87,19 @@ function collectSkills(): SkillMeta[] {
         console.warn(`⚠ MISSING: ${skillFile} — no SKILL.md in skill directory`);
         continue;
       }
+
       const content = readFileSync(skillFile, "utf-8");
       const fm = parseFrontmatter(content);
+      const name = fm.values["name"];
+      const description = fm.values["description"];
       skills.push({
-        filePath: skillFile,
         dirName: entry,
         layer,
-        name: fm["name"] || "",
-        description: fm["description"] || "",
-        lineCount: content.split("\n").length,
+        frontmatterError: fm.error,
+        name: typeof name === "string" ? name : "",
+        description: typeof description === "string" ? description : "",
+        content,
+        lineCount: content.split(/\r?\n/).length,
       });
     }
   }
@@ -79,9 +114,20 @@ interface CheckResult {
   errors: string[];
 }
 
+function checkFrontmatter(skill: SkillMeta): CheckResult {
+  if (!skill.frontmatterError) return { pass: true, warnings: [], errors: [] };
+  return {
+    pass: false,
+    warnings: [],
+    errors: [`invalid frontmatter: ${skill.frontmatterError}`],
+  };
+}
+
 function checkDescriptionConvention(skill: SkillMeta): CheckResult {
   const errors: string[] = [];
   const warnings: string[] = [];
+
+  if (skill.frontmatterError) return { pass: true, warnings, errors };
 
   if (!skill.description) {
     errors.push(`missing description — all skills MUST have a description in frontmatter`);
@@ -115,6 +161,8 @@ function checkNameConsistency(skill: SkillMeta): CheckResult {
   const errors: string[] = [];
   const warnings: string[] = [];
 
+  if (skill.frontmatterError) return { pass: true, warnings, errors };
+
   if (!skill.name) {
     errors.push(`missing "name" in frontmatter — every SKILL.md must have a name field`);
     return { pass: false, warnings, errors };
@@ -143,11 +191,10 @@ function checkLineCount(skill: SkillMeta): CheckResult {
 
 function checkExternalUrls(skill: SkillMeta): CheckResult {
   const warnings: string[] = [];
-  const content = readFileSync(skill.filePath, "utf-8");
 
   // Match http:// or https:// URLs that look like CDN or external resource loads
   const urlPattern = /https?:\/\/(?:unpkg|cdn|jsdelivr|esm\.sh|skypack|cdnjs)\./gi;
-  const matches = content.match(urlPattern);
+  const matches = skill.content.match(urlPattern);
   if (matches && matches.length > 0) {
     warnings.push(
       `Found ${matches.length} CDN/external URL reference(s). Skills should not depend on external CDN resources.`
@@ -169,6 +216,7 @@ function main() {
   for (const skill of skills) {
     const label = `[${skill.layer}/${skill.dirName}]`;
     const checks = [
+      checkFrontmatter(skill),
       checkDescriptionConvention(skill),
       checkNameConsistency(skill),
       checkLineCount(skill),

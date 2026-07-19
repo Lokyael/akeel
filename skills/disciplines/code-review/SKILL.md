@@ -1,6 +1,6 @@
 ---
 name: code-review
-description: Use when the user wants to review a branch, a PR, work-in-progress changes, or asks to "review since X" — two-axis parallel review: Standards (conventions?) and Spec (requirements?).
+description: 'Use when the user wants to review a branch, a PR, work-in-progress changes, or asks to "review since X" — two-axis parallel review: Standards (conventions?) and Spec (requirements?).'
 ---
 
 # Code Review

@@ -1,6 +1,6 @@
 ---
 name: systematic-debugging
-description: Use when encountering any bug, test failure, or unexpected behavior, before proposing fixes — 4-phase root cause analysis: reproduce → pattern → hypothesis → implementation.
+description: 'Use when encountering any bug, test failure, or unexpected behavior, before proposing fixes — 4-phase root cause analysis: reproduce → pattern → hypothesis → implementation.'
 ---
 
 # Systematic Debugging
