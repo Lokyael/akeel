@@ -1,6 +1,6 @@
 ---
 name: fix-validation
-description: Prove a fix works before declaring done by re-running the failing test, running the full test suite, and checking for regressions. Use after fixing a bug or implementing a feature, before code-review.
+description: Use after fixing a bug or implementing a feature, before code-review — prove the fix works with fresh evidence: re-run failing test, full suite, check regressions.
 ---
 
 # Validate Fix

@@ -12,15 +12,16 @@ Verify with `/security status`. No configuration required — principles and sec
 
 ```
 pi 启动
-  ├─ bootstrap.ts 注入 engineering-principles + evidence-first
+  ├─ src/bootstrap/index.ts 注入 engineering-principles + evidence-first
   │   成为系统提示词的一部分，始终可见。compaction 后自动重新注入。
   │
-  ├─ command-taxonomy.ts 统一命令分类体系
-  │   phase.ts（PLAN 门控）和 detection.ts（威胁/shell-write）从此派生。
-  │   加一条规则即可控制所有模式行为，无需多处同步。
+  ├─ taxonomy/ 统一受限 shell 词法和命令分类
+  │   taxonomy/index.ts 是公共入口，commands.ts 是规则数据唯一来源。
+  │   pipeline/plan-gate.ts（PLAN 门控）和 pipeline/bash.ts（BUILD 评估）从此派生。
+  │   literal read/write intent 进入统一 policy/path.ts。
   │
-  ├─ security-gate/index.ts 五层拦截管道
-  │   PLAN 门控 → 威胁扫描 → 密钥扫描 → shell-write 检测 → 权限评估
+  ├─ security-gate/index.ts 分层拦截管道
+  │   PLAN 门控 → critical/threat 扫描 → shell/path policy → 权限评估
   │
   ├─ skills/disciplines/ 的 name + description 出现在 <available_skills>
   │   模型根据任务自动匹配，通过 read 工具加载完整 SKILL.md。
@@ -68,22 +69,21 @@ pi 启动
 | `handoff-session` | Handing work to a fresh session — compact conversation to handoff doc |
 | `draft-spec` | Turn conversation into formal spec |
 | `draft-tickets` | Break spec into independent, tracer-bullet tickets |
-| `rollback-session` | Undoing unwanted changes — file snapshots, then session tree |
+| `rollback-session` | Recovering unwanted changes — version control and session tree; no automatic file snapshots |
 
 ## Security
 
 ### Levels
 
-| Level | Sandbox | Semantic Analysis | Permission | Content Scan |
-|-------|---------|-------------------|------------|--------------|
-| `strict` | ✅ Landlock | ✅ All rules | `*` = ask | ✅ |
-| `standard` | — | ✅ Critical | `*` = ask | ✅ |
-| `permissive` | — | — | `*` = allow | — |
+| Level | Semantic analysis | Permission |
+|-------|-------------------|------------|
+| `strict` | all hard boundaries + configured rules | `*` = ask |
+| `standard` | all hard boundaries + configured rules | `*` = ask |
+| `permissive` | critical/hard boundaries remain | `*` = allow |
 
 ```bash
 /security status              # View current config
 /security level standard      # Switch level
-/security sandbox on          # Toggle sandbox
 ```
 
 ### Configuration
@@ -93,7 +93,7 @@ Global:  ~/.pi/agent/extensions/security-gate/config.json
 Project: .pi/extensions/security-gate/config.json
 ```
 
-See [config/presets.json](config/presets.json) for full examples. Project config overrides global.
+See [src/security-gate/config/presets.json](src/security-gate/config/presets.json) for full examples. Project config overrides global. Unknown top-level configuration fields are rejected.
 
 ### What Gets Blocked
 
@@ -103,32 +103,35 @@ Standard adds: `git push --force`, `git reset --hard`, `git clean -f`, `sudo *`,
 
 Shell bypasses (`sed -i .env`, `echo > .env`, `tee .env`, `cp /tmp/x .env`) are detected and blocked.
 
-See `config/presets.json` — the single source of truth for all protected paths and security levels.
+See `src/security-gate/config/presets.json` — the single source of truth for all protected paths and security levels.
+
+### Session And Authorization
+
+PLAN/BUILD mode belongs to the current `securityGate(pi)` extension instance. A new session or session replacement resets the controller to PLAN; `session_tree` keeps the current mode because it remains the same extension instance. Headless `/plan` and `/build` commands do not change mode.
+
+Permission prompts offer only `Allow once` and `Deny`. There is no session-wide allow, and a prior PLAN decision is never reused by BUILD. Critical taxonomy rules, unsafe syntax, dynamic execution, unknown commands, and immutable path denials cannot be bypassed by configuration allow or one-time approval.
+
+`/security status` reports the active command/path policy. Pi-keel does not provide or install a sandbox, Landlock, seccomp, network namespace, or other kernel-level isolation.
 
 ### Testing
 
 ```bash
-# Command classification
-npx tsx extensions/security-gate/taxonomy.test.ts  # 1134 tests
-npx tsx extensions/security-gate/gate.test.ts       # 39 tests
-npx tsx extensions/security-gate/rules.test.ts      # 35 tests
-npx tsx extensions/security-gate/snapshots.test.ts  # 32 tests
+npm test
 
-# Security gate end-to-end
-npx tsx extensions/security-gate/gate.test.ts       # 39 tests
+npx tsx tests/security-gate/taxonomy.test.ts        # 1192 assertions
+npx tsx tests/security-gate/plan-gate.test.ts       # 30 assertions
+npx tsx tests/security-gate/permission-engine.test.ts # 33 assertions
+npx tsx tests/security-gate/tool-gate.test.ts       # 22 assertions
+npx tsx tests/security-gate/path.test.ts            # 23 assertions
+npx tsx tests/security-gate/config.test.ts          # 15 assertions
+npx tsx tests/security-gate/phase.test.ts           # 5 assertions
+npx tsx tests/security-gate/index.test.ts           # 5 assertions
+npx tsx tests/security-gate/integration.test.ts     # 6 assertions
 ```
 
-### Rollback
+### Recovery
 
-Every `write`/`edit` is automatically backed up to `.pi-keel/snapshots/`.
-
-```bash
-/rollback              # List snapshots
-/rollback undo         # Restore most recent
-/rollback undo file    # Restore specific file
-/rollback undo 3       # Restore last 3 files
-/rollback clean        # Clear all
-```
+pi-keel no longer creates, reads, restores, manages, or cleans up snapshots and does not register `/rollback`. Existing `.pi-keel/snapshots/` data is not a recovery source and is left untouched. Use version control, editor history, or pi's `/tree` for recovery.
 
 ## Common Workflows
 
@@ -138,7 +141,7 @@ Every `write`/`edit` is automatically backed up to `.pi-keel/snapshots/`.
 /skill:survey-context        → assess project state
 /skill:brainstorm-design     → design with HARD-GATE
 /skill:plan-writing          → implementation plan
-/skill:implement-work        → TDD → audit → review
+/skill:implement-work        → TDD → code-audit → code-review
 ```
 
 ### Bug Fix
@@ -155,14 +158,6 @@ Every `write`/`edit` is automatically backed up to `.pi-keel/snapshots/`.
 ```
 /skill:code-review           → two-axis review
 /skill:security-review       → if touching auth/data/API
-```
-
-### Rollback
-
-```
-/rollback                    → what was changed?
-/rollback undo               → restore last change
-/skill:rollback-session      → if conversation is also off-track
 ```
 
 ### Handoff
@@ -191,4 +186,4 @@ Try `/skill:survey-context` first — it will recommend the right next step. You
 
 ### How do I add project-specific security rules?
 
-Copy the relevant section from `config/presets.json` to `.pi/extensions/security-gate/config.json` and customize. Project config merges over global.
+Copy the relevant section from `src/security-gate/config/presets.json` to `.pi/extensions/security-gate/config.json` and customize. Project config merges over global.

@@ -2,13 +2,19 @@
   "name": "pi-keel",
   "description": "Engineering skills and security system for pi — the keel that keeps AI coding steady",
   "license": "MIT",
+  "type": "module",
   "scripts": {
-    "test": "npx tsx extensions/security-gate/taxonomy.test.ts && npx tsx extensions/security-gate/gate.test.ts && npx tsx extensions/security-gate/rules.test.ts && npx tsx extensions/security-gate/snapshots.test.ts"
+    "test": "npx tsx scripts/validate-skills.ts && npx tsc --noEmit && npx tsx tests/security-gate/taxonomy.test.ts && npx tsx tests/security-gate/plan-gate.test.ts && npx tsx tests/security-gate/permission-engine.test.ts && npx tsx tests/security-gate/tool-gate.test.ts && npx tsx tests/security-gate/path.test.ts && npx tsx tests/security-gate/config.test.ts && npx tsx tests/security-gate/phase.test.ts && npx tsx tests/security-gate/index.test.ts && npx tsx tests/security-gate/integration.test.ts"
+  },
+  "devDependencies": {
+    "@types/node": "24.12.4",
+    "tsx": "4.23.1",
+    "typescript": "5.9.3"
   },
   "pi": {
     "extensions": [
-      "./extensions/bootstrap.ts",
-      "./extensions/security-gate"
+      "./src/bootstrap/index.ts",
+      "./src/security-gate"
     ],
     "skills": [
       "./skills/foundations",

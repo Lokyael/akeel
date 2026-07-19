@@ -8,7 +8,9 @@ disable-model-invocation: true
 
 If you are still in PLAN mode, tell the user: "Run /build to switch to BUILD mode first." Do not proceed until build mode is active.
 
-Implement the work described by the user in the spec or tickets.
+## Process
+
+**Lifecycle:** When starting, update artifact status `draft` → `in-progress`. When done, `in-progress` → `done`. Per principles.md Quick Reference — Artifact Status Transitions. If no artifact file is found, ask: "Where is the plan/spec/tickets file, or describe the work."
 
 Use `/skill:test-driven-development` where possible, at pre-agreed seams (confirm seams with the user before writing tests).
 

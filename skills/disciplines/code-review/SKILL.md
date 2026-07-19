@@ -1,6 +1,6 @@
 ---
 name: code-review
-description: Review changes along two axes — Standards (does the code follow conventions?) and Spec (does the code match the requirements?). Runs both reviews as parallel analyses and reports side by side. Use when the user wants to review a branch, a PR, work-in-progress changes, or asks to "review since X".
+description: Use when the user wants to review a branch, a PR, work-in-progress changes, or asks to "review since X" — two-axis parallel review: Standards (conventions?) and Spec (requirements?).
 ---
 
 # Code Review

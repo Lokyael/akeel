@@ -1,6 +1,6 @@
 ---
 name: codebase-design
-description: Shared discipline and vocabulary for designing deep modules — a lot of behaviour behind a small interface, placed at a clean seam, testable through that interface. Use when designing new modules or evaluating existing architecture.
+description: Use when designing new modules or evaluating existing architecture — deep module vocabulary (depth, leverage, locality, seam) with Design Twice comparison.
 ---
 
 # Codebase Design
@@ -35,6 +35,20 @@ If you can't test a module through its public interface, the interface is wrong.
 ### "One Adapter = Hypothetical, Two = Real"
 
 A seam you design for but only use once is speculative. Wait for the second adapter before extracting.
+
+## Design Twice
+
+Before settling on a module interface, sketch 2–3 distinct alternatives. The first feasible design anchors your thinking — force yourself past it.
+
+For each alternative, ask:
+
+| Dimension | Question |
+|-----------|----------|
+| **Depth** | How much behaviour sits behind how small an interface? Deeper = better. |
+| **Leverage** | If this interface changes slightly, how much of the system changes with it? Higher = better. |
+| **Locality** | Are the things that change together located together? Closer = better. |
+
+Pick the alternative with the deepest interface, highest leverage, and tightest locality. The first design you thought of rarely wins.
 
 ## Designing a Deep Module
 

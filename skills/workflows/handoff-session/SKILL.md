@@ -18,7 +18,7 @@ Include:
 
 ## What NOT to Include
 
-- Content already captured in other artifacts (specs, plans, ADRs, tickets, commits). Reference them by path instead.
+- Content already captured in other artifacts (specs, plans, ADRs, tickets, commits). Reference them by path.
 - Sensitive information: API keys, passwords, tokens, personally identifiable information.
 
 ## How to Use

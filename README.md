@@ -2,7 +2,7 @@
 
 Engineering skills and security system for [pi](https://pi.dev) — the keel that keeps AI coding steady.
 
-Pi Keel fuses the best practices from four leading agent-skills communities into a single `pi install`: behavioral principles, engineering disciplines, orchestration workflows, and a 5-layer security gate.
+Pi Keel fuses the best practices from four leading agent-skills communities into a single `pi install`: behavioral principles, engineering disciplines, orchestration workflows, and a layered security gate. The gate is policy enforcement in the extension; it does not install an OS-level sandbox.
 
 ## Install
 
@@ -17,17 +17,19 @@ Principles and security activate automatically. Skills load on-demand. No config
 - **2 foundations** — always-on behavioral principles (think first, simplicity, surgical changes, goal-driven, verify before claiming, keep docs in sync)
 - **12 disciplines** — auto-matched engineering practices (TDD, code review, debugging, security review, domain modeling, planning, doc sync)
 - **10 workflows** — user-invoked orchestration (brainstorming, grilling, implementing, rollback, handoff)
-- **5-layer security** — PLAN mode gate, threat scan, secret scan, shell-write detection, path protection (22 deny patterns)
-- **Rollback system** — automatic file snapshots before every write/edit, recoverable via `/rollback`
-- **Test coverage** — 1,134 taxonomy + 39 gate + 35 rules + 32 snapshots = 1,240 tests
+- **Security gate** — PLAN/BUILD shell policy, threat scan, shell-write and literal-read path policy, permission evaluation, canonical file path protection
+- **Session-safe authorization** — PLAN/BUILD mode is owned per extension instance; new sessions start in PLAN and approvals are `Allow once` only
+- **Recovery boundary** — no automatic file snapshots or `/rollback`; use version control, editor history, or pi session-tree recovery. Existing legacy snapshot data is never read or deleted by pi-keel.
+- **Test coverage** — 1,192 taxonomy + 30 plan-gate + 33 permission-engine + 22 tool-gate + 23 path + 15 config + 5 phase + 5 index + 6 integration = 1,331 security assertions + skill validation gate
 
 ## Documentation
 
 | Document | For |
 |----------|-----|
 | [USAGE.md](USAGE.md) | How to use every skill, configure security, and run common workflows |
-| [ADR.md](ADR.md) | Why pi-keel is built the way it is — 11 architecture decision records |
-| [TRACEABILITY.md](TRACEABILITY.md) | Where every artifact came from — community sources and adaptation notes |
+| [docs/adr/INDEX.md](docs/adr/INDEX.md) | Why pi-keel is built the way it is — 13 current architecture decision records |
+| [docs/traceability.md](docs/traceability.md) | Main community sources and adaptation decisions |
+| [docs/security-boundaries.md](docs/security-boundaries.md) | Security boundaries recorded outside the implementation plan |
 
 ## License
 

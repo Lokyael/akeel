@@ -1,6 +1,6 @@
 ---
 name: test-driven-development
-description: Test-driven development with red-green-refactor loop. Use when implementing any feature or bugfix before writing implementation code. Use when the user mentions "test-first", "tdd", "red-green", or asks for integration tests.
+description: Use when implementing any feature or bugfix before writing implementation code, or when the user mentions "test-first", "tdd", "red-green", or asks for integration tests — red-green-refactor loop with seams.
 ---
 
 # Test-Driven Development

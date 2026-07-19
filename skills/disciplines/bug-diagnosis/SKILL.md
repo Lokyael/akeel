@@ -1,6 +1,6 @@
 ---
 name: bug-diagnosis
-description: Build a tight feedback loop for hard bugs and performance regressions before investigating. Use when the user says "diagnose", "debug this", or reports something broken/throwing/failing/slow. Distinct from systematic-debugging which focuses on root cause analysis; this skill focuses on constructing testable feedback loops for hard or intermittent bugs.
+description: Use when the user says "diagnose", "debug this", or reports something broken/throwing/failing/slow — build a tight feedback loop for hard bugs before investigating. Distinct from systematic-debugging which focuses on root cause analysis.
 ---
 
 # Diagnosing Bugs

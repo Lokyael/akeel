@@ -1,6 +1,6 @@
 ---
 name: security-review
-description: AI-powered security analysis of code changes — traces data flow, detects injection, auth bypass, secrets exposure, and unsafe deserialization. Use when reviewing pending changes, before merge, during verify-work, or when the user says "security review" or "scan for vulns".
+description: Use when reviewing pending changes, before merge, during verify-work, or when the user says "security review" or "scan for vulns" — AI-powered 5-phase CWE-mapped security scan.
 ---
 
 # Security Review

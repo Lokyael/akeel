@@ -18,11 +18,11 @@ Every project goes through this process. "Simple" projects are where unexamined 
 
 ## Process
 
-1. **Explore project context** — check files, docs, recent commits
+1. **Explore project context** — read CONTEXT.md if it exists (Glossary, Negative Space), then check docs, recent commits
 2. **Ask clarifying questions** — one at a time, understand purpose/constraints/success criteria. Prefer multiple choice when possible. One question per message.
-3. **Propose 2-3 approaches** — with trade-offs and your recommendation. Lead with your recommended option and explain why.
-4. **Present design** — in sections scaled to their complexity, get user approval after each section. Cover: architecture, components, data flow, error handling, testing.
-5. **Write design doc** — save to `docs/designs/YYYY-MM-DD-<topic>-design.md` and commit.
+3. **Propose 2-3 approaches** — with trade-offs and your recommendation. For interface-level design, apply Design Twice from codebase-design. Lead with your recommended option and explain why.
+4. **Present design** — in sections scaled to their complexity, get user approval after each section. Cover: architecture, components, data flow, error handling, testing, and Out of Scope (principles.md §7 format).
+5. **Write design doc** — save to `docs/designs/YYYY-MM-DD-<topic>-design.md`. Include Out of Scope.
 6. **Spec self-review** — quick check for placeholders, contradictions, ambiguity. Fix inline.
 7. **User reviews spec** — ask user to review before proceeding.
 

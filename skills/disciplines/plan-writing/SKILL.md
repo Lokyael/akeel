@@ -1,6 +1,6 @@
 ---
 name: plan-writing
-description: Write implementation plans with bite-sized tasks (2-5 min each), exact file paths, and complete code in every step. Use when you have a spec or requirements for a multi-step task, before touching code.
+description: Use when you have a spec or requirements for a multi-step task, before touching code — bite-sized tasks (2-5 min each), exact file paths, complete code in every step.
 ---
 
 # Writing Plans
@@ -16,18 +16,19 @@ Every plan MUST start with:
 ```markdown
 # [Feature Name] Implementation Plan
 
+**Status:** draft
 **Goal:** [One sentence]
 
 **Architecture:** [2-3 sentences about approach]
 
 **Tech Stack:** [Key technologies]
 
-## Global Constraints
-
-[Project-wide requirements — version floors, naming rules, platform requirements — one line each.]
-
----
+**Out of Scope:** (per principles.md §7 — what + why not now + revisit when. Omit if nothing.)
 ```
+
+Status transitions and lifecycle: per principles.md Quick Reference — Artifact Status Transitions.
+
+## Global Constraints
 
 ## Task Right-Sizing
 

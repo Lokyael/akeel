@@ -1,6 +1,6 @@
 ---
 name: bug-investigation
-description: Investigate a bug by exploring the codebase to find root cause, then write a bug file with reproduction steps, evidence, and hypotheses. Use when the user reports a bug, something is broken but root cause is unknown, or to start the debugging workflow.
+description: Use when the user reports a bug, something is broken but root cause is unknown, or to start the debugging workflow — explore codebase, then write a bug file with reproduction steps, evidence, and hypotheses.
 ---
 
 # Investigate Bug

@@ -1,6 +1,6 @@
 ---
 name: code-audit
-description: Self-review checklist checking conventions compliance, Boy Scout Rule, test coverage, types, SOLID, and agent readability. Use before code-review, before committing, or when the user asks for a code quality check.
+description: Use before code-review, before committing, or when the user asks for a code quality check — self-review checklist covering conventions, Boy Scout Rule, test coverage, types, SOLID, and agent readability.
 ---
 
 # Audit Code

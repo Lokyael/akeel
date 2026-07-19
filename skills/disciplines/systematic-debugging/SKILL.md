@@ -1,6 +1,6 @@
 ---
 name: systematic-debugging
-description: "Four-phase root cause analysis process: reproduce → pattern → hypothesis → implementation. Use when encountering any bug, test failure, or unexpected behavior, before proposing fixes."
+description: Use when encountering any bug, test failure, or unexpected behavior, before proposing fixes — 4-phase root cause analysis: reproduce → pattern → hypothesis → implementation.
 ---
 
 # Systematic Debugging

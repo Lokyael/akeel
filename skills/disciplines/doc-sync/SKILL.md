@@ -1,6 +1,6 @@
 ---
 name: doc-sync
-description: After code changes, verify all project docs for stale info — outdated counts, broken references, mismatched architecture. Use after implementing features or refactoring, before declaring completion.
+description: Use after implementing features or refactoring, before declaring completion — verify all project docs for stale counts, broken references, and outdated architecture.
 ---
 
 # Documentation Synchronization
@@ -15,7 +15,7 @@ Activate automatically after:
 - Adding/removing rules, tests, or configurations
 - Any change that alters what README/USAGE/ADRs describe
 
-## The 3-Step Check
+## The 4-Step Check
 
 ### Step 1: Identify Affected Docs
 
@@ -24,6 +24,10 @@ Scan the project root for documentation markers. Common files:
 | File | Contains | Stale When |
 |------|----------|------------|
 | Actual doc files in project | Features, counts, architecture, guides, conventions | Code changes that alter what the docs describe |
+
+Also scan `docs/plans/` and `docs/specs/` for artifacts with stale status:
+- Plan marked `done` but code was refactored afterward → update status or add note
+- Spec marked `implemented` but new requirements were added → update status to `draft` and flag
 
 ### Step 2: Verify Each Against Code
 
@@ -34,6 +38,7 @@ For each identified doc, verify:
 3. **Commands**: all listed commands still exist
 4. **References**: cross-references to other docs/files resolve
 5. **Examples**: code examples still work with current API
+6. **Artifact statuses**: plan/spec status fields match reality — if a plan says `done` but code was refactored, the plan is stale
 
 ### Step 3: Fix or Flag
 

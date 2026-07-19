@@ -1,6 +1,6 @@
 ---
 name: domain-modeling
-description: Build and sharpen a project's domain model. Challenge terms against the glossary, stress-test with edge-case scenarios, and update CONTEXT.md and ADRs inline as decisions crystallise. Use when the user wants to pin down domain terminology or record an architectural decision.
+description: Use when the user wants to pin down domain terminology or record an architectural decision — challenge terms against glossary, stress-test with edge cases, update CONTEXT.md and ADRs inline.
 ---
 
 # Domain Modeling
@@ -43,16 +43,15 @@ When the user states how something works, check whether the code agrees. If you 
 
 ### Update CONTEXT.md Inline
 
-When a term crystallises, add it to `CONTEXT.md` immediately. The format:
-```markdown
-## Glossary
-- **Cancellation** — ...
-- **Materialization** — ...
-```
+When a term crystallises, add it to `CONTEXT.md` immediately. The canonical structure
+is in principles.md Quick Reference — User-Project CONTEXT.md Structure.
+Build sections lazily: Glossary → ADR Index → Negative Space.
 
 ### Create ADRs for Load-Bearing Decisions
 
-When a decision is hard, contentious, or likely needed by future explorers, offer: "Want me to record this as an ADR?" Only for decisions a future developer would need to understand. Self-evident choices don't need ADRs.
+Offer: "Want me to record this as an ADR?" for hard, contentious, or
+future-explorer-relevant decisions. Every ADR must include an Out of Scope row
+(principles.md §7 format). If nothing is excluded, omit the row.
 
 ## Integration
 
