@@ -71,14 +71,16 @@ function truncatePlain(text: string, width: number): string {
   return `${text.slice(0, width - 3)}...`;
 }
 
-function appendRight(text: string, right: string, width: number): string {
-  if (right.length >= width) return truncatePlain(right, width);
-  const leftWidth = width - right.length - 2;
-  if (visibleWidth(text) <= leftWidth) {
-    return `${text}${" ".repeat(width - visibleWidth(text) - right.length)}${right}`;
+export function appendRight(text: string, right: string, width: number): string {
+  const rightWidth = visibleWidth(right);
+  if (rightWidth >= width) return truncatePlain(stripAnsi(right), width);
+  const leftWidth = width - rightWidth - 2;
+  const textWidth = visibleWidth(text);
+  if (textWidth <= leftWidth) {
+    return `${text}${" ".repeat(width - textWidth - rightWidth)}${right}`;
   }
   const left = truncatePlain(stripAnsi(text), leftWidth);
-  return `${left}${" ".repeat(Math.max(0, width - left.length - right.length))}${right}`;
+  return `${left}${" ".repeat(Math.max(0, width - left.length - rightWidth))}${right}`;
 }
 
 function collapseNativeFooterLines(lines: string[], width: number): string[] {

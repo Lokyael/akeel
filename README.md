@@ -20,7 +20,7 @@ Principles and the access gate activate automatically. Skills load on demand.
 - **Access profiles** — composable read/write path rules, Shell command decisions, one-time approval, hard protected paths, and threat scanning
 - **Session-safe authorization** — each Session starts from the configured default Profile; approvals are `Allow once` only
 - **Recovery boundary** — no automatic snapshots or rollback extension; use version control, editor history, or pi's session tree
-- **Test coverage** — 24 skill validations and 145 access-gate assertions（Profile 5 + 路径 4 + 加载 4 + Gate 13 + Shell IR 54 + control-flow 21 + adapters 40 + 集成 2 + Footer 2）
+- **Test coverage** — 24 skill validations and 146 access-gate assertions（Profile 5 + 路径 4 + 加载 4 + Gate 13 + Shell IR 54 + control-flow 21 + adapters 40 + 集成 2 + Footer 3）
 
 ## Access Gate
 

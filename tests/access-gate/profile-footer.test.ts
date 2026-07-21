@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { renderProfileFooter, type FooterSnapshot } from "../../src/access-gate/ui/profile-footer";
+import { appendRight, renderProfileFooter, type FooterSnapshot } from "../../src/access-gate/ui/profile-footer";
 
 const snapshot: FooterSnapshot = {
   cwd: "~/workspace/pi-skills",
@@ -23,6 +23,14 @@ test("renders the complete bottom UI as exactly two lines", () => {
   assert.doesNotMatch(lines[0]!, /Profile:/);
   assert.match(lines[1]!, /↑480k/);
   assert.match(lines[1]!, /gpt-5.6-luna • high$/);
+});
+
+test("right-aligns Profile after stripping ANSI styling codes from width calculations", () => {
+  const line = appendRight("location", "\u001b[2mproject-write\u001b[0m", 40);
+
+  assert.equal(line.length, 40 + 8);
+  assert.equal(line.endsWith("\u001b[2mproject-write\u001b[0m"), true);
+  assert.equal(line.indexOf("\u001b[2mproject-write"), 40 - "project-write".length);
 });
 
 test("truncates both rows without allowing content to overlap", () => {
