@@ -207,6 +207,10 @@ When a task reaches `verified`, update `CONTEXT.md` and `docs/decisions.md` when
 
 `survey-context` reads only `CONTEXT.md`, `docs/decisions.md`, `docs/task.md`, and `docs/task-*.md`. It does not scan legacy or type-specific artifact paths.
 
+### Temporary Resources
+
+When your active Profile permits, use `/tmp/pi-work/` to download and inspect external repositories, documentation, or reference code. Create the directory if it doesn't exist. Remove resources when inspection is complete; do not leave stale downloads in `/tmp/pi-work/`.
+
 ### User-Project CONTEXT.md Structure
 
 ```
