@@ -45,7 +45,7 @@ Built-in Profiles:
 | `file-read` | Read explicitly targeted project files; no listing, search, writes, or unclassified Shell commands |
 | `project-read` | Read and search `projectRoot`; no writes or unclassified Shell commands |
 | `research` | Read `projectRoot` and the temporary staging directory; unclassified commands require approval |
-| `plan` | Read and search the project; write only `docs/`, `specs/`, root `CONTEXT.md`, and `.pi-keel/` |
+| `plan` | Read and search the project; write only `docs/` and root `CONTEXT.md` |
 | `safe-write` | Write only configured source and test paths |
 | `project-write` | Write project files; known mutations are allowed, unclassified commands ask |
 | `guarded-write` | Write project files; every known mutation requires one-time approval |
@@ -83,7 +83,7 @@ Example:
   "defaultProfile": "plan-research",
   "profiles": {
     "plan-research": {
-      "description": "Write plan documents and approve unclassified research commands.",
+      "description": "Write task documents and approve unclassified research commands.",
       "extends": ["plan", "research"],
       "shellPolicy": {
         "readOnly": "allow",

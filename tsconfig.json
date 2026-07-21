@@ -9,5 +9,5 @@
     "types": ["node"]
   },
   "include": ["src/**/*.ts", "scripts/**/*.ts", "types/**/*.d.ts", "tests/**/*.ts"],
-  "exclude": ["node_modules", ".pi-keel"]
+  "exclude": ["node_modules"]
 }

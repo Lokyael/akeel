@@ -77,7 +77,7 @@ Then claim the result.
 *Every code change must include its doc counterpart.*
 
 After every significant code change, ask: which project documentation is now stale?
-Scan actual doc files in the project (README, USAGE, ADR, CONTEXT, AGENTS,
+Scan actual doc files in the project (README, USAGE, CONTEXT, AGENTS,
 pages/, docs/ — whatever exists). Fix stale info immediately.
 Prefer removing hardcoded counts over letting them rot.
 Include doc changes in the same commit as code changes.

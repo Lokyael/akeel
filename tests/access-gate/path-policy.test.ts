@@ -28,12 +28,12 @@ test("resolves project and staging paths separately from external paths", () => 
   const staging = mkdtempSync(join(tmpdir(), "pi-access-staging-"));
   try {
     mkdirSync(join(root, "docs"));
-    writeFileSync(join(root, "docs", "plan.md"), "plan");
-    const project = resolvePath(root, root, staging, "docs/plan.md");
+    writeFileSync(join(root, "docs", "task.md"), "task");
+    const project = resolvePath(root, root, staging, "docs/task.md");
     const staged = resolvePath(root, root, staging, join(staging, "remote.md"));
     const external = resolvePath(root, root, staging, "/tmp/other.md");
     assert.equal(project.scope, "project");
-    assert.equal(project.virtualPath, "project/docs/plan.md");
+    assert.equal(project.virtualPath, "project/docs/task.md");
     assert.equal(staged.scope, "staging");
     assert.equal(staged.virtualPath, "staging/remote.md");
     assert.equal(external.scope, "external");

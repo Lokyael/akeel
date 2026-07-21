@@ -42,7 +42,7 @@ Expected: Exit 0 for both. No new warnings.
 
 If the fix touches UI or behaviour visible to a human, verify manually:
 - Does the original bug no longer reproduce?
-- Does the new behaviour match the spec?
+- Does the new behaviour match the Task Record requirements?
 - Are edge cases handled correctly?
 
 ### 5. Git Status Check

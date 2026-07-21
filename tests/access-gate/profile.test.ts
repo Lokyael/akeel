@@ -41,7 +41,7 @@ test("resolves inherited profiles and unions path rules", () => {
       "project-read": base,
       plan: {
         extends: ["project-read"],
-        description: "Write plan documents.",
+        description: "Write project task documents.",
         pathPolicy: {
           rules: [{ path: "project/docs/**", write: "allow" }],
         },

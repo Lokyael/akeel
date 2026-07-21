@@ -41,8 +41,10 @@ Hard threats, unsafe Shell syntax, symlink escapes, and blocked paths always den
 | Document | For |
 |----------|-----|
 | [USAGE.md](USAGE.md) | Profile configuration, skills, security boundaries, and workflows |
-| [docs/adr/INDEX.md](docs/adr/INDEX.md) | Architecture decisions |
-| [docs/traceability.md](docs/traceability.md) | Sources and adaptation decisions |
+| [CONTEXT.md](CONTEXT.md) | Current project context and active decision index |
+| [docs/decisions.md](docs/decisions.md) | Long-term architecture and policy decisions |
+| [docs/task.md](docs/task.md) | Current Access Gate security task |
+| [docs/traceability.md](docs/traceability.md) | Sources, fusion decisions, and compliance traceability |
 | [docs/security-boundaries.md](docs/security-boundaries.md) | Residual security boundaries |
 
 ## License

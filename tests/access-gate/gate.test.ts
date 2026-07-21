@@ -86,7 +86,7 @@ test("allows a project read through the direct read tool", async () => {
   }
 });
 
-test("allows plan document writes but denies source writes", async () => {
+test("allows task document writes but denies source writes", async () => {
   const root = mkdtempSync(join(tmpdir(), "pi-access-gate-"));
   const staging = mkdtempSync(join(tmpdir(), "pi-access-staging-"));
   try {
@@ -102,7 +102,7 @@ test("allows plan document writes but denies source writes", async () => {
         ],
       },
     });
-    const planResult = await evaluateToolCall({ surface: "write", args: { path: "docs/plan.md", content: "plan" }, cwd: root, projectRoot: root, stagingDir: staging, profile: planProfile }, { hasUI: true, select: async () => "Deny" });
+    const planResult = await evaluateToolCall({ surface: "write", args: { path: "docs/task.md", content: "task" }, cwd: root, projectRoot: root, stagingDir: staging, profile: planProfile }, { hasUI: true, select: async () => "Deny" });
     const sourceResult = await evaluateToolCall({ surface: "write", args: { path: "src/main.ts", content: "code" }, cwd: root, projectRoot: root, stagingDir: staging, profile: planProfile }, { hasUI: true, select: async () => "Deny" });
     assert.deepEqual(planResult, { kind: "allow" });
     assert.equal(sourceResult.kind, "block");
@@ -175,7 +175,7 @@ test("tracks directory changes before checking relative reads", async () => {
 });
 
 test("checks every file redirection", async () => {
-  const result = await evaluateBash("echo data > project/docs/plan.md > ~/.ssh/authorized_keys", projectWriteProfile());
+  const result = await evaluateBash("echo data > project/docs/task.md > ~/.ssh/authorized_keys", projectWriteProfile());
   assert.equal(result.kind, "block");
 });
 

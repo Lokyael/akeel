@@ -43,14 +43,12 @@
       }
     },
     "plan": {
-      "description": "Read and search projectRoot; write only plan and domain documents.",
+      "description": "Read and search projectRoot; write project task and domain documents.",
       "extends": ["project-read"],
       "pathPolicy": {
         "rules": [
           { "path": "project/docs/**", "write": "allow" },
-          { "path": "project/specs/**", "write": "allow" },
-          { "path": "project/CONTEXT.md", "write": "allow" },
-          { "path": "project/.pi-keel/**", "write": "allow" }
+          { "path": "project/CONTEXT.md", "write": "allow" }
         ]
       }
     },

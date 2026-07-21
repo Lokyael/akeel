@@ -1,8 +1,20 @@
-# Access Gate 待核查事项
+# T-001: Access Gate 安全核查
 
-本文记录尚未完成核查的安全与质量事项。已确认的安全边界以 [`security-boundaries.md`](security-boundaries.md) 为准，架构决策以 [`adr/INDEX.md`](adr/INDEX.md) 为准。
+**Kind:** maintenance
+**Status:** in-progress
+**Goal:** 集中维护 Access Gate 尚未完成核查的安全与质量事项，并在验证完成后提炼长期信息。
 
-## 风险清单
+## Scope
+
+覆盖 Shell 解析、命令语义、路径策略、Profile、Gate、Session 生命周期和安全矩阵。
+
+## Out of Scope
+
+- **OS-level isolation**：Access Gate 是用户态策略，不负责容器、VM、seccomp、Landlock 或 network namespace。
+- **独立 network policy**：当前网络命令继续使用 `unclassified` 决策，直到有独立策略需求。
+- **全局 enforcement**：Shell 实际执行、用户 `!`/`!!` 命令和其他 Extension 的直接操作不在 Access Gate 范围内。
+
+## Risk Register
 
 | ID | 优先级 | 待核查事项 | 主要模块 |
 |----|--------|------------|----------|
@@ -21,7 +33,7 @@
 | AG-13 | P2 | 并发 tool call、Profile 切换、Session shutdown 与执行中的 tool call 之间是否有明确同步边界。 | `gate/`、`index.ts` |
 | AG-14 | P3 | 是否有覆盖内置 Profile、四类 PathOperation、Direct tool 和 Shell 的安全矩阵。 | `tests/access-gate/` |
 
-## 测试缺口
+## Test Gaps
 
 以下场景应纳入安全矩阵或对应模块测试：
 
@@ -32,12 +44,9 @@
 - heredoc 多段 body、quoted delimiter、截断 body 和 body 内控制符
 - `find -exec`、`xargs`、`parallel`、归档内部路径和特殊文件
 
-## 当前边界
+## Durable Updates
 
-以下事项不属于 Access Gate 的运行时承诺：
-
-- OS sandbox、容器、VM、seccomp、Landlock 和 network namespace
-- 独立 network policy 轴
-- Shell 实际执行、用户 `!`/`!!` 命令和其他 Extension 的直接操作
-- 基于 fd 的原子文件访问与 TOCTOU 消除
-- 审批界面的敏感信息脱敏
+- [ ] 安全边界变化同步到 `docs/security-boundaries.md`。
+- [ ] 架构或策略决策同步到 `docs/decisions.md`。
+- [ ] 当前术语、架构或 Negative Space 变化同步到 `CONTEXT.md`。
+- [ ] 验证完成后删除已关闭的风险和本 Task Record。
