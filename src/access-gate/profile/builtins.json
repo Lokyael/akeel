@@ -1,20 +1,6 @@
 {
   "defaultProfile": "plan",
   "profiles": {
-    "file-read": {
-      "description": "Read explicitly targeted project files; deny directory listing, search, writes, and unclassified shell commands.",
-      "shellPolicy": {
-        "readOnly": "allow",
-        "mutating": "deny",
-        "unclassified": "deny"
-      },
-      "pathPolicy": {
-        "default": { "read": "deny", "list": "deny", "search": "deny", "write": "deny" },
-        "rules": [
-          { "path": "project/**", "read": "allow" }
-        ]
-      }
-    },
     "project-read": {
       "description": "Read and search projectRoot; deny writes, external paths, and unclassified shell commands.",
       "shellPolicy": {
@@ -30,7 +16,7 @@
       }
     },
     "wide-read": {
-      "description": "Read and search anywhere on the filesystem; deny writes, mutations, and unclassified shell commands. Blocked paths (secrets, keys, .git internals) are always denied and cannot be relaxed.",
+      "description": "Read and search anywhere on the filesystem; deny writes, mutations, and unclassified shell commands. Blocked paths (secrets, keys, .git internals) are always denied.",
       "shellPolicy": {
         "readOnly": "allow",
         "mutating": "deny",
@@ -41,17 +27,7 @@
       }
     },
     "plan": {
-      "description": "Read and search anywhere; write only docs/ and root CONTEXT.md. Blocked paths are always denied.",
-      "extends": ["wide-read"],
-      "pathPolicy": {
-        "rules": [
-          { "path": "project/docs/**", "write": "allow" },
-          { "path": "project/CONTEXT.md", "write": "allow" }
-        ]
-      }
-    },
-    "inspect": {
-      "description": "Read and search anywhere; write project docs/ and /tmp/ for downloading and reviewing external code. Mutations and unclassified commands require one-time approval. No source-tree writes.",
+      "description": "Read and search anywhere; write docs/, CONTEXT.md, and /tmp/ for downloading and reviewing external resources. Mutations and unclassified commands require one-time approval. No source-tree writes.",
       "extends": ["wide-read"],
       "shellPolicy": {
         "mutating": "ask",
@@ -79,7 +55,7 @@
         ]
       }
     },
-    "project-write": {
+    "develop": {
       "description": "Read and search anywhere; write project files. Known mutations are allowed and unclassified commands require approval. Blocked paths and .git are always denied.",
       "extends": ["wide-read"],
       "shellPolicy": {

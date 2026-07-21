@@ -42,13 +42,11 @@ Built-in Profiles:
 
 | Profile | Description |
 |---------|-------------|
-| `file-read` | Read explicitly targeted project files; no listing, search, writes, or unclassified Shell commands |
 | `project-read` | Read and search `projectRoot`; no external paths, writes, or unclassified Shell commands |
 | `wide-read` | Read and search anywhere on the filesystem; blocked paths (secrets, keys, .git) are always denied |
-| `plan` | Read anywhere; write only `docs/` and root `CONTEXT.md` |
-| `inspect` | Read anywhere; write `docs/`, `CONTEXT.md`, and `/tmp/` for downloading and reviewing external code; mutations require approval |
+| `plan` | Read anywhere; write `docs/`, `CONTEXT.md`, and `/tmp/` for downloading and reviewing external code; mutations require approval |
 | `safe-write` | Read `projectRoot`; write only `src/` and `tests/`; mutations require approval |
-| `project-write` | Read anywhere; write project files; known mutations allowed, unclassified commands ask |
+| `develop` | Read anywhere; write project files; known mutations allowed, unclassified commands ask |
 | `guarded-write` | Read anywhere; write project files; every mutation requires one-time approval |
 
 Commands:
@@ -81,11 +79,11 @@ Example:
 
 ```json
 {
-  "defaultProfile": "plan-inspect",
+  "defaultProfile": "develop-plan",
   "profiles": {
-    "plan-inspect": {
-      "description": "Write task documents and approve inspection commands for downloading external code.",
-      "extends": ["plan", "inspect"],
+    "develop-plan": {
+      "description": "Develop with plan document access.",
+      "extends": ["develop", "plan"],
       "shellPolicy": {
         "readOnly": "allow",
         "mutating": "deny",

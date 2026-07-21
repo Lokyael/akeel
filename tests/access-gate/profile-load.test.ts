@@ -24,11 +24,11 @@ test("project profiles override same-name built-ins and can extend them", () => 
     mkdirSync(join(agentDir, "extensions", "access-gate"), { recursive: true });
     mkdirSync(join(project, ".pi", "extensions", "access-gate"), { recursive: true });
     writeFileSync(join(agentDir, "extensions", "access-gate", "profiles.json"), JSON.stringify({
-      defaultProfile: "inspect",
+      defaultProfile: "develop",
       profiles: {
-        inspect: {
+        develop: {
           extends: ["project-read"],
-          description: "Global inspect profile.",
+          description: "Global develop profile.",
           shellPolicy: { unclassified: "ask" },
         },
       },
@@ -36,9 +36,9 @@ test("project profiles override same-name built-ins and can extend them", () => 
     writeFileSync(join(project, ".pi", "extensions", "access-gate", "profiles.json"), JSON.stringify({
       defaultProfile: "guarded-write",
       profiles: {
-        inspect: {
+        develop: {
           extends: ["project-read"],
-          description: "Project inspect profile.",
+          description: "Project develop profile.",
           shellPolicy: { unclassified: "ask" },
         },
       },
@@ -51,7 +51,7 @@ test("project profiles override same-name built-ins and can extend them", () => 
     else process.env.PI_CODING_AGENT_DIR = previous;
 
     assert.equal(result.defaultProfile, "guarded-write");
-    assert.equal(result.profiles.inspect.description, "Project inspect profile.");
+    assert.equal(result.profiles.develop.description, "Project develop profile.");
   } finally {
     rmSync(agentDir, { recursive: true, force: true });
     rmSync(project, { recursive: true, force: true });
@@ -62,7 +62,7 @@ test("does not load project profiles when project trust is absent", () => {
   const project = mkdtempSync(join(tmpdir(), "pi-access-profile-"));
   try {
     mkdirSync(join(project, ".pi", "extensions", "access-gate"), { recursive: true });
-    writeFileSync(join(project, ".pi", "extensions", "access-gate", "profiles.json"), JSON.stringify({ defaultProfile: "project-write", profiles: {} }));
+    writeFileSync(join(project, ".pi", "extensions", "access-gate", "profiles.json"), JSON.stringify({ defaultProfile: "develop", profiles: {} }));
     assert.equal(loadProfiles(project, "/tmp/pi-access-agent-does-not-exist", false).defaultProfile, "plan");
   } finally {
     rmSync(project, { recursive: true, force: true });
