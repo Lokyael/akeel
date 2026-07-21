@@ -44,8 +44,8 @@ Built-in Profiles:
 |---------|-------------|
 | `project-read` | Read and search `projectRoot`; no external paths, writes, or unclassified Shell commands |
 | `wide-read` | Read and search anywhere on the filesystem; blocked paths (secrets, keys, .git) are always denied |
-| `plan` | Read anywhere; write `docs/`, `CONTEXT.md`, and `/tmp/` for downloading and reviewing external code; mutations require approval |
-| `safe-write` | Read `projectRoot`; write `src/`, `tests/`, and `/tmp/` for dependencies; mutations require approval |
+| `plan` | Read anywhere; write `docs/`, `CONTEXT.md`, and `/tmp/pi-work/` for reviewing external code; mutations require approval |
+| `safe-write` | Read `projectRoot`; write `src/`, `tests/`, and `/tmp/pi-work/` for dependencies; mutations require approval |
 | `develop` | Read anywhere; write project files; known mutations allowed, unclassified commands ask |
 | `guarded-write` | Read anywhere; write project files; every mutation requires one-time approval |
 

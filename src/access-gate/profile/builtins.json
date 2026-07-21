@@ -27,7 +27,7 @@
       }
     },
     "plan": {
-      "description": "Read and search anywhere; write docs/, CONTEXT.md, and /tmp/ for downloading and reviewing external resources. Mutations and unclassified commands require one-time approval. No source-tree writes.",
+      "description": "Read and search anywhere; write docs/, CONTEXT.md, and /tmp/pi-work/ for downloading and reviewing external resources. Mutations and unclassified commands require one-time approval. No source-tree writes.",
       "extends": ["wide-read"],
       "shellPolicy": {
         "mutating": "ask",
@@ -37,12 +37,12 @@
         "rules": [
           { "path": "project/docs/**", "write": "allow" },
           { "path": "project/CONTEXT.md", "write": "allow" },
-          { "path": "/tmp/**", "read": "allow", "list": "allow", "search": "allow", "write": "allow" }
+          { "path": "/tmp/pi-work/**", "read": "allow", "list": "allow", "search": "allow", "write": "allow" }
         ]
       }
     },
     "safe-write": {
-      "description": "Read and search projectRoot; write source, test paths, and /tmp/ for downloaded dependencies and reference code. Mutations and unclassified commands require one-time approval.",
+      "description": "Read and search projectRoot; write source, test paths, and /tmp/pi-work/ for downloaded dependencies and reference code. Mutations and unclassified commands require one-time approval.",
       "extends": ["project-read"],
       "shellPolicy": {
         "mutating": "ask",
@@ -52,7 +52,7 @@
         "rules": [
           { "path": "project/src/**", "write": "allow" },
           { "path": "project/tests/**", "write": "allow" },
-          { "path": "/tmp/**", "read": "allow", "list": "allow", "search": "allow", "write": "allow" }
+          { "path": "/tmp/pi-work/**", "read": "allow", "list": "allow", "search": "allow", "write": "allow" }
         ]
       }
     },
