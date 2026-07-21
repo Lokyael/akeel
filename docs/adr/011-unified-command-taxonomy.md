@@ -1,4 +1,6 @@
-# ADR-011: 统一命令分类体系（taxonomy 模块）
+# ADR-011: 统一命令分类体系（历史）
+
+> 本 ADR 描述的 plan/build action 字段已由 ADR-017 的命令分类和 Profile shellPolicy 取代。
 
 **分类：** 代码架构
 

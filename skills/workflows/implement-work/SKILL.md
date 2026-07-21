@@ -6,7 +6,7 @@ disable-model-invocation: true
 
 # Implement Work
 
-If you are still in PLAN mode, tell the user: "Run /build to switch to BUILD mode first." Do not proceed until build mode is active.
+If you are still in a restrictive profile (e.g. `plan`), tell the user: "Switch to a permissive profile with `/profile project-write` first." Do not proceed without sufficient permissions.
 
 ## Process
 

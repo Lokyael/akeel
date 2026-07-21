@@ -1,4 +1,6 @@
-# ADR-012: Pipeline 拆解与 Bootstrap 简化
+# ADR-012: Pipeline 拆解与 Bootstrap 简化（历史）
+
+> 本 ADR 描述的旧 pipeline 结构已由 ADR-017 的统一 Gate 取代。
 
 **分类：** 代码架构
 

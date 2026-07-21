@@ -1,4 +1,6 @@
-# ADR-016: 安全门控模块边界与统一命名
+# ADR-016: 安全门控模块边界与统一命名（历史）
+
+> 本 ADR 描述的旧 phase/pipeline 结构已由 ADR-017 的 Profile access-gate 架构取代。
 
 **分类：** 代码架构
 

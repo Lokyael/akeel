@@ -4,7 +4,13 @@
   "license": "MIT",
   "type": "module",
   "scripts": {
-    "test": "npx tsx scripts/validate-skills.ts && npx tsc --noEmit && npx tsx tests/security-gate/taxonomy.test.ts && npx tsx tests/security-gate/plan-gate.test.ts && npx tsx tests/security-gate/permission-engine.test.ts && npx tsx tests/security-gate/tool-gate.test.ts && npx tsx tests/security-gate/path.test.ts && npx tsx tests/security-gate/config.test.ts && npx tsx tests/security-gate/phase.test.ts && npx tsx tests/security-gate/index.test.ts && npx tsx tests/security-gate/integration.test.ts"
+        "test": "npx tsx scripts/validate-skills.ts && npx tsc --noEmit && npm run test:profile && npm run test:path && npm run test:gate && npm run test:shell-parse && npm run test:cmd-semantics && npm run test:index",
+    "test:profile": "npx tsx tests/access-gate/profile.test.ts && npx tsx tests/access-gate/profile-load.test.ts",
+        "test:path": "npx tsx tests/access-gate/path-policy.test.ts",
+    "test:gate": "npx tsx tests/access-gate/gate.test.ts",
+    "test:shell-parse": "npx tsx tests/access-gate/shell-parse.test.ts",
+    "test:cmd-semantics": "npx tsx tests/access-gate/command-semantics-control-flow.test.ts && npx tsx tests/access-gate/command-semantics-adapters.test.ts",
+    "test:index": "npx tsx tests/access-gate/index.test.ts"
   },
   "devDependencies": {
     "@types/node": "24.12.4",
@@ -15,7 +21,7 @@
   "pi": {
     "extensions": [
       "./src/bootstrap/index.ts",
-      "./src/security-gate"
+      "./src/access-gate"
     ],
     "skills": [
       "./skills/foundations",

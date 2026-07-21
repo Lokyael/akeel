@@ -1,8 +1,8 @@
 # Pi Keel
 
-Engineering skills and security system for [pi](https://pi.dev) — the keel that keeps AI coding steady.
+Engineering skills and an access-control system for [pi](https://pi.dev).
 
-Pi Keel fuses the best practices from four leading agent-skills communities into a single `pi install`: behavioral principles, engineering disciplines, orchestration workflows, and a layered security gate. The gate is policy enforcement in the extension; it does not install an OS-level sandbox.
+Pi Keel combines behavioral principles, engineering disciplines, workflows, and a Profile-driven access gate in one `pi install`. The gate is user-space policy enforcement; it is not an OS sandbox.
 
 ## Install
 
@@ -10,26 +10,40 @@ Pi Keel fuses the best practices from four leading agent-skills communities into
 pi install git:github.com/Lokyael/pi-keel
 ```
 
-Principles and security activate automatically. Skills load on-demand. No configuration required.
+Principles and the access gate activate automatically. Skills load on demand.
 
 ## What's Inside
 
-- **2 foundations** — always-on behavioral principles (think first, simplicity, surgical changes, goal-driven, verify before claiming, keep docs in sync)
-- **12 disciplines** — auto-matched engineering practices (TDD, code review, debugging, security review, domain modeling, planning, doc sync)
-- **10 workflows** — user-invoked orchestration (brainstorming, grilling, implementing, rollback, handoff)
-- **Security gate** — PLAN/BUILD shell policy, threat scan, shell-write and literal-read path policy, permission evaluation, canonical file path protection
-- **Session-safe authorization** — PLAN/BUILD mode is owned per extension instance; new sessions start in PLAN and approvals are `Allow once` only
-- **Recovery boundary** — no automatic file snapshots or `/rollback`; use version control, editor history, or pi session-tree recovery. Existing legacy snapshot data is never read or deleted by pi-keel.
-- **Test coverage** — 1,192 taxonomy + 30 plan-gate + 33 permission-engine + 22 tool-gate + 23 path + 15 config + 5 phase + 5 index + 6 integration = 1,331 security assertions + skill validation gate
+- **2 foundations** — always-on engineering principles and evidence-first verification
+- **12 disciplines** — TDD, code review, debugging, security review, domain modeling, planning, documentation sync, and related practices
+- **10 workflows** — design, grilling, implementation, rollback, handoff, and context workflows
+- **Access profiles** — composable read/write path rules, Shell command decisions, one-time approval, hard protected paths, and threat scanning
+- **Session-safe authorization** — each Session starts from the configured default Profile; approvals are `Allow once` only
+- **Recovery boundary** — no automatic snapshots or rollback extension; use version control, editor history, or pi's session tree
+- **Test coverage** — 24 skill validations and 143 access-gate assertions（Profile 5 + 路径 4 + 加载 4 + Gate 13 + Shell IR 54 + control-flow 21 + adapters 40 + 集成 2）
+
+## Access Gate
+
+The active Profile is the only permission mode exposed to users. Built-ins include `file-read`, `project-read`, `research`, `plan`, `safe-write`, `project-write`, and `guarded-write`. Project-local Profile overrides are read only for Pi-trusted projects.
+
+```text
+/profile                 # Select a Profile
+/profile <name>          # Activate a Profile
+/profile status          # Show its detailed policy
+```
+
+The Footer displays only the active Profile name. Unknown Shell commands use the Profile's `unclassified` decision. Network commands are not managed by a separate policy axis yet, so unclassified network commands require one-time approval in Profiles that allow it.
+
+Hard threats, unsafe Shell syntax, symlink escapes, and blocked paths always deny and cannot be overridden by a Profile or approval.
 
 ## Documentation
 
 | Document | For |
 |----------|-----|
-| [USAGE.md](USAGE.md) | How to use every skill, configure security, and run common workflows |
-| [docs/adr/INDEX.md](docs/adr/INDEX.md) | Why pi-keel is built the way it is — 13 current architecture decision records |
-| [docs/traceability.md](docs/traceability.md) | Main community sources and adaptation decisions |
-| [docs/security-boundaries.md](docs/security-boundaries.md) | Security boundaries recorded outside the implementation plan |
+| [USAGE.md](USAGE.md) | Profile configuration, skills, security boundaries, and workflows |
+| [docs/adr/INDEX.md](docs/adr/INDEX.md) | Architecture decisions |
+| [docs/traceability.md](docs/traceability.md) | Sources and adaptation decisions |
+| [docs/security-boundaries.md](docs/security-boundaries.md) | Residual security boundaries |
 
 ## License
 

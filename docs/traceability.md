@@ -1,26 +1,28 @@
 # Pi Keel — 溯源摘要
 
-本文保留产物的主要来源和融合决策；具体实现以当前源码、技能文件和 [ADR 记录](adr/INDEX.md) 为准。
+本文保留主要来源和融合决策；具体实现以当前源码、技能文件和 [ADR 记录](adr/INDEX.md) 为准。
 
 ## 当前边界
 
-- R-01、R-03、R-04、R-05 和 R-07 已实现并通过当前测试集验证。
-- R-02、R-08 仅记录于 [docs/security-boundaries.md](security-boundaries.md)，不在实施计划内。
-- pi-keel 提供 command/path policy、permission gate 和 PLAN/BUILD；不提供 OS-level sandbox。
-- snapshot/rollback、legacy cleanup、audit runtime、secret scan 和 secret replacement 不属于当前 runtime。
-- 用户项目的 `README.md`、`AGENTS.md`、`.gitignore` 和 `package.json` 只读不写；第三方 extension 的直接文件或网络操作不在 enforcement 范围内。
+- pi-keel 提供 Profile 驱动的 command/path access gate，不提供 OS-level sandbox。
+- Profile 统一读取、写入、Shell 分类和一次性批准；网络不是当前独立策略轴。
+- 未分类命令由 Profile 的 `shellPolicy.unclassified` 决定；`research` 等 Profile 可以要求一次性批准。
+- hard threat、危险命令、unsafe syntax、blocked paths 和 symlink escape 不可被 Profile 或用户批准覆盖。
+- snapshot/rollback、audit runtime、secret replacement 不属于当前 runtime。
+- 用户项目的 `README.md`、`AGENTS.md`、`.gitignore` 和 `package.json` 只读不写；第三方 extension 的直接操作不在本扩展的 enforcement 范围内。
 
 ## Runtime 产物
 
 | 产物 | 主要来源 | 当前融合决策 |
 |------|---------|-------------|
 | `src/bootstrap/index.ts` + `principles.md` | obra/superpowers、Karpathy principles | 保留 compaction 后重注入；原则和 Quick Reference 外置到 `principles.md`。 |
-| `src/security-gate/` | pi-permission-system、cc-safety-net、pi-hermes-memory、pi-landstrip（部分为历史参考） | 统一 extension；按 config、taxonomy、security、policy、pipeline 分层，PLAN、bash、permission 三条管道负责编排。 |
-| `src/security-gate/taxonomy/` | 原创整合 | `commands.ts` 集中命令规则，`index.ts` 提供命令分类和 shell analysis 的唯一公共入口。 |
-| `src/security-gate/policy/path.ts` | 原创整合 | 统一 cwd、外部路径、immutable path 和 operation policy。 |
-| `src/security-gate/config/index.ts` + `presets.json` | pi-permission-system、pi-landstrip、原创 preset | 三级 preset；global/project 配置经验证后合并；旧字段 fail-closed。 |
-| `src/security-gate/pipeline/*.ts` | 统一 security gate 设计 | PLAN、bash、permission 各自可通过公开 seam 测试；`plan-gate.ts` 同时承载 PLAN 约束检查和结果适配。 |
-| `tests/security-gate/*.ts` | 项目行为测试 | 覆盖 taxonomy、plan-gate、permission-engine、tool-gate、path、config、phase、index 和 integration。 |
+| `src/access-gate/` | pi-permission-system、cc-safety-net、pi-hermes-memory、pi-landstrip（部分为历史参考） | 以 Profile 为唯一 Session 权限状态，统一处理工具、Shell、路径和审批。 |
+| `src/access-gate/profile/` | 原创整合 | Profile 校验、继承、分层加载和内置 Profile 唯一来源。 |
+| `src/access-gate/shell-parse/` | 原创 | 受限 Shell IR：lexer（引用感知分词）+ parser（控制操作符、重定向、wrapper）|
+| `src/access-gate/command-semantics/` | 原创整合 | 统一命令语义：wrapper 规范化、control-flow、adapter 注册表（filesystem、text-transform、search、git、package、build）|
+| `src/access-gate/path/` | 原创整合 | 统一 `cwd`、`projectRoot`、`stagingDir`、按操作路径决策、blocked paths 和 symlink 检查。 |
+| `src/access-gate/gate/` | 统一 access gate 设计 | `evaluate.ts` 统一入口，`analyze-shell.ts` 使用新 IR + 语义注册表替代旧 shell-command |
+| `tests/access-gate/` | 项目行为测试 | 覆盖 Profile、路径、Shell IR、语义 adapter、Gate 和 Extension 状态。 |
 
 ## 技能来源
 
@@ -32,14 +34,15 @@
 
 ## 关键融合决策
 
-- 统一 security extension，避免多个扩展竞争拦截和重复弹窗。
-- command taxonomy 作为命令分类唯一真相源，避免规则分散漂移。
-- security-gate 按 config、taxonomy、security、policy、pipeline 分层；模块和测试文件采用领域命名，测试与源码保持目录隔离。
+- 统一 access gate，避免多个扩展竞争拦截和重复弹窗。
+- Profile 是唯一用户权限入口；不再拆分执行阶段和安全级别。
+- 命令分类和路径操作分别拥有单一真相源，Profile 只提供决策。
+- `blockedPaths`、threat scan 和 unsafe Shell rules 是不可覆盖边界。
+- Profile 组合只允许显式继承；路径规则保留合并后的声明顺序，由 first-match 决定结果。
 - principles 注入 + Quick Reference 是模型在用户项目中获取通用约束的唯一渠道。
-- snapshot/rollback、audit 和伪 OS sandbox 能力移除，避免文档承诺超过实际 enforcement。
-- 当前决策的完整记录见 [ADR 目录](adr/INDEX.md)；已清理的历史方案不再进入当前索引，ADR 编号不复用。
+- snapshot/rollback 和伪 OS sandbox 能力不进入 runtime，避免文档承诺超过实际 enforcement。
 
 ## 维护规则
 
 - 新增产物只需在本摘要补充来源和融合决策，不复制实现细节。
-- 行为、路径和命令规则以源码及测试为准；测试数量以 [README.md](../README.md) 和 [USAGE.md](../USAGE.md) 为准。
+- 行为、路径和命令规则以源码及测试为准；测试入口以 `package.json` 为准。

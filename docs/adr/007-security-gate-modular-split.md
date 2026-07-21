@@ -1,4 +1,6 @@
-# ADR-007: 安全扩展模块化拆分
+# ADR-007: 安全扩展模块化拆分（历史）
+
+> 本 ADR 描述的旧 config/pipeline 结构已由 ADR-017 的 Profile access-gate 架构取代。
 
 **分类：** 代码架构
 

@@ -6,184 +6,171 @@
 pi install git:github.com/Lokyael/pi-keel
 ```
 
-Verify with `/security status`. No configuration required — principles and security activate immediately.
+The access gate starts automatically. Use `/profile status` to inspect the active Profile.
 
-## How It Works
+## Runtime Layout
 
-```
-pi 启动
-  ├─ src/bootstrap/index.ts 注入 engineering-principles + evidence-first
-  │   成为系统提示词的一部分，始终可见。compaction 后自动重新注入。
+```text
+pi starts
+  ├─ src/bootstrap/index.ts
+  │   Injects engineering principles and evidence-first guidance.
   │
-  ├─ taxonomy/ 统一受限 shell 词法和命令分类
-  │   taxonomy/index.ts 是公共入口，commands.ts 是规则数据唯一来源。
-  │   pipeline/plan-gate.ts（PLAN 门控）和 pipeline/bash.ts（BUILD 评估）从此派生。
-  │   literal read/write intent 进入统一 policy/path.ts。
+  ├─ src/access-gate/index.ts
+  │   Loads Profiles, owns Session state, registers /profile, and intercepts tool calls.
   │
-  ├─ security-gate/index.ts 分层拦截管道
-  │   PLAN 门控 → critical/threat 扫描 → shell/path policy → 权限评估
+  ├─ src/access-gate/profile/
+  │   Validates, composes, and loads Profile definitions.
   │
-  ├─ skills/disciplines/ 的 name + description 出现在 <available_skills>
-  │   模型根据任务自动匹配，通过 read 工具加载完整 SKILL.md。
+  ├─ src/access-gate/shell-parse/
+  │   Tokenizer and restricted Shell parser producing a typed IR.
   │
-  └─ skills/workflows/ 注册为 /skill:name 命令
-      用户主动调用时加载 SKILL.md。
+  ├─ src/access-gate/command-semantics/
+  │   Wrapper normalization, control-flow analysis, and adapter-based command classification.
+  │
+  ├─ src/access-gate/path/
+  │   Resolves cwd/projectRoot/stagingDir and applies per-operation path decisions.
+  │
+  └─ skills/
+      Provides foundations, disciplines, and workflows on demand.
 ```
 
-## Skills Reference
+## Profiles
 
-### Foundations (always active)
+The active Profile is the only access mode. A new Session starts from `defaultProfile` and does not inherit a temporary Profile from another Session.
 
-| Skill | Principle |
-|-------|-----------|
-| `engineering-principles` | Think First, Simplicity, Surgical Changes, Goal-Driven Execution, Verify Before Claiming, Keep Docs in Sync |
-| `evidence-first` | No completion claims without fresh verification evidence |
+Built-in Profiles:
 
-### Disciplines (auto-matched)
+| Profile | Description |
+|---------|-------------|
+| `file-read` | Read explicitly targeted project files; no listing, search, writes, or unclassified Shell commands |
+| `project-read` | Read and search `projectRoot`; no writes or unclassified Shell commands |
+| `research` | Read `projectRoot` and the temporary staging directory; unclassified commands require approval |
+| `plan` | Read and search the project; write only `docs/`, `specs/`, root `CONTEXT.md`, and `.pi-keel/` |
+| `safe-write` | Write only configured source and test paths |
+| `project-write` | Write project files; known mutations are allowed, unclassified commands ask |
+| `guarded-write` | Write project files; every known mutation requires one-time approval |
 
-| Skill | Use When |
-|-------|----------|
-| `test-driven-development` | Implementing features or fixing bugs — red-green-refactor with seams |
-| `code-review` | Reviewing changes — two-axis parallel review (Standards + Spec) |
-| `systematic-debugging` | Any bug or test failure — 4-phase root cause analysis |
-| `bug-diagnosis` | Hard/intermittent bugs — build a tight feedback loop first |
-| `security-review` | Before merge — 5-phase CWE-mapped security scan |
-| `code-audit` | Before code-review — self-review checklist |
-| `domain-modeling` | Defining project terminology — build CONTEXT.md + ADRs |
-| `codebase-design` | Designing modules — deep module principles |
-| `plan-writing` | Before implementation — bite-sized task plans with exact file paths |
-| `fix-validation` | After fixing — prove the fix works with fresh evidence |
-| `bug-investigation` | Bug reported — gather evidence, write bug file |
-| `doc-sync` | After code changes — verify docs for stale counts, broken refs, outdated architecture |
+Commands:
 
-### Workflows (user-invoked)
-
-| Skill | Use When |
-|-------|----------|
-| `brainstorm-design` | Starting new work — HARD-GATE: no code without design approval |
-| `grill-plan` | Stress-testing a plan — one question at a time until every decision is resolved |
-| `grill-docs` | Plan relies on external libraries — doc-grounded grilling that creates ADRs |
-| `improve-architecture` | Scanning for deepening opportunities — visual HTML report |
-| `implement-work` | Ready to build — orchestrates TDD → code-audit → code-review |
-| `survey-context` | Starting a session or returning after a break — "where am I?" |
-| `handoff-session` | Handing work to a fresh session — compact conversation to handoff doc |
-| `draft-spec` | Turn conversation into formal spec |
-| `draft-tickets` | Break spec into independent, tracer-bullet tickets |
-| `rollback-session` | Recovering unwanted changes — version control and session tree; no automatic file snapshots |
-
-## Security
-
-### Levels
-
-| Level | Semantic analysis | Permission |
-|-------|-------------------|------------|
-| `strict` | all hard boundaries + configured rules | `*` = ask |
-| `standard` | all hard boundaries + configured rules | `*` = ask |
-| `permissive` | critical/hard boundaries remain | `*` = allow |
-
-```bash
-/security status              # View current config
-/security level standard      # Switch level
+```text
+/profile                 # Open the Profile selector
+/profile <name>          # Activate a Profile for this Session
+/profile status          # Show the detailed resolved policy
 ```
 
-### Configuration
+The Footer displays only the exact Profile name, for example `plan` or `guarded-write`.
 
+## Configuration
+
+Global:
+
+```text
+~/.pi/agent/extensions/access-gate/profiles.json
 ```
-Global:  ~/.pi/agent/extensions/security-gate/config.json
-Project: .pi/extensions/security-gate/config.json
+
+Project:
+
+```text
+.pi/extensions/access-gate/profiles.json
 ```
 
-See [src/security-gate/config/presets.json](src/security-gate/config/presets.json) for full examples. Project config overrides global. Unknown top-level configuration fields are rejected.
+The loading order is built-ins, global configuration, then project configuration. Project configuration is loaded only when Pi marks the project as trusted. A same-name Profile in a later layer replaces the earlier definition. Profiles compose with `extends`.
 
-### What Gets Blocked
+Example:
 
-All levels block: `rm -rf /`, `sudo rm *`, `curl URL | sh`, writes to `.env`/`*.pem`/`*.key`/`*.ppk`/`.netrc`.
+```json
+{
+  "defaultProfile": "plan-research",
+  "profiles": {
+    "plan-research": {
+      "description": "Write plan documents and approve unclassified research commands.",
+      "extends": ["plan", "research"],
+      "shellPolicy": {
+        "readOnly": "allow",
+        "mutating": "deny",
+        "unclassified": "ask"
+      }
+    }
+  }
+}
+```
 
-Standard adds: `git push --force`, `git reset --hard`, `git clean -f`, `sudo *`, writes to `~/.ssh/*`/`~/.aws/*`/`~/.kube/*`/`~/.gnupg/*`/`*.pfx`/`*.p12`/`*.cred`/`*.credentials`/`.npmrc`/`.pypirc`/`/etc/passwd`/`/etc/shadow`/`**/.git/config`.
+`Decision` values are:
 
-Shell bypasses (`sed -i .env`, `echo > .env`, `tee .env`, `cp /tmp/x .env`) are detected and blocked.
+```text
+allow    Execute without a prompt
+ask      Show Allow once / Deny
+ deny    Block without an approval prompt
+```
 
-See `src/security-gate/config/presets.json` — the single source of truth for all protected paths and security levels.
+`pathPolicy` makes decisions independently for `read`, `list`, `search`, and `write`. More-specific paths win. `blockedPaths` are global hard denials and cannot be relaxed.
 
-### Session And Authorization
+Network access is not a separate Profile axis yet. Commands without a matching adapter use the Profile's `shellPolicy.unclassified` decision.
 
-PLAN/BUILD mode belongs to the current `securityGate(pi)` extension instance. A new session or session replacement resets the controller to PLAN; `session_tree` keeps the current mode because it remains the same extension instance. Headless `/plan` and `/build` commands do not change mode.
+## Enforcement
 
-Permission prompts offer only `Allow once` and `Deny`. There is no session-wide allow, and a prior PLAN decision is never reused by BUILD. Critical taxonomy rules, unsafe syntax, dynamic execution, unknown commands, and immutable path denials cannot be bypassed by configuration allow or one-time approval.
+The decision order is:
 
-`/security status` reports the active command/path policy. Pi-keel does not provide or install a sandbox, Landlock, seccomp, network namespace, or other kernel-level isolation.
+```text
+hard threat
+→ unsafe Shell syntax
+→ blocked path
+→ command classification
+→ path operation policy
+→ Profile decision
+→ one-time approval, when required
+```
 
-### Testing
+Hard denials include dangerous commands (adapter class `dangerous`), dynamic execution, prompt/data-exfiltration threat patterns, protected paths, and symlink escapes. pi-keel does not provide a container, VM, seccomp policy, network namespace, or other OS-level sandbox.
+
+Approval is never remembered. Every `ask` decision offers only:
+
+```text
+Allow once
+Deny
+```
+
+Headless modes fail closed when an approval would be required.
+
+## Testing
 
 ```bash
 npm test
-
-npx tsx tests/security-gate/taxonomy.test.ts        # 1192 assertions
-npx tsx tests/security-gate/plan-gate.test.ts       # 30 assertions
-npx tsx tests/security-gate/permission-engine.test.ts # 33 assertions
-npx tsx tests/security-gate/tool-gate.test.ts       # 22 assertions
-npx tsx tests/security-gate/path.test.ts            # 23 assertions
-npx tsx tests/security-gate/config.test.ts          # 15 assertions
-npx tsx tests/security-gate/phase.test.ts           # 5 assertions
-npx tsx tests/security-gate/index.test.ts           # 5 assertions
-npx tsx tests/security-gate/integration.test.ts     # 6 assertions
+npm run test:profile
+npm run test:path
+npm run test:gate
+npm run test:shell-parse
+npm run test:cmd-semantics
+npm run test:index
 ```
 
-### Recovery
+## Recovery
 
-pi-keel no longer creates, reads, restores, manages, or cleans up snapshots and does not register `/rollback`. Existing `.pi-keel/snapshots/` data is not a recovery source and is left untouched. Use version control, editor history, or pi's `/tree` for recovery.
+Pi Keel does not create or manage snapshots and does not register a rollback command. Use version control, editor history, or pi's `/tree` session recovery.
 
 ## Common Workflows
 
 ### New Feature
 
-```
-/skill:survey-context        → assess project state
-/skill:brainstorm-design     → design with HARD-GATE
-/skill:plan-writing          → implementation plan
-/skill:implement-work        → TDD → code-audit → code-review
+```text
+/skill:survey-context
+/skill:brainstorm-design
+/skill:plan-writing
+/skill:implement-work
 ```
 
 ### Bug Fix
 
-```
-/skill:bug-investigation     → gather evidence, write bug file
-  → systematic-debugging auto-activates
-  → test-driven-development auto-activates
-  → fix-validation auto-activates
+```text
+/skill:bug-investigation
+/skill:systematic-debugging
+/skill:test-driven-development
+/skill:fix-validation
 ```
 
 ### Code Review
 
+```text
+/skill:code-review
+/skill:security-review
 ```
-/skill:code-review           → two-axis review
-/skill:security-review       → if touching auth/data/API
-```
-
-### Handoff
-
-```
-/skill:handoff-session       → compact session to /tmp/handoff-*.md
-```
-
-## FAQ
-
-### Does compaction remove the principles?
-
-No. Bootstrap re-injects `engineering-principles` and `evidence-first` after every compaction.
-
-### Can I disable a skill?
-
-Yes. In `~/.pi/agent/settings.json`:
-
-```json
-{ "pi": { "skills": { "disabled": ["code-audit"] } } }
-```
-
-### What if a skill doesn't activate when it should?
-
-Try `/skill:survey-context` first — it will recommend the right next step. You can also invoke any skill manually with `/skill:name`.
-
-### How do I add project-specific security rules?
-
-Copy the relevant section from `src/security-gate/config/presets.json` to `.pi/extensions/security-gate/config.json` and customize. Project config merges over global.

@@ -38,4 +38,4 @@ Break the system into units that each have one clear purpose, communicate throug
 
 ## After the Design
 
-When the user approves the design, remind them: "Design approved. Run /build to switch to BUILD mode and /skill:implement-work to start implementing."
+When the user approves the design, remind them: "Design approved. Switch to a writable profile with `/profile project-write` and run `/skill:implement-work` to start implementing."
