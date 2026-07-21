@@ -36,6 +36,7 @@
 
 - 统一 access gate，避免多个扩展竞争拦截和重复弹窗。
 - Profile 是唯一用户权限入口；不再拆分执行阶段和安全级别。
+- TUI Footer 固定为两行：Access Gate 通过 `setFooter()` 包装 Pi 原生 `FooterComponent`，第一行显示位置和 Profile，第二行保留原生运行统计、上下文、模型和扩展状态；Pi 主包不可用时仅使用本地 fallback。
 - 命令分类和路径操作分别拥有单一真相源，Profile 只提供决策。
 - `blockedPaths`、threat scan 和 unsafe Shell rules 是不可覆盖边界。
 - Profile 组合只允许显式继承；路径规则保留合并后的声明顺序，由 first-match 决定结果。

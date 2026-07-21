@@ -58,7 +58,7 @@ Commands:
 /profile status          # Show the detailed resolved policy
 ```
 
-The Footer displays only the exact Profile name, for example `plan` or `guarded-write`.
+The Footer wraps Pi's native `FooterComponent` when available and uses two lines. The active Profile name, for example `plan` or `guarded-write`, appears on the first line with the project location; the second line retains Pi's native token, context, cost, model, and extension-status details. Standalone tests use a local rendering fallback when the Pi host package is unavailable.
 
 ## Configuration
 

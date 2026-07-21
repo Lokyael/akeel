@@ -6,7 +6,7 @@ import { evaluateToolCall } from "./gate";
 import { loadProfiles } from "./profile/load";
 import type { ResolvedProfiles } from "./profile/types";
 import { findProjectRoot, createProfileState, type ProfileState } from "./session/profile-state";
-import { clearProfileStatus, updateProfileStatus } from "./ui/profile-status";
+import { clearProfileStatus, installProfileFooter, type ProfileFooterHandle } from "./ui/profile-status";
 
 function profileStatus(state: ProfileState, profiles: ResolvedProfiles): string {
   const profile = state.getProfile();
@@ -25,6 +25,7 @@ export default function accessGate(pi: ExtensionAPI): void {
   let state: ProfileState | undefined;
   let projectRoot = process.cwd();
   let stagingDir: string | undefined;
+  let footer: ProfileFooterHandle | undefined;
 
   const requireState = (): { profiles: ResolvedProfiles; state: ProfileState } => {
     if (!profiles || !state) throw new Error("access profile is not initialized");
@@ -48,7 +49,7 @@ export default function accessGate(pi: ExtensionAPI): void {
         ctx.ui.notify(`Unknown profile: ${selected}`, "error");
         return;
       }
-      updateProfileStatus(ctx, selected);
+      footer?.refresh();
       ctx.ui.notify(`Active profile: ${selected}`, "info");
     },
   });
@@ -57,13 +58,31 @@ export default function accessGate(pi: ExtensionAPI): void {
     projectRoot = findProjectRoot(ctx.cwd);
     profiles = loadProfiles(projectRoot, undefined, ctx.isProjectTrusted?.() === true);
     state = createProfileState(profiles);
+    footer?.dispose();
+    footer = installProfileFooter(
+      ctx,
+      () => requireState().state.getProfile(),
+      () => ctx.model,
+      () => {
+        const entries = ctx.sessionManager?.buildContextEntries() ?? [];
+        for (let index = entries.length - 1; index >= 0; index--) {
+          const entry = entries[index];
+          if (entry && typeof entry === "object" && (entry as { type?: unknown }).type === "thinking_level_change") {
+            const level = (entry as { thinkingLevel?: unknown }).thinkingLevel;
+            if (typeof level === "string") return level;
+          }
+        }
+        return "off";
+      },
+      () => ctx.getContextUsage?.(),
+    );
     if (stagingDir) rmSync(stagingDir, { recursive: true, force: true });
     stagingDir = mkdtempSync(join(tmpdir(), "pi-access-"));
-    updateProfileStatus(ctx, state.getName());
   });
 
   pi.on("session_shutdown", async (_event, ctx) => {
-    clearProfileStatus(ctx);
+    clearProfileStatus(footer);
+    footer = undefined;
     if (stagingDir) rmSync(stagingDir, { recursive: true, force: true });
     stagingDir = undefined;
   });

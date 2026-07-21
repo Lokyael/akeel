@@ -6,73 +6,99 @@ import { tmpdir } from "node:os";
 import accessGate from "../../src/access-gate/index";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 
-test("starts with the configured default profile and exposes only its name in the status", async () => {
-  const root = mkdtempSync(join(tmpdir(), "pi-access-index-"));
+type Footer = { render(width: number): string[] };
+type FooterFactory = (
+  tui: { requestRender(): void },
+  theme: { fg(color: string, text: string): string },
+  footerData: { getGitBranch(): string | null },
+) => Footer;
+
+function createHarness(root: string) {
   const commands = new Map<string, (args: string, ctx: ExtensionContext) => Promise<void>>();
   type Handler = (event: unknown, ctx: ExtensionContext) => Promise<unknown>;
   const handlers = new Map<string, Handler>();
-  const statuses = new Map<string, string | undefined>();
-  try {
-    const pi = {
-      registerCommand(name: string, options: { handler: (args: string, ctx: ExtensionContext) => Promise<void> }) {
-        commands.set(name, options.handler);
+  let footerFactory: FooterFactory | undefined;
+  let renderRequests = 0;
+  const sessionManager = {
+    getSessionId: () => "test-session",
+    getCwd: () => root,
+    getSessionName: () => undefined,
+    getEntries: () => [],
+    buildContextEntries: () => [],
+  };
+  const pi = {
+    registerCommand(name: string, options: { handler: (args: string, ctx: ExtensionContext) => Promise<void> }) {
+      commands.set(name, options.handler);
+    },
+    on(event: string, handler: Handler) {
+      handlers.set(event, handler);
+    },
+  } as unknown as ExtensionAPI;
+  const ctx = {
+    cwd: root,
+    hasUI: true,
+    sessionManager,
+    ui: {
+      select: async () => undefined,
+      notify: () => undefined,
+      setFooter: (factory: FooterFactory | undefined) => {
+        footerFactory = factory;
       },
-      on(event: string, handler: Handler) {
-        handlers.set(event, handler);
-      },
-    } as unknown as ExtensionAPI;
-    accessGate(pi);
-    const ctx = {
-      cwd: root,
-      hasUI: true,
-      ui: {
-        select: async () => undefined,
-        notify: () => undefined,
-        setStatus: (id: string, value: string | undefined) => statuses.set(id, value),
-      },
-    } as unknown as ExtensionContext;
+      getContextUsage: () => ({ percent: 35.2, contextWindow: 272000 }),
+    },
+  } as unknown as ExtensionContext;
 
-    await handlers.get("session_start")!(undefined, ctx);
-    assert.equal(statuses.get("access-profile"), "plan");
-    assert.ok(commands.has("profile"));
-    await commands.get("profile")!("guarded-write", ctx);
-    assert.equal(statuses.get("access-profile"), "guarded-write");
-    await commands.get("profile")!("status", ctx);
+  return {
+    commands,
+    handlers,
+    ctx,
+    startFooter(): Footer {
+      assert.ok(footerFactory);
+      return footerFactory(
+        { requestRender: () => renderRequests++ },
+        { fg: (_color, text) => text },
+        { getGitBranch: () => "main" },
+      );
+    },
+    getRenderRequests: () => renderRequests,
+    pi,
+  };
+}
+
+test("renders the active Profile in a two-line Footer and refreshes after switching", async () => {
+  const root = mkdtempSync(join(tmpdir(), "pi-access-index-"));
+  try {
+    const harness = createHarness(root);
+    accessGate(harness.pi);
+    await harness.handlers.get("session_start")!(undefined, harness.ctx);
+    const footer = harness.startFooter();
+
+    let lines = footer.render(120);
+    assert.equal(lines.length, 2);
+    assert.match(lines[0]!, /plan$/);
+    assert.doesNotMatch(lines[0]!, /Profile:/);
+    await harness.commands.get("profile")!("guarded-write", harness.ctx);
+    lines = footer.render(120);
+    assert.match(lines[0]!, /guarded-write$/);
+    assert.ok(harness.getRenderRequests() > 0);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
 });
 
-test("resets the active profile on every session start", async () => {
+test("resets the active Profile and Footer on every session start", async () => {
   const root = mkdtempSync(join(tmpdir(), "pi-access-index-"));
-  const commands = new Map<string, (args: string, ctx: ExtensionContext) => Promise<void>>();
-  type Handler = (event: unknown, ctx: ExtensionContext) => Promise<unknown>;
-  const handlers = new Map<string, Handler>();
-  const statuses = new Map<string, string | undefined>();
   try {
-    const pi = {
-      registerCommand(name: string, options: { handler: (args: string, ctx: ExtensionContext) => Promise<void> }) {
-        commands.set(name, options.handler);
-      },
-      on(event: string, handler: Handler) {
-        handlers.set(event, handler);
-      },
-    } as unknown as ExtensionAPI;
-    accessGate(pi);
-    const ctx = {
-      cwd: root,
-      hasUI: true,
-      ui: {
-        select: async () => undefined,
-        notify: () => undefined,
-        setStatus: (id: string, value: string | undefined) => statuses.set(id, value),
-      },
-    } as unknown as ExtensionContext;
-    await handlers.get("session_start")!(undefined, ctx);
-    await commands.get("profile")!("project-read", ctx);
-    assert.equal(statuses.get("access-profile"), "project-read");
-    await handlers.get("session_start")!(undefined, ctx);
-    assert.equal(statuses.get("access-profile"), "plan");
+    const harness = createHarness(root);
+    accessGate(harness.pi);
+    await harness.handlers.get("session_start")!(undefined, harness.ctx);
+    const footer = harness.startFooter();
+    await harness.commands.get("profile")!("project-read", harness.ctx);
+    assert.match(footer.render(120)[0]!, /project-read$/);
+
+    await harness.handlers.get("session_start")!(undefined, harness.ctx);
+    const resetFooter = harness.startFooter();
+    assert.match(resetFooter.render(120)[0]!, /plan$/);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
