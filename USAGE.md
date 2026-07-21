@@ -43,12 +43,13 @@ Built-in Profiles:
 | Profile | Description |
 |---------|-------------|
 | `file-read` | Read explicitly targeted project files; no listing, search, writes, or unclassified Shell commands |
-| `project-read` | Read and search `projectRoot`; no writes or unclassified Shell commands |
-| `research` | Read `projectRoot` and the temporary staging directory; unclassified commands require approval |
-| `plan` | Read and search the project; write only `docs/` and root `CONTEXT.md` |
-| `safe-write` | Write only configured source and test paths |
-| `project-write` | Write project files; known mutations are allowed, unclassified commands ask |
-| `guarded-write` | Write project files; every known mutation requires one-time approval |
+| `project-read` | Read and search `projectRoot`; no external paths, writes, or unclassified Shell commands |
+| `wide-read` | Read and search anywhere on the filesystem; blocked paths (secrets, keys, .git) are always denied |
+| `plan` | Read anywhere; write only `docs/` and root `CONTEXT.md` |
+| `inspect` | Read anywhere; write `docs/`, `CONTEXT.md`, and `/tmp/` for downloading and reviewing external code; mutations require approval |
+| `safe-write` | Read `projectRoot`; write only `src/` and `tests/`; mutations require approval |
+| `project-write` | Read anywhere; write project files; known mutations allowed, unclassified commands ask |
+| `guarded-write` | Read anywhere; write project files; every mutation requires one-time approval |
 
 Commands:
 
@@ -80,11 +81,11 @@ Example:
 
 ```json
 {
-  "defaultProfile": "plan-research",
+  "defaultProfile": "plan-inspect",
   "profiles": {
-    "plan-research": {
-      "description": "Write task documents and approve unclassified research commands.",
-      "extends": ["plan", "research"],
+    "plan-inspect": {
+      "description": "Write task documents and approve inspection commands for downloading external code.",
+      "extends": ["plan", "inspect"],
       "shellPolicy": {
         "readOnly": "allow",
         "mutating": "deny",

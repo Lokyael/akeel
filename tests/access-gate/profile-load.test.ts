@@ -24,11 +24,11 @@ test("project profiles override same-name built-ins and can extend them", () => 
     mkdirSync(join(agentDir, "extensions", "access-gate"), { recursive: true });
     mkdirSync(join(project, ".pi", "extensions", "access-gate"), { recursive: true });
     writeFileSync(join(agentDir, "extensions", "access-gate", "profiles.json"), JSON.stringify({
-      defaultProfile: "research",
+      defaultProfile: "inspect",
       profiles: {
-        research: {
+        inspect: {
           extends: ["project-read"],
-          description: "Global research profile.",
+          description: "Global inspect profile.",
           shellPolicy: { unclassified: "ask" },
         },
       },
@@ -36,9 +36,9 @@ test("project profiles override same-name built-ins and can extend them", () => 
     writeFileSync(join(project, ".pi", "extensions", "access-gate", "profiles.json"), JSON.stringify({
       defaultProfile: "guarded-write",
       profiles: {
-        research: {
+        inspect: {
           extends: ["project-read"],
-          description: "Project research profile.",
+          description: "Project inspect profile.",
           shellPolicy: { unclassified: "ask" },
         },
       },
@@ -51,7 +51,7 @@ test("project profiles override same-name built-ins and can extend them", () => 
     else process.env.PI_CODING_AGENT_DIR = previous;
 
     assert.equal(result.defaultProfile, "guarded-write");
-    assert.equal(result.profiles.research.description, "Project research profile.");
+    assert.equal(result.profiles.inspect.description, "Project inspect profile.");
   } finally {
     rmSync(agentDir, { recursive: true, force: true });
     rmSync(project, { recursive: true, force: true });

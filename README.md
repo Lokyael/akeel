@@ -24,7 +24,7 @@ Principles and the access gate activate automatically. Skills load on demand.
 
 ## Access Gate
 
-The active Profile is the only permission mode exposed to users. Built-ins include `file-read`, `project-read`, `research`, `plan`, `safe-write`, `project-write`, and `guarded-write`. Project-local Profile overrides are read only for Pi-trusted projects.
+The active Profile is the only permission mode exposed to users. Built-ins include `file-read`, `project-read`, `wide-read`, `plan`, `inspect`, `safe-write`, `project-write`, and `guarded-write`. Project-local Profile overrides are read only for Pi-trusted projects.
 
 ```text
 /profile                 # Select a Profile

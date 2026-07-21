@@ -2,7 +2,7 @@
   "defaultProfile": "plan",
   "profiles": {
     "file-read": {
-      "description": "Read explicitly targeted files in projectRoot; deny directory listing, search, writes, and unclassified shell commands.",
+      "description": "Read explicitly targeted project files; deny directory listing, search, writes, and unclassified shell commands.",
       "shellPolicy": {
         "readOnly": "allow",
         "mutating": "deny",
@@ -29,22 +29,20 @@
         ]
       }
     },
-    "research": {
-      "description": "Read projectRoot and the staging directory; unclassified shell commands require one-time approval.",
-      "extends": ["project-read"],
+    "wide-read": {
+      "description": "Read and search anywhere on the filesystem; deny writes, mutations, and unclassified shell commands. Blocked paths (secrets, keys, .git internals) are always denied and cannot be relaxed.",
       "shellPolicy": {
-        "mutating": "ask",
-        "unclassified": "ask"
+        "readOnly": "allow",
+        "mutating": "deny",
+        "unclassified": "deny"
       },
       "pathPolicy": {
-        "rules": [
-          { "path": "staging/**", "read": "allow", "list": "allow", "search": "allow", "write": "allow" }
-        ]
+        "default": { "read": "allow", "list": "allow", "search": "allow", "write": "deny" }
       }
     },
     "plan": {
-      "description": "Read and search projectRoot; write only docs/ and root CONTEXT.md.",
-      "extends": ["project-read"],
+      "description": "Read and search anywhere; write only docs/ and root CONTEXT.md. Blocked paths are always denied.",
+      "extends": ["wide-read"],
       "pathPolicy": {
         "rules": [
           { "path": "project/docs/**", "write": "allow" },
@@ -52,8 +50,23 @@
         ]
       }
     },
+    "inspect": {
+      "description": "Read and search anywhere; write project docs/ and /tmp/ for downloading and reviewing external code. Mutations and unclassified commands require one-time approval. No source-tree writes.",
+      "extends": ["wide-read"],
+      "shellPolicy": {
+        "mutating": "ask",
+        "unclassified": "ask"
+      },
+      "pathPolicy": {
+        "rules": [
+          { "path": "project/docs/**", "write": "allow" },
+          { "path": "project/CONTEXT.md", "write": "allow" },
+          { "path": "/tmp/**", "read": "allow", "list": "allow", "search": "allow", "write": "allow" }
+        ]
+      }
+    },
     "safe-write": {
-      "description": "Read projectRoot and write only the configured safe source and test paths.",
+      "description": "Read and search projectRoot; write only source and test paths. Mutations and unclassified commands require one-time approval.",
       "extends": ["project-read"],
       "shellPolicy": {
         "mutating": "ask",
@@ -67,8 +80,8 @@
       }
     },
     "project-write": {
-      "description": "Read and write projectRoot; known mutating shell commands are allowed and unclassified commands require approval.",
-      "extends": ["project-read"],
+      "description": "Read and search anywhere; write project files. Known mutations are allowed and unclassified commands require approval. Blocked paths and .git are always denied.",
+      "extends": ["wide-read"],
       "shellPolicy": {
         "mutating": "allow",
         "unclassified": "ask"
@@ -80,8 +93,8 @@
       }
     },
     "guarded-write": {
-      "description": "Read and write projectRoot; every known mutation and unclassified shell command requires one-time approval.",
-      "extends": ["project-read"],
+      "description": "Read and search anywhere; write project files. Every known mutation and unclassified shell command requires one-time approval. Blocked paths and .git are always denied.",
+      "extends": ["wide-read"],
       "shellPolicy": {
         "mutating": "ask",
         "unclassified": "ask"
