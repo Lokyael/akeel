@@ -41,9 +41,9 @@
 - `blockedPaths`、threat scan 和 unsafe Shell rules 是不可覆盖边界。
 - Profile 组合只允许显式继承；路径规则保留合并后的声明顺序，由 first-match 决定结果。
 - principles 注入 + Quick Reference 是模型在用户项目中获取通用约束的唯一渠道。
+- 用户项目文档统一为 `CONTEXT.md`、`docs/decisions.md` 和 `docs/task.md`；Task Record 验证完成后删除，长期信息提炼后保留。
 - snapshot/rollback 和伪 OS sandbox 能力不进入 runtime，避免文档承诺超过实际 enforcement。
 
-## 维护规则
+## 维护边界
 
-- 新增产物只需在本摘要补充来源和融合决策，不复制实现细节。
-- 行为、路径和命令规则以源码及测试为准；测试入口以 `package.json` 为准。
+来源与融合决策记录在本文；行为、路径和命令规则以源码及测试为准，测试入口以 `package.json` 为准。

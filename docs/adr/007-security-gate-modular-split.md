@@ -1,12 +1,25 @@
 # ADR-007: 安全扩展模块化拆分（历史）
 
-> 本 ADR 描述的旧 config/pipeline 结构已由 ADR-017 的 Profile access-gate 架构取代。
+> 当前运行时架构以 ADR-017 和 ADR-018 为准。本记录保留旧拆分决策的背景。
 
 **分类：** 代码架构
 
-| 维度 | 内容 |
-|------|------|
-| **问题** | `security-gate.ts` 是 902 行巨石文件，混合了类型定义、4 组模式库、3 组预设配置、配置加载、规则评估、shell 检测、审计——8 个独立关注点。 |
-| **决策** | 拆分为 `src/security-gate/` 目录下模块 + `pipeline/` 子目录。预置加载整合到 `config/index.ts`。管道分层为 `pipeline/plan-gate.ts`、`pipeline/bash.ts`、`pipeline/permission.ts`，每层独立可测。主入口 `index.ts` 负责事件注册和管道组装。 |
-| **理由** | 1. 关注点分离——每个模块可独立理解和测试。2. `config/index.ts` 从 `config/presets.json` 动态加载 + deepMerge，消除配置重复。3. `taxonomy/commands.ts` 统一命令分类（见 ADR-011）。4. `bootstrap/index.ts` 注入内容外化到 `principles.md`，非程序员可直接编辑。 |
-| **后果** | 模块可独立测试。权限 gate 的日志记录不属于 pi-keel 当前能力范围；gate decision 不依赖日志 I/O。 |
+## 问题
+
+旧的 `security-gate.ts` 同时承担类型、规则库、配置加载、规则评估、Shell 检测和事件编排，职责过多且难以独立测试。
+
+## 决策
+
+按职责拆分配置、命令分类、安全检测、路径与权限策略、生命周期状态和事件管道；入口只负责注册事件并组装模块。
+
+## 理由
+
+职责边界让模块可以独立理解和测试，配置与规则各自拥有明确来源，入口层也不再承载策略细节。
+
+## 不采用的方案
+
+不继续扩展单文件实现，因为新增安全规则会同时扩大耦合面和测试范围。
+
+## 当前状态
+
+后续 Profile access-gate 架构取代了本 ADR 中的旧目录和 pipeline 设计；“按职责拆分、入口负责组装”的原则仍适用。

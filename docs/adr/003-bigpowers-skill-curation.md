@@ -1,10 +1,23 @@
-# ADR-003: bigpowers 72→10 技能精选
+# ADR-003: bigpowers 技能精选
 
 **分类：** 技能策展
 
-| 维度 | 内容 |
-|------|------|
-| **问题** | bigpowers 有 72 个技能。为什么精选到 ~10 个并融合进其他来源的技能？ |
-| **决策** | 只保留 bigpowers 独有的、且质量超过其他仓库对应物的技能。 |
-| **理由** | 1. ~36 个是 Claude Code 专用的（orchestrate-project, build-epic, execute-plan 等）。2. ~8 个被 mattpocock/superpowers 更好版本替代。3. ~10 个是内部元工具（craft-skill, evolve-skill 等）。4. ~8 个是项目特定（publish-package, wire-ci 等）。 |
-| **后果** | 失去 bigpowers 的 lifecycle 自动编排能力。通过 bootstrap + survey-context 手动编排来补偿。 |
+## 问题
+
+bigpowers 的技能集合包含大量平台专用、重复或项目特定内容，是否应整体引入？
+
+## 决策
+
+只引入 bigpowers 中具有独特价值、且没有更合适替代品的技能，并与其他来源的实践融合。
+
+## 理由
+
+整体引入会把 Claude Code 专用流程、已有更好实现的重复技能、内部元工具和项目特定能力带入 pi，增加加载和维护成本。精选后保留与 pi 工作方式匹配的通用能力。
+
+## 不采用的方案
+
+不整体复制 bigpowers，也不按原仓库的生命周期结构照搬，因为其中相当部分不适用于 pi 或已被其他来源覆盖。
+
+## 影响
+
+不提供 bigpowers 的自动生命周期编排；相关流程由 bootstrap、技能匹配和 `survey-context` 协同完成。

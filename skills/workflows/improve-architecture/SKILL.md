@@ -17,7 +17,7 @@ Surface architectural friction and propose **deepening opportunities** — refac
 - If the user named a direction (a module, subsystem, pain point), take it.
 - Otherwise, walk back commit history (`git log --oneline`) to find hot spots — files and areas that keep coming up.
 
-Read the project's `CONTEXT.md` and any ADRs in the area first. Then explore organically and note where you experience friction:
+Read the project's `CONTEXT.md` and relevant entries in `docs/decisions.md` first. Then explore organically and note where you experience friction:
 
 - Where does understanding one concept require bouncing between many modules?
 - Where are modules **shallow** — interface nearly as complex as the implementation?
@@ -44,4 +44,4 @@ End with a **Top recommendation** — which to tackle first and why.
 
 Once the user picks a candidate, run the `/skill:grill-plan` skill to walk the decision tree — constraints, dependencies, the shape of the deepened module, what tests survive.
 
-Side effects happen inline as decisions crystallise: update `CONTEXT.md` for new terms, create ADRs for load-bearing decisions.
+Side effects happen inline as decisions crystallise: update `CONTEXT.md` for new terms and append load-bearing decisions to `docs/decisions.md`.

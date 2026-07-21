@@ -2,9 +2,22 @@
 
 **分类：** 技能哲学
 
-| 维度 | 内容 |
-|------|------|
-| **问题** | superpowers 使用"IF A SKILL APPLIES, YOU MUST USE IT. This is not negotiable."的强制性语言。是否采用？ |
-| **决策** | 不采用。改为"use skills when they match, user instructions take precedence"。 |
-| **理由** | 1. superpowers 的强制语气在实测中常被模型无视或产生抗拒。2. Pi 哲学强调"user control over agent"。3. 技能是工具，不是枷锁。 |
-| **后果** | 模型可能在某些场景跳过技能。通过提高 description 质量和 bootstrap 中的引导语言来补偿。 |
+## 问题
+
+技能匹配后是否必须强制执行，才能保证工程流程一致？
+
+## 决策
+
+采用软性匹配：技能适用时使用，但用户指令优先，不把技能描述为不可协商的强制规则。
+
+## 理由
+
+Pi 的核心交互是用户控制 agent。技能是帮助模型判断和执行工作的工具，强制语气既不能可靠改变模型行为，也会增加与用户意图冲突的风险。通过清晰的技能 description 和 bootstrap 引导提高匹配率。
+
+## 不采用的方案
+
+不采用“匹配即必须执行”的硬性措辞，因为它无法提供可靠的执行保证，且可能阻断用户明确要求的更简单路径。
+
+## 影响
+
+个别适用技能可能被跳过；技能 description 和全会话原则注入必须保持清晰、可执行。

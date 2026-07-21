@@ -88,8 +88,7 @@ Include doc changes in the same commit as code changes.
 
 *Boundaries prevent scope creep. Write them down.*
 
-Every spec, plan, ADR, design doc, and ticket must state what is deliberately
-out of scope. Use this format:
+Every Task Record and load-bearing decision must state what is deliberately out of scope when exclusions matter. Use this format:
 
 ```
 - **[What]**: [Why not now]. Revisit when [condition].
@@ -172,8 +171,8 @@ Find at least one to reject before responding.
 ## When You Start a Session
 
 Read the project's CONTEXT.md if it exists — before touching code, even if the
-user hasn't asked. Its structure (Glossary, ADR Index, Negative Space) is in
-Quick Reference below.
+user hasn't asked. Its structure (Glossary, Architecture, Security Boundaries,
+Active Decisions, Negative Space) is in Quick Reference below.
 
 If CONTEXT.md doesn't exist yet, the project may be early-stage.
 Use `/skill:survey-context` to orient.
@@ -182,37 +181,43 @@ Use `/skill:survey-context` to orient.
 
 ## Quick Reference
 
-### Standard Artifact Paths
+### User-Project Document Set
 
-| Artifact | Path | Produced By |
-|----------|------|-------------|
-| Spec | `docs/specs/YYYY-MM-DD-<topic>-spec.md` | draft-spec |
-| Plan | `docs/plans/YYYY-MM-DD-<name>.md` | plan-writing |
-| Design doc | `docs/designs/YYYY-MM-DD-<topic>-design.md` | brainstorm-design |
-| Tickets | `docs/tickets/YYYY-MM-DD-<topic>-tickets.md` | draft-tickets |
-| ADR | `docs/adr/NNNN-<title>.md` | domain-modeling, grill-docs |
+User projects maintain three document entry points:
 
-### Artifact Status Transitions
+| Document | Purpose | Lifecycle |
+|----------|---------|-----------|
+| `CONTEXT.md` | Current glossary, architecture, invariants, security boundaries, active decisions, and Negative Space | Permanent; update current truth only |
+| `docs/decisions.md` | Load-bearing decisions with rationale and rejected alternatives | Permanent; mark superseded decisions, do not rewrite history |
+| `docs/task.md` | Active feature, bug, refactor, design, plan, or maintenance task | Temporary; remove completed tasks after durable updates |
+
+Use `docs/task-<topic>.md` only when genuinely independent tasks must have separate lifecycles. Keep these files flat; do not create type-specific subdirectories or date-based copies.
+
+### Task Lifecycle
 
 ```
-Plan:   draft  →  in-progress  →  done
-Spec:   draft  →  approved     →  implemented
-Ticket: - [ ]   →  - [x]
+Task:     draft → in-progress → verified → removed
+Decision:  active → superseded
+Context:   current truth, no status transition
 ```
 
-Producer sets initial status. Consumer updates it. `survey-context` reports
-in-progress artifacts (possible interrupted session). `doc-sync` flags artifacts
-whose status no longer matches reality.
+A Task Record may use `Kind: feature | bug | refactor | investigation | maintenance`. Its `Out of Scope`, Requirements, Design, Plan, Evidence, and durable-update checklist stay in the same task file.
+
+When a task reaches `verified`, update `CONTEXT.md` and `docs/decisions.md` when needed, then remove the completed task or file. Git and external issue tracking retain process history; do not create a default archive directory.
+
+`survey-context` reads only `CONTEXT.md`, `docs/decisions.md`, `docs/task.md`, and `docs/task-*.md`. It does not scan legacy or type-specific artifact paths.
 
 ### User-Project CONTEXT.md Structure
 
 ```
-## Glossary          ← domain terms and precise meanings
-## ADR Index         ← architecture decisions that constrain implementation
-## Negative Space    ← what the project deliberately excludes
+## Glossary           ← domain terms and precise meanings
+## Architecture       ← current structure and invariants
+## Security Boundaries ← current security promises and residual limits
+## Active Decisions   ← IDs and links into docs/decisions.md
+## Negative Space     ← what the project deliberately excludes
 ```
 
-`domain-modeling` builds this lazily. `survey-context` reads it for orientation.
+`domain-modeling` updates this file when current terminology, constraints, or decisions change. It does not copy the full decision record into `CONTEXT.md`.
 
 ---
 

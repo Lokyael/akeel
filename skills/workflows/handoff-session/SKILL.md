@@ -12,13 +12,13 @@ Include:
 - **Goal**: What we're trying to accomplish
 - **Current state**: Where we are in the process
 - **Key decisions**: What was decided and why
-- **Files involved**: Paths to relevant files, specs, plans
+- **Files involved**: Paths to relevant files, `CONTEXT.md`, `docs/decisions.md`, or the active Task Record (`docs/task.md` or `docs/task-<topic>.md`)
 - **Next steps**: What to do next
 - **Suggested skills**: Which skills the next agent should invoke
 
 ## What NOT to Include
 
-- Content already captured in other artifacts (specs, plans, ADRs, tickets, commits). Reference them by path.
+- Content already captured in `CONTEXT.md`, `docs/decisions.md`, an active Task Record, or commits. Reference it by path.
 - Sensitive information: API keys, passwords, tokens, personally identifiable information.
 
 ## How to Use

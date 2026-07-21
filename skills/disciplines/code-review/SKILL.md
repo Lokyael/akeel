@@ -1,6 +1,6 @@
 ---
 name: code-review
-description: 'Use when the user wants to review a branch, a PR, work-in-progress changes, or asks to "review since X" — two-axis parallel review: Standards (conventions?) and Spec (requirements?).'
+description: 'Use when the user wants to review a branch, a PR, task-in-progress changes, or asks to "review since X" — two-axis parallel review: Standards (conventions?) and Requirements (expected behavior?).'
 ---
 
 # Code Review
@@ -8,7 +8,7 @@ description: 'Use when the user wants to review a branch, a PR, work-in-progress
 Two-axis review of the diff between `HEAD` and a fixed point the user supplies:
 
 - **Standards** — does the code conform to this repo's documented coding standards?
-- **Spec** — does the code faithfully implement the originating issue/PRD/spec?
+- **Requirements** — does the code faithfully implement the originating issue, expected behavior, or Task Record?
 
 Both axes run as **parallel analyses** so they don't pollute each other's context, then results are aggregated.
 
@@ -19,13 +19,13 @@ Both axes run as **parallel analyses** so they don't pollute each other's contex
 Capture the diff: `git diff <fixed-point>...HEAD` (three-dot for merge-base).
 Confirm the fixed point resolves and the diff is non-empty.
 
-### 2. Identify the Spec Source
+### 2. Identify the Task Record
 
-Look for the originating spec:
+Look for the originating Task Record:
 1. Issue references in commit messages (`#123`, `Closes #45`)
 2. A path the user passed as an argument
-3. A spec file under `docs/`, `specs/`, or `plan/` matching the branch name
-4. If nothing found, ask. If there isn't one, the Spec axis reports "no spec available."
+3. A matching Task Record in `docs/task.md` or `docs/task-<topic>.md`
+4. If nothing is found, ask. If there is no Task Record, the Requirements axis reports "no requirements source available."
 
 ### 3. Identify Standards Sources
 
@@ -55,21 +55,21 @@ On top of whatever the repo documents, apply the **smell baseline** — a fixed 
 - (a) Every place the diff violates a documented standard — cite the standard
 - (b) Any baseline smell spotted — name it and quote the hunk
 
-**Spec review** — against the spec document:
+**Requirements review** — against the Task Record:
 - (a) Requirements asked for that are missing or partial
 - (b) Behaviour in the diff that wasn't asked for (scope creep)
-- (c) Requirements that look implemented but the implementation looks wrong — quote the spec line
+- (c) Requirements that look implemented but the implementation looks wrong — quote the Task Record line
 
 ### 5. Aggregate
 
-Present under `## Standards` and `## Spec` headings. Do **not** merge or rerank — the two axes are deliberately separate.
+Present under `## Standards` and `## Requirements` headings. Do **not** merge or rerank — the two axes are deliberately separate.
 
 End with: total findings per axis, and the worst issue within each axis (if any).
 
 ## Why Two Axes
 
 A change can pass one axis and fail the other:
-- Code that follows every standard but implements the wrong thing → **Standards pass, Spec fail**
-- Code that does exactly what the issue asked but breaks conventions → **Spec pass, Standards fail**
+- Code that follows every standard but implements the wrong thing → **Standards pass, Requirements fail**
+- Code that does exactly what the issue asked but breaks conventions → **Requirements pass, Standards fail**
 
 Reporting them separately stops one from masking the other.

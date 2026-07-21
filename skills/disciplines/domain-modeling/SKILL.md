@@ -1,6 +1,6 @@
 ---
 name: domain-modeling
-description: Use when the user wants to pin down domain terminology or record an architectural decision — challenge terms against glossary, stress-test with edge cases, update CONTEXT.md and ADRs inline.
+description: Use when the user wants to pin down domain terminology or record a load-bearing decision — challenge terms against the glossary, stress-test edge cases, and update CONTEXT.md and docs/decisions.md inline.
 ---
 
 # Domain Modeling
@@ -9,19 +9,17 @@ Actively build and sharpen the project's domain model as you design. This is the
 
 ## File Structure
 
-Most repos have a single context:
+User projects keep current knowledge and decisions in two stable files:
 
 ```
 /
 ├── CONTEXT.md
 ├── docs/
-│   └── adr/
-│       ├── 0001-event-sourced-orders.md
-│       └── 0002-postgres-for-write-model.md
+│   └── decisions.md
 └── src/
 ```
 
-Create files lazily — only when you have something to write. If no `docs/adr/` exists, create it when the first ADR is needed.
+Create `CONTEXT.md` when current project terminology or constraints first need a home, and create `docs/decisions.md` lazily when the first load-bearing decision is needed. Do not create one file per decision.
 
 ## During the Session
 
@@ -43,15 +41,11 @@ When the user states how something works, check whether the code agrees. If you 
 
 ### Update CONTEXT.md Inline
 
-When a term crystallises, add it to `CONTEXT.md` immediately. The canonical structure
-is in principles.md Quick Reference — User-Project CONTEXT.md Structure.
-Build sections lazily: Glossary → ADR Index → Negative Space.
+When a term or current constraint crystallises, add it to `CONTEXT.md` immediately. The canonical structure is in principles.md Quick Reference — User-Project CONTEXT.md Structure. Build sections lazily: Glossary → Architecture → Security Boundaries → Active Decisions → Negative Space.
 
-### Create ADRs for Load-Bearing Decisions
+### Record Load-Bearing Decisions
 
-Offer: "Want me to record this as an ADR?" for hard, contentious, or
-future-explorer-relevant decisions. Every ADR must include an Out of Scope row
-(principles.md §7 format). If nothing is excluded, omit the row.
+Offer: "Want me to record this in `docs/decisions.md`?" for hard, contentious, or future-explorer-relevant decisions. Append a precise `D-xxx: <decision>` entry with the decision, reasons, rejected alternatives, consequences, and genuine Out of Scope items. Do not record exploratory steps or create a separate file.
 
 ## Integration
 

@@ -1,32 +1,35 @@
 ---
 name: plan-writing
-description: Use when you have a spec or requirements for a multi-step task, before touching code — bite-sized tasks (2-5 min each), exact file paths, complete code in every step.
+description: Use when you have requirements for a multi-step task, before touching code — bite-sized tasks (2-5 min each), exact file paths, complete code in every step.
 ---
 
 # Writing Plans
 
 Write comprehensive implementation plans assuming the engineer has zero context and questionable taste. Document everything: which files to touch, code, testing, verification. DRY. YAGNI. TDD. Frequent commits.
 
-**Save plans to:** `docs/plans/YYYY-MM-DD-<feature-name>.md`
+**Save plans to:** Add a `Kind: feature|refactor|maintenance` Task Record to `docs/task.md`. Use `docs/task-<topic>.md` only for genuinely independent concurrent tasks.
 
 ## Plan Header
 
-Every plan MUST start with:
+Every Task Record MUST include:
 
 ```markdown
-# [Feature Name] Implementation Plan
+## T-001: [Feature Name]
 
+**Kind:** feature
 **Status:** draft
 **Goal:** [One sentence]
 
-**Architecture:** [2-3 sentences about approach]
+### Architecture
 
-**Tech Stack:** [Key technologies]
+[2-3 sentences about approach]
 
-**Out of Scope:** (per principles.md §7 — what + why not now + revisit when. Omit if nothing.)
+### Out of Scope
+
+(per principles.md §7 — what + why not now + revisit when. Omit if nothing.)
 ```
 
-Status transitions and lifecycle: per principles.md Quick Reference — Artifact Status Transitions.
+Status transitions and cleanup: per principles.md Quick Reference — Task Lifecycle.
 
 ## Global Constraints
 
@@ -104,12 +107,12 @@ Every step must contain actual content. These are **plan failures** — never wr
 ## Self-Review
 
 After writing the plan:
-1. **Spec coverage**: Can you point to a task for every spec requirement? List gaps.
+1. **Requirement coverage**: Can you point to a task for every requirement? List gaps.
 2. **Placeholder scan**: Search for red flags — any TBD/TODO/vague steps. Fix them.
-3. **Type consistency**: Do types/signatures in later tasks match earlier definitions?
+3. **Interface consistency**: Do interfaces and signatures in later tasks match earlier definitions?
 
-Fix issues inline. If a spec requirement has no task, add the task.
+Fix issues inline. If a requirement has no task, add the task.
 
 ## Execution Handoff
 
-After saving: "Plan saved to `docs/plans/<filename>.md`. Ready to implement with `/skill:implement-work`."
+After updating the Task Record: "Task recorded in `docs/task.md`. Ready to implement with `/skill:implement-work`."

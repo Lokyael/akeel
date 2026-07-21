@@ -7,7 +7,7 @@ description: Use when implementing any feature or bugfix before writing implemen
 
 TDD is the red → green loop. This skill makes that loop produce tests worth keeping: what a good test is, where tests go, the anti-patterns to avoid, and the rules of the loop.
 
-When exploring the codebase, read `CONTEXT.md` (if it exists) so test names and interface vocabulary match the project's domain language. Respect ADRs in the area you're touching.
+When exploring the codebase, read `CONTEXT.md` (if it exists) so test names and interface vocabulary match the project's domain language. Respect relevant entries in `docs/decisions.md`.
 
 ## Iron Law
 

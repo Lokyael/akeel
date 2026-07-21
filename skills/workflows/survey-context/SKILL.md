@@ -1,43 +1,38 @@
 ---
 name: survey-context
-description: Per-task context bootstrap — reads existing specs, plans, and docs to map the current project state and suggest the next action. Use at the start of any task, when returning after a break, or when unsure what to do next.
+description: Per-task context bootstrap — reads the project's current knowledge and active tasks to map the project state and suggest the next action. Use at the start of any task, when returning after a break, or when unsure what to do next.
 ---
 
 # Survey Context
 
-Read the project's current state and give a phase map + next-skill recommendation. This is the "where am I?" skill — run it at the start of every task.
+Read the project's current state and produce a phase map plus the next-skill recommendation. This is the context bootstrap for every task.
 
 ## Process
 
-### 1. Read CONVENTIONS.md
+### 1. Read project conventions
 
-If `CONVENTIONS.md` exists at the project root, read it first. It contains the rules all agents must follow.
+Read `CONVENTIONS.md` if it exists. Read `AGENTS.md` or `CLAUDE.md` for engineering constraints. These files are user-owned and read-only to pi-keel.
 
-### 2. Read CONTEXT.md
+### 2. Read current project knowledge
 
-If `CONTEXT.md` exists at the project root, read it. Internalize the Glossary (use these exact terms) and Negative Space (do not propose work in these areas).
+Read `CONTEXT.md` if it exists. Internalize its Glossary, Architecture, Security Boundaries, Active Decisions, and Negative Space.
 
-### 3. Read Specs Directory
+### 3. Read durable decisions
 
-Scan `specs/` if it exists:
-```
-specs/
-├── state.yaml              → session: active_flow, epic, git, handoff
-├── release-plan.yaml       → target version, epic index
-├── execution-status.yaml   → story/epic status
-├── requirements/           → VISION, SCOPE, GLOSSARY
-├── plans/                  → TECH_STACK, TEST_PLAN
-├── epics/                  → epic capsules with stories/tasks
-└── bugs/                   → BUG-*.md
-```
+Read `docs/decisions.md` if it exists. Use it for the rationale behind current architecture and constraints. Do not treat it as an active task list.
 
-Note: exists? keys populated? `handoff.next_skill`?
+### 4. Read active tasks
 
-### 4. Read AGENTS.md
+Read `docs/task.md` and any flat `docs/task-<topic>.md` files if they exist. For each Task Record, note:
 
-Read the project's `AGENTS.md` (or `CLAUDE.md`) for project context: stack, commands, architecture, conventions.
+- `Kind` and `Status`
+- Goal, scope, and Requirements
+- Unresolved risks or decisions
+- Required durable updates
 
-### 5. Check Git State
+Do not scan or create type-specific directories or date-based artifact paths.
+
+### 5. Check Git state
 
 ```bash
 git status --short
@@ -45,21 +40,16 @@ git log --oneline -5
 git branch --show-current
 ```
 
-### 6. Check Previous Session State
+### 6. Synthesize and recommend
 
-If `specs/state.yaml` exists, read `handoff.next_skill` — this tells you exactly which skill the previous session intended to invoke next.
+Based on the project state:
 
-### 7. Synthesize and Recommend
+- No active task → suggest `brainstorm-design` for a new feature or `plan-writing` for explicit requirements.
+- Task Record is `draft` → suggest the next design, requirements, planning, or debugging skill based on its `Kind`.
+- Task Record is `in-progress` → continue it or ask whether to reassess if its evidence is stale.
+- Task Record is `verified` → apply durable updates, then remove the Task Record.
+- A bug is reported → suggest `bug-investigation`.
+- A load-bearing decision is unresolved → suggest `domain-modeling` or `grill-docs`.
+- No `CONTEXT.md` exists → note that current project knowledge has not yet been centralized.
 
-Based on what you found:
-- **No specs exist, greenfield** → suggest `brainstorm-design`
-- **Spec exists, no plan** → suggest `plan-writing`
-- **Plan exists, ready** → suggest `implement-work`
-- **Plan status: in-progress** → previous session may have been interrupted. Ask: "Plan X is marked in-progress. Continue or reassess?"
-- **Plan status: done, but spec changed** → spec was updated after implementation. Flag mismatch.
-- **Bug reported** → suggest `bug-investigation`
-- **State stale** → request clarification rather than assuming intent
-- **Specific phase active** (from state.yaml) → suggest next skill in that phase
-- **No AGENTS.md or no centralization conventions in it** → note it: "This project has no documented conventions for where config, modules, and rules live. If I notice scattered changes, I'll suggest centralizing per principles.md §8."
-
-Present findings concisely and ask: "Ready to proceed with [recommended skill]?"
+Present the findings concisely and ask: "Ready to proceed with [recommended skill]?"

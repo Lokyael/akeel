@@ -1,10 +1,10 @@
 ---
 name: draft-tickets
-description: Break any plan, spec, or conversation into a set of tracer-bullet tickets, each declaring its blocking edges. Use after draft-spec or when you have a plan ready for decomposition.
+description: Break the current Task Record into tracer-bullet task sections, each declaring its blocking edges. Use after draft-spec or when a plan is ready for decomposition.
 disable-model-invocation: true
 ---
 
-Break the plan or spec into independent, vertical-slice tickets. Each ticket should be a self-contained unit of work that delivers user-visible value.
+Break the Task Record in the current task file (`docs/task.md` or `docs/task-<topic>.md`) into independent, vertical-slice task sections. Each task should be a self-contained unit of work that delivers user-visible value.
 
 ## Ticket Template
 
@@ -40,4 +40,4 @@ Break the plan or spec into independent, vertical-slice tickets. Each ticket sho
 
 ## Output
 
-Save tickets to `docs/tickets/YYYY-MM-DD-<topic>-tickets.md`. If the user specifies an issue tracker, also create the corresponding issues and link them.
+Add task sections to the current Task Record. Use `docs/task.md` by default; use `docs/task-<topic>.md` only when the task has an independent lifecycle. If the user specifies an issue tracker, link each task from its section. Do not create a separate ticket file or directory.

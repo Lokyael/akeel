@@ -5,7 +5,7 @@ description: Use when reviewing pending changes, before merge, during verify-wor
 
 # Security Review
 
-> **HARD GATE** — Requires git context (branch with merge-base or diff). Reports write only under `specs/security/`.
+> **HARD GATE** — Requires git context (branch with merge-base or diff). Add the report to the current security-review section of the active Task Record (`docs/task.md` or `docs/task-<topic>.md`); create a `Kind: maintenance` Task Record in `docs/task.md` only when no active task exists.
 
 ## 5-Phase Scan
 
@@ -50,6 +50,4 @@ Each finding: **`File:Line` — Severity — Category**
 
 ## Verify
 
-```bash
-test -d specs/security && echo "OK: specs/security/ exists" || mkdir -p specs/security
-```
+The security review is complete only when its findings and evidence are recorded in the active Task Record, or when that Task Record is marked `verified` and its durable updates are complete.

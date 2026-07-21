@@ -142,6 +142,7 @@ npm run test:gate
 npm run test:shell-parse
 npm run test:cmd-semantics
 npm run test:index
+npm run test:footer
 ```
 
 ## Recovery

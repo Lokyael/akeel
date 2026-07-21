@@ -13,7 +13,7 @@ Activate automatically after:
 - Feature implementation (new capabilities, new modules)
 - Refactoring (architecture changes, file renames)
 - Adding/removing rules, tests, or configurations
-- Any change that alters what README/USAGE/ADRs describe
+- Any change that alters what README/USAGE, `CONTEXT.md`, `docs/decisions.md`, or the active Task Record describe
 
 ## The 4-Step Check
 
@@ -25,9 +25,10 @@ Scan the project root for documentation markers. Common files:
 |------|----------|------------|
 | Actual doc files in project | Features, counts, architecture, guides, conventions | Code changes that alter what the docs describe |
 
-Also scan `docs/plans/` and `docs/specs/` for artifacts with stale status:
-- Plan marked `done` but code was refactored afterward → update status or add note
-- Spec marked `implemented` but new requirements were added → update status to `draft` and flag
+Also scan `CONTEXT.md`, `docs/decisions.md`, `docs/task.md`, and `docs/task-*.md`:
+- A Task Record marked `verified` but durable updates are missing → update `CONTEXT.md` or `docs/decisions.md`
+- A Task Record marked `verified` with no remaining action → remove the Task Record
+- A superseded decision without a replacement reference → update its status and link
 
 ### Step 2: Verify Each Against Code
 
@@ -38,13 +39,13 @@ For each identified doc, verify:
 3. **Commands**: all listed commands still exist
 4. **References**: cross-references to other docs/files resolve
 5. **Examples**: code examples still work with current API
-6. **Artifact statuses**: plan/spec status fields match reality — if a plan says `done` but code was refactored, the plan is stale
+6. **Task lifecycle**: Task Record status matches reality; verified tasks are either removed or clearly blocked on a durable documentation update
 
 ### Step 3: Fix or Flag
 
 - Fix stale information immediately
 - Prefer removing stale counts over hardcoding new ones
-- Flag issues you can't fix: "The ADR references module X, removed in commit Y"
+- Flag issues you can't fix: "The decision record references module X, removed in commit Y"
 
 ## Anti-Patterns
 
@@ -59,6 +60,7 @@ For each identified doc, verify:
 
 After applying this skill:
 - Every doc count verified or removed
-- Every architecture diagram reflects current code
+- Every architecture description reflects current code
 - Every cross-reference resolves
 - No reference to deleted files, modules, or features
+- No completed Task Record remains without a documented reason

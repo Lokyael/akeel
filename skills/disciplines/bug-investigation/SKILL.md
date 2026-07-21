@@ -1,11 +1,11 @@
 ---
 name: bug-investigation
-description: Use when the user reports a bug, something is broken but root cause is unknown, or to start the debugging workflow — explore codebase, then write a bug file with reproduction steps, evidence, and hypotheses.
+description: Use when the user reports a bug, something is broken but root cause is unknown, or to start the debugging workflow — explore the codebase, then record a Task Record with reproduction steps, evidence, and hypotheses.
 ---
 
 # Investigate Bug
 
-End-to-end bug investigation. Produces a bug file that captures everything needed to fix it.
+End-to-end bug investigation. Produces a bug Task Record that captures everything needed to fix it.
 
 ## Process
 
@@ -38,58 +38,59 @@ Create the smallest possible reproduction. Write it down as exact steps. If you 
 - State of data before/after failure
 - Working examples for comparison
 
-### 5. Write the Bug File
+### 5. Record the Bug Task
 
-Save to `specs/bugs/BUG-<YYYY-MM-DD>-<slug>.md`:
+Add a precise `T-xxx: <bug-topic>` section to `docs/task.md` or the active `docs/task-<topic>.md` file:
 
 ```markdown
-# [Bug Title]
+## T-001: [Bug Title]
 
-**Status:** investigating
+**Kind:** bug
+**Status:** draft
 **Severity:** critical | high | medium | low
 **Reported:** YYYY-MM-DD
 
-## Description
+### Description
 
 [What happens and what should happen]
 
-## Reproduction
+### Reproduction
 
 1. [Step]
 2. [Step]
 3. [Observed vs Expected]
 
-## Environment
+### Environment
 
 - OS: ...
 - Version: ...
 - Branch: ...
 
-## Evidence
+### Evidence
 
 [Logs, stack traces, screenshots]
 
-## Investigation
+### Investigation
 
-### Recent Changes
+#### Recent Changes
 [Commits that may be related]
 
-### Affected Code
+#### Affected Code
 [Files and functions involved]
 
-### Hypotheses
+#### Hypotheses
 1. [Hypothesis] — falsification test: [test]
 2. [Hypothesis] — falsification test: [test]
 
-## Root Cause
+### Root Cause
 
-[To be filled by diagnose-root]
+[To be filled by systematic-debugging]
 
-## Fix
+### Fix
 
-[To be filled by fix-bug]
+[To be filled by implement-work]
 ```
 
 ### 6. Handoff
 
-After writing the bug file: hand off to `systematic-debugging` for root cause analysis.
+After recording the Task Record, hand off to `systematic-debugging` for root cause analysis.

@@ -6,7 +6,7 @@ disable-model-invocation: true
 
 # Brainstorming Ideas Into Designs
 
-Help turn ideas into fully formed designs and specs through natural collaborative dialogue.
+Help turn ideas into fully formed designs and Requirements through natural collaborative dialogue.
 
 <HARD-GATE>
 Do NOT invoke any implementation skill, write any code, scaffold any project, or take any implementation action until you have presented a design and the user has approved it. This applies to EVERY project regardless of perceived simplicity.
@@ -22,9 +22,9 @@ Every project goes through this process. "Simple" projects are where unexamined 
 2. **Ask clarifying questions** — one at a time, understand purpose/constraints/success criteria. Prefer multiple choice when possible. One question per message.
 3. **Propose 2-3 approaches** — with trade-offs and your recommendation. For interface-level design, apply Design Twice from codebase-design. Lead with your recommended option and explain why.
 4. **Present design** — in sections scaled to their complexity, get user approval after each section. Cover: architecture, components, data flow, error handling, testing, and Out of Scope (principles.md §7 format).
-5. **Write design doc** — save to `docs/designs/YYYY-MM-DD-<topic>-design.md`. Include Out of Scope.
-6. **Spec self-review** — quick check for placeholders, contradictions, ambiguity. Fix inline.
-7. **User reviews spec** — ask user to review before proceeding.
+5. **Record the design** — add the approved design to the current Task Record (`docs/task.md` or `docs/task-<topic>.md`). Include Out of Scope. Do not create a separate design file.
+6. **Work-item self-review** — quick check for placeholders, contradictions, and ambiguity. Fix inline.
+7. **User reviews the Task Record** — ask the user to review the design section before proceeding.
 
 ## Working in Existing Codebases
 
