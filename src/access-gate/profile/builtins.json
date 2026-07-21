@@ -43,7 +43,7 @@
       }
     },
     "plan": {
-      "description": "Read and search projectRoot; write project task and domain documents.",
+      "description": "Read and search projectRoot; write only docs/ and root CONTEXT.md.",
       "extends": ["project-read"],
       "pathPolicy": {
         "rules": [

@@ -11,7 +11,7 @@ test("loads the built-in profiles with plan as the default", () => {
     const result = loadProfiles(project, "/tmp/pi-access-agent-does-not-exist");
     assert.equal(result.defaultProfile, "plan");
     assert.ok(result.profiles.plan);
-    assert.match(result.profiles.plan.description, /task|domain/i);
+    assert.match(result.profiles.plan.description, /docs.*CONTEXT/);
   } finally {
     rmSync(project, { recursive: true, force: true });
   }
