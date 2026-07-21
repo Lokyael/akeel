@@ -6,7 +6,7 @@
 
 - pi-keel 提供 Profile 驱动的 command/path access gate，不提供 OS-level sandbox。
 - Profile 统一读取、写入、Shell 分类和一次性批准；网络不是当前独立策略轴。
-- 未分类命令由 Profile 的 `shellPolicy.unclassified` 决定；`research` 等 Profile 可以要求一次性批准。
+- 未分类命令由 Profile 的 `shellPolicy.unclassified` 决定；`plan`、`safe-write`、`develop`、`guarded-write` 可以要求一次性批准。
 - hard threat、危险命令、unsafe syntax、blocked paths 和 symlink escape 不可被 Profile 或用户批准覆盖。
 - snapshot/rollback、audit runtime、secret replacement 不属于当前 runtime。
 - 用户项目的 `README.md`、`AGENTS.md`、`.gitignore` 和 `package.json` 只读不写；第三方 extension 的直接操作不在本扩展的 enforcement 范围内。
