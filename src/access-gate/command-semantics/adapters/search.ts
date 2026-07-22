@@ -56,13 +56,24 @@ const SEARCH_CONFIG: Record<string, SearchConfig> = {
     class: "readOnly",
     defaultRoot: ".",
     rootAtArgIndex: 1, // pattern 在第一个非选项参数，targets 从第二个起
-    valueOpts: ["-e", "--regexp", "-f", "--file", "-g", "--glob", "-t", "--type", "--type-not", "--iglob", "--iglob-case-insensitive", "-m", "--max-count", "--max-columns", "--max-depth", "--sort", "--sortr"],
-    attachedValueOpts: ["-e", "--regexp=", "-f", "--file=", "-g", "--glob=", "-t", "--type=", "--type-not=", "--iglob=", "-m", "--max-count=", "--max-columns=", "--max-depth=", "--sort=", "--sortr="],
+    valueOpts: ["-e", "--regexp", "-f", "--file", "-g", "--glob", "-t", "--type", "--type-not", "--iglob", "--iglob-case-insensitive", "-m", "--max-count", "-A", "--after-context", "-B", "--before-context", "-C", "--context", "--max-columns", "--max-depth", "--sort", "--sortr"],
+    attachedValueOpts: ["-e", "--regexp=", "-f", "--file=", "-g", "--glob=", "-t", "--type=", "--type-not=", "--iglob=", "-m", "--max-count=", "-A", "--after-context=", "-B", "--before-context=", "-C", "--context=", "--max-columns=", "--max-depth=", "--sort=", "--sortr="],
     patternOpts: ["-e", "--regexp", "-f", "--file"],
     fileOpts: ["-f", "--file"],
     reason: "ripgrep search",
   },
 };
+
+function hasOption(args: readonly ShellArg[], option: string): boolean {
+  return args.some((arg) => {
+    const value = arg.value ?? "";
+    if (value === option) return true;
+    return option.length === 2
+      && value.startsWith("-")
+      && !value.startsWith("--")
+      && value.slice(1).includes(option[1]!);
+  });
+}
 
 export const searchAdapter: CommandAdapter = {
   names: Object.keys(SEARCH_CONFIG),
@@ -123,7 +134,7 @@ export const searchAdapter: CommandAdapter = {
     const foundRoots = positional.slice(rootIndex).map((arg) => arg.value ?? "");
     const roots = foundRoots.length > 0 ? foundRoots : [config.defaultRoot];
     const isRecursive = config.recursiveOpts
-      ? args.some((a) => config.recursiveOpts!.includes(a.value ?? ""))
+      ? config.recursiveOpts.some((option) => hasOption(args, option))
       : true;
 
     // 对于需要递归标记的命令，没有递归标记时不产生搜索 intent

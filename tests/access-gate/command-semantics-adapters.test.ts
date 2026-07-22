@@ -165,6 +165,14 @@ void test("search: grep -r searches directory", () => {
   assert.equal(sem.intents[0]!.rawPath, "src/");
 });
 
+void test("search: grep combined flags preserve recursive search", () => {
+  const { program } = parse(lex("grep -rn pattern src/").tokens);
+  const sem = analyzeSemantics(program.commands[0]!, CTX);
+  assert.equal(sem.intents.length, 1);
+  assert.equal(sem.intents[0]!.operation, "search");
+  assert.equal(sem.intents[0]!.rawPath, "src/");
+});
+
 void test("search: grep without -r produces a read intent", () => {
   const { program } = parse(lex("grep pattern file.txt").tokens);
   const sem = analyzeSemantics(program.commands[0]!, CTX);
@@ -200,6 +208,15 @@ void test("search: rg skips values for glob and type options", () => {
   assert.deepEqual(
     sem.intents.filter((intent) => intent.operation === "search").map((intent) => intent.rawPath),
     ["src/", "/etc"],
+  );
+});
+
+void test("search: rg skips context counts", () => {
+  const { program } = parse(lex("rg -n -C 3 pattern AGENTS.md").tokens);
+  const sem = analyzeSemantics(program.commands[0]!, CTX);
+  assert.deepEqual(
+    sem.intents.filter((intent) => intent.operation === "search").map((intent) => intent.rawPath),
+    ["AGENTS.md"],
   );
 });
 
@@ -260,11 +277,28 @@ void test("git: status is readOnly", () => {
   assert.equal(sem.class, "readOnly");
 });
 
+void test("git: rev-list is readOnly", () => {
+  const { program } = parse(lex("git rev-list --left-right --count origin/main...HEAD").tokens);
+  const sem = analyzeSemantics(program.commands[0]!, CTX);
+  assert.equal(sem.class, "readOnly");
+  assert.equal(sem.opaque, false);
+});
+
 void test("git: add produces read intents", () => {
   const { program } = parse(lex("git add src/file.ts").tokens);
   const sem = analyzeSemantics(program.commands[0]!, CTX);
   assert.equal(sem.class, "mutating");
   assert.ok(sem.intents.some((i) => i.operation === "read" && i.rawPath === "src/file.ts"));
+});
+
+void test("git: rm produces write intents for every path", () => {
+  const { program } = parse(lex("git rm --cached first.md second.md").tokens);
+  const sem = analyzeSemantics(program.commands[0]!, CTX);
+  assert.equal(sem.class, "mutating");
+  assert.deepEqual(
+    sem.intents.filter((intent) => intent.operation === "write").map((intent) => intent.rawPath),
+    ["first.md", "second.md"],
+  );
 });
 
 void test("git: checkout -- writes path", () => {

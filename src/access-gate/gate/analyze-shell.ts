@@ -79,7 +79,10 @@ export async function analyzeShellCommand(input: ShellInput): Promise<GateResult
       cwd: effectiveCwd,
     });
 
-    // 6c: Hard check for dangerous commands
+    // 6c: Hard check for commands whose effects cannot be safely explained
+    if (semantics.opaque) {
+      return decisionBlock(`opaque command cannot be analyzed: ${normalized.executable ?? "?"}`);
+    }
     if (semantics.class === "dangerous") {
       return decisionBlock(`dangerous command denied: ${normalized.executable ?? "?"}`);
     }
@@ -119,12 +122,16 @@ export async function analyzeShellCommand(input: ShellInput): Promise<GateResult
     }
 
     // 6h: Shell policy decision
-    const cmdName = normalized.executable ?? cmdNode.executable?.value ?? "?";
-    const shellDecision: Decision = input.profile.shellPolicy[semantics.class] ?? "deny";
-    if (shellDecision === "deny") return decisionBlock(`${semantics.class} shell command denied: ${cmdName}`);
-    if (shellDecision === "ask") {
-      const desc = semantics.reason ? ` (${semantics.reason})` : "";
-      addApproval(`${semantics.class} command: ${cmdName}${desc}`);
+    // cd is handled as a control-flow transition above; its target path is the authorization boundary.
+    const isCd = cmdNode.executable?.value?.toLowerCase() === "cd";
+    if (!isCd) {
+      const cmdName = normalized.executable ?? cmdNode.executable?.value ?? "?";
+      const shellDecision: Decision = input.profile.shellPolicy[semantics.class] ?? "deny";
+      if (shellDecision === "deny") return decisionBlock(`${semantics.class} shell command denied: ${cmdName}`);
+      if (shellDecision === "ask") {
+        const desc = semantics.reason ? ` (${semantics.reason})` : "";
+        addApproval(`${semantics.class} command: ${cmdName}${desc}`);
+      }
     }
   }
 

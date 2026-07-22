@@ -8,6 +8,8 @@ pi install git:github.com/Lokyael/pi-keel
 
 The access gate starts automatically. Use `/profile status` to inspect the active Profile.
 
+The Shell IR is intentionally a restricted command representation, not a full Bash grammar. It covers simple commands, known wrappers, control operators, redirections, and supported literal bodies; structured constructs such as `for`, `while`, `if`, and function definitions are not modeled as executable control flow. Dynamic tokens such as `$f`, command substitution, and unquoted globs are hard-denied. Use the direct `read`, `grep`, `find`, or `ls` tools for batch inspection instead of encoding the inspection as a Shell loop.
+
 ## Runtime Layout
 
 ```text
@@ -106,7 +108,7 @@ ask      Show Allow once / Deny
 
 `pathPolicy` makes decisions independently for `read`, `list`, `search`, and `write`. More-specific paths win. `blockedPaths` are global hard denials and cannot be relaxed.
 
-Network access is not a separate Profile axis yet. Commands without a matching adapter use the Profile's `shellPolicy.unclassified` decision.
+Network access is not a separate Profile axis yet. Commands without a matching adapter use the Profile's `shellPolicy.unclassified` decision. Commands that an adapter marks opaque because their effects cannot be safely classified are hard-denied.
 
 ## Enforcement
 
@@ -122,7 +124,7 @@ hard threat
 → one-time approval, when required
 ```
 
-Hard denials include dangerous commands (adapter class `dangerous`), dynamic execution, prompt/data-exfiltration threat patterns, protected paths, and symlink escapes. pi-keel does not provide a container, VM, seccomp policy, network namespace, or other OS-level sandbox.
+Hard denials include dangerous commands (adapter class `dangerous`), opaque command semantics, dynamic execution, prompt/data-exfiltration threat patterns, protected paths, and symlink escapes. pi-keel does not provide a container, VM, seccomp policy, network namespace, or other OS-level sandbox.
 
 Approval is never remembered. Every `ask` decision offers only:
 

@@ -20,7 +20,7 @@ Principles and the access gate activate automatically. Skills load on demand.
 - **Access profiles** — composable read/write path rules, Shell command decisions, one-time approval, hard protected paths, and threat scanning
 - **Session-safe authorization** — each Session starts from the configured default Profile; approvals are `Allow once` only
 - **Recovery boundary** — no automatic snapshots or rollback extension; use version control, editor history, or pi's session tree
-- **Test coverage** — 24 skill validations and 164 access-gate assertions（Profile 5 + 路径 4 + 加载 4 + Gate 17 + Shell IR 56 + control-flow 21 + adapters 52 + 集成 2 + Footer 3）
+- **Test coverage** — 24 skill validations and 174 access-gate assertions（Profile 5 + 路径 4 + 加载 4 + Gate 23 + Shell IR 56 + control-flow 21 + adapters 56 + 集成 2 + Footer 3）
 
 ## Access Gate
 
@@ -32,7 +32,7 @@ The active Profile is the only permission mode exposed to users. Built-ins inclu
 /profile status          # Show its detailed policy
 ```
 
-The Footer wraps Pi's native `FooterComponent` when available and uses two lines: the active Profile name appears on the first line with the project location, while the second line retains Pi's native token, context, cost, model, and extension-status details. Standalone tests use a local rendering fallback when the Pi host package is unavailable. Unknown Shell commands use the Profile's `unclassified` decision. Network commands are not managed by a separate policy axis yet, so unclassified network commands require one-time approval in Profiles that allow it.
+The Footer wraps Pi's native `FooterComponent` when available and uses two lines: the active Profile name appears on the first line with the project location, while the second line retains Pi's native token, context, cost, model, and extension-status details. Standalone tests use a local rendering fallback when the Pi host package is unavailable. Shell commands without a matching adapter use the Profile's `unclassified` decision; commands an adapter cannot safely analyze are hard-denied as opaque. Network commands are not managed by a separate policy axis yet, so unclassified network commands require one-time approval in Profiles that allow it.
 
 Hard threats, unsafe Shell syntax, symlink escapes, and blocked paths always deny and cannot be overridden by a Profile or approval.
 

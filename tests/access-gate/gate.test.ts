@@ -47,7 +47,7 @@ function projectWriteProfile(): ResolvedProfile {
   });
 }
 
-async function evaluateBash(command: string, activeProfile = profile()): Promise<Awaited<ReturnType<typeof evaluateToolCall>>> {
+async function evaluateBash(command: string, activeProfile = profile(), selection?: string): Promise<Awaited<ReturnType<typeof evaluateToolCall>>> {
   const root = mkdtempSync(join(tmpdir(), "pi-access-gate-"));
   const staging = mkdtempSync(join(tmpdir(), "pi-access-staging-"));
   try {
@@ -58,7 +58,7 @@ async function evaluateBash(command: string, activeProfile = profile()): Promise
       projectRoot: root,
       stagingDir: staging,
       profile: activeProfile,
-    }, { hasUI: true, select: async () => undefined });
+    }, { hasUI: true, select: async () => selection });
   } finally {
     rmSync(root, { recursive: true, force: true });
     rmSync(staging, { recursive: true, force: true });
@@ -186,6 +186,11 @@ test("checks explicit files in read-only file commands", async () => {
   assert.equal(catResult.kind, "block");
 });
 
+test("allows rg context options without treating the count as a search root", async () => {
+  const result = await evaluateBash("rg -n -C 3 pattern AGENTS.md");
+  assert.deepEqual(result, { kind: "allow" });
+});
+
 test("allows stderr discard to /dev/null without allowing other external writes", async () => {
   const result = await evaluateBash("rg pattern project/docs 2>/dev/null");
   assert.equal(result.kind, "allow");
@@ -194,6 +199,11 @@ test("allows stderr discard to /dev/null without allowing other external writes"
 test("tracks directory changes before checking relative reads", async () => {
   const result = await evaluateBash("cd /etc && cat shadow");
   assert.equal(result.kind, "block");
+});
+
+test("does not ask for cd when the target path is allowed", async () => {
+  const result = await evaluateBash("cd . && grep -rn pattern src/");
+  assert.deepEqual(result, { kind: "allow" });
 });
 
 test("checks every file redirection", async () => {
@@ -218,4 +228,43 @@ test("checks git source and checkout paths", async () => {
   const checkoutResult = await evaluateBash("git checkout -- ~/.ssh/id_rsa", projectWriteProfile());
   assert.equal(addResult.kind, "block");
   assert.equal(checkoutResult.kind, "block");
+});
+
+test("allows staging already deleted project files with git rm after approval", async () => {
+  const result = await evaluateBash(
+    "git rm docs/2026-07-19-access-gate-rewrite-design.md docs/2026-07-19-profile-access-gate-plan.md",
+    projectWriteProfile(),
+    "Allow once",
+  );
+  assert.deepEqual(result, { kind: "allow" });
+});
+
+test("denies git rm on protected paths", async () => {
+  const result = await evaluateBash("git rm ~/.ssh/id_rsa", projectWriteProfile());
+  assert.equal(result.kind, "block");
+});
+
+test("allows the compound git refresh inspection after fetch approval", async () => {
+  const command = "git fetch --prune origin && git status --short --branch && git rev-list --left-right --count origin/main...HEAD && git log --oneline --decorate origin/main..HEAD";
+  const activeProfile = profile({
+    shellPolicy: { readOnly: "allow", mutating: "ask", unclassified: "deny" },
+    pathPolicy: {
+      default: { read: "allow", list: "allow", search: "allow", write: "allow" },
+      rules: [],
+    },
+  });
+  const result = await evaluateBash(command, activeProfile, "Allow once");
+  assert.deepEqual(result, { kind: "allow" });
+});
+
+test("denies opaque command semantics even when unclassified commands are allowed", async () => {
+  const activeProfile = profile({
+    shellPolicy: { readOnly: "allow", mutating: "allow", unclassified: "allow" },
+    pathPolicy: {
+      default: { read: "allow", list: "allow", search: "allow", write: "allow" },
+      rules: [],
+    },
+  });
+  const result = await evaluateBash("git unknown-subcommand", activeProfile, "Allow once");
+  assert.deepEqual(result, { kind: "block", reason: "opaque command cannot be analyzed: git" });
 });
