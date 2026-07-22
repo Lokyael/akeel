@@ -65,14 +65,25 @@ function createHarness(root: string) {
   };
 }
 
-test("renders the active Profile in a two-line Footer and refreshes after switching", async () => {
+/** Create a harness, start a session, and return the harness + footer. */
+function startSession() {
   const root = mkdtempSync(join(tmpdir(), "pi-access-index-"));
-  try {
-    const harness = createHarness(root);
-    accessGate(harness.pi);
-    await harness.handlers.get("session_start")!(undefined, harness.ctx);
-    const footer = harness.startFooter();
+  const harness = createHarness(root);
+  const cleanup = () => rmSync(root, { recursive: true, force: true });
+  accessGate(harness.pi);
+  return { harness, root, cleanup };
+}
 
+async function startSessionWithFooter(): Promise<{ harness: ReturnType<typeof createHarness>; footer: Footer; cleanup: () => void }> {
+  const { harness, cleanup } = startSession();
+  await harness.handlers.get("session_start")!(undefined, harness.ctx);
+  const footer = harness.startFooter();
+  return { harness, footer, cleanup };
+}
+
+test("renders the active Profile in a two-line Footer and refreshes after switching", async () => {
+  const { harness, footer, cleanup } = await startSessionWithFooter();
+  try {
     let lines = footer.render(120);
     assert.equal(lines.length, 2);
     assert.match(lines[0]!, /plan$/);
@@ -82,17 +93,13 @@ test("renders the active Profile in a two-line Footer and refreshes after switch
     assert.match(lines[0]!, /query$/);
     assert.ok(harness.getRenderRequests() > 0);
   } finally {
-    rmSync(root, { recursive: true, force: true });
+    cleanup();
   }
 });
 
 test("resets the active Profile and Footer on every session start", async () => {
-  const root = mkdtempSync(join(tmpdir(), "pi-access-index-"));
+  const { harness, footer, cleanup } = await startSessionWithFooter();
   try {
-    const harness = createHarness(root);
-    accessGate(harness.pi);
-    await harness.handlers.get("session_start")!(undefined, harness.ctx);
-    const footer = harness.startFooter();
     await harness.commands.get("profile")!("read", harness.ctx);
     assert.match(footer.render(120)[0]!, /read$/);
 
@@ -100,6 +107,6 @@ test("resets the active Profile and Footer on every session start", async () => 
     const resetFooter = harness.startFooter();
     assert.match(resetFooter.render(120)[0]!, /plan$/);
   } finally {
-    rmSync(root, { recursive: true, force: true });
+    cleanup();
   }
 });
