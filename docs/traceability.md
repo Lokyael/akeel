@@ -19,7 +19,7 @@
 | `src/access-gate/` | pi-permission-system、cc-safety-net、pi-hermes-memory、pi-landstrip（部分为历史参考） | 以 Profile 为唯一 Session 权限状态，统一处理工具、Shell、路径和审批。 |
 | `src/access-gate/profile/` | 原创整合 | Profile 校验、继承、分层加载和内置 Profile 唯一来源。 |
 | `src/access-gate/shell-parse/` | 原创 | 受限 Shell IR：lexer（引用感知分词）+ parser（控制操作符、重定向、wrapper）|
-| `src/access-gate/command-semantics/` | 原创整合 | 统一命令语义：wrapper 规范化、control-flow、adapter 注册表（filesystem、text-transform、search、git、package、build）|
+| `src/access-gate/command-semantics/` | 原创整合 | 统一命令语义：wrapper 规范化、control-flow、adapter 注册表（filesystem、text-transform、search、read、noop、git、package、build）|
 | `src/access-gate/path/` | 原创整合 | 统一 `cwd`、`projectRoot`、`stagingDir`、按操作路径决策、blocked paths 和 symlink 检查。 |
 | `src/access-gate/gate/` | 统一 access gate 设计 | `evaluate.ts` 统一入口，`analyze-shell.ts` 使用新 IR + 语义注册表替代旧 shell-command |
 | `tests/access-gate/` | 项目行为测试 | 覆盖 Profile、路径、Shell IR、语义 adapter、Gate 和 Extension 状态。 |

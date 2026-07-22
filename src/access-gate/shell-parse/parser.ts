@@ -61,7 +61,10 @@ function tryParseRedirect(
   const op = tok.value;
 
   // detect fd prefix (e.g. 2>)
-  if (i > 0 && tokens[i - 1]?.kind === "word" && ALL_DIGITS.test(tokens[i - 1]!.value)) {
+  if (i > 0
+    && tokens[i - 1]?.kind === "word"
+    && ALL_DIGITS.test(tokens[i - 1]!.value)
+    && tokens[i - 1]!.span.end === tok.span.start) {
     fd = Number(tokens[i - 1]!.value);
   }
 
@@ -177,6 +180,16 @@ function parseCommandGroup(tokens: LexToken[]): Omit<ShellCommandNode, "operator
 
   while (i < tokens.length) {
     const tok = tokens[i]!;
+
+    // An adjacent numeric token belongs to the redirect, not command args.
+    if (tok.kind === "word"
+      && i + 1 < tokens.length
+      && tokens[i + 1]?.kind === "redirect"
+      && ALL_DIGITS.test(tok.value)
+      && tok.span.end === tokens[i + 1]!.span.start) {
+      i++;
+      continue;
+    }
 
     // ── 处理重定向 ──
     const redirect = tryParseRedirect(tokens, i);

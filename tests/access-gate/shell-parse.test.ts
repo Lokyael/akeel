@@ -204,6 +204,23 @@ void test("parser: stdout redirection", () => {
   assert.equal(cmd.redirections[0]!.target?.value, "out.txt");
 });
 
+void test("parser: consumes an adjacent stderr fd prefix", () => {
+  const { program } = parse(lex("cmd 2> err.txt").tokens);
+  const cmd = program.commands[0]!;
+  assert.equal(cmd.executable?.value, "cmd");
+  assert.deepEqual(cmd.args.map((arg) => arg.value), []);
+  assert.equal(cmd.redirections[0]!.kind, "stderr");
+  assert.equal(cmd.redirections[0]!.fd, 2);
+});
+
+void test("parser: preserves a spaced numeric argument before redirect", () => {
+  const { program } = parse(lex("cmd 2 > err.txt").tokens);
+  const cmd = program.commands[0]!;
+  assert.deepEqual(cmd.args.map((arg) => arg.value), ["2"]);
+  assert.equal(cmd.redirections[0]!.kind, "stdout");
+  assert.equal(cmd.redirections[0]!.fd, 1);
+});
+
 void test("parser: stdin redirection", () => {
   const { program } = parse(lex("sort < in.txt").tokens);
   const cmd = program.commands[0]!;

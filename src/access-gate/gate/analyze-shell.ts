@@ -6,6 +6,7 @@ import { analyzeSemantics } from "../command-semantics/registry";
 import { decidePath, resolvePath } from "../path";
 import { scanThreats } from "../security/threat-scan";
 import type { Decision, PathOperation } from "../profile/types";
+import type { ShellRedirectionNode } from "../shell-parse/types";
 import { askOnce, decisionBlock } from "./unknown-command";
 import type { GateResult, GateRuntime } from "./types";
 import type { ResolvedProfile } from "../profile/types";
@@ -97,6 +98,7 @@ export async function analyzeShellCommand(input: ShellInput): Promise<GateResult
 
     // 6e: Process redirections
     for (const redir of cmdNode.redirections) {
+      if (isDiscardRedirect(redir)) continue;
       if (redir.target?.value) {
         const op: PathOperation = (redir.kind === "stdin" || redir.kind === "heredoc" || redir.kind === "hereString") ? "read" : "write";
         const rBlock = checkPath(input, effectiveCwd, redir.target.value, op, addApproval);
@@ -129,6 +131,12 @@ export async function analyzeShellCommand(input: ShellInput): Promise<GateResult
   // ── Step 7: Ask aggregation ──
   if (approvalReason) return askOnce(input.runtime, "Access profile approval", approvalReason);
   return { kind: "allow" };
+}
+
+/** `/dev/null` is a conventional output sink, not a project file write. */
+function isDiscardRedirect(redir: ShellRedirectionNode): boolean {
+  return redir.target?.value === "/dev/null"
+    && ["stdout", "stdoutAppend", "stderr", "stderrAppend"].includes(redir.kind);
 }
 
 /**

@@ -165,11 +165,13 @@ void test("search: grep -r searches directory", () => {
   assert.equal(sem.intents[0]!.rawPath, "src/");
 });
 
-void test("search: grep without -r has no search intent", () => {
+void test("search: grep without -r produces a read intent", () => {
   const { program } = parse(lex("grep pattern file.txt").tokens);
   const sem = analyzeSemantics(program.commands[0]!, CTX);
-  // 非递归 grep 不产生搜索 intent
-  assert.equal(sem.intents.length, 0);
+  // 非递归 grep 读取文件，但不产生 search intent
+  assert.equal(sem.intents.length, 1);
+  assert.equal(sem.intents[0]!.operation, "read");
+  assert.equal(sem.intents[0]!.rawPath, "file.txt");
 });
 
 void test("search: grep -f extracts file opt read intent", () => {
@@ -190,6 +192,64 @@ void test("search: rg -f extracts pattern file", () => {
   const { program } = parse(lex("rg -f patterns.txt").tokens);
   const sem = analyzeSemantics(program.commands[0]!, CTX);
   assert.ok(sem.intents.some((i) => i.operation === "read" && i.rawPath === "patterns.txt"));
+});
+
+void test("search: rg skips values for glob and type options", () => {
+  const { program } = parse(lex("rg --glob '*.ts' --type ts pattern src/ /etc").tokens);
+  const sem = analyzeSemantics(program.commands[0]!, CTX);
+  assert.deepEqual(
+    sem.intents.filter((intent) => intent.operation === "search").map((intent) => intent.rawPath),
+    ["src/", "/etc"],
+  );
+});
+
+void test("search: pattern file option makes the first positional argument a root", () => {
+  const { program } = parse(lex("rg -f patterns.txt src/ /etc").tokens);
+  const sem = analyzeSemantics(program.commands[0]!, CTX);
+  assert.deepEqual(
+    sem.intents.filter((intent) => intent.operation === "search").map((intent) => intent.rawPath),
+    ["src/", "/etc"],
+  );
+});
+
+// ─── Read adapter ───
+
+void test("read: head -250 reads stdin without a path intent", () => {
+  const { program } = parse(lex("head -250").tokens);
+  const sem = analyzeSemantics(program.commands[0]!, CTX);
+  assert.equal(sem.class, "readOnly");
+  assert.equal(sem.intents.length, 0);
+});
+
+void test("read: head checks explicit files", () => {
+  const { program } = parse(lex("head -n 5 /etc/passwd").tokens);
+  const sem = analyzeSemantics(program.commands[0]!, CTX);
+  assert.equal(sem.class, "readOnly");
+  assert.deepEqual(sem.intents.map((intent) => [intent.operation, intent.rawPath]), [["read", "/etc/passwd"]]);
+});
+
+void test("read: cat checks multiple files", () => {
+  const { program } = parse(lex("cat first.txt second.txt").tokens);
+  const sem = analyzeSemantics(program.commands[0]!, CTX);
+  assert.deepEqual(sem.intents.map((intent) => intent.rawPath), ["first.txt", "second.txt"]);
+});
+
+void test("read: tail skips line-count values and checks files", () => {
+  const { program } = parse(lex("tail --lines=5 file.txt").tokens);
+  const sem = analyzeSemantics(program.commands[0]!, CTX);
+  assert.deepEqual(sem.intents.map((intent) => intent.rawPath), ["file.txt"]);
+});
+
+void test("read: wc checks files after flags", () => {
+  const { program } = parse(lex("wc -l file.txt").tokens);
+  const sem = analyzeSemantics(program.commands[0]!, CTX);
+  assert.deepEqual(sem.intents.map((intent) => intent.rawPath), ["file.txt"]);
+});
+
+void test("read: cut skips delimiter and field values", () => {
+  const { program } = parse(lex("cut -d : -f 1 /etc/passwd").tokens);
+  const sem = analyzeSemantics(program.commands[0]!, CTX);
+  assert.deepEqual(sem.intents.map((intent) => intent.rawPath), ["/etc/passwd"]);
 });
 
 // ─── Git adapter ───

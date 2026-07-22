@@ -14,8 +14,14 @@ interface SearchConfig {
   needsRecursiveFlag?: boolean;
   /** 递归选项。 */
   recursiveOpts?: string[];
-  /** 文件选项：提取为 read intent。 */
-  fileOpts?: string[];
+  /** 选项名：其后一个 token 是选项值，不是路径。 */
+  valueOpts?: readonly string[];
+  /** 选项前缀：选项值附在同一 token 中，不是路径。 */
+  attachedValueOpts?: readonly string[];
+  /** 选项名：提供搜索 pattern，位置参数起点因此左移。 */
+  patternOpts?: readonly string[];
+  /** 文件选项：提取值为 read intent。 */
+  fileOpts?: readonly string[];
   reason: string;
 }
 
@@ -24,12 +30,14 @@ const SEARCH_CONFIG: Record<string, SearchConfig> = {
     class: "readOnly",
     defaultRoot: ".",
     rootAtArgIndex: 0,
+    valueOpts: ["-type", "-name", "-iname", "-path", "-ipath", "-size", "-mtime", "-atime", "-ctime", "-user", "-group", "-perm", "-exec", "-execdir", "-ok", "-maxdepth", "-mindepth"],
     reason: "search files",
   },
   tree: {
     class: "readOnly",
     defaultRoot: ".",
     rootAtArgIndex: 0,
+    valueOpts: ["-L", "--level", "-I", "--ignore", "-P", "--pattern", "--charset"],
     reason: "list directory tree",
   },
   grep: {
@@ -38,6 +46,9 @@ const SEARCH_CONFIG: Record<string, SearchConfig> = {
     rootAtArgIndex: 1, // 第一个非选项参数是 pattern，第二个起是 targets
     needsRecursiveFlag: true,
     recursiveOpts: ["-r", "-R", "--recursive"],
+    valueOpts: ["-e", "--regexp", "-f", "--file", "-m", "--max-count", "-A", "-B", "-C", "--include", "--exclude", "--exclude-dir"],
+    attachedValueOpts: ["-e", "--regexp=", "-f", "--file=", "-m", "--max-count=", "-A", "-B", "-C"],
+    patternOpts: ["-e", "--regexp", "-f", "--file"],
     fileOpts: ["-f", "--file"],
     reason: "search file contents",
   },
@@ -45,6 +56,9 @@ const SEARCH_CONFIG: Record<string, SearchConfig> = {
     class: "readOnly",
     defaultRoot: ".",
     rootAtArgIndex: 1, // pattern 在第一个非选项参数，targets 从第二个起
+    valueOpts: ["-e", "--regexp", "-f", "--file", "-g", "--glob", "-t", "--type", "--type-not", "--iglob", "--iglob-case-insensitive", "-m", "--max-count", "--max-columns", "--max-depth", "--sort", "--sortr"],
+    attachedValueOpts: ["-e", "--regexp=", "-f", "--file=", "-g", "--glob=", "-t", "--type=", "--type-not=", "--iglob=", "-m", "--max-count=", "--max-columns=", "--max-depth=", "--sort=", "--sortr="],
+    patternOpts: ["-e", "--regexp", "-f", "--file"],
     fileOpts: ["-f", "--file"],
     reason: "ripgrep search",
   },
@@ -60,54 +74,70 @@ export const searchAdapter: CommandAdapter = {
     const args = [...node.args];
     const intents: PathIntent[] = [];
 
-    // ── 文件选项提取（-f pattern-file, --file pattern-file）──
-    if (config.fileOpts) {
-      for (let i = 0; i < args.length; i++) {
-        const val = args[i]!.value ?? "";
-        if (config.fileOpts.includes(val) && i + 1 < args.length) {
-          const nextVal = args[i + 1]!.value;
-          if (nextVal && !nextVal.startsWith("-")) {
-            intents.push({
-              operation: "read",
-              rawPath: nextVal,
-              source: "option",
-              span: { start: 0, end: 0 },
-              confidence: "conservative",
-            });
-          }
-        }
-      }
-    }
+    // ── 选项值和位置参数提取 ──
+    const positional: ShellArg[] = [];
+    const optionValues: Array<{ option: string; value: string; span: ShellArg["span"] }> = [];
+    const valueOpts = config.valueOpts ?? [];
+    const attachedValueOpts = config.attachedValueOpts ?? [];
+    let parseOptions = true;
 
-    // ── 搜索根提取 ──
-    // 跳过选项和选项值，找到第 N 个非选项参数
-    let nonOptionCount = 0;
-    let foundRoot: string | null = null;
-    const skipNext = new Set<string>();
-    const KNOWN_OPT_VALS = ["-type", "-name", "-iname", "-path", "-ipath", "-size", "-mtime", "-atime", "-ctime",
-      "-user", "-group", "-perm", "-exec", "-execdir", "-ok", "-delete", "-maxdepth", "-mindepth"];
     for (let i = 0; i < args.length; i++) {
-      const val = args[i]!.value ?? "";
-      if (val === "--") { i++; break; }
-      if (val.startsWith("-")) {
-        if (KNOWN_OPT_VALS.includes(val)) i++; // skip option value
+      const arg = args[i]!;
+      const val = arg.value ?? "";
+      if (parseOptions && val === "--") {
+        parseOptions = false;
         continue;
       }
-      if (nonOptionCount === config.rootAtArgIndex) {
-        foundRoot = val;
-        break;
+      if (parseOptions && val.startsWith("-")) {
+        const takesNext = valueOpts.includes(val);
+        const hasAttachedValue = attachedValueOpts.some((prefix) => val.startsWith(prefix) && val.length > prefix.length);
+        if (takesNext && i + 1 < args.length) {
+          const value = args[i + 1]!;
+          optionValues.push({ option: val, value: value.value ?? "", span: value.span });
+          i++;
+        } else if (hasAttachedValue) {
+          const prefix = attachedValueOpts.find((candidate) => val.startsWith(candidate) && val.length > candidate.length)!;
+          const option = prefix.endsWith("=") ? prefix.slice(0, -1) : prefix;
+          optionValues.push({ option, value: val.slice(prefix.length), span: arg.span });
+        }
+        continue;
       }
-      nonOptionCount++;
+      positional.push(arg);
     }
 
-    const root = foundRoot ?? config.defaultRoot;
+    // 文件选项值是 read intent；其他选项值（pattern、glob、type 等）不涉及路径。
+    for (const entry of optionValues) {
+      if (config.fileOpts?.includes(entry.option)) {
+        intents.push({
+          operation: "read",
+          rawPath: entry.value,
+          source: "option",
+          span: entry.span,
+          confidence: "conservative",
+        });
+      }
+    }
+
+    const hasPatternOption = optionValues.some((entry) => config.patternOpts?.includes(entry.option));
+    const rootIndex = Math.max(0, config.rootAtArgIndex - (hasPatternOption ? 1 : 0));
+    const foundRoots = positional.slice(rootIndex).map((arg) => arg.value ?? "");
+    const roots = foundRoots.length > 0 ? foundRoots : [config.defaultRoot];
     const isRecursive = config.recursiveOpts
       ? args.some((a) => config.recursiveOpts!.includes(a.value ?? ""))
       : true;
 
     // 对于需要递归标记的命令，没有递归标记时不产生搜索 intent
     if (config.needsRecursiveFlag && !isRecursive) {
-      // 非递归 grep: 只读单文件，不产生搜索 intent
+      // 非递归 grep 读取文件参数，但不会递归搜索目录。
+      for (const file of foundRoots) {
+        intents.push({
+          operation: "read",
+          rawPath: file,
+          source: "argument",
+          span: { start: 0, end: 0 },
+          confidence: "conservative",
+        });
+      }
       return makeSemantics(config.class, {
         reason: config.reason,
         intents,
@@ -115,13 +145,15 @@ export const searchAdapter: CommandAdapter = {
       });
     }
 
-    intents.push({
-      operation: "search",
-      rawPath: root,
-      source: "argument",
-      span: { start: 0, end: 0 },
-      confidence: "conservative",
-    });
+    for (const root of roots) {
+      intents.push({
+        operation: "search",
+        rawPath: root,
+        source: "argument",
+        span: { start: 0, end: 0 },
+        confidence: "conservative",
+      });
+    }
 
     return makeSemantics(config.class, {
       reason: config.reason,

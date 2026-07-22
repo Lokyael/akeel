@@ -169,6 +169,28 @@ test("denies search roots outside the project", async () => {
   assert.equal(result.kind, "block");
 });
 
+test("checks every search root in a multi-root command", async () => {
+  const result = await evaluateBash("rg pattern project/docs /etc");
+  assert.equal(result.kind, "block");
+});
+
+test("checks files read by non-recursive grep", async () => {
+  const result = await evaluateBash("grep pattern /etc/passwd");
+  assert.equal(result.kind, "block");
+});
+
+test("checks explicit files in read-only file commands", async () => {
+  const headResult = await evaluateBash("head -n 5 /etc/passwd");
+  const catResult = await evaluateBash("cat /etc/passwd");
+  assert.equal(headResult.kind, "block");
+  assert.equal(catResult.kind, "block");
+});
+
+test("allows stderr discard to /dev/null without allowing other external writes", async () => {
+  const result = await evaluateBash("rg pattern project/docs 2>/dev/null");
+  assert.equal(result.kind, "allow");
+});
+
 test("tracks directory changes before checking relative reads", async () => {
   const result = await evaluateBash("cd /etc && cat shadow");
   assert.equal(result.kind, "block");

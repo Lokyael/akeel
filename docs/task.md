@@ -44,6 +44,14 @@
 - heredoc 多段 body、quoted delimiter、截断 body 和 body 内控制符
 - `find -exec`、`xargs`、`parallel`、归档内部路径和特殊文件
 
+## Security Review
+
+- [x] 多搜索根逐个生成 `search` intent；`rg pattern project/docs /etc` 现在拒绝 `/etc`，避免第二个根目录绕过策略。
+- [x] 非递归 `grep` 的显式文件生成 `read` intent；`grep pattern /etc/passwd` 现在拒绝外部读取。
+- [x] `2>/dev/null` 仅对精确 `/dev/null` 输出 sink 放行，其他外部写入仍由路径策略决定。
+- [x] fd 前缀仅在数字 token 与重定向符相邻时消费；`2 > file` 保留为普通参数加 stdout 重定向。
+- [ ] 复杂命令参数（如 `find -exec`、`xargs`、`parallel`）仍按未完成风险处理，不在本次 adapter 扩展中放宽。
+
 ## Durable Updates
 
 - [ ] 安全边界变化同步到 `docs/security-boundaries.md`。
