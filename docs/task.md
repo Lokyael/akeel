@@ -71,102 +71,222 @@
 
 **Kind:** refactor
 **Status:** draft
-**Goal:** 让每次拒绝都能提供结构化、可验证且不放宽权限的原因与替代入口，同时统一 Shell 和 Direct tool 的访问计划。
-
-### Architecture
-
-采用三层边界：`tool_call` 编译为不可执行的 `AccessPlan`，Policy Evaluator 只根据计划和 Profile 产生结构化 `GateDecision`，Renderer 在 Pi 边界将决策转换为兼容现有 host API 的 `reason` 字符串。动态 token、opaque effect、威胁和 blocked path 继续是不可覆盖的 hard deny；guidance 只描述安全替代入口，不能执行替代操作或覆盖 deny。
-
-Shell 的 `CommandSemantics` 继续作为 Shell compiler 的内部输出；Direct tool 通过同一计划接口进入 Gate。现有 `GateResult.kind` 在迁移期保留，新增稳定的 `code`、`hard`、`evidence` 和 `guidance` 字段，避免一次重构同时破坏 Pi host 集成和测试调用方。
-
-### Out of Scope
-
-- **完整 Bash 兼容**：`for`、`while`、`if`、函数定义、命令替换和未引用 glob 仍不建模；因为这需要独立的 Shell 解释器或执行沙箱，而不是拒绝消息重构。
-- **自动 glob 展开**：不在 Gate 中枚举并执行 Shell glob；因为路径检查与实际展开之间会引入 TOCTOU 和语义差异。批量检查继续通过 Direct tool 或字面 `find`。
-- **OS-level isolation 和全局 enforcement**：遵循 T-001 与 D-004/D-018 的既有边界。
-- **持久化审批和自动重试**：guidance 不产生授权状态。
+**Goal:** 让拒绝结果具备稳定原因、最小安全证据和可执行的替代入口，同时统一 Shell 与 Direct tool 的授权前置检查。
 
 ### Requirements
 
-- hard deny、Profile deny、ask、user deny 使用稳定的 machine-readable decision code。
-- `AccessPlan` 只能由 Gate 内部 compiler 创建；`evaluatePlan` 必须重新验证 plan 完整性，不能信任外部传入的 `hard`、`hazards` 或 `intents`。
-- guidance 只能引用内置的静态 `GuidanceId`，不能携带可直接执行的 Shell 字符串或由用户输入决定的 tool/action 名称。
-- 每个可恢复拒绝最多提供一个安全替代方案类别；敏感路径拒绝不得通过 guidance 泄露更多秘密信息。
-- 所有 guidance 的目标 tool call 必须再次经过同一 Gate；渲染层不得返回隐含 allow。
-- 迁移期间只保留一个 `tool_call` enforcement entry；旧 evaluator 和新 evaluator 不得按 surface 并行产生不同结论。
-- `cd`、Shell path intent、Direct `find/read/grep/ls` 对同一 `AccessPlan` 契约进行路径检查。
-- 保留现有审批聚合、blocked path、opaque hard deny、symlink escape 和 Profile 语义。
-- headless 模式在 ask 场景继续 fail closed。
+- hard deny、Profile deny、ask 和 user deny 使用稳定的 machine-readable decision code。
+- Shell 与 Direct tool 经过各自 compiler 后进入同一个 Policy Kernel；运行时只保留一个 `tool_call` enforcement entry。
+- 任何无法证明完整的语法、命令效果、路径 intent、cwd 分支或资源边界都必须 reject，不能生成可 allow 的空请求。
+- guidance 只能引用源码内置的静态 `GuidanceId`，不能携带可直接执行的 Shell 字符串。
+- guidance 只提供替代入口，不改变 decision、不执行替代操作、不产生持久授权。
+- 所有替代 tool call 必须再次经过同一个 Gate。
+- 保留现有 Profile、blocked path、symlink escape、opaque hard deny、审批聚合和 headless fail-closed 语义。
 
-### Design Alternatives
+### Scope Boundary
 
-**方案 A：仅扩展拒绝字符串**
+本任务解决 Gate 的分析证据、授权决策和拒绝解释边界，不把受限 Shell 变成完整 Bash。
 
-在 `decisionBlock(reason)` 后拼接固定建议，例如动态 token 拒绝时追加“使用 `find`”。改动小，但原因、严重性和建议仍被字符串耦合；调用方无法区分 hard deny 与普通 deny，建议也无法被测试或其他 UI 复用。拒绝。
+明确不做：
 
-**方案 B：结构化拒绝 + 中央 Guidance Catalog**
+- `for`、`while`、`if`、函数定义、命令替换和未引用 glob 的完整建模。
+- Gate 内的 glob expansion 或 Shell interpreter。
+- OS-level sandbox、容器、VM、seccomp、Landlock、network namespace 或全局 enforcement。
+- 持久化审批、自动重试、跨 tool call 的授权缓存。
+- 可编程 Profile policy DSL；现有 JSON Profile 足够覆盖当前需求。
 
-新增 reason code、evidence 和 guidance ID，由一个 catalog 将 code 映射成提示。它能快速解决交互问题，迁移成本低，但 Shell 与 Direct tool 仍分别构造路径意图，长期会继续产生入口行为漂移。作为过渡层保留，不作为终态。
+### Target Architecture
 
-**方案 C：统一 AccessPlan + Policy Decision + Explanation Renderer（推荐）**
+统一的是“访问证据和策略输入”，不是把所有 Shell 语义压成一套通用命令模型：
 
-两个入口先编译到统一计划，再由单一 evaluator 执行所有 effect/path 检查，最后由 renderer 生成 host reason 和 guidance。接口更深、职责更清晰，能同时解决审批详情、拒绝引导、矩阵测试和未来非 Shell tool 的扩展问题；代价是需要分阶段迁移现有 Gate。
+```text
+Shell compiler       ┐
+                     ├─> CompleteAccessRequest
+Direct tool compiler ┘            │
+                                  ↓
+                           Policy Kernel
+                                  │
+                                  ↓
+                            GateDecision
+                                  │
+                     ┌────────────┴────────────┐
+                     ↓                         ↓
+              approval adapter          explanation renderer
+                     ↓                         ↓
+                 Pi host                 block reason / guidance
+```
+
+现有 `shell-parse/` 仍负责受限 Shell IR，`command-semantics/` 仍负责 wrapper、command class、effects、path intents 和 cwd 分析。新入口只增加一个转换边界，不重复实现这些语义。
+
+Direct `read`、`write`、`edit`、`find`、`grep`、`ls` 通过 schema compiler 生成同一种访问请求。`cd` 作为 `cwdChange + list` operation 进入 Shell request；无法确定目标或分支 cwd 时拒绝。
+
+### Domain Model
+
+`AccessRequest` 是分析证据，不是执行计划，也不是授权凭证：
+
+```typescript
+type CompileResult =
+  | { kind: "complete"; request: CompleteAccessRequest }
+  | { kind: "reject"; code: DecisionCode; evidence: readonly GateEvidence[] };
+
+interface CompleteAccessRequest {
+  readonly source: ToolSurface;
+  readonly operations: readonly AccessOperation[];
+  readonly cwdStates: readonly CwdState[];
+  readonly assumptions: readonly Assumption[];
+  readonly compilerVersion: string;
+}
+
+type AccessOperation =
+  | {
+      readonly kind: "path";
+      readonly operation: "read" | "list" | "search" | "write";
+      readonly input: string;
+      readonly cwd: CwdState;
+      readonly source: "argument" | "option" | "redirection" | "cwd" | "wrapper";
+      readonly confidence: "exact" | "conservative";
+    }
+  | {
+      readonly kind: "effect";
+      readonly effect: "read" | "search" | "write" | "delete" | "permissionChange" | "execute" | "network" | "cwdChange";
+      readonly confidence: "exact" | "conservative";
+    };
+```
+
+`CompleteAccessRequest` 不包含 `allow`、`deny`、`hard`、`approved` 或 policy reason。只有 Policy Kernel 可以产生授权结果。`complete` 是内部 compiler 对“所有已建模语义均已覆盖”的封闭类型证明，不是 tool input 提供的布尔字段。
+
+决策类型：
+
+```typescript
+type GateDecision =
+  | { disposition: "allow" }
+  | {
+      disposition: "ask";
+      evidence: readonly GateEvidence[];
+      approval: ApprovalRequest;
+    }
+  | {
+      disposition: "deny";
+      code: DecisionCode;
+      enforcement: "hard" | "profile";
+      evidence: readonly GateEvidence[];
+      guidance: readonly Guidance[];
+    };
+```
+
+`GateResult.kind` 只作为 Pi host 兼容层保留。host 仍接收 `{ block: true, reason }`，但 reason 由 renderer 在最后一层生成，内部流程不再依赖自由格式字符串。
+
+核心边界必须保持为：
+
+```text
+分析证据 ≠ 授权结果
+CompleteAccessRequest ≠ allow
+guidance ≠ 权限
+plan digest ≠ 安全证明
+```
+
+### Security Invariants
+
+1. **Closed world**：未知 syntax、effect、intent、hazard、tool surface、cwd branch 或 compiler version 一律 reject。
+2. **Hard boundary first**：threat、dynamic/unsafe syntax、opaque semantics、blocked path、symlink escape 和不可分类路径不能被 Profile 或 `Allow once` 覆盖。
+3. **Complete coverage**：所有 command node、redirection、effect、path intent 和 cwd candidate 都必须进入 request；遗漏不能产生 allow。
+4. **Monotonic policy**：增加 operation、扩大 cwd 候选或降低 confidence，只能保持原决策或使其更严格，不能让 deny 变 allow。
+5. **Effect closure**：每个 Effect 必须映射到明确 Profile 决策；没有策略轴的 effect hard deny，不能回退到 `readOnly`。
+6. **Approval scope**：一次审批绑定整个不可变 request；提示展示全部必要 evidence，不能只展示第一个 approval reason。
+7. **Guidance separation**：GuidanceId 是静态枚举；renderer 不做策略判断，不生成可执行 Shell，不自动调用替代 tool。
+8. **No false security claim**：request、digest 和 Gate 都是用户态 preflight，不消除 pathname TOCTOU，也不覆盖其他 Extension 入口。
+9. **Bounded analysis**：lexer、parser、compiler、path resolver、evidence 和 renderer 各自有输入长度、节点数、intent 数、分支数和输出长度上限；超限 hard reject。
+10. **Snapshot semantics**：Profile 和 request 在一次 tool call 内冻结；不跨调用缓存 Profile 决策、realpath 或 symlink 结果。
+
+### Guidance Policy
+
+Guidance 由 `DecisionCode` 映射到静态 catalog：
+
+| DecisionCode | Guidance | 是否允许 Allow once |
+|---|---|---|
+| `dynamic-shell` | `batch-inspection-tools`：使用 Direct `read`/`grep`/`find`/`ls` | 否 |
+| `opaque-command` | `literal-command-or-direct-tool` | 否 |
+| `unsafe-syntax` | `split-supported-commands` | 否 |
+| `path-denied` | 无，避免诱导绕过路径策略 | 否 |
+| `blocked-path` | 无 | 否 |
+| `threat` | 无 | 否 |
+| `shell-policy-denied` | 可显示当前 Profile 限制，不建议自动切换 Profile | 否 |
+| `approval-required` | 显示最小必要 evidence | 是 |
+| `user-denied` | 无自动重试 | 否 |
+
+Guidance 不包含原始 glob、Shell 变量、命令替换内容、未经脱敏的敏感路径或由用户输入决定的 tool/action 名称。所有 evidence 经过长度限制、脱敏和明确的数据区渲染。
+
+### Policy Evaluation Order
+
+```text
+1. validate CompleteAccessRequest schema and compiler version
+2. validate resource budget and coverage markers
+3. recompute hard hazards and resolve every cwd candidate
+4. check blocked paths, symlink escapes and path classification
+5. evaluate every AccessOperation against Profile
+6. aggregate all ask evidence for this request
+7. return allow, one ask, or structured deny
+8. render only at the Pi host boundary
+```
+
+任何阶段失败都停止后续 allow 计算。不同操作的 decision 组合规则为：
+
+```text
+hard deny > profile deny > ask > allow
+```
 
 ### Implementation Plan
 
-#### Task 1: 定义决策领域类型
+#### Task 1: 建立决策领域类型
 
 **Files:**
 - Create: `src/access-gate/gate/decision-types.ts`
 - Modify: `src/access-gate/gate/types.ts`
 - Test: `tests/access-gate/gate-decision.test.ts`
 
-**Interfaces:**
-- `DecisionCode`: `dynamic-shell`, `unsafe-syntax`, `threat`, `opaque-command`, `blocked-path`, `path-denied`, `shell-policy-denied`, `approval-required`, `user-denied`, `unknown-tool`。
-- `GateEvidence`: `{ kind, subject, operation?, pattern?, span? }`，其中 `subject` 只允许经过 redact 的结构化值。
-- `Guidance`: `{ id: GuidanceId, safety: "recheck" }`；`GuidanceId` 来自源码内置 catalog，不包含可执行命令。
-- `GateDecision`: `{ disposition: "allow" } | { disposition: "ask", prompt, evidence } | { disposition: "deny", code, enforcement: "hard" | "profile", evidence, guidance }`。
+**Steps:**
 
-- [ ] 为每个 code 写构造器和判定不变量测试：`hard=true` 不能进入 ask；guidance 不能携带 allow 状态。
-- [ ] 保留 `GateResult` 的 `kind` 兼容字段，并定义从 `GateDecision` 到旧 host 结果的转换接口。
+- [ ] 先写测试：验证 `DecisionCode`、`GateEvidence`、`GateDecision` 的 discriminated union；验证 hard deny 不能进入 ask，guidance 不能携带授权字段。
+- [ ] 运行 `npx tsx tests/access-gate/gate-decision.test.ts`，确认新类型和构造器测试先失败。
+- [ ] 实现 `CompleteAccessRequest`、`AccessOperation`、`DecisionCode`、`GateEvidence`、`Guidance` 和 `GateDecision`；禁止导出可伪造的 policy result 构造器。
+- [ ] 再运行同一测试，确认通过。
+- [ ] 在 `gate/types.ts` 保留 `GateResult` 兼容类型和结构化 decision 到 host result 的适配签名。
 
-#### Task 2: 建立统一 AccessPlan compiler seam
+#### Task 2: 统一 Shell 与 Direct tool compiler
 
 **Files:**
-- Create: `src/access-gate/gate/access-plan.ts`
-- Modify: `src/access-gate/gate/evaluate.ts`
+- Create: `src/access-gate/gate/access-request.ts`
 - Modify: `src/access-gate/gate/analyze-shell.ts`
-- Test: `tests/access-gate/access-plan.test.ts`
+- Modify: `src/access-gate/gate/evaluate.ts`
+- Test: `tests/access-gate/access-request.test.ts`
 
-**Interfaces:**
-- `AccessPlan`: `{ surface, cwd, transitions, intents, effects, hazards, assumptions }`。
-- `compileShellCall(input): CompileResult`。
-- `compileDirectToolCall(input): CompileResult`。
-- `CompileResult`: `{ kind: "plan", plan } | { kind: "reject", code, evidence }`。
+**Steps:**
 
-- [ ] 将 dynamic/unsafe/threat/opaque 从字符串 early return 改成带 span 和 code 的 compile rejection。
-- [ ] 让 `AccessPlan` 使用非导出构造器或不可伪造的内部 token；`evaluatePlan` 对 effect、intent、hazard、cwd transition 和 compiler version 做完整性校验，无法证明完整时 reject。
-- [ ] 把 Direct tool 的 `TOOL_OPERATIONS` 和 pathForTool 逻辑移入 compiler；不复制另一套 path policy。
-- [ ] 将 `cd` 作为 `cwdChange + list intent` 进入计划；保留无法解析 cwd 时的 reject。
-- [ ] 为 Shell 和 Direct tool 写等价计划测试，确保相同文件操作使用相同 `PathOperation`；迁移期只从一个 compiler entry 进入 evaluator。
+- [ ] 先写 compiler 测试：`grep -rn`、`cd && grep`、重定向、Direct `find` 和 Direct `read` 产生一致的 path operation；dynamic、opaque、未知 effect 和不确定 cwd 产生 reject。
+- [ ] 运行 `npx tsx tests/access-gate/access-request.test.ts`，确认当前两套入口不能满足统一 request 契约。
+- [ ] 实现 `compileShellCall()`：复用现有 lexer、parser、normalize、control-flow 和 command adapter，不在 compiler 内重复解析。
+- [ ] 实现 `compileDirectToolCall()`：集中校验 surface 和参数 schema，生成 path/effect operation。
+- [ ] 将 `joined` cwd 转为候选集合；所有候选不能安全检查时返回 reject，不允许只取一个 cwd。
+- [ ] 运行 compiler 测试和现有 Shell/command-semantics 测试，确认行为保持 fail closed。
 
-#### Task 3: 集中 Policy Evaluator 与 hard-boundary 优先级
+#### Task 3: 实现唯一 Policy Kernel
 
 **Files:**
-- Create: `src/access-gate/gate/evaluate-plan.ts`
+- Create: `src/access-gate/gate/evaluate-request.ts`
 - Modify: `src/access-gate/gate/evaluate.ts`
 - Test: `tests/access-gate/gate-policy-matrix.test.ts`
 
-**Interfaces:**
-- `evaluatePlan(plan, profile, runtime): Promise<GateDecision>`。
-- `evaluatePlan` 按顺序执行 hard hazards、path decisions、effect class、approval aggregation；只在全部 intent 通过后返回 allow 或一次 ask。
+**Steps:**
 
-- [ ] 为每个内置 Profile 覆盖 `read/list/search/write` 与 Shell class 的矩阵。
-- [ ] 验证 blocked path、symlink escape、opaque 和 threat 不受 Profile allow 或 Allow once 覆盖。
-- [ ] 验证多个 ask 仍聚合为一个 prompt，prompt 只展示必要证据。
-- [ ] 验证无 UI 时 ask 返回 hard fail-closed 结果。
+- [ ] 先写 Profile 矩阵测试：四类 PathOperation、Shell class、每个 Effect、blocked path、symlink escape、opaque 和 headless ask。
+- [ ] 运行 `npx tsx tests/access-gate/gate-policy-matrix.test.ts`，确认旧 evaluator 的分散路径不能覆盖完整矩阵。
+- [ ] 实现 `evaluateRequest(request, profile, runtime): Promise<GateDecision>`；入口只接受 `CompleteAccessRequest`。
+- [ ] 重新解析每个 path operation，检查 blocked path、classifiable、symlink escape、Profile rule/default，并拒绝未知 effect。
+- [ ] 聚合全部 ask evidence 为一个审批请求；用户批准只返回当前 request 的 allow，不保存授权。
+- [ ] 让 `evaluateToolCall()` 成为唯一 compiler → kernel → host adapter 入口，删除旧 evaluator 的并行 surface 分支。
+- [ ] 运行 `npm run test:gate`、`npm run test:path` 和矩阵测试。
 
-#### Task 4: 实现中央 Guidance Catalog 和安全渲染
+#### Task 4: 实现拒绝解释和静态 guidance
 
 **Files:**
 - Create: `src/access-gate/gate/guidance-catalog.ts`
@@ -175,64 +295,72 @@ Shell 的 `CommandSemantics` 继续作为 Shell compiler 的内部输出；Direc
 - Modify: `src/access-gate/index.ts`
 - Test: `tests/access-gate/guidance.test.ts`
 
-**Interfaces:**
-- `guidanceFor(code, evidence): readonly Guidance[]`。
-- `renderDecision(decision): string`。
-- `formatApprovalPrompt(decision): { title, detail, options }`。
+**Steps:**
 
-- [ ] 为 `dynamic-shell` 提供静态替代入口：Direct `read`/`grep`/`find`/`ls`；不要把原始 glob 或变量重新拼成可执行命令。
-- [ ] 为 `opaque-command` 和未建模结构化语法提供 Direct tool 或拆分为字面命令的建议。
-- [ ] 为 blocked path、threat、symlink escape 和 hard path deny 不提供可能诱导绕过的 guidance。
-- [ ] catalog 只接受源码内置的 `GuidanceId`，不读取 Profile、项目文件或 Shell 输入提供的提示模板；Renderer 将 untrusted evidence 放在明确的数据区并做长度限制和脱敏。
-- [ ] 保留现有 `block: true, reason` host 适配；reason 由 renderer 生成并包含 code 对应的简短说明与可选建议。
-- [ ] 对 path、command、threat evidence 做最小化和脱敏，避免审批/拒绝文案扩大 R-11 暴露面。
+- [ ] 先写测试：dynamic glob 显示 Direct tool guidance；blocked path/threat 不显示绕过建议；ask 显示完整必要 evidence；raw input 不进入可执行建议。
+- [ ] 运行 `npx tsx tests/access-gate/guidance.test.ts`，确认当前 block reason 没有结构化 guidance。
+- [ ] 实现静态 `GuidanceId` catalog；catalog 不读取 Profile、项目文件或 Shell 输入中的模板。
+- [ ] 实现 evidence redact、长度限制和 `renderDecision()`；renderer 只转换展示，不改变 decision。
+- [ ] 保持 Pi host 的 `{ block: true, reason }` 适配，并将 guidance 附加到 reason 的安全说明区。
+- [ ] 运行 guidance、gate 和 index 测试，确认 headless 与 hard deny 行为不变。
 
-#### Task 5: 迁移测试、文档和运行时验证
+#### Task 5: 加入单调性、资源预算和迁移回归
 
 **Files:**
-- Modify: `tests/access-gate/gate.test.ts`
-- Modify: `tests/access-gate/index.test.ts`
-- Modify: `README.md`
-- Modify: `USAGE.md`
-- Modify: `docs/security-boundaries.md`
-- Modify: `docs/decisions.md`
-- Modify: `CONTEXT.md`
+- Modify: `src/access-gate/shell-parse/lexer.ts`
+- Modify: `src/access-gate/shell-parse/parser.ts`
+- Modify: `src/access-gate/command-semantics/control-flow.ts`
+- Modify: `src/access-gate/path/resolve.ts`
+- Test: `tests/access-gate/access-request-invariants.test.ts`
+- Test: `tests/access-gate/security-matrix.test.ts`
 
-- [ ] 增加动态 glob、变量、命令替换、opaque、blocked path、Profile deny、ask 和 user deny 的拒绝引导回归测试。
-- [ ] 增加 Pi host 适配测试，验证结构化 decision 最终仍能被 host 识别为 block 或 allow。
-- [ ] 更新 D-018，记录“拒绝解释不改变授权结果”和“替代入口必须重新过 Gate”。
-- [ ] 更新安全边界与使用文档，明确 guidance 是建议而非授权，Direct tool 是批量检查的正式入口。
-- [ ] 执行 `npm test`、`git diff --check`，并用实际 Pi Session 重载扩展验证拒绝提示。
+**Steps:**
+
+- [ ] 先写单调性测试：增加 path intent、cwd candidate 或 effect 后，结果只能不变或更严格。
+- [ ] 增加超长输入、超多 command、超多 intent、深层分支和超长 evidence 测试；超限必须 hard reject。
+- [ ] 增加 `&&`/`||`/pipeline/cd 的所有 cwd 候选测试，覆盖当前 `joined` 欠近似风险。
+- [ ] 增加 Shell 与 Direct tool 的等价 operation 矩阵，防止新旧入口策略漂移。
+- [ ] 运行 `npm test`、`git diff --check`，并在实际 Pi Session 重载扩展后验证拒绝提示。
 
 ### Acceptance Criteria
 
-- 动态 glob 示例被拒绝时，结果包含稳定 code，并提示 Direct tool；没有 Allow once 选项。
-- blocked path、threat、opaque 仍 hard deny，且没有可绕过性建议。
-- Profile deny 与 ask 的语义不变；ask 仍是一次审批，批准后不产生持久授权。
-- Shell 与 Direct tool 对同一目标路径产生一致的 path evidence。
-- 现有 Access Gate 全部测试通过，新增决策、计划、渲染和矩阵测试通过。
+- `ls skills/foundations/*/SKILL.md` 被拒绝时返回稳定 code，并提示 Direct tool；没有 Allow once。
+- `grep -rn`、`cd && grep` 等已支持的字面命令不再因为 `cd` 或组合短选项产生多余审批。
+- blocked path、threat、opaque、unknown effect、unknown syntax 和不确定 cwd 仍 hard deny。
+- Shell 与 Direct tool 对同一目标产生一致的 operation 和 path evidence。
+- 一个 compound tool call 的所有 ask evidence 聚合为一次审批，批准不跨调用保存。
+- 任何不完整 request、未知字段、未知 effect 或资源超限都不能返回 allow。
+- guidance 不生成可执行 Shell，不泄露未脱敏敏感 evidence，不改变授权结果。
+- `npm test`、TypeScript 检查、Access Gate 安全矩阵和 Pi host 适配测试全部通过。
 
 ### Security Review
 
-**Status:** conditional pass；方案 C 可继续推进，但以下设计约束必须在实现前固定，不能作为实现细节留给后续决定。
+**Status:** conditional pass。设计可以实施，但以下风险必须在实现中作为不变量处理：
 
-- `docs/task.md:121-128` — **High — CWE-863 / 授权绕过**：如果 `AccessPlan` 的字段或 `hard` 标志可以由普通调用方构造，调用方可能省略 path intent 或伪造无 hazard 计划，直接得到 allow。修复：仅允许 Gate compiler 创建内部 plan；evaluator 对所有字段和 compiler version 做完整性校验，并对未知 effect/hazard fail closed。
-- `docs/task.md:130-147` — **High — CWE-863 / 双 evaluator 漂移**：迁移期若旧 `evaluateToolCall` 与新 `evaluatePlan` 按 surface 并行，Shell 与 Direct tool 可能得出不同授权结论。修复：保留一个 tool-call entry；旧 API 只能成为 renderer 兼容层，不能绕过统一 compiler/evaluator。
-- `docs/task.md:165-183` — **Medium — CWE-74 / 指令与命令注入风险**：可执行的 guidance 字符串或由原始命令拼接的 `tool/action` 会把 untrusted Shell 输入带入下一次操作。修复：guidance 仅使用静态 `GuidanceId`，不自动执行、不生成 Shell 命令；所有替代调用重新过 Gate。
-- `docs/task.md:121-125,174-183` — **Medium — CWE-200 / 敏感信息暴露**：`subject`、path、command span 和 threat evidence 可能在拒绝/审批 UI 中泄露密钥路径或用户输入。修复：evidence 只保留最小结构化值，统一长度限制、脱敏和数据区渲染；hard security reason 不追加绕过建议。
-- `docs/task.md:138-147,156-163` — **Medium — 完整性假设错误**：统一计划类型本身不保证 intent 完整；遗漏一个 intent 仍可能让 evaluator 合法地产生 allow。修复：compiler 输出带版本/完成标记的内部 plan，evaluator 对未知或未覆盖 effect 一律 reject，并增加 Shell/Direct 等价计划矩阵。
-
-现有 R-02/R-08 的 pathname 与 TOCTOU 边界不因方案 C 消失，继续按 `docs/security-boundaries.md` 保留为已知限制。
+| 风险 | 严重性 | 处理 |
+|---|---|---|
+| 不完整 request 被误当成完整 request | High / CWE-863 | 只允许 `CompleteAccessRequest` 进入 Kernel；unknown/uncertain 一律 reject。 |
+| 旧 evaluator 与新 Kernel 并行 | High / CWE-863 | 只保留一个 `tool_call` entry；旧 API 只做 host adapter。 |
+| `joined` cwd 只检查一个候选 | High / CWE-863 | 保存所有候选 cwd；无法全部检查时 hard deny。 |
+| Effect 没有策略映射 | High / CWE-863 | effect-to-policy 使用封闭 registry；未知 effect hard deny。 |
+| guidance 拼接为可执行命令 | Medium / CWE-74 | 只使用静态 GuidanceId；不自动重试，替代调用重新过 Gate。 |
+| evidence 泄露敏感路径或输入 | Medium / CWE-200 | 最小化、脱敏、限长、数据区渲染；hard security deny 不提供绕过提示。 |
+| compound approval 覆盖范围不透明 | Medium / CWE-863 | 展示完整必要 evidence；approval 只绑定当前不可变 request。 |
+| 超长输入和分支导致资源耗尽 | Medium / CWE-400 | 各解析、路径和渲染阶段设置预算，超限 hard reject。 |
+| 用户态 pathname TOCTOU | Known boundary | 不宣称被消除，继续记录在 `docs/security-boundaries.md`。 |
+| 非 `tool_call` 入口绕过 | Known boundary | 不扩大 enforcement 承诺，继续记录 R-09。 |
 
 ### Evidence
 
 - 当前 `GateResult` 只有 `{ kind: "allow" } | { kind: "block", reason: string }`，拒绝原因在 `gate/unknown-command.ts` 被压成字符串。
-- `analyze-shell.ts` 对 dynamic、unsafe、threat 和 opaque 直接返回字符串拒绝。
-- `evaluate.ts` 对 Direct tool 也独立生成字符串路径拒绝；两类入口尚无统一 AccessPlan。
+- `analyze-shell.ts` 同时承担解析后的语义、路径、Profile 和审批流程；Direct tool 在 `evaluate.ts` 中有独立路径分支。
+- 当前 `CommandSemantics` 已提供 Shell 语义 IR，但 Direct tool 尚未进入相同的 request/kernel seam。
+- 当前 `control-flow.ts` 可以产生 `joined` cwd，而 Gate 需要在重构中将其转为候选集合或 hard reject。
 - `USAGE.md` 已定义 Direct tool 是批量检查入口，但运行时拒绝结果不会自动显示该信息。
 
 ### Durable Updates
 
-- [ ] 实施完成后将架构决策提炼到 `docs/decisions.md`，不保留实施过程作为长期文档。
-- [ ] 将当前生效的 guidance 与残余泄露风险提炼到 `docs/security-boundaries.md`。
-- [ ] 验证完成后删除本 Task Record，保留必要的 CONTEXT/Decision/Security boundary 内容。
+- [ ] 实施完成后将当前架构和“拒绝解释不改变授权”提炼到 `docs/decisions.md`。
+- [ ] 将 guidance、evidence 脱敏和残余 TOCTOU 风险提炼到 `docs/security-boundaries.md`。
+- [ ] 将 AccessRequest、Policy Kernel 和 Direct tool 入口术语同步到 `CONTEXT.md`。
+- [ ] 验证完成后删除本 Task Record，保留必要的长期决策和安全边界内容。
