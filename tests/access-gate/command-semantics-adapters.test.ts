@@ -295,3 +295,27 @@ void test("make: is mutating", () => {
   const sem = analyzeSemantics(program.commands[0]!, CTX);
   assert.equal(sem.class, "mutating");
 });
+
+void test("noop: true is readOnly", () => {
+  const { program } = parse(lex("true").tokens);
+  const sem = analyzeSemantics(program.commands[0]!, CTX);
+  assert.equal(sem.class, "readOnly");
+});
+
+void test("noop: false is readOnly", () => {
+  const { program } = parse(lex("false").tokens);
+  const sem = analyzeSemantics(program.commands[0]!, CTX);
+  assert.equal(sem.class, "readOnly");
+});
+
+void test("noop: echo is readOnly", () => {
+  const { program } = parse(lex("echo hello").tokens);
+  const sem = analyzeSemantics(program.commands[0]!, CTX);
+  assert.equal(sem.class, "readOnly");
+});
+
+void test("noop: : (colon noop) is readOnly", () => {
+  const { program } = parse(lex(": 'no operation'").tokens);
+  const sem = analyzeSemantics(program.commands[0]!, CTX);
+  assert.equal(sem.class, "readOnly");
+});
