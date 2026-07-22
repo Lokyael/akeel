@@ -1,6 +1,3 @@
-// gate/analyze-shell.ts — 统一 Shell 语义分析门控
-// 替代旧 shell-command.ts，使用新的 shell-parse + command-semantics + adapters
-
 import { lex } from "../shell-parse/lexer";
 import { parse } from "../shell-parse/parser";
 import { normalizeCommand } from "../command-semantics/normalize";

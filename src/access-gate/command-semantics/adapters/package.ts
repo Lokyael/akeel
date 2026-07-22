@@ -1,4 +1,3 @@
-// command-semantics/adapters/package.ts
 // 包管理器命令 — npm, pnpm, yarn 的语义
 
 import type { ShellCommandNode } from "../../shell-parse/types";

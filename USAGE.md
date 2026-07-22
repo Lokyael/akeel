@@ -40,14 +40,16 @@ The active Profile is the only access mode. A new Session starts from `defaultPr
 
 Built-in Profiles:
 
+Profile names are stored with a `keel-` prefix (`keel-read`, `keel-explore`, …) to avoid ambiguity with path operations and common words. The prefix is stripped for display. `/profile` accepts both forms: `/profile read` and `/profile keel-read` are equivalent.
+
 | Profile | Description |
 |---------|-------------|
-| `project-read` | Read and search `projectRoot`; no external paths, writes, or unclassified Shell commands |
-| `wide-read` | Read and search anywhere on the filesystem; blocked paths (secrets, keys, .git) are always denied |
+| `read` | Read and search `projectRoot`; no external paths, writes, or unclassified Shell commands |
+| `explore` | Read and search anywhere on the filesystem; blocked paths (secrets, keys, .git) are always denied |
 | `plan` | Read anywhere; write `docs/`, `CONTEXT.md`, and `/tmp/pi-work/` for reviewing external code; mutations require approval |
-| `safe-write` | Read `projectRoot`; write `src/`, `tests/`, and `/tmp/pi-work/` for dependencies; mutations require approval |
+| `code` | Read `projectRoot`; write `src/`, `tests/`, and `/tmp/pi-work/` for dependencies; mutations require approval |
 | `develop` | Read anywhere; write project files; known mutations allowed, unclassified commands ask |
-| `guarded-write` | Read anywhere; write project files; every mutation requires one-time approval |
+| `query` | Read anywhere; write project files; every mutation requires one-time approval |
 
 Commands:
 
@@ -57,7 +59,7 @@ Commands:
 /profile status          # Show the detailed resolved policy
 ```
 
-The Footer wraps Pi's native `FooterComponent` when available and uses two lines. The active Profile name, for example `plan` or `guarded-write`, appears on the first line with the project location; the second line retains Pi's native token, context, cost, model, and extension-status details. Standalone tests use a local rendering fallback when the Pi host package is unavailable.
+The Footer wraps Pi's native `FooterComponent` when available and uses two lines. The active Profile name, for example `plan` or `query`, appears on the first line with the project location; the second line retains Pi's native token, context, cost, model, and extension-status details. Standalone tests use a local rendering fallback when the Pi host package is unavailable.
 
 ## Configuration
 
@@ -83,7 +85,7 @@ Example:
   "profiles": {
     "develop-plan": {
       "description": "Develop with plan document access.",
-      "extends": ["develop", "plan"],
+      "extends": ["keel-develop", "keel-plan"],
       "shellPolicy": {
         "readOnly": "allow",
         "mutating": "deny",

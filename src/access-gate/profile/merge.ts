@@ -1,4 +1,4 @@
-import type { Decision, PathDecisions, PathOperation, PathPolicy, PathRule, ResolvedProfile, ShellPolicy } from "./types";
+import type { Decision, PathDecisions, PathOperation, PathPolicy, PathRule, ShellPolicy } from "./types";
 
 const DEFAULT_SHELL_POLICY: ShellPolicy = {
   readOnly: "deny",
@@ -11,18 +11,6 @@ const DEFAULT_PATH_DECISIONS = {
   search: "deny",
   write: "deny",
 } as const;
-
-export function cloneProfile(profile: ResolvedProfile): ResolvedProfile {
-  return {
-    name: profile.name,
-    description: profile.description,
-    shellPolicy: { ...profile.shellPolicy },
-    pathPolicy: {
-      default: { ...profile.pathPolicy.default },
-      rules: profile.pathPolicy.rules.map((rule) => ({ ...rule })),
-    },
-  };
-}
 
 export function mergeShellPolicy(base: ShellPolicy, override: Partial<ShellPolicy>): ShellPolicy {
   return { ...base, ...override };

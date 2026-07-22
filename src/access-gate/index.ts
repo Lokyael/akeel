@@ -5,6 +5,7 @@ import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-a
 import { evaluateToolCall } from "./gate";
 import { loadProfiles } from "./profile/load";
 import type { ResolvedProfiles } from "./profile/types";
+import { displayName, PROFILE_PREFIX } from "./profile/defaults";
 import { findProjectRoot, createProfileState, type ProfileState } from "./session/profile-state";
 import { clearProfileStatus, installProfileFooter, type ProfileFooterHandle } from "./ui/profile-status";
 
@@ -12,11 +13,11 @@ function profileStatus(state: ProfileState, profiles: ResolvedProfiles): string 
   const profile = state.getProfile();
   const pathRules = profile.pathPolicy.rules.length;
   return [
-    `Profile: ${state.getName()}`,
+    `Profile: ${displayName(state.getName())}`,
     `Description: ${profile.description}`,
     `Shell: readOnly=${profile.shellPolicy.readOnly}, mutating=${profile.shellPolicy.mutating}, unclassified=${profile.shellPolicy.unclassified}`,
     `Path rules: ${pathRules}`,
-    `Available profiles: ${Object.keys(profiles.profiles).join(", ")}`,
+    `Available profiles: ${Object.keys(profiles.profiles).map(displayName).join(", ")}`,
   ].join("\n");
 }
 
@@ -32,6 +33,18 @@ export default function accessGate(pi: ExtensionAPI): void {
     return { profiles, state };
   };
 
+  pi.registerCommand("cleanup", {
+    description: "Post-milestone cleanup: dead code, duplicates, long files, module boundaries, tests, docs",
+    handler: async (_args, ctx) => {
+      if (!ctx.hasUI) return;
+      if (typeof (ctx as unknown as Record<string, unknown>).sendUserMessage === "function") {
+        await (ctx as unknown as { sendUserMessage(text: string): Promise<void> }).sendUserMessage("clean up");
+      } else {
+        ctx.ui.notify("Use /skill:code-audit → 阶段性清理", "info");
+      }
+    },
+  });
+
   pi.registerCommand("profile", {
     description: "Select or inspect the active access profile",
     handler: async (args, ctx) => {
@@ -43,14 +56,19 @@ export default function accessGate(pi: ExtensionAPI): void {
         return;
       }
 
-      const selected = value || await ctx.ui.select("Select access profile", Object.keys(current.profiles.profiles));
+      const storageNames = Object.keys(current.profiles.profiles);
+      const selected = value
+        ? (storageNames.includes(value) ? value : (storageNames.includes(`${PROFILE_PREFIX}${value}`) ? `${PROFILE_PREFIX}${value}` : value))
+        : await ctx.ui.select("Select access profile", storageNames.map(displayName)).then(
+            (display) => display ? storageNames.find((s) => displayName(s) === display) : undefined
+          );
       if (!selected) return;
       if (!current.state.set(selected)) {
         ctx.ui.notify(`Unknown profile: ${selected}`, "error");
         return;
       }
       footer?.refresh();
-      ctx.ui.notify(`Active profile: ${selected}`, "info");
+      ctx.ui.notify(`Active profile: ${displayName(selected)}`, "info");
     },
   });
 

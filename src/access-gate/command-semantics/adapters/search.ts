@@ -1,4 +1,3 @@
-// command-semantics/adapters/search.ts
 // 搜索命令 — find, tree, grep, rg, ls 的路径 intent
 
 import type { ShellCommandNode, ShellArg } from "../../shell-parse/types";

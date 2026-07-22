@@ -1,7 +1,7 @@
 {
-  "defaultProfile": "plan",
+  "defaultProfile": "keel-plan",
   "profiles": {
-    "project-read": {
+    "keel-read": {
       "description": "Read and search projectRoot; deny writes, external paths, and unclassified shell commands.",
       "shellPolicy": {
         "readOnly": "allow",
@@ -15,7 +15,7 @@
         ]
       }
     },
-    "wide-read": {
+    "keel-explore": {
       "description": "Read and search anywhere on the filesystem; deny writes, mutations, and unclassified shell commands. Blocked paths (secrets, keys, .git internals) are always denied.",
       "shellPolicy": {
         "readOnly": "allow",
@@ -26,9 +26,9 @@
         "default": { "read": "allow", "list": "allow", "search": "allow", "write": "deny" }
       }
     },
-    "plan": {
+    "keel-plan": {
       "description": "Read and search anywhere; write docs/, CONTEXT.md, and /tmp/pi-work/ for downloading and reviewing external resources. Mutations and unclassified commands require one-time approval. No source-tree writes.",
-      "extends": ["wide-read"],
+      "extends": ["keel-explore"],
       "shellPolicy": {
         "mutating": "ask",
         "unclassified": "ask"
@@ -41,9 +41,9 @@
         ]
       }
     },
-    "safe-write": {
+    "keel-code": {
       "description": "Read and search projectRoot; write source, test paths, and /tmp/pi-work/ for downloaded dependencies and reference code. Mutations and unclassified commands require one-time approval.",
-      "extends": ["project-read"],
+      "extends": ["keel-read"],
       "shellPolicy": {
         "mutating": "ask",
         "unclassified": "ask"
@@ -56,9 +56,9 @@
         ]
       }
     },
-    "develop": {
+    "keel-develop": {
       "description": "Read and search anywhere; write project files. Known mutations are allowed and unclassified commands require approval. Blocked paths and .git are always denied.",
-      "extends": ["wide-read"],
+      "extends": ["keel-explore"],
       "shellPolicy": {
         "mutating": "allow",
         "unclassified": "ask"
@@ -69,9 +69,9 @@
         ]
       }
     },
-    "guarded-write": {
+    "keel-query": {
       "description": "Read and search anywhere; write project files. Every known mutation and unclassified shell command requires one-time approval. Blocked paths and .git are always denied.",
-      "extends": ["wide-read"],
+      "extends": ["keel-explore"],
       "shellPolicy": {
         "mutating": "ask",
         "unclassified": "ask"

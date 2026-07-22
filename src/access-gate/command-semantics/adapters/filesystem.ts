@@ -1,4 +1,3 @@
-// command-semantics/adapters/filesystem.ts
 // 文件系统命令语义 — cp, mv, rm, touch, mkdir, chmod, chown, tee, dd, truncate
 
 import type { ShellCommandNode, ShellArg } from "../../shell-parse/types";

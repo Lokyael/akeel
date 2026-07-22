@@ -77,9 +77,9 @@ test("renders the active Profile in a two-line Footer and refreshes after switch
     assert.equal(lines.length, 2);
     assert.match(lines[0]!, /plan$/);
     assert.doesNotMatch(lines[0]!, /Profile:/);
-    await harness.commands.get("profile")!("guarded-write", harness.ctx);
+    await harness.commands.get("profile")!("query", harness.ctx);
     lines = footer.render(120);
-    assert.match(lines[0]!, /guarded-write$/);
+    assert.match(lines[0]!, /query$/);
     assert.ok(harness.getRenderRequests() > 0);
   } finally {
     rmSync(root, { recursive: true, force: true });
@@ -93,8 +93,8 @@ test("resets the active Profile and Footer on every session start", async () => 
     accessGate(harness.pi);
     await harness.handlers.get("session_start")!(undefined, harness.ctx);
     const footer = harness.startFooter();
-    await harness.commands.get("profile")!("project-read", harness.ctx);
-    assert.match(footer.render(120)[0]!, /project-read$/);
+    await harness.commands.get("profile")!("read", harness.ctx);
+    assert.match(footer.render(120)[0]!, /read$/);
 
     await harness.handlers.get("session_start")!(undefined, harness.ctx);
     const resetFooter = harness.startFooter();

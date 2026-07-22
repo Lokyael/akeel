@@ -18,7 +18,7 @@ const base = {
 } as const;
 
 test("validates a profile with a description and complete policies", () => {
-  const result = validateProfiles({ profiles: { "project-read": base }, defaultProfile: "project-read" });
+  const result = validateProfiles({ profiles: { "keel-read": base }, defaultProfile: "keel-read" });
   assert.equal(result.ok, true);
 });
 
@@ -38,22 +38,22 @@ test("rejects an unknown profile field and invalid decision", () => {
 test("resolves inherited profiles and unions path rules", () => {
   const raw: RawProfiles = {
     profiles: {
-      "project-read": base,
-      plan: {
-        extends: ["project-read"],
+      "keel-read": base,
+      "keel-plan": {
+        extends: ["keel-read"],
         description: "Write project task documents.",
         pathPolicy: {
           rules: [{ path: "project/docs/**", write: "allow" }],
         },
       },
     },
-    defaultProfile: "plan",
+    defaultProfile: "keel-plan",
   };
   const result = resolveProfiles(raw);
   assert.equal(result.ok, true);
   if (!result.ok) return;
-  assert.equal(result.value.profiles.plan.pathPolicy.rules.length, 2);
-  assert.equal(result.value.profiles.plan.pathPolicy.rules[1]?.path, "project/docs/**");
+  assert.equal(result.value.profiles["keel-plan"].pathPolicy.rules.length, 2);
+  assert.equal(result.value.profiles["keel-plan"].pathPolicy.rules[1]?.path, "project/docs/**");
 });
 
 test("rejects inheritance cycles", () => {

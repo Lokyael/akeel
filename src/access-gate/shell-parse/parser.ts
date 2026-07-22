@@ -43,7 +43,54 @@ function redirectKind(op: string, fd: number | null): RedirectionKind {
   return "stdout";
 }
 
-// ─── 辅助：合并数字前缀与重定向操作符 ───
+// ─── 辅助：重定向解析 ───
+
+/**
+ * Try to parse a redirect at tokens[i]. Returns the redirection node and new
+ * index, or null if the token is not a redirect.
+ */
+function tryParseRedirect(
+  tokens: LexToken[],
+  i: number,
+): { redirection: ShellRedirectionNode; newIndex: number } | null {
+  const tok = tokens[i]!;
+  if (tok.kind !== "redirect") return null;
+
+  const next = i + 1 < tokens.length ? tokens[i + 1] : null;
+  let fd: number | null = null;
+  const op = tok.value;
+
+  // detect fd prefix (e.g. 2>)
+  if (i > 0 && tokens[i - 1]?.kind === "word" && ALL_DIGITS.test(tokens[i - 1]!.value)) {
+    fd = Number(tokens[i - 1]!.value);
+  }
+
+  let target: ShellArg | null = null;
+  if (op === "<<" || op === "<<<") {
+    if (next?.kind === "word") { target = wordToArg(next); i += 2; }
+    else { i += 1; }
+  } else {
+    if (next?.kind === "word") { target = wordToArg(next); i += 2; }
+    else { i += 1; }
+  }
+
+  const kind = redirectKind(op, fd);
+  if (fd === null) {
+    if (kind === "stdin" || kind === "heredoc" || kind === "hereString") fd = 0;
+    else if (kind === "stderr" || kind === "stderrAppend") fd = 2;
+    else fd = 1;
+  }
+
+  return {
+    redirection: {
+      kind,
+      fd,
+      target,
+      span: { start: tok.span.start, end: target ? target.span.end : tok.span.end },
+    },
+    newIndex: i,
+  };
+}
 
 // ─── 主解析函数 ───
 
@@ -132,67 +179,11 @@ function parseCommandGroup(tokens: LexToken[]): Omit<ShellCommandNode, "operator
     const tok = tokens[i]!;
 
     // ── 处理重定向 ──
-    if (tok.kind === "redirect") {
-      state = "args"; // from this point on, everything is argument/redirection context
-      const next = i + 1 < tokens.length ? tokens[i + 1] : null;
-      // 检查是否是 fd 前缀 + redirect 的情况
-      let fd: number | null = null;
-      let op = tok.value;
-
-      // 检查上一个 word token 是否是 fd 数字
-      if (i > 0 && tokens[i - 1]?.kind === "word" && ALL_DIGITS.test(tokens[i - 1]!.value)) {
-        // pop the digit token from args (or wherever it was)
-        const prev = tokens[i - 1]!;
-        fd = Number(prev.value);
-        // 如果 digit 已经被加到 args，需要移除
-        // 但这里我们还没加，按顺序处理时 digit 应该还在前面的状态中
-        // 简化：如果 fd 来自前一个 word，我们忽略它在前序状态中的加入
-      }
-
-      let target: ShellArg | null = null;
-      if (op === "<<") {
-        // heredoc: target is the delimiter (next word)
-        if (next && next.kind === "word") {
-          target = wordToArg(next);
-          i += 2;
-        } else {
-          i += 1;
-        }
-      } else if (op === "<<<") {
-        // here-string: target is the next word (string)
-        if (next && next.kind === "word") {
-          target = wordToArg(next);
-          i += 2;
-        } else {
-          i += 1;
-        }
-      } else {
-        // 普通重定向
-        const wordTarget = next?.kind === "word" ? next : null;
-        if (wordTarget) {
-          target = wordToArg(wordTarget);
-          i += 2;
-        } else {
-          i += 1;
-        }
-      }
-
-      // 推断 kind
-      const kind = redirectKind(op, fd);
-
-      // 确定实际 fd
-      if (fd === null) {
-        if (kind === "stdin" || kind === "heredoc" || kind === "hereString") fd = 0;
-        else if (kind === "stderr" || kind === "stderrAppend") fd = 2;
-        else fd = 1;
-      }
-
-      redirections.push({
-        kind,
-        fd,
-        target,
-        span: { start: tok.span.start, end: target ? target.span.end : tok.span.end },
-      });
+    const redirect = tryParseRedirect(tokens, i);
+    if (redirect) {
+      state = "args";
+      redirections.push(redirect.redirection);
+      i = redirect.newIndex;
       continue;
     }
 

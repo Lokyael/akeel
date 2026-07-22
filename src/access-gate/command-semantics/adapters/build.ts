@@ -1,4 +1,3 @@
-// command-semantics/adapters/build.ts
 // 构建工具命令 — cargo, go, make 的语义
 
 import type { ShellCommandNode } from "../../shell-parse/types";

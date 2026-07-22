@@ -1,4 +1,3 @@
-// command-semantics/adapters/git.ts
 // Git 命令语义
 
 import type { ShellCommandNode, ShellArg } from "../../shell-parse/types";

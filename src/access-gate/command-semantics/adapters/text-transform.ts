@@ -1,4 +1,3 @@
-// command-semantics/adapters/text-transform.ts
 // 文本处理命令 — sed, awk, sort, uniq 的选项语义
 
 import type { ShellCommandNode, ShellArg } from "../../shell-parse/types";

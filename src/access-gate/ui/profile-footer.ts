@@ -1,4 +1,5 @@
 import type { ResolvedProfile } from "../profile/types";
+import { displayName } from "../profile/defaults";
 
 export interface FooterSnapshot {
   cwd: string;
@@ -64,22 +65,15 @@ function visibleWidth(text: string): number {
   return stripAnsi(text).length;
 }
 
-function truncatePlain(text: string, width: number): string {
-  if (width <= 0) return "";
-  if (text.length <= width) return text;
-  if (width <= 3) return text.slice(0, width);
-  return `${text.slice(0, width - 3)}...`;
-}
-
 export function appendRight(text: string, right: string, width: number): string {
   const rightWidth = visibleWidth(right);
-  if (rightWidth >= width) return truncatePlain(stripAnsi(right), width);
+  if (rightWidth >= width) return truncate(stripAnsi(right), width);
   const leftWidth = width - rightWidth - 2;
   const textWidth = visibleWidth(text);
   if (textWidth <= leftWidth) {
     return `${text}${" ".repeat(width - textWidth - rightWidth)}${right}`;
   }
-  const left = truncatePlain(stripAnsi(text), leftWidth);
+  const left = truncate(stripAnsi(text), leftWidth);
   return `${left}${" ".repeat(Math.max(0, width - left.length - rightWidth))}${right}`;
 }
 
@@ -88,7 +82,7 @@ function collapseNativeFooterLines(lines: string[], width: number): string[] {
   const second = lines[1] ?? "";
   const extra = lines.slice(2).map(stripAnsi).join(" ").trim();
   if (!extra) return [first, second];
-  return [first, truncatePlain(`${stripAnsi(second).trimEnd()} ${extra}`, width)];
+  return [first, truncate(`${stripAnsi(second).trimEnd()} ${extra}`, width)];
 }
 
 function formatTokens(count: number): string {
@@ -202,7 +196,7 @@ export function createProfileFooter(
     render(width) {
       if (nativeFooter) {
         const lines = collapseNativeFooterLines(nativeFooter.render(width), width);
-        return [appendRight(lines[0] ?? "", theme.fg("dim", profile().name), width), lines[1] ?? ""];
+        return [appendRight(lines[0] ?? "", theme.fg("dim", displayName(profile().name)), width), lines[1] ?? ""];
       }
 
       const activeModel = model();
@@ -210,7 +204,7 @@ export function createProfileFooter(
         cwd: session.getCwd(),
         branch: footerData.getGitBranch(),
         sessionName: session.getSessionName(),
-        profileName: profile().name,
+        profileName: displayName(profile().name),
         stats: buildStats(session),
         context: formatContext(contextUsage()),
         provider: activeModel?.provider,

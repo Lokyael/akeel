@@ -3,7 +3,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { BUILTIN_PROFILES_PATH, DEFAULT_PROFILE_NAME } from "./defaults";
 import { resolveProfiles } from "./resolve";
-import type { RawProfiles, ResolvedProfiles, ValidationResult } from "./types";
+import type { RawProfiles, ResolvedProfiles } from "./types";
 
 function getAgentDir(): string {
   return process.env.PI_CODING_AGENT_DIR || join(homedir(), ".pi", "agent");
@@ -51,11 +51,4 @@ export function loadProfiles(projectRoot: string, agentDir = getAgentDir(), incl
   const resolved = resolveProfiles(raw);
   if (!resolved.ok) throw new Error(`invalid active profiles: ${resolved.error}`);
   return resolved.value;
-}
-
-export function selectProfile(profiles: ResolvedProfiles, name: string): ValidationResult<ResolvedProfiles["profiles"][string]> {
-  const profile = profiles.profiles[name];
-  return profile
-    ? { ok: true, value: structuredClone(profile) }
-    : { ok: false, error: `unknown profile '${name}'` };
 }
