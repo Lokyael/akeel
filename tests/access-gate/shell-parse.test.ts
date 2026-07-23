@@ -237,6 +237,14 @@ void test("parser: append redirection", () => {
   assert.equal(cmd.redirections[0]!.kind, "stdoutAppend");
 });
 
+void test("parser: distinguishes fd duplication from file redirection", () => {
+  const { program } = parse(lex("cat file 2>&1").tokens);
+  const cmd = program.commands[0]!;
+  assert.equal(cmd.redirections[0]!.kind, "fdDuplicate");
+  assert.equal(cmd.redirections[0]!.fd, 2);
+  assert.equal(cmd.redirections[0]!.target?.value, "1");
+});
+
 void test("parser: env assignments", () => {
   const { program } = parse(lex("VAR=value cmd").tokens);
   const cmd = program.commands[0]!;

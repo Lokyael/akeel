@@ -266,5 +266,7 @@ test("denies opaque command semantics even when unclassified commands are allowe
     },
   });
   const result = await evaluateBash("git unknown-subcommand", activeProfile, "Allow once");
-  assert.deepEqual(result, { kind: "block", reason: "opaque command cannot be analyzed: git" });
+  assert.equal(result.kind, "block");
+  assert.equal(result.code, "opaque-command");
+  assert.ok(result.reason.startsWith("opaque-command:"));
 });

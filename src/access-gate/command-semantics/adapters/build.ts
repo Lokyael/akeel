@@ -60,6 +60,7 @@ export const buildAdapter: CommandAdapter = {
       if (def.pattern(subcmd)) {
         return makeSemantics(def.cls, {
           reason: def.reason,
+          effects: def.network ? ["network"] : undefined,
           opaque: def.cls === "unclassified",
         });
       }

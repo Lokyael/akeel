@@ -1,40 +1,45 @@
 // 文件系统命令语义 — cp, mv, rm, touch, mkdir, chmod, chown, tee, dd, truncate
 
 import type { ShellCommandNode, ShellArg } from "../../shell-parse/types";
-import type { CommandAdapter, CommandSemantics, PathIntent, SemanticContext } from "../types";
+import type { CommandAdapter, CommandSemantics, Effect, PathIntent, SemanticContext } from "../types";
 import { makeSemantics } from "./shared";
 
 const FILESYSTEM_CMDS: Record<string, {
   class: "readOnly" | "mutating" | "dangerous";
   paths: (args: ShellArg[]) => { op: "read" | "write"; value: string }[];
-  effects?: string[];
+  effects: readonly Effect[];
   reason: string;
 }> = {
   rm: {
     class: "mutating",
     paths: (args) => args.map((a) => ({ op: "write", value: a.value ?? "" })),
+    effects: ["delete"],
     reason: "remove files",
   },
   touch: {
     class: "mutating",
     paths: (args) => args.map((a) => ({ op: "write", value: a.value ?? "" })),
+    effects: ["write"],
     reason: "create/update files",
   },
   mkdir: {
     class: "mutating",
     paths: (args) => args.map((a) => ({ op: "write", value: a.value ?? "" })),
+    effects: ["write"],
     reason: "create directories",
   },
   chmod: {
     class: "mutating",
     // chmod <mode> <file>... — skip first positional arg (mode)
     paths: (args) => args.slice(1).map((a) => ({ op: "write", value: a.value ?? "" })),
+    effects: ["permissionChange"],
     reason: "change file permissions",
   },
   chown: {
     class: "mutating",
     // chown <owner> <file>... — skip first positional arg (owner)
     paths: (args) => args.slice(1).map((a) => ({ op: "write", value: a.value ?? "" })),
+    effects: ["permissionChange"],
     reason: "change file ownership",
   },
   cp: {
@@ -48,6 +53,7 @@ const FILESYSTEM_CMDS: Record<string, {
         { op: "write" as const, value: last.value ?? "" },
       ];
     },
+    effects: ["read", "write"],
     reason: "copy files",
   },
   mv: {
@@ -61,16 +67,19 @@ const FILESYSTEM_CMDS: Record<string, {
         { op: "write" as const, value: last.value ?? "" },
       ];
     },
+    effects: ["write", "delete"],
     reason: "move/rename files",
   },
   tee: {
     class: "mutating",
     paths: (args) => args.map((a) => ({ op: "write", value: a.value ?? "" })),
+    effects: ["write"],
     reason: "write to files",
   },
   truncate: {
     class: "mutating",
     paths: (args) => args.map((a) => ({ op: "write", value: a.value ?? "" })),
+    effects: ["write"],
     reason: "truncate files",
   },
 };
@@ -98,6 +107,7 @@ export const filesystemAdapter: CommandAdapter = {
 
     return makeSemantics(def.class, {
       reason: def.reason,
+      effects: def.effects,
       intents,
     });
   },

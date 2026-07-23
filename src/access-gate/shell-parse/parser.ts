@@ -23,23 +23,19 @@ const ALL_DIGITS = /^\d+$/;
 
 // ─── 重定向 kind 推断 ───
 
-function redirectKind(op: string, fd: number | null): RedirectionKind {
+function redirectKind(op: string, fd: number | null, target: string | null): RedirectionKind {
   if (op === "<" || op === "<>") return "stdin";
+  if (op === "<&" || op === ">&") {
+    if (target === "-") return "fdClose";
+    if (target !== null && ALL_DIGITS.test(target)) return "fdDuplicate";
+  }
   if (op === ">" || op === ">|") return fd === 2 ? "stderr" : "stdout";
   if (op === ">>") return fd === 2 ? "stderrAppend" : "stdoutAppend";
-  if (op === "&>" || op === ">&") {
-    if (fd === 1) return "stdoutAppend";
-    if (fd === 2) return "stderr";
-    return "stdout"; // &> 默认为 stdout
-  }
+  if (op === "&>") return "stdout";
   if (op === "&>>") return "stdoutAppend";
-  if (op === "<&" || op === ">&") {
-    // fd duplicate: e.g. 2>&1
-    if (op.startsWith(">")) return "stdout";
-    return "stdin";
-  }
   if (op === "<<") return "heredoc";
   if (op === "<<<") return "hereString";
+  if (op === ">&") return fd === 2 ? "stderr" : "stdout";
   return "stdout";
 }
 
@@ -77,7 +73,7 @@ function tryParseRedirect(
     else { i += 1; }
   }
 
-  const kind = redirectKind(op, fd);
+  const kind = redirectKind(op, fd, target?.value ?? null);
   if (fd === null) {
     if (kind === "stdin" || kind === "heredoc" || kind === "hereString") fd = 0;
     else if (kind === "stderr" || kind === "stderrAppend") fd = 2;

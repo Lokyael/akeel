@@ -1,8 +1,9 @@
 import type { ResolvedProfile } from "../profile/types";
+import type { DecisionCode } from "./decision-types";
 
 export type GateResult =
   | { kind: "allow" }
-  | { kind: "block"; reason: string };
+  | { kind: "block"; reason: string; code: DecisionCode };
 
 export interface GateRuntime {
   hasUI: boolean;
@@ -11,7 +12,7 @@ export interface GateRuntime {
 
 export interface ToolCallInput {
   surface: string;
-  args: Record<string, unknown>;
+  args: unknown;
   cwd: string;
   projectRoot: string;
   stagingDir: string;

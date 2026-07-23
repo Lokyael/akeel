@@ -3,6 +3,10 @@
 // 输出：LexToken[] 扁平 token 流，带 source span
 // 不依赖 command rules 或 Profile
 
+export const LEXER_LIMITS = {
+  maxTokens: 4_096,
+} as const;
+
 export type LexTokenKind = "word" | "operator" | "redirect" | "heredoc-body";
 
 export interface LexToken {
@@ -39,6 +43,7 @@ function matchOp(ops: string[], text: string, index: number): string | null {
 const CTRL_OPS = ["&&", "||", ";", "|", "&"];
 
 export function lex(text: string): { tokens: LexToken[]; unsafeSyntax: string | null } {
+  if (text.length > LEXER_LIMITS.maxTokens * 20) return { tokens: [], unsafeSyntax: "input exceeds the lexer budget" };
   const tokens: LexToken[] = [];
   let unsafeSyntax: string | null = null;
 
@@ -183,5 +188,6 @@ export function lex(text: string): { tokens: LexToken[]; unsafeSyntax: string | 
     }
   }
 
+  if (tokens.length > LEXER_LIMITS.maxTokens) return { tokens: [], unsafeSyntax: "token count exceeds the lexer budget" };
   return { tokens, unsafeSyntax };
 }

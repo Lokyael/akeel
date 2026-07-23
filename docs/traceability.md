@@ -22,8 +22,8 @@
 | `src/access-gate/shell-parse/` | 原创 | 受限 Shell IR：lexer（引用感知分词）+ parser（控制操作符、重定向、wrapper）|
 | `src/access-gate/command-semantics/` | 原创整合 | 统一命令语义：wrapper 规范化、control-flow、adapter 注册表（filesystem、text-transform、search、read、noop、git、package、build）|
 | `src/access-gate/path/` | 原创整合 | 统一 `cwd`、`projectRoot`、`stagingDir`、按操作路径决策、blocked paths 和 symlink 检查。 |
-| `src/access-gate/gate/` | 统一 access gate 设计 | `evaluate.ts` 统一入口，`analyze-shell.ts` 使用新 IR + 语义注册表替代旧 shell-command |
-| `tests/access-gate/` | 项目行为测试 | 覆盖 Profile、路径、Shell IR、语义 adapter、Gate 和 Extension 状态。 |
+| `src/access-gate/gate/` | 统一 access gate 设计 | `evaluate.ts` 保持唯一运行时入口；`shell-compiler.ts`、`direct-tool-compiler.ts` 生成 AccessRequest，`evaluate-request.ts` 执行 Policy Kernel，`render-decision.ts` 产生 host 兼容结果 |
+| `tests/access-gate/` | 项目行为测试 | 覆盖 Profile、路径、Shell IR、compiler、Kernel、guidance/renderer、invariants、语义 adapter、Gate 和 Extension 状态。 |
 
 ## 技能来源
 

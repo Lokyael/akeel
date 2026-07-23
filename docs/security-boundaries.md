@@ -42,6 +42,20 @@ access-gate 只拦截 Pi `tool_call` 事件。`user_bash`（`!`/`!!`）、`shell
 
 ## R-11：审批详情敏感信息
 
-**状态：** deferred。
+**状态：** partial。
 
-当前审批界面展示 command 和 path，不提供敏感信息脱敏（如 token、password、私钥路径）。后续需要独立设计展示与日志脱敏边界。
+deny 决策的 reason 经过 sensitive prefix 脱敏（`~/.ssh`、`/home/`、`.env` 等），subject 被截断到 1,024 字符，reason 总长度 ≤ 2,048。ask 决策仍保留完整 evidence 供用户审批判断。renderer 不做完整 security log scrubbing。
+
+## R-13：Compiler-issued request 真实性
+
+**状态：** implemented。
+
+`CompleteAccessRequest` 只能由 compiler 构造器发行；构造器 deep-freeze request 后加入模块私有 WeakSet。Kernel 通过 `isCompleteAccessRequest()` 验证 WeakSet 成员资格、递归冻结、exact coverage correspondence 和 resource budget，拒绝复制或伪造的 request。
+
+WeakSet 在进程生命周期内保持，request 不跨调用缓存或持久化。
+
+## R-14：Guidance 注入
+
+**状态：** implemented。
+
+Guidance 只能从源码内置的静态 `GuidanceId` catalog 映射，不拼接原始 Shell、glob、用户输入或文件路径。blocked path、threat 和 symlink escape 不提供绕过建议。renderer 不调用替代 tool、不生成可执行命令。

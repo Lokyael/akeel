@@ -5,12 +5,16 @@
 import { isAbsolute, resolve } from "node:path";
 import { existsSync, statSync } from "node:fs";
 import type { ShellProgram, ShellCommandNode, ShellOperator } from "../shell-parse/types";
-import type { CwdState, CommandSemantics } from "./types";
+import type { CwdCandidate, CwdState, CommandSemantics } from "./types";
 
 // ─── 初始状态 ───
 
 export function initialCwd(cwd: string): CwdState {
-  return { cwd, certainty: "exact" };
+  return {
+    cwd,
+    certainty: "exact",
+    candidates: [{ cwd, certainty: "exact", branch: "initial" }],
+  };
 }
 
 // ─── cd 命令分析 ───
@@ -65,6 +69,7 @@ export function resolveCdTarget(target: string, currentCwd: string): { cwd: stri
 export interface ControlFlowAnalysis {
   nodes: {
     node: ShellCommandNode;
+    cwdBefore: CwdState;
     effectiveCwd: CwdState;
     semantics: CommandSemantics | null;
   }[];
@@ -82,73 +87,68 @@ export function analyzeControlFlow(
   const result: ControlFlowAnalysis["nodes"] = [];
   let opaque = false;
 
-  // 如果程序有动态 token 或 unsafe syntax → opaque
   if (program.dynamic || program.unsafeSyntax) {
     return {
       nodes: program.commands.map((cmd) => ({
         node: cmd,
-        effectiveCwd: { cwd: initial.cwd, certainty: "joined" },
+        cwdBefore: initial,
+        effectiveCwd: { ...initial, certainty: "joined" },
         semantics: null,
       })),
       opaque: true,
     };
   }
 
-  // 遍历每个命令
-  // "joined" cwd: 需要 intersection 检查
-  let currentCwd = initial.cwd;
-  let currentCertainty: "exact" | "joined" = initial.certainty;
+  let previousBefore = initial;
+  let previousAfter = initial;
 
   for (let i = 0; i < program.commands.length; i++) {
     const cmd = program.commands[i]!;
-    const op = cmd.operatorBefore;
-
-    // 如果前一个操作符是 && 或 ||，尝试 joined cwd
-    if (i > 0 && (op === "&&" || op === "||")) {
-      // conservative: 使用 joined，需要检查所有可能分支
-      // 简单处理：从上个命令的 cd 结果考虑
-      // 对于 &&：只有前一个成功才执行，cwd 来自上一个命令
-      // 对于 ||：只有前一个失败才执行，cwd 是初始状态
-      // 我们不知道成功/失败 → 用 joined
-      currentCertainty = "joined";
-    }
-
-    if (op === "|") {
-      // pipeline: 每个命令在独立 subshell 中执行
-      // cwd 变化不传播到右侧
-      // 但 pipeline 不改变当前 cwd
-      // 保持 current cwd
-    }
-
-    // 提取 cd 信息
+    const operator = cmd.operatorBefore;
+    const before = i === 0 || operator === "start" || operator === "&&" || operator === ";" || operator === "newline"
+      ? previousAfter
+      : previousBefore;
     const cdInfo = analyzeCd(cmd);
-    let effectiveCwd: CwdState = { cwd: currentCwd, certainty: currentCertainty };
+    let effectiveCwd = before;
+    let after = before;
 
     if (cdInfo.target) {
-      // 解析 cd target
-      const resolved = resolveCdTarget(cdInfo.target, currentCwd);
-      if (resolved) {
-        effectiveCwd = { cwd: resolved.cwd, certainty: "exact" };
-        // 如果没有管道反转，更新 currentCwd
-        if (op !== "|" && cmd.executable?.value?.toLowerCase() === "cd") {
-          currentCwd = resolved.cwd;
-          currentCertainty = "exact";
-        }
-      } else {
-        // 目标不可解析 → opaque
+      const targets = before.candidates
+        .map((candidate) => resolveCdTarget(cdInfo.target!, candidate.cwd))
+        .filter((resolved): resolved is { cwd: string; exists: boolean } => resolved !== null)
+        .map((resolved, index) => ({
+          cwd: resolved.cwd,
+          certainty: "exact" as const,
+          branch: `${i}:cd:${index}`,
+        }));
+      if (targets.length === 0) {
         opaque = true;
+      } else {
+        effectiveCwd = stateFromCandidates(targets);
+        if (operator !== "|" && operator !== "&") after = effectiveCwd;
       }
     } else if (cdInfo.opaque) {
-      // cd - 或 pushd/popd → opaque
       opaque = true;
     }
 
     result.push({
       node: cmd,
+      cwdBefore: before,
       effectiveCwd,
-      semantics: null, // 由 adapter 填充
+      semantics: null,
     });
+    previousBefore = before;
+    previousAfter = after;
   }
 
   return { nodes: result, opaque };
+}
+
+function stateFromCandidates(candidates: readonly CwdCandidate[]): CwdState {
+  const unique = candidates.filter((candidate, index, values) => values.findIndex((value) => value.cwd === candidate.cwd) === index);
+  return {
+    cwd: unique[0]?.cwd ?? "",
+    certainty: unique.length === 1 ? "exact" : "joined",
+    candidates: unique,
+  };
 }

@@ -178,3 +178,38 @@
 **Why:** Task 比 Work 更准确地表达具有目标、范围、验收和验证边界的有限任务；Requirements 保留为内容概念，不再作为独立文件类型。
 
 **Rejected:** 不采用 Work/Work Item、Change Record、Change Request 或独立 Specification 文件作为统一短期产物。
+
+## D-022: Compiler-Kernel 分层与请求真实性
+
+**Status:** active
+
+**Decision:** Access Gate 的 enforcement 分为三层：compiler → Policy Kernel → host adapter。Compiler 只生成 `CompleteAccessRequest`（分析证据）或 structured reject，不接 Profile 或审批。Policy Kernel 只消费 compiler-issued request，验证其 authenticity（WeakSet issuance）后执行封闭 policy evaluation。
+
+**Why:** 分层保证分析证据（request）和授权结果（GateDecision）不混淆；compiler 可以独立证明 fail-closed 边界，Kernel 可以独立证明 monotonic policy。
+
+**Security invariants:**
+
+- 每个 request 由构造器 defensive-copy、deep-freeze 后加入模块私有 WeakSet，只有 issued request 能通过 `isCompleteAccessRequest()`。
+- Kernel 不接收原始 Shell，不重新计算 hard hazard — 所有 dynamic/unsafe/opaque/threat 在 compiler 阶段已 reject。
+- coverage 必须逐项对应：command/redirection/effect span 与 operation、顶层 cwd candidates 与 path candidates 去重集合。
+- Effect policy axis 是封闭映射：`read/search/write/delete/permissionChange/cwdChange → path`，`execute/network → shell`。
+
+## D-023: 拒绝解释与静态 Guidance
+
+**Status:** active
+
+**Decision:** 拒绝结果的 guidance 只能引用源码内置的静态 `GuidanceId` catalog，不能拼接可执行 Shell、原始 glob 或用户输入。`renderDecision()` 将 `GateDecision` 转为 Pi host `GateResult` 时执行 evidence redact 和长度预算。
+
+**Why:** guidance 不能成为间接 code injection 通道；blocked path/threat 不提供绕过建议；evidence 脱敏防止拒绝原因泄露敏感路径。
+
+**Guidance mapping:**
+
+| DecisionCode | GuidanceId |
+|---|---|
+| `dynamic-shell` | `batch-inspection-tools` |
+| `opaque-command` | `literal-command-or-direct-tool` |
+| `unsafe-syntax` | `split-supported-commands` |
+| `shell-policy-denied` | `profile-restriction` |
+| 其他 deny code | 无（避免诱导绕过）|
+
+**Redaction rules:** renderer 仅对 deny 决策执行 sensitive prefix 脱敏（`~/.ssh`、`/home/`、`.env` 等），ask 决策保留完整 evidence 供用户审批判断。

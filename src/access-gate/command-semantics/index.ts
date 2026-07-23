@@ -9,5 +9,6 @@ export type {
   SemanticContext,
   CommandAdapter,
   NormalizedCommand,
+  CwdCandidate,
   CwdState,
 } from "./types";

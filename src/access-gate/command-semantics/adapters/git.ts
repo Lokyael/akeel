@@ -1,7 +1,7 @@
 // Git 命令语义
 
 import type { ShellCommandNode, ShellArg } from "../../shell-parse/types";
-import type { CommandAdapter, CommandSemantics, PathIntent, SemanticContext } from "../types";
+import type { CommandAdapter, CommandSemantics, Effect, PathIntent, SemanticContext } from "../types";
 import { makeSemantics } from "./shared";
 
 /** Git 子命令分类。 */
@@ -65,6 +65,13 @@ function gitPathOpts(args: ShellArg[]): PathIntent[] {
   return intents;
 }
 
+function gitEffects(def: GitDef, subcmd: string): readonly Effect[] {
+  const effects = new Set<Effect>(def.cls === "readOnly" ? ["read"] : def.cls === "dangerous" ? ["execute"] : ["write"]);
+  if (/^rm\\b/.test(subcmd)) effects.add("delete");
+  if (/^(fetch|pull|push|clone|remote)\\b/.test(subcmd)) effects.add("network");
+  return [...effects];
+}
+
 function positionalArgs(args: ShellArg[]): ShellArg[] {
   const result: ShellArg[] = [];
   let optionsDone = false;
@@ -115,7 +122,7 @@ export const gitAdapter: CommandAdapter = {
             });
           }
         }
-        return makeSemantics(def.cls, { reason: def.reason, intents: pathIntents });
+        return makeSemantics(def.cls, { reason: def.reason, intents: pathIntents, effects: gitEffects(def, subcmd) });
       }
     }
 

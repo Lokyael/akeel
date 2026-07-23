@@ -1,52 +1,54 @@
-import { decidePath, resolvePath } from "../path";
-import type { PathOperation } from "../profile/types";
-import { analyzeShellCommand } from "./analyze-shell";
-import { askOnce, decisionBlock } from "./unknown-command";
+import { compileDirectToolCall } from "./direct-tool-compiler";
+import { compileShellCall } from "./shell-compiler";
+import { isRecord, type CompileResult, type CompilerContext } from "./access-request";
+import { evaluateRequest } from "./evaluate-request";
+import { renderDecision } from "./render-decision";
+import { askOnce } from "./unknown-command";
 import type { GateResult, GateRuntime, ToolCallInput } from "./types";
 
-const TOOL_OPERATIONS: Record<string, PathOperation> = {
-  read: "read",
-  write: "write",
-  edit: "write",
-  find: "search",
-  grep: "search",
-  ls: "list",
+export type ToolCompilerInput = CompilerContext & {
+  surface: string;
+  args: unknown;
 };
 
-function pathForTool(surface: string, args: Record<string, unknown>): string | null {
-  const value = args.path;
-  if (typeof value === "string" && value.trim() !== "") return value;
-  if (surface === "read" || surface === "write" || surface === "edit") return null;
-  return ".";
+export function compileToolCall(input: ToolCompilerInput): CompileResult {
+  if (input.surface === "bash") {
+    const args = isRecord(input.args) ? input.args : {};
+    return compileShellCall({ ...input, command: typeof args.command === "string" ? args.command : "" });
+  }
+  return compileDirectToolCall(input);
+}
+
+function compilerRejectToDecision(result: Extract<CompileResult, { kind: "reject" }>): import("./decision-types").GateDecision {
+  const code = result.code;
+  const evidence = result.evidence;
+  if (code === "unknown-tool" || code === "invalid-tool-input"
+    || code === "dynamic-shell" || code === "unsafe-syntax" || code === "threat"
+    || code === "opaque-command" || code === "dangerous-command" || code === "hard-command-rule"
+    || code === "unsupported-redirection" || code === "uncertain-cwd" || code === "unknown-effect"
+    || code === "resource-limit") {
+    return { disposition: "deny", code, enforcement: "hard", evidence, guidance: [] };
+  }
+  return { disposition: "deny", code: "invalid-tool-input", enforcement: "hard", evidence, guidance: [] };
 }
 
 export async function evaluateToolCall(input: ToolCallInput, runtime: GateRuntime): Promise<GateResult> {
-  if (input.surface === "bash") {
-    const command = typeof input.args.command === "string" ? input.args.command : "";
-    if (!command.trim()) return decisionBlock("bash command is missing");
-    return analyzeShellCommand({
-      command,
-      cwd: input.cwd,
-      projectRoot: input.projectRoot,
-      stagingDir: input.stagingDir,
-      profile: input.profile,
-      runtime,
-    });
-  }
+  const compiled = compileToolCall({
+    surface: input.surface,
+    args: input.args,
+    cwd: input.cwd,
+    projectRoot: input.projectRoot,
+    stagingDir: input.stagingDir,
+  });
+  if (compiled.kind === "reject") return renderDecision(compilerRejectToDecision(compiled));
+  return adaptDecision(await evaluateRequest(compiled.request, input.profile, runtime), runtime);
+}
 
-  const operation = TOOL_OPERATIONS[input.surface];
-  if (operation) {
-    const target = pathForTool(input.surface, input.args);
-    if (!target) return decisionBlock(`${input.surface} path is missing`);
-    const path = resolvePath(input.cwd, input.projectRoot, input.stagingDir, target);
-    const decision = decidePath(path, input.profile, operation);
-    if (decision.decision === "deny") return decisionBlock(`${operation} path denied: ${target} (${decision.reason})`);
-    if (decision.decision === "ask") return askOnce(runtime, "Access profile approval", `${operation} path: ${target}`);
-    return { kind: "allow" };
+async function adaptDecision(decision: import("./decision-types").GateDecision, runtime: GateRuntime): Promise<GateResult> {
+  if (decision.disposition === "allow") return { kind: "allow" };
+  if (decision.disposition === "ask") {
+    const rendered = renderDecision(decision);
+    return askOnce(runtime, "Access profile approval", rendered.kind === "block" ? rendered.reason : "approval required");
   }
-
-  const decision = input.profile.shellPolicy.unclassified;
-  if (decision === "deny") return decisionBlock(`unclassified tool denied: ${input.surface}`);
-  if (decision === "ask") return askOnce(runtime, "Access profile approval", `unclassified tool: ${input.surface}`);
-  return { kind: "allow" };
+  return renderDecision(decision);
 }

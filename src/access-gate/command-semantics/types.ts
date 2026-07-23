@@ -77,7 +77,14 @@ export interface NormalizedCommand {
 
 // ─── 控制流分析结果 ───
 
+export interface CwdCandidate {
+  cwd: string;
+  certainty: "exact" | "conservative";
+  branch: string;
+}
+
 export interface CwdState {
   cwd: string;
   certainty: "exact" | "joined";
+  candidates: readonly CwdCandidate[];
 }
