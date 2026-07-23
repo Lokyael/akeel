@@ -33,18 +33,6 @@ export default function accessGate(pi: ExtensionAPI): void {
     return { profiles, state };
   };
 
-  pi.registerCommand("cleanup", {
-    description: "Post-milestone cleanup: dead code, duplicates, long files, module boundaries, tests, docs",
-    handler: async (_args, ctx) => {
-      if (!ctx.hasUI) return;
-      if (typeof (ctx as unknown as Record<string, unknown>).sendUserMessage === "function") {
-        await (ctx as unknown as { sendUserMessage(text: string): Promise<void> }).sendUserMessage("clean up");
-      } else {
-        ctx.ui.notify("Use /skill:code-audit → 阶段性清理", "info");
-      }
-    },
-  });
-
   pi.registerCommand("profile", {
     description: "Select or inspect the active access profile",
     handler: async (args, ctx) => {
