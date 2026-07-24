@@ -5,7 +5,7 @@ import type { CommandAdapter, CommandSemantics, SemanticContext } from "../types
 import { makeSemantics } from "./shared";
 
 interface BuildDef {
-  cls: "readOnly" | "mutating" | "unclassified";
+  cls: "inspect" | "modify" | "execute" | "unknown";
   pattern: (subcmd: string) => boolean;
   reason: string;
   network?: boolean;
@@ -13,33 +13,33 @@ interface BuildDef {
 
 const BUILD_RULES: Record<string, BuildDef[]> = {
   cargo: [
-    { cls: "readOnly", pattern: (s) => /^search\b/.test(s), reason: "cargo search" },
-    { cls: "readOnly", pattern: (s) => /^--version\b/.test(s), reason: "cargo version" },
-    { cls: "mutating", pattern: (s) => /^build\b/.test(s), reason: "cargo build", network: true },
-    { cls: "mutating", pattern: (s) => /^test\b/.test(s), reason: "cargo test", network: true },
-    { cls: "mutating", pattern: (s) => /^run\b/.test(s), reason: "cargo run" },
-    { cls: "mutating", pattern: (s) => /^install\b/.test(s), reason: "cargo install", network: true },
-    { cls: "mutating", pattern: (s) => /^publish\b/.test(s), reason: "cargo publish", network: true },
-    { cls: "mutating", pattern: (s) => /^update\b/.test(s), reason: "cargo update", network: true },
-    { cls: "mutating", pattern: (s) => /^check\b/.test(s), reason: "cargo check", network: true },
-    { cls: "mutating", pattern: (s) => /^clean\b/.test(s), reason: "cargo clean" },
-    { cls: "unclassified", pattern: () => true, reason: "cargo other" },
+    { cls: "inspect", pattern: (s) => /^search\b/.test(s), reason: "cargo search" },
+    { cls: "inspect", pattern: (s) => /^--version\b/.test(s), reason: "cargo version" },
+    { cls: "execute", pattern: (s) => /^build\b/.test(s), reason: "cargo build", network: true },
+    { cls: "execute", pattern: (s) => /^test\b/.test(s), reason: "cargo test", network: true },
+    { cls: "execute", pattern: (s) => /^run\b/.test(s), reason: "cargo run" },
+    { cls: "execute", pattern: (s) => /^install\b/.test(s), reason: "cargo install", network: true },
+    { cls: "execute", pattern: (s) => /^publish\b/.test(s), reason: "cargo publish", network: true },
+    { cls: "execute", pattern: (s) => /^update\b/.test(s), reason: "cargo update", network: true },
+    { cls: "execute", pattern: (s) => /^check\b/.test(s), reason: "cargo check", network: true },
+    { cls: "execute", pattern: (s) => /^clean\b/.test(s), reason: "cargo clean" },
+    { cls: "unknown", pattern: () => true, reason: "cargo other" },
   ],
   go: [
-    { cls: "readOnly", pattern: (s) => /^doc\b/.test(s), reason: "go doc" },
-    { cls: "readOnly", pattern: (s) => /^list\b/.test(s), reason: "go list" },
-    { cls: "readOnly", pattern: (s) => /^version\b/.test(s), reason: "go version" },
-    { cls: "mutating", pattern: (s) => /^build\b/.test(s), reason: "go build" },
-    { cls: "mutating", pattern: (s) => /^test\b/.test(s), reason: "go test" },
-    { cls: "mutating", pattern: (s) => /^run\b/.test(s), reason: "go run" },
-    { cls: "mutating", pattern: (s) => /^install\b/.test(s), reason: "go install", network: true },
-    { cls: "mutating", pattern: (s) => /^mod\s+download\b/.test(s), reason: "go mod download", network: true },
-    { cls: "mutating", pattern: (s) => /^mod\s+(init|tidy|vendor)\b/.test(s), reason: "go mod modify" },
-    { cls: "mutating", pattern: (s) => /^get\b/.test(s), reason: "go get", network: true },
-    { cls: "unclassified", pattern: () => true, reason: "go other" },
+    { cls: "inspect", pattern: (s) => /^doc\b/.test(s), reason: "go doc" },
+    { cls: "inspect", pattern: (s) => /^list\b/.test(s), reason: "go list" },
+    { cls: "inspect", pattern: (s) => /^version\b/.test(s), reason: "go version" },
+    { cls: "execute", pattern: (s) => /^build\b/.test(s), reason: "go build" },
+    { cls: "execute", pattern: (s) => /^test\b/.test(s), reason: "go test" },
+    { cls: "execute", pattern: (s) => /^run\b/.test(s), reason: "go run" },
+    { cls: "execute", pattern: (s) => /^install\b/.test(s), reason: "go install", network: true },
+    { cls: "execute", pattern: (s) => /^mod\s+download\b/.test(s), reason: "go mod download", network: true },
+    { cls: "execute", pattern: (s) => /^mod\s+(init|tidy|vendor)\b/.test(s), reason: "go mod modify" },
+    { cls: "execute", pattern: (s) => /^get\b/.test(s), reason: "go get", network: true },
+    { cls: "unknown", pattern: () => true, reason: "go other" },
   ],
   make: [
-    { cls: "mutating", pattern: () => true, reason: "execute makefile" },
+    { cls: "execute", pattern: () => true, reason: "execute makefile" },
   ],
 };
 
@@ -48,7 +48,7 @@ export const buildAdapter: CommandAdapter = {
   analyze(node: ShellCommandNode, _context: SemanticContext): CommandSemantics {
     const name = node.executable?.value?.toLowerCase() ?? "";
     const rules = BUILD_RULES[name];
-    if (!rules) return makeSemantics("unclassified", { reason: `unknown build tool: ${name}`, opaque: true });
+    if (!rules) return makeSemantics("unknown", { reason: `unknown build tool: ${name}`, opaque: true });
 
     const args = [...node.args];
     const subcmd = args.find((a) => {
@@ -61,11 +61,11 @@ export const buildAdapter: CommandAdapter = {
         return makeSemantics(def.cls, {
           reason: def.reason,
           effects: def.network ? ["network"] : undefined,
-          opaque: def.cls === "unclassified",
+          opaque: def.cls === "unknown",
         });
       }
     }
 
-    return makeSemantics("unclassified", { reason: `${name}: unrecognized`, opaque: true });
+    return makeSemantics("unknown", { reason: `${name}: unrecognized`, opaque: true });
   },
 };

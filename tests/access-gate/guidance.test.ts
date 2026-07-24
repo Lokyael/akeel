@@ -30,8 +30,8 @@ test("path-denied and invalid-tool-input map to profile/tool guidance", () => {
   assert.equal(guidanceFor("unknown-tool")[0]?.id, "literal-command-or-direct-tool");
   // resource-limit → split-supported-commands
   assert.equal(guidanceFor("resource-limit")[0]?.id, "split-supported-commands");
-  // dangerous-command and hard-command-rule have no guidance (security-sensitive)
-  assert.deepEqual(guidanceFor("dangerous-command"), []);
+  // destroy-command and hard-command-rule have no guidance (security-sensitive)
+  assert.deepEqual(guidanceFor("destroy-command"), []);
   assert.deepEqual(guidanceFor("hard-command-rule"), []);
 });
 

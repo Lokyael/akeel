@@ -11,7 +11,7 @@ function profile(): ResolvedProfile {
   return {
     name: "test",
     description: "test",
-    shellPolicy: { readOnly: "allow", mutating: "ask", unclassified: "ask" },
+    shellPolicy: { inspect: "allow", modify: "ask", execute: "deny", destroy: "deny", unknown: "ask" },
     pathPolicy: {
       default: { read: "deny", list: "deny", search: "deny", write: "deny" },
       rules: [

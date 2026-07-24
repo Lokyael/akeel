@@ -5,15 +5,15 @@ import type { CommandAdapter, CommandSemantics, SemanticContext } from "../types
 import { makeSemantics } from "./shared";
 
 interface InterpRule {
-  cls: "readOnly" | "mutating";
+  cls: "inspect" | "execute";
   pattern: (firstArg: string) => boolean;
   reason: string;
 }
 
 function buildInterpRules(cmd: string): InterpRule[] {
   return [
-    { cls: "readOnly", pattern: (s) => /^(--version|-V|-v|--help)$/.test(s), reason: cmd + " version/help" },
-    { cls: "mutating", pattern: () => true, reason: cmd + " execute script" },
+    { cls: "inspect", pattern: (s) => /^(--version|-V|-v|--help)$/.test(s), reason: cmd + " version/help" },
+    { cls: "execute", pattern: () => true, reason: cmd + " execute script" },
   ];
 }
 
@@ -30,7 +30,7 @@ export const interpreterAdapter: CommandAdapter = {
   analyze(node: ShellCommandNode, _context: SemanticContext): CommandSemantics {
     const name = node.executable?.value?.toLowerCase() ?? "";
     const rules = INTERP_RULES[name];
-    if (!rules) return makeSemantics("unclassified", { reason: "unknown interpreter: " + name, opaque: true });
+    if (!rules) return makeSemantics("unknown", { reason: "unknown interpreter: " + name, opaque: true });
 
     const args = [...node.args];
     const subcmd = args.find((a) => {
@@ -45,6 +45,6 @@ export const interpreterAdapter: CommandAdapter = {
       }
     }
 
-    return makeSemantics("mutating", { reason: name + ": execute script" });
+    return makeSemantics("modify", { reason: name + ": execute script" });
   },
 };

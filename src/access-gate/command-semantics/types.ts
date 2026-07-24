@@ -8,8 +8,16 @@ import type {
 } from "../shell-parse/types";
 
 // ─── 命令分类 ───
+// 5 个互斥类，按风险严格递增：inspect < modify < execute < destroy。
+// unknown 为找不到匹配适配器的回退分类。
+//
+// inspect  读取文件 — 所有路径意图均已知，无变更
+// modify   写入/删除/移动文件 — 所有目标均已知
+// execute  运行代码 — 效果取决于外部内容（脚本、二进制文件、Makefile）
+// destroy  不可逆破坏 — 无论信任度如何均不可接受
+// unknown  无匹配适配器
 
-export type CommandClass = "readOnly" | "mutating" | "dangerous" | "unclassified";
+export type CommandClass = "inspect" | "modify" | "execute" | "destroy" | "unknown";
 
 // ─── Effect ───
 

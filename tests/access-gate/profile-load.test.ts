@@ -29,7 +29,7 @@ test("project profiles override same-name built-ins and can extend them", () => 
         "keel-develop": {
           extends: ["keel-read"],
           description: "Global develop profile.",
-          shellPolicy: { unclassified: "ask" },
+          shellPolicy: { unknown: "ask" },
         },
       },
     }));
@@ -39,7 +39,7 @@ test("project profiles override same-name built-ins and can extend them", () => 
         "keel-develop": {
           extends: ["keel-read"],
           description: "Project develop profile.",
-          shellPolicy: { unclassified: "ask" },
+          shellPolicy: { unknown: "ask" },
         },
       },
     }));

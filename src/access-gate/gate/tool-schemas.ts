@@ -28,7 +28,7 @@ export const TOOL_SCHEMAS: Record<string, ToolSchema> = {
     },
     pathOperation: "read",
     effects: ["read"],
-    commandClass: "readOnly",
+    commandClass: "inspect",
   },
   write: {
     fields: {
@@ -37,7 +37,7 @@ export const TOOL_SCHEMAS: Record<string, ToolSchema> = {
     },
     pathOperation: "write",
     effects: ["write"],
-    commandClass: "mutating",
+    commandClass: "modify",
   },
   edit: {
     fields: {
@@ -46,7 +46,7 @@ export const TOOL_SCHEMAS: Record<string, ToolSchema> = {
     },
     pathOperation: "write",
     effects: ["write"],
-    commandClass: "mutating",
+    commandClass: "modify",
   },
   find: {
     fields: {
@@ -55,7 +55,7 @@ export const TOOL_SCHEMAS: Record<string, ToolSchema> = {
     },
     pathOperation: "search",
     effects: ["read", "search"],
-    commandClass: "readOnly",
+    commandClass: "inspect",
   },
   grep: {
     fields: {
@@ -65,7 +65,7 @@ export const TOOL_SCHEMAS: Record<string, ToolSchema> = {
     },
     pathOperation: "search",
     effects: ["read", "search"],
-    commandClass: "readOnly",
+    commandClass: "inspect",
   },
   ls: {
     fields: {
@@ -73,6 +73,6 @@ export const TOOL_SCHEMAS: Record<string, ToolSchema> = {
     },
     pathOperation: "list",
     effects: ["read"],
-    commandClass: "readOnly",
+    commandClass: "inspect",
   },
 } as const;

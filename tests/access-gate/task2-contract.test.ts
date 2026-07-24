@@ -24,7 +24,7 @@ function allowAllProfile(): ResolvedProfile {
   return {
     name: "test",
     description: "test",
-    shellPolicy: { readOnly: "allow", mutating: "allow", unclassified: "allow" },
+    shellPolicy: { inspect: "allow", modify: "allow", execute: "deny", destroy: "deny", unknown: "allow" },
     pathPolicy: {
       default: { read: "allow", list: "allow", search: "allow", write: "allow" },
       rules: [],
@@ -61,7 +61,7 @@ test("assigns stable codes to headless approval and user denial", async () => {
       stagingDir: env.stagingDir,
       profile: {
         ...allowAllProfile(),
-        shellPolicy: { readOnly: "allow", mutating: "ask", unclassified: "allow" },
+        shellPolicy: { inspect: "allow", modify: "ask", execute: "deny", destroy: "deny", unknown: "allow" },
         pathPolicy: { default: { read: "allow", list: "allow", search: "allow", write: "ask" }, rules: [] },
       } satisfies ResolvedProfile,
     };
@@ -104,7 +104,7 @@ test("legacy evaluator blocks carry stable path and shell policy codes", async (
       cwd: env.cwd,
       projectRoot: env.projectRoot,
       stagingDir: env.stagingDir,
-      profile: { ...allowAllProfile(), shellPolicy: { readOnly: "deny", mutating: "allow", unclassified: "allow" } },
+      profile: { ...allowAllProfile(), shellPolicy: { inspect: "deny", modify: "allow", execute: "deny", destroy: "deny", unknown: "allow" } },
     }, { hasUI: false });
     assert.equal(pathDenied.kind, "block");
     assert.equal(blockedPath.kind, "block");

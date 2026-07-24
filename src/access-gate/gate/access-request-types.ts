@@ -22,7 +22,7 @@ export const ANALYSIS_LIMITS = {
 // ── closed-world registries ──
 export const TOOL_SURFACES = new Set<ToolSurface>(["bash", "read", "write", "edit", "find", "grep", "ls"]);
 export const PATH_OPERATIONS = new Set<PathOperationKind>(["read", "list", "search", "write"]);
-export const COMMAND_CLASSES = new Set<CommandClass>(["readOnly", "mutating", "dangerous", "unclassified"]);
+export const COMMAND_CLASSES = new Set<CommandClass>(["inspect", "modify", "execute", "destroy", "unknown"]);
 export const EFFECTS = new Set<Effect>([
   "read",
   "search",

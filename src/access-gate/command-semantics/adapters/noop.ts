@@ -9,7 +9,7 @@ const NAMES = ["true", "false", ":", "echo", "printf"];
 export const noopAdapter: CommandAdapter = {
   names: NAMES,
   analyze(_node: ShellCommandNode, _context: SemanticContext): CommandSemantics {
-    return makeSemantics("readOnly", {
+    return makeSemantics("inspect", {
       reason: "posix noop/builtin",
     });
   },

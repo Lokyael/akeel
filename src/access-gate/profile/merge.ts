@@ -1,9 +1,11 @@
 import type { Decision, PathDecisions, PathOperation, PathPolicy, PathRule, ShellPolicy } from "./types";
 
 const DEFAULT_SHELL_POLICY: ShellPolicy = {
-  readOnly: "deny",
-  mutating: "deny",
-  unclassified: "deny",
+  inspect: "deny",
+  modify: "deny",
+  execute: "deny",
+  destroy: "deny",
+  unknown: "deny",
 };
 const DEFAULT_PATH_DECISIONS = {
   read: "deny",
@@ -21,9 +23,10 @@ export function mergePathDefaults(base: Record<PathOperation, Decision>, overrid
 }
 
 export function mergePathRules(base: PathRule[], additions: readonly PathRule[]): PathRule[] {
+  // Child rules prepended; they shadow parent rules with the same path+operation via first-match.
   return [
-    ...base.map((rule) => ({ ...rule })),
     ...additions.map((rule) => ({ ...rule })),
+    ...base.map((rule) => ({ ...rule })),
   ];
 }
 

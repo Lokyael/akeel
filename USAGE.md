@@ -46,12 +46,13 @@ Profile names are stored with a `keel-` prefix (`keel-read`, `keel-explore`, …
 
 | Profile | Description |
 |---------|-------------|
-| `read` | Read and search `projectRoot`; no external paths, writes, or unclassified Shell commands |
-| `explore` | Read and search anywhere on the filesystem; blocked paths (secrets, keys, .git) are always denied |
-| `plan` | Read anywhere; write `docs/`, `CONTEXT.md`, and `/tmp/pi-work/` for reviewing external code; mutations require approval |
-| `code` | Read `projectRoot`; write `src/`, `tests/`, and `/tmp/pi-work/` for dependencies; mutations require approval |
-| `develop` | Read anywhere; write project files; known mutations allowed, unclassified commands ask |
-| `query` | Read anywhere; write project files; every mutation requires one-time approval |
+| `read` | Inspect `projectRoot` only; no writes, no shell commands |
+| `explore` | Inspect anywhere on the filesystem; no writes, no shell commands |
+| `code` | Inspect `projectRoot`; write `src/`, `tests/`, `/tmp/pi-work/`; shell commands require approval |
+| `plan` | Inspect anywhere; write `docs/`, `CONTEXT.md`, `/tmp/pi-work/`; shell commands require approval |
+| `query` | Inspect anywhere; write all project files (each write asks); shell commands require approval |
+| `develop` | Inspect anywhere; write all project files freely; scripts and build tools still require approval |
+| `full` | Inspect anywhere; write all project files freely; scripts and build tools allowed without approval |
 
 Commands:
 
@@ -89,9 +90,11 @@ Example:
       "description": "Develop with plan document access.",
       "extends": ["keel-develop", "keel-plan"],
       "shellPolicy": {
-        "readOnly": "allow",
-        "mutating": "deny",
-        "unclassified": "ask"
+        "inspect": "allow",
+        "modify": "deny",
+        "execute": "deny",
+        "destroy": "deny",
+        "unknown": "ask"
       }
     }
   }
@@ -108,7 +111,7 @@ ask      Show Allow once / Deny
 
 `pathPolicy` makes decisions independently for `read`, `list`, `search`, and `write`. More-specific paths win. `blockedPaths` are global hard denials and cannot be relaxed.
 
-Network access is not a separate Profile axis yet. Commands without a matching adapter use the Profile's `shellPolicy.unclassified` decision. Commands that an adapter marks opaque because their effects cannot be safely classified are hard-denied.
+Commands without a matching adapter use the Profile's `shellPolicy.unknown` decision. Commands that an adapter marks opaque because their effects cannot be safely classified are hard-denied.
 
 ## Enforcement
 
@@ -124,7 +127,7 @@ hard threat
 → one-time approval, when required
 ```
 
-Hard denials include dangerous commands (adapter class `dangerous`), opaque command semantics, dynamic execution, prompt/data-exfiltration threat patterns, protected paths, and symlink escapes. pi-keel does not provide a container, VM, seccomp policy, network namespace, or other OS-level sandbox.
+Hard denials include destroy commands (adapter class `destroy`), opaque command semantics, dynamic execution, prompt/data-exfiltration threat patterns, protected paths, and symlink escapes. pi-keel does not provide a container, VM, seccomp policy, network namespace, or other OS-level sandbox.
 
 Approval is never remembered. Every `ask` decision offers only:
 

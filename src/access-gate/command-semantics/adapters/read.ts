@@ -74,9 +74,9 @@ export const readAdapter: CommandAdapter = {
   analyze(node: ShellCommandNode, _context: SemanticContext): CommandSemantics {
     const name = node.executable?.value?.toLowerCase() ?? "";
     const config = READ_CONFIG[name];
-    if (!config) return makeSemantics("unclassified", { reason: `unknown read command: ${name}`, opaque: true });
+    if (!config) return makeSemantics("unknown", { reason: `unknown read command: ${name}`, opaque: true });
 
-    return makeSemantics("readOnly", {
+    return makeSemantics("inspect", {
       reason: `${name} file read`,
       intents: readIntents(node.args, config),
     });

@@ -5,7 +5,7 @@ import type { CommandAdapter, CommandSemantics, SemanticContext } from "../types
 import { makeSemantics } from "./shared";
 
 interface PkgDef {
-  cls: "readOnly" | "mutating" | "unclassified";
+  cls: "inspect" | "modify" | "execute" | "unknown";
   pattern: (subcmd: string) => boolean;
   reason: string;
   network?: boolean;
@@ -15,27 +15,27 @@ function buildPkgRules(cmd: string): PkgDef[] {
   const installPat = cmd === "yarn" ? /^(?:add|install)\b/ : /^install\b/;
   const removePat = cmd === "yarn" ? /^(?:remove|upgrade)\b/ : /^(?:remove|uninstall)\b/;
   return [
-    { cls: "readOnly", pattern: (s) => /^view\b/.test(s) || /^info\b/.test(s), reason: `${cmd} package info` },
-    { cls: "readOnly", pattern: (s) => /^outdated\b/.test(s), reason: `${cmd} outdated packages` },
-    { cls: "readOnly", pattern: (s) => /^(?:search|ls|list)\b/.test(s), reason: `${cmd} search/list` },
-    { cls: "mutating", pattern: (s) => installPat.test(s), reason: `${cmd} install`, network: true },
-    { cls: "mutating", pattern: (s) => removePat.test(s), reason: `${cmd} remove` },
-    { cls: "mutating", pattern: (s) => /^update\b/.test(s), reason: `${cmd} update`, network: true },
-    { cls: "mutating", pattern: (s) => /^init\b/.test(s), reason: `${cmd} init` },
-    { cls: "mutating", pattern: (s) => /^publish\b/.test(s), reason: `${cmd} publish`, network: true },
-    { cls: "mutating", pattern: (s) => /^run\b/.test(s), reason: `${cmd} run script` },
-    { cls: "mutating", pattern: (s) => /^exec\b/.test(s), reason: `${cmd} exec` },
-    { cls: "mutating", pattern: (s) => /^test\b/.test(s), reason: `${cmd} test` },
-    { cls: "mutating", pattern: (s) => /^build\b/.test(s), reason: `${cmd} build` },
-    { cls: "unclassified", pattern: () => true, reason: `${cmd} unknown subcommand`, network: true },
+    { cls: "inspect", pattern: (s) => /^view\b/.test(s) || /^info\b/.test(s), reason: `${cmd} package info` },
+    { cls: "inspect", pattern: (s) => /^outdated\b/.test(s), reason: `${cmd} outdated packages` },
+    { cls: "inspect", pattern: (s) => /^(?:search|ls|list)\b/.test(s), reason: `${cmd} search/list` },
+    { cls: "execute", pattern: (s) => installPat.test(s), reason: `${cmd} install`, network: true },
+    { cls: "execute", pattern: (s) => removePat.test(s), reason: `${cmd} remove` },
+    { cls: "execute", pattern: (s) => /^update\b/.test(s), reason: `${cmd} update`, network: true },
+    { cls: "modify", pattern: (s) => /^init\b/.test(s), reason: `${cmd} init` },
+    { cls: "execute", pattern: (s) => /^publish\b/.test(s), reason: `${cmd} publish`, network: true },
+    { cls: "execute", pattern: (s) => /^run\b/.test(s), reason: `${cmd} run script` },
+    { cls: "execute", pattern: (s) => /^exec\b/.test(s), reason: `${cmd} exec` },
+    { cls: "execute", pattern: (s) => /^test\b/.test(s), reason: `${cmd} test` },
+    { cls: "execute", pattern: (s) => /^build\b/.test(s), reason: `${cmd} build` },
+    { cls: "unknown", pattern: () => true, reason: `${cmd} unknown subcommand`, network: true },
   ];
 }
 
 // npx always executes (potentially after download).  Flags like --version/--help
-// are readOnly; everything else is mutating + network.
+// are inspect; everything else is execute + network.
 const NPX_RULES: PkgDef[] = [
-  { cls: "readOnly", pattern: (s) => /^(--version|-v|--help)$/.test(s), reason: "npx version/help" },
-  { cls: "mutating", pattern: () => true, reason: "npx execute package", network: true },
+  { cls: "inspect", pattern: (s) => /^(--version|-v|--help)$/.test(s), reason: "npx version/help" },
+  { cls: "execute", pattern: () => true, reason: "npx execute package", network: true },
 ];
 
 const PKG_RULES: Record<string, PkgDef[]> = {
@@ -50,7 +50,7 @@ export const packageAdapter: CommandAdapter = {
   analyze(node: ShellCommandNode, _context: SemanticContext): CommandSemantics {
     const name = node.executable?.value?.toLowerCase() ?? "";
     const rules = PKG_RULES[name];
-    if (!rules) return makeSemantics("unclassified", { reason: `unknown package manager: ${name}`, opaque: true });
+    if (!rules) return makeSemantics("unknown", { reason: `unknown package manager: ${name}`, opaque: true });
 
     const args = [...node.args];
     let subcmd = args.find((a) => {
@@ -67,11 +67,11 @@ export const packageAdapter: CommandAdapter = {
         return makeSemantics(def.cls, {
           reason: def.reason,
           effects: def.network ? ["network"] : undefined,
-          opaque: def.cls === "unclassified",
+          opaque: def.cls === "unknown",
         });
       }
     }
 
-    return makeSemantics("unclassified", { reason: `${name}: unrecognized command`, opaque: true });
+    return makeSemantics("unknown", { reason: `${name}: unrecognized command`, opaque: true });
   },
 };

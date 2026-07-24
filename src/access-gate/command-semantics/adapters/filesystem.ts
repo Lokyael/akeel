@@ -5,45 +5,45 @@ import type { CommandAdapter, CommandSemantics, Effect, PathIntent, SemanticCont
 import { makeSemantics } from "./shared";
 
 const FILESYSTEM_CMDS: Record<string, {
-  class: "readOnly" | "mutating" | "dangerous";
+  class: "inspect" | "modify" | "destroy";
   paths: (args: ShellArg[]) => { op: "read" | "write"; value: string }[];
   effects: readonly Effect[];
   reason: string;
 }> = {
   rm: {
-    class: "mutating",
+    class: "modify",
     paths: (args) => args.map((a) => ({ op: "write", value: a.value ?? "" })),
     effects: ["delete"],
     reason: "remove files",
   },
   touch: {
-    class: "mutating",
+    class: "modify",
     paths: (args) => args.map((a) => ({ op: "write", value: a.value ?? "" })),
     effects: ["write"],
     reason: "create/update files",
   },
   mkdir: {
-    class: "mutating",
+    class: "modify",
     paths: (args) => args.map((a) => ({ op: "write", value: a.value ?? "" })),
     effects: ["write"],
     reason: "create directories",
   },
   chmod: {
-    class: "mutating",
+    class: "modify",
     // chmod <mode> <file>... — skip first positional arg (mode)
     paths: (args) => args.slice(1).map((a) => ({ op: "write", value: a.value ?? "" })),
     effects: ["permissionChange"],
     reason: "change file permissions",
   },
   chown: {
-    class: "mutating",
+    class: "modify",
     // chown <owner> <file>... — skip first positional arg (owner)
     paths: (args) => args.slice(1).map((a) => ({ op: "write", value: a.value ?? "" })),
     effects: ["permissionChange"],
     reason: "change file ownership",
   },
   cp: {
-    class: "mutating",
+    class: "modify",
     // cp <src>... <dst>
     paths: (args) => {
       if (args.length < 2) return [];
@@ -57,7 +57,7 @@ const FILESYSTEM_CMDS: Record<string, {
     reason: "copy files",
   },
   mv: {
-    class: "mutating",
+    class: "modify",
     // mv <src>... <dst>
     paths: (args) => {
       if (args.length < 2) return [];
@@ -71,13 +71,13 @@ const FILESYSTEM_CMDS: Record<string, {
     reason: "move/rename files",
   },
   tee: {
-    class: "mutating",
+    class: "modify",
     paths: (args) => args.map((a) => ({ op: "write", value: a.value ?? "" })),
     effects: ["write"],
     reason: "write to files",
   },
   truncate: {
-    class: "mutating",
+    class: "modify",
     paths: (args) => args.map((a) => ({ op: "write", value: a.value ?? "" })),
     effects: ["write"],
     reason: "truncate files",
@@ -89,7 +89,7 @@ export const filesystemAdapter: CommandAdapter = {
   analyze(node: ShellCommandNode, _context: SemanticContext): CommandSemantics {
     const name = node.executable?.value?.toLowerCase() ?? "";
     const def = FILESYSTEM_CMDS[name];
-    if (!def) return makeSemantics("unclassified", { reason: `unknown filesystem command: ${name}`, opaque: true });
+    if (!def) return makeSemantics("unknown", { reason: `unknown filesystem command: ${name}`, opaque: true });
 
     // 跳过命令行选项（以 - 开头）
     const positionalArgs = [...node.args].filter((a) => a.value && !a.value.startsWith("-"));

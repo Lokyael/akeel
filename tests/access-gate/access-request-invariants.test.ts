@@ -21,7 +21,7 @@ function context(): CompilerContext & { cleanup: () => void } {
 function profile(): ResolvedProfile {
   return {
     name: "test", description: "test",
-    shellPolicy: { readOnly: "allow", mutating: "deny", unclassified: "deny" },
+    shellPolicy: { inspect: "allow", modify: "deny", execute: "deny", destroy: "deny", unknown: "deny" },
     pathPolicy: { default: { read: "allow", list: "allow", search: "allow", write: "deny" }, rules: [] },
   };
 }

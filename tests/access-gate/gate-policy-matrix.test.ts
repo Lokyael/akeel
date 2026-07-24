@@ -26,7 +26,7 @@ function profile(overrides?: Partial<ResolvedProfile>): ResolvedProfile {
   return {
     name: "test",
     description: "test",
-    shellPolicy: { readOnly: "allow", mutating: "ask", unclassified: "deny" },
+    shellPolicy: { inspect: "allow", modify: "ask", execute: "deny", destroy: "deny", unknown: "deny" },
     pathPolicy: {
       default: { read: "allow", list: "allow", search: "allow", write: "ask" },
       rules: [],

@@ -5,7 +5,7 @@ import type { CommandAdapter, CommandSemantics, PathIntent, SemanticContext } fr
 import { makeSemantics } from "./shared";
 
 interface SearchConfig {
-  class: "readOnly" | "mutating" | "unclassified";
+  class: "inspect" | "modify" | "unknown";
   /** 默认搜索根（. 表示当前 cwd）。 */
   defaultRoot: string;
   /** 识别搜索根：从参数中第几个位置开始（0 = 第一个非选项参数）。 */
@@ -29,21 +29,21 @@ interface SearchConfig {
 
 const SEARCH_CONFIG: Record<string, SearchConfig> = {
   find: {
-    class: "readOnly",
+    class: "inspect",
     defaultRoot: ".",
     rootAtArgIndex: 0,
     valueOpts: ["-type", "-name", "-iname", "-path", "-ipath", "-size", "-mtime", "-atime", "-ctime", "-user", "-group", "-perm", "-exec", "-execdir", "-ok", "-maxdepth", "-mindepth"],
     reason: "search files",
   },
   tree: {
-    class: "readOnly",
+    class: "inspect",
     defaultRoot: ".",
     rootAtArgIndex: 0,
     valueOpts: ["-L", "--level", "-I", "--ignore", "-P", "--pattern", "--charset"],
     reason: "list directory tree",
   },
   grep: {
-    class: "readOnly",
+    class: "inspect",
     defaultRoot: ".",
     rootAtArgIndex: 1, // 第一个非选项参数是 pattern，第二个起是 targets
     needsRecursiveFlag: true,
@@ -55,7 +55,7 @@ const SEARCH_CONFIG: Record<string, SearchConfig> = {
     reason: "search file contents",
   },
   rg: {
-    class: "readOnly",
+    class: "inspect",
     defaultRoot: ".",
     rootAtArgIndex: 1, // pattern 在第一个非选项参数，targets 从第二个起
     valueOpts: ["-e", "--regexp", "-f", "--file", "-g", "--glob", "-t", "--type", "--type-not", "--iglob", "--iglob-case-insensitive", "-m", "--max-count", "-A", "--after-context", "-B", "--before-context", "-C", "--context", "--max-columns", "--max-depth", "--sort", "--sortr"],
@@ -65,7 +65,7 @@ const SEARCH_CONFIG: Record<string, SearchConfig> = {
     reason: "ripgrep search",
   },
   ls: {
-    class: "readOnly",
+    class: "inspect",
     defaultRoot: ".",
     rootAtArgIndex: 0,
     operation: "list",
@@ -89,7 +89,7 @@ export const searchAdapter: CommandAdapter = {
   analyze(node: ShellCommandNode, _context: SemanticContext): CommandSemantics {
     const name = node.executable?.value?.toLowerCase() ?? "";
     const config = SEARCH_CONFIG[name];
-    if (!config) return makeSemantics("unclassified", { reason: `unknown search command: ${name}`, opaque: true });
+    if (!config) return makeSemantics("unknown", { reason: `unknown search command: ${name}`, opaque: true });
 
     const args = [...node.args];
     const intents: PathIntent[] = [];

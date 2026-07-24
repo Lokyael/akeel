@@ -5,7 +5,7 @@ export type DecisionCode =
   | "unsafe-syntax"
   | "threat"
   | "opaque-command"
-  | "dangerous-command"
+  | "destroy-command"
   | "hard-command-rule"
   | "blocked-path"
   | "symlink-escape"

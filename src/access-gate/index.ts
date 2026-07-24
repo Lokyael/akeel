@@ -15,7 +15,7 @@ function profileStatus(state: ProfileState, profiles: ResolvedProfiles): string 
   return [
     `Profile: ${displayName(state.getName())}`,
     `Description: ${profile.description}`,
-    `Shell: readOnly=${profile.shellPolicy.readOnly}, mutating=${profile.shellPolicy.mutating}, unclassified=${profile.shellPolicy.unclassified}`,
+    `Shell: inspect=${profile.shellPolicy.inspect}, modify=${profile.shellPolicy.modify}, execute=${profile.shellPolicy.execute}, unknown=${profile.shellPolicy.unknown}`,
     `Path rules: ${pathRules}`,
     `Available profiles: ${Object.keys(profiles.profiles).map(displayName).join(", ")}`,
   ].join("\n");

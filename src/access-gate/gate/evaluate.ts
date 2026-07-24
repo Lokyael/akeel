@@ -28,7 +28,7 @@ const COMPILER_REJECT_CODES: ReadonlySet<HardDenyCode> = new Set([
   "unsafe-syntax",
   "threat",
   "opaque-command",
-  "dangerous-command",
+  "destroy-command",
   "hard-command-rule",
   "unsupported-redirection",
   "uncertain-cwd",

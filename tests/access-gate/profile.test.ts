@@ -7,9 +7,11 @@ import type { RawProfiles } from "../../src/access-gate/profile/types";
 const base = {
   description: "Read project files.",
   shellPolicy: {
-    readOnly: "allow",
-    mutating: "deny",
-    unclassified: "deny",
+    inspect: "allow",
+    modify: "deny",
+    execute: "deny",
+    destroy: "deny",
+    unknown: "deny",
   },
   pathPolicy: {
     default: { read: "deny", list: "deny", search: "deny", write: "deny" },
@@ -28,7 +30,7 @@ test("rejects an unknown profile field and invalid decision", () => {
       broken: {
         ...base,
         extra: true,
-        shellPolicy: { ...base.shellPolicy, mutating: "maybe" },
+        shellPolicy: { ...base.shellPolicy, modify: "maybe" },
       },
     },
   });
@@ -53,7 +55,8 @@ test("resolves inherited profiles and unions path rules", () => {
   assert.equal(result.ok, true);
   if (!result.ok) return;
   assert.equal(result.value.profiles["keel-plan"].pathPolicy.rules.length, 2);
-  assert.equal(result.value.profiles["keel-plan"].pathPolicy.rules[1]?.path, "project/docs/**");
+  // Child rules are prepended; they shadow parent rules with the same path via first-match.
+  assert.equal(result.value.profiles["keel-plan"].pathPolicy.rules[0]?.path, "project/docs/**");
 });
 
 test("rejects inheritance cycles", () => {

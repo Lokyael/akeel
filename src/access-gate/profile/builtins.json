@@ -2,11 +2,13 @@
   "defaultProfile": "keel-plan",
   "profiles": {
     "keel-read": {
-      "description": "Read and search projectRoot; deny writes, external paths, and unclassified shell commands.",
+      "description": "Read and search projectRoot only. No writes, no external paths, no shell commands.",
       "shellPolicy": {
-        "readOnly": "allow",
-        "mutating": "deny",
-        "unclassified": "deny"
+        "inspect": "allow",
+        "modify": "deny",
+        "execute": "deny",
+        "destroy": "deny",
+        "unknown": "deny"
       },
       "pathPolicy": {
         "default": { "read": "deny", "list": "deny", "search": "deny", "write": "deny" },
@@ -15,38 +17,14 @@
         ]
       }
     },
-    "keel-explore": {
-      "description": "Read and search anywhere on the filesystem; deny writes, mutations, and unclassified shell commands. Blocked paths (secrets, keys, .git internals) are always denied.",
-      "shellPolicy": {
-        "readOnly": "allow",
-        "mutating": "deny",
-        "unclassified": "deny"
-      },
-      "pathPolicy": {
-        "default": { "read": "allow", "list": "allow", "search": "allow", "write": "deny" }
-      }
-    },
-    "keel-plan": {
-      "description": "Read and search anywhere; write docs/, CONTEXT.md, and /tmp/pi-work/ for downloading and reviewing external resources. Mutations and unclassified commands require one-time approval. No source-tree writes.",
-      "extends": ["keel-explore"],
-      "shellPolicy": {
-        "mutating": "ask",
-        "unclassified": "ask"
-      },
-      "pathPolicy": {
-        "rules": [
-          { "path": "project/docs/**", "write": "allow" },
-          { "path": "project/CONTEXT.md", "write": "allow" },
-          { "path": "/tmp/pi-work/**", "read": "allow", "list": "allow", "search": "allow", "write": "allow" }
-        ]
-      }
-    },
+
     "keel-code": {
-      "description": "Read and search projectRoot; write source, test paths, and /tmp/pi-work/ for downloaded dependencies and reference code. Mutations and unclassified commands require one-time approval.",
+      "description": "Read projectRoot; write src/, tests/, and /tmp/pi-work/ for dependencies. Shell commands require approval.",
       "extends": ["keel-read"],
       "shellPolicy": {
-        "mutating": "ask",
-        "unclassified": "ask"
+        "modify": "ask",
+        "execute": "ask",
+        "unknown": "ask"
       },
       "pathPolicy": {
         "rules": [
@@ -56,30 +34,57 @@
         ]
       }
     },
-    "keel-develop": {
-      "description": "Read and search anywhere; write project files. Known mutations are allowed and unclassified commands require approval. Blocked paths and .git are always denied.",
+
+    "keel-explore": {
+      "description": "Read and search anywhere on the filesystem. No writes, no shell commands.",
+      "extends": ["keel-read"],
+      "pathPolicy": {
+        "default": { "read": "allow", "list": "allow", "search": "allow", "write": "deny" }
+      }
+    },
+
+    "keel-plan": {
+      "description": "Read anywhere; write docs/, CONTEXT.md, and /tmp/pi-work/ for reviewing external code. Shell commands require approval. No source-tree writes.",
       "extends": ["keel-explore"],
       "shellPolicy": {
-        "mutating": "allow",
-        "unclassified": "ask"
+        "modify": "ask",
+        "execute": "ask",
+        "unknown": "ask"
       },
+      "pathPolicy": {
+        "rules": [
+          { "path": "project/docs/**", "write": "allow" },
+          { "path": "project/CONTEXT.md", "write": "allow" },
+          { "path": "/tmp/pi-work/**", "read": "allow", "list": "allow", "search": "allow", "write": "allow" }
+        ]
+      }
+    },
+
+    "keel-query": {
+      "description": "Read anywhere; write all project files but every write and shell command requires one-time approval.",
+      "extends": ["keel-plan"],
+      "pathPolicy": {
+        "rules": [
+          { "path": "project/**", "write": "ask" }
+        ]
+      }
+    },
+
+    "keel-develop": {
+      "description": "Read anywhere; write all project files freely. Scripts and build tools still require approval (interpreters and build commands are not blind-trusted).",
+      "extends": ["keel-query"],
       "pathPolicy": {
         "rules": [
           { "path": "project/**", "write": "allow" }
         ]
       }
     },
-    "keel-query": {
-      "description": "Read and search anywhere; write project files. Every known mutation and unclassified shell command requires one-time approval. Blocked paths and .git are always denied.",
-      "extends": ["keel-explore"],
+
+    "keel-build": {
+      "description": "Read anywhere; write all project files freely; run scripts, interpreters, and build tools without approval. Only destructive operations remain denied.",
+      "extends": ["keel-develop"],
       "shellPolicy": {
-        "mutating": "ask",
-        "unclassified": "ask"
-      },
-      "pathPolicy": {
-        "rules": [
-          { "path": "project/**", "write": "ask" }
-        ]
+        "execute": "allow"
       }
     }
   }

@@ -2,9 +2,11 @@ export type Decision = "allow" | "ask" | "deny";
 export type PathOperation = "read" | "list" | "search" | "write";
 
 export interface ShellPolicy {
-  readOnly: Decision;
-  mutating: Decision;
-  unclassified: Decision;
+  inspect: Decision;
+  modify: Decision;
+  execute: Decision;
+  destroy: Decision;
+  unknown: Decision;
 }
 
 export type PathDecisions = Partial<Record<PathOperation, Decision>>;

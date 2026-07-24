@@ -36,14 +36,14 @@ const UNIQ_OPTS: OptionSchema[] = [
 ];
 
 const TEXT_CONFIG: Record<string, {
-  class: "readOnly" | "mutating" | "unclassified";
+  class: "inspect" | "modify" | "unknown";
   schemas: OptionSchema[];
   reason: string;
 }> = {
-  sed: { class: "readOnly", schemas: SED_OPTS, reason: "stream editor" },
-  awk: { class: "readOnly", schemas: AWK_OPTS, reason: "pattern scanning" },
-  sort: { class: "readOnly", schemas: SORT_OPTS, reason: "sort lines" },
-  uniq: { class: "readOnly", schemas: UNIQ_OPTS, reason: "unique lines" },
+  sed: { class: "inspect", schemas: SED_OPTS, reason: "stream editor" },
+  awk: { class: "inspect", schemas: AWK_OPTS, reason: "pattern scanning" },
+  sort: { class: "inspect", schemas: SORT_OPTS, reason: "sort lines" },
+  uniq: { class: "inspect", schemas: UNIQ_OPTS, reason: "unique lines" },
 };
 
 /**
@@ -129,14 +129,14 @@ export const textTransformAdapter: CommandAdapter = {
   analyze(node: ShellCommandNode, _context: SemanticContext): CommandSemantics {
     const name = node.executable?.value?.toLowerCase() ?? "";
     const config = TEXT_CONFIG[name];
-    if (!config) return makeSemantics("unclassified", { reason: `unknown text command: ${name}`, opaque: true });
+    if (!config) return makeSemantics("unknown", { reason: `unknown text command: ${name}`, opaque: true });
 
     // 解析选项
     const { intents: optionIntents, opaque } = parseOptions([...node.args], config.schemas, 0);
 
-    // 如果产生了写 intent，降级为 mutating
+    // 如果产生了写 intent，升级为 modify
     const hasWrite = optionIntents.some((i) => i.operation === "write");
-    const cls: "readOnly" | "mutating" | "unclassified" = hasWrite ? "mutating" : config.class;
+    const cls: "inspect" | "modify" | "unknown" = hasWrite ? "modify" : config.class;
 
     return makeSemantics(cls, {
       reason: config.reason,

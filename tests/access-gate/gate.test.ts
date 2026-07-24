@@ -10,7 +10,7 @@ function profile(overrides?: Partial<ResolvedProfile>): ResolvedProfile {
   return {
     name: "test",
     description: "test",
-    shellPolicy: { readOnly: "allow", mutating: "ask", unclassified: "ask" },
+    shellPolicy: { inspect: "allow", modify: "ask", execute: "deny", destroy: "deny", unknown: "ask" },
     pathPolicy: {
       default: { read: "deny", list: "deny", search: "deny", write: "deny" },
       rules: [
@@ -39,7 +39,7 @@ function makeRuntime(selections: string[] = []) {
 
 function projectWriteProfile(): ResolvedProfile {
   return profile({
-    shellPolicy: { readOnly: "allow", mutating: "allow", unclassified: "ask" },
+    shellPolicy: { inspect: "allow", modify: "allow", execute: "deny", destroy: "deny", unknown: "ask" },
     pathPolicy: {
       default: { read: "deny", list: "deny", search: "deny", write: "deny" },
       rules: [{ path: "project/**", read: "allow", list: "allow", search: "allow", write: "allow" }],
@@ -93,7 +93,7 @@ test("allows task document writes but denies source writes", async () => {
     mkdirSync(join(root, "docs"));
     const planProfile = profile({
       name: "plan",
-      shellPolicy: { readOnly: "allow", mutating: "deny", unclassified: "deny" },
+      shellPolicy: { inspect: "allow", modify: "deny", execute: "deny", destroy: "deny", unknown: "deny" },
       pathPolicy: {
         default: { read: "deny", list: "deny", search: "deny", write: "deny" },
         rules: [
@@ -126,7 +126,7 @@ test("asks once for a guarded project write", async () => {
   }
 });
 
-test("asks for an unclassified network command", async () => {
+test("asks for an unknown network command", async () => {
   const root = mkdtempSync(join(tmpdir(), "pi-access-gate-"));
   const staging = mkdtempSync(join(tmpdir(), "pi-access-staging-"));
   try {
@@ -140,7 +140,7 @@ test("asks for an unclassified network command", async () => {
   }
 });
 
-test("hard dangerous commands are denied without asking", async () => {
+test("hard destroy commands are denied without asking", async () => {
   const root = mkdtempSync(join(tmpdir(), "pi-access-gate-"));
   const staging = mkdtempSync(join(tmpdir(), "pi-access-staging-"));
   try {
@@ -154,7 +154,7 @@ test("hard dangerous commands are denied without asking", async () => {
   }
 });
 
-test("denies mutating commands that target protected paths", async () => {
+test("denies modify commands that target protected paths", async () => {
   const result = await evaluateBash("touch ~/.ssh/authorized_keys");
   assert.equal(result.kind, "block");
 });
@@ -211,12 +211,12 @@ test("checks every file redirection", async () => {
   assert.equal(result.kind, "block");
 });
 
-test("does not allow package scripts through the read-only policy", async () => {
+test("does not allow package scripts through the inspect-only policy", async () => {
   const result = await evaluateBash("npm run test");
   assert.equal(result.kind, "block");
 });
 
-test("does not allow build hooks through the read-only policy", async () => {
+test("does not allow build hooks through the inspect-only policy", async () => {
   const cargoResult = await evaluateBash("cargo build");
   const goResult = await evaluateBash("go build ./...");
   assert.equal(cargoResult.kind, "block");
@@ -247,7 +247,7 @@ test("denies git rm on protected paths", async () => {
 test("allows the compound git refresh inspection after fetch approval", async () => {
   const command = "git fetch --prune origin && git status --short --branch && git rev-list --left-right --count origin/main...HEAD && git log --oneline --decorate origin/main..HEAD";
   const activeProfile = profile({
-    shellPolicy: { readOnly: "allow", mutating: "ask", unclassified: "deny" },
+    shellPolicy: { inspect: "allow", modify: "ask", execute: "deny", destroy: "deny", unknown: "deny" },
     pathPolicy: {
       default: { read: "allow", list: "allow", search: "allow", write: "allow" },
       rules: [],
@@ -257,9 +257,9 @@ test("allows the compound git refresh inspection after fetch approval", async ()
   assert.deepEqual(result, { kind: "allow" });
 });
 
-test("denies opaque command semantics even when unclassified commands are allowed", async () => {
+test("denies opaque command semantics even when unknown commands are allowed", async () => {
   const activeProfile = profile({
-    shellPolicy: { readOnly: "allow", mutating: "allow", unclassified: "allow" },
+    shellPolicy: { inspect: "allow", modify: "allow", execute: "deny", destroy: "deny", unknown: "allow" },
     pathPolicy: {
       default: { read: "allow", list: "allow", search: "allow", write: "allow" },
       rules: [],

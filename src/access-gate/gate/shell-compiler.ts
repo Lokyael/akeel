@@ -73,7 +73,7 @@ export function compileShellCall(input: ShellCompilerInput): CompileResult {
       cwd: flowNode.effectiveCwd.cwd,
     });
     if (semantics.opaque) return reject("opaque-command", normalized.executable ?? "unknown command", flowNode.node.span);
-    if (semantics.class === "dangerous") return reject("dangerous-command", normalized.executable ?? "dangerous command", flowNode.node.span);
+    if (semantics.class === "destroy") return reject("destroy-command", normalized.executable ?? "destroy command", flowNode.node.span);
 
     commandSpans.push(flowNode.node.span);
     const cdInfo = analyzeCd(flowNode.node);
@@ -109,10 +109,10 @@ export function compileShellCall(input: ShellCompilerInput): CompileResult {
     for (const intent of semantics.intents) {
       operations.push(pathOperation(intent.operation, intent.rawPath, flowNode.effectiveCwd, intent.source, intent.confidence, intent.span));
     }
-    // Conservative fallback: mutating Shell commands with no explicit paths
+    // Conservative fallback: modify-class commands with no explicit paths
     // or redirections get a synthetic write intent on cwd.  Direct tools do not
     // need this fallback because every Direct surface always carries a path arg.
-    if (semantics.class === "mutating" && semantics.intents.length === 0 && flowNode.node.redirections.length === 0) {
+    if (semantics.class === "modify" && semantics.intents.length === 0 && flowNode.node.redirections.length === 0) {
       operations.push(pathOperation("write", ".", flowNode.effectiveCwd, "cwd", "conservative", flowNode.node.span));
     }
   }

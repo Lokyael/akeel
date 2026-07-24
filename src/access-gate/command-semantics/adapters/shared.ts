@@ -11,9 +11,10 @@ export interface MakeSemanticsOpts {
 }
 
 function defaultEffects(cls: CommandClass): readonly Effect[] {
-  if (cls === "readOnly") return ["read"];
-  if (cls === "mutating") return ["write"];
-  if (cls === "dangerous") return ["execute"];
+  if (cls === "inspect") return ["read"];
+  if (cls === "modify") return ["write"];
+  if (cls === "execute") return ["execute"];
+  if (cls === "destroy") return ["execute"];
   return [];
 }
 

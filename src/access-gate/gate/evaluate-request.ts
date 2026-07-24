@@ -39,8 +39,8 @@ export async function evaluateRequest(
       if (shellOnlyEffect) {
         return DecisionBuilder.hard("unknown-effect", `Direct tool cannot produce ${shellOnlyEffect}`, operation.span);
       }
-      if (operation.commandClass === "dangerous") {
-        return DecisionBuilder.hard("dangerous-command", `${operation.commandClass} command: ${operation.executable ?? "?"}`, operation.span);
+      if (operation.commandClass === "destroy") {
+        return DecisionBuilder.hard("destroy-command", `${operation.commandClass} command: ${operation.executable ?? "?"}`, operation.span);
       }
       // Direct tools bypass Shell policy — their effects are checked by the
       // EFFECT_POLICY_AXIS (shell-only effects like execute/network are hard-denied

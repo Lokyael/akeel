@@ -36,7 +36,7 @@ for (const adapter of ADAPTERS) {
 
 /**
  * 查找并执行语义分析。
- * 找不到 adapter 时返回 unclassified，opaque=false。
+ * 找不到 adapter 时返回 unknown，opaque=false。
  */
 export function analyzeSemantics(
   node: ShellCommandNode,
@@ -46,7 +46,7 @@ export function analyzeSemantics(
   const adapter = INDEX.get(name);
 
   if (!adapter) {
-    return makeSemantics("unclassified", {
+    return makeSemantics("unknown", {
       reason: `no adapter for: ${name}`,
       opaque: false,
     });

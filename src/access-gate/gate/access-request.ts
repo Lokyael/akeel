@@ -61,7 +61,7 @@ export function evidenceKind(code: DecisionCode): GateEvidence["kind"] {
   if (code === "unknown-tool" || code === "invalid-tool-input") return "tool";
   if (code === "unsupported-redirection") return "redirection";
   if (code === "blocked-path" || code === "symlink-escape" || code === "path-unclassifiable" || code === "path-denied") return "path";
-  if (code === "dangerous-command" || code === "hard-command-rule" || code === "shell-policy-denied" || code === "opaque-command") return "command";
+  if (code === "destroy-command" || code === "hard-command-rule" || code === "shell-policy-denied" || code === "opaque-command") return "command";
   if (code === "resource-limit") return "tool";
   return "command";
 }
@@ -155,8 +155,8 @@ export function effectsFor(
   const result = new Set<Effect>(effects);
   for (const intent of intents) result.add(intent.operation === "list" ? "read" : intent.operation);
   if (hasRedirection) result.add("write");
-  if (commandClass === "dangerous") result.add("execute");
-  if (commandClass === "mutating" && !["write", "delete", "permissionChange"].some((effect) => result.has(effect as Effect))) {
+  if (commandClass === "destroy" || commandClass === "execute") result.add("execute");
+  if (commandClass === "modify" && !["write", "delete", "permissionChange"].some((effect) => result.has(effect as Effect))) {
     result.add("write");
   }
   return [...result];
