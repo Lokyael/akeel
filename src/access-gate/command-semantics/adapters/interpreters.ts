@@ -45,6 +45,6 @@ export const interpreterAdapter: CommandAdapter = {
       }
     }
 
-    return makeSemantics("modify", { reason: name + ": execute script" });
+    return makeSemantics("execute", { reason: name + ": execute script" });
   },
 };

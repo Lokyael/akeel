@@ -22,7 +22,7 @@
 
 Shell IR 不是完整 Bash 语法树；当前只对简单命令、已知 wrapper、控制操作符、重定向和已支持的字面量参数建模。`for`、`while`、`if`、函数定义等结构化控制流没有对应的安全语义。命令中的动态 token（例如 `$f`、命令替换和未引用 glob）会在 Profile 决策前 hard deny。
 
-没有动态 token 的未知命令仍可能按 `shellPolicy.unclassified` 进入 deny、ask 或 allow，这不代表结构化 Shell 语法已经得到验证。需要批量检查文件时，应使用直接 `read`、`grep`、`find` 或 `ls` tool call；这是受支持的访问入口，不是绕过 Shell gate。
+没有动态 token 的未知命令仍可能按 `shellPolicy.unknown` 进入 deny、ask 或 allow，这不代表结构化 Shell 语法已经得到验证。需要批量检查文件时，应使用直接 `read`、`grep`、`find` 或 `ls` tool call；这是受支持的访问入口，不是绕过 Shell gate。
 
 ## 范围声明
 

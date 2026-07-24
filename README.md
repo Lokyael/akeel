@@ -32,7 +32,7 @@ The active Profile is the only permission mode exposed to users. Built-ins inclu
 /profile status          # Show its detailed policy
 ```
 
-The Footer wraps Pi's native `FooterComponent` when available and uses two lines: the active Profile name appears on the first line with the project location, while the second line retains Pi's native token, context, cost, model, and extension-status details. Standalone tests use a local rendering fallback when the Pi host package is unavailable. Shell commands without a matching adapter use the Profile's `unclassified` decision; commands an adapter cannot safely analyze are hard-denied as opaque. Network commands are not managed by a separate policy axis yet, so unclassified network commands require one-time approval in Profiles that allow it.
+The Footer wraps Pi's native `FooterComponent` when available and uses two lines: the active Profile name appears on the first line with the project location, while the second line retains Pi's native token, context, cost, model, and extension-status details. Standalone tests use a local rendering fallback when the Pi host package is unavailable. Shell commands without a matching adapter use the Profile's `unknown` decision; commands an adapter cannot safely analyze are hard-denied as opaque. Network commands are not managed by a separate policy axis yet, so unknown network commands require one-time approval in Profiles that allow it.
 
 Hard threats, unsafe Shell syntax, symlink escapes, and blocked paths always deny and cannot be overridden by a Profile or approval.
 

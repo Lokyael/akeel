@@ -85,7 +85,7 @@ void test("fs: command cp src dst after normalization produces read+write", () =
 void test("tx: sort -o writes to output file", () => {
   const { program } = parse(lex("sort -o output.txt input.txt").tokens);
   const sem = analyzeSemantics(program.commands[0]!, CTX);
-  // sort -o 产生写 intent → 应为 mutating
+  // sort -o 产生写 intent → 应为 modify
   assert.equal(sem.class, "modify");
   assert.ok(sem.intents.some((i) => i.operation === "write" && i.rawPath === "output.txt"));
 });
@@ -155,6 +155,24 @@ void test("search: find /etc is protected", () => {
   const { program } = parse(lex("find /etc -name shadow").tokens);
   const sem = analyzeSemantics(program.commands[0]!, CTX);
   assert.equal(sem.intents[0]!.rawPath, "/etc");
+});
+
+void test("search: find -delete upgrades to modify", () => {
+  const { program } = parse(lex("find . -name '*.tmp' -delete").tokens);
+  const sem = analyzeSemantics(program.commands[0]!, CTX);
+  assert.equal(sem.class, "modify");
+});
+
+void test("search: find -exec upgrades to modify", () => {
+  const { program } = parse(lex("find . -name '*.log' -exec rm {} \\;").tokens);
+  const sem = analyzeSemantics(program.commands[0]!, CTX);
+  assert.equal(sem.class, "modify");
+});
+
+void test("search: find without destructive opts stays inspect", () => {
+  const { program } = parse(lex("find . -type f").tokens);
+  const sem = analyzeSemantics(program.commands[0]!, CTX);
+  assert.equal(sem.class, "inspect");
 });
 
 void test("search: grep -r searches directory", () => {
@@ -505,6 +523,18 @@ void test("go: version is inspect", () => {
   const { program } = parse(lex("go version").tokens);
   const sem = analyzeSemantics(program.commands[0]!, CTX);
   assert.equal(sem.class, "inspect");
+});
+
+void test("cargo: clean is modify (deletes target/ without invoking compiler)", () => {
+  const { program } = parse(lex("cargo clean").tokens);
+  const sem = analyzeSemantics(program.commands[0]!, CTX);
+  assert.equal(sem.class, "modify");
+});
+
+void test("go: mod tidy is modify (edits go.mod without compiling)", () => {
+  const { program } = parse(lex("go mod tidy").tokens);
+  const sem = analyzeSemantics(program.commands[0]!, CTX);
+  assert.equal(sem.class, "modify");
 });
 
 void test("make: is execute", () => {

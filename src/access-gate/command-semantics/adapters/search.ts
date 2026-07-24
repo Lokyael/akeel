@@ -24,6 +24,8 @@ interface SearchConfig {
   patternOpts?: readonly string[];
   /** 文件选项：提取值为 read intent。 */
   fileOpts?: readonly string[];
+  /** 破坏性选项：检测到则分类升级为 modify（如 find -delete、-exec）。 */
+  destructiveOpts?: readonly string[];
   reason: string;
 }
 
@@ -33,6 +35,7 @@ const SEARCH_CONFIG: Record<string, SearchConfig> = {
     defaultRoot: ".",
     rootAtArgIndex: 0,
     valueOpts: ["-type", "-name", "-iname", "-path", "-ipath", "-size", "-mtime", "-atime", "-ctime", "-user", "-group", "-perm", "-exec", "-execdir", "-ok", "-maxdepth", "-mindepth"],
+    destructiveOpts: ["-delete", "-exec", "-execdir", "-ok"],
     reason: "search files",
   },
   tree: {
@@ -158,7 +161,8 @@ export const searchAdapter: CommandAdapter = {
           confidence: "conservative",
         });
       }
-      return makeSemantics(config.class, {
+      const cls = config.class;
+      return makeSemantics(cls, {
         reason: config.reason,
         intents,
         opaque: false,
@@ -176,7 +180,12 @@ export const searchAdapter: CommandAdapter = {
       });
     }
 
-    return makeSemantics(config.class, {
+    // 检测破坏性选项 → 升级为 modify（find -delete、-exec 等）
+    const hasDestructive = config.destructiveOpts
+      ?.some((opt) => hasOption(args, opt)) ?? false;
+    const cls = hasDestructive ? "modify" : config.class;
+
+    return makeSemantics(cls, {
       reason: config.reason,
       intents,
       opaque: false,

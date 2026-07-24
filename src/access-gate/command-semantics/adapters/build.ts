@@ -22,7 +22,7 @@ const BUILD_RULES: Record<string, BuildDef[]> = {
     { cls: "execute", pattern: (s) => /^publish\b/.test(s), reason: "cargo publish", network: true },
     { cls: "execute", pattern: (s) => /^update\b/.test(s), reason: "cargo update", network: true },
     { cls: "execute", pattern: (s) => /^check\b/.test(s), reason: "cargo check", network: true },
-    { cls: "execute", pattern: (s) => /^clean\b/.test(s), reason: "cargo clean" },
+    { cls: "modify", pattern: (s) => /^clean\b/.test(s), reason: "cargo clean" },
     { cls: "unknown", pattern: () => true, reason: "cargo other" },
   ],
   go: [
@@ -34,7 +34,7 @@ const BUILD_RULES: Record<string, BuildDef[]> = {
     { cls: "execute", pattern: (s) => /^run\b/.test(s), reason: "go run" },
     { cls: "execute", pattern: (s) => /^install\b/.test(s), reason: "go install", network: true },
     { cls: "execute", pattern: (s) => /^mod\s+download\b/.test(s), reason: "go mod download", network: true },
-    { cls: "execute", pattern: (s) => /^mod\s+(init|tidy|vendor)\b/.test(s), reason: "go mod modify" },
+    { cls: "modify", pattern: (s) => /^mod\s+(init|tidy|vendor)\b/.test(s), reason: "go mod modify" },
     { cls: "execute", pattern: (s) => /^get\b/.test(s), reason: "go get", network: true },
     { cls: "unknown", pattern: () => true, reason: "go other" },
   ],

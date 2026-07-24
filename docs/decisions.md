@@ -124,7 +124,7 @@
 
 **Rules:**
 
-- 命令分类为 `readOnly`、`mutating`、`dangerous`、`unclassified`。
+- Shell 命令分类为 `inspect`、`modify`、`execute`、`destroy`、`unknown`。
 - 路径规则按声明顺序 per-operation first-match。
 - `blockedPaths`、威胁模式、unsafe syntax 和 symlink escape 是不可覆盖的 hard deny。
 - `ask` 只提供 `Allow once` 和 `Deny`，不跨调用或 Session 持久化。
@@ -142,7 +142,7 @@
 - blocked intent hard deny，不能由 Profile 或 `Allow once` 覆盖。
 - 只有所有语法节点和 effect 都被安全解释时才可 allow。
 - wrapper 必须保留底层命令 intent。
-- mutating 源路径按 `read` 检查，目标、删除和权限变化按 `write` 检查。
+- modify 命令的源路径按 `read` 检查，目标、删除和权限变化按 `write` 检查。
 - 无法确定分支 cwd 时不得 allow。
 - 一个 tool call 的所有 ask intent 聚合为一次审批。
 - 项目 Profile 仅在项目受信时参与合并。
