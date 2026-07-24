@@ -213,3 +213,56 @@
 | 其他 deny code | 无（避免诱导绕过）|
 
 **Redaction rules:** renderer 仅对 deny 决策执行 sensitive prefix 脱敏（`~/.ssh`、`/home/`、`.env` 等），ask 决策保留完整 evidence 供用户审批判断。
+
+## D-024: 命令覆盖层
+
+**Status:** active
+
+**Decision:** 不将内置 adapter 的分类规则迁移到声明式文件。改为提供轻量 `command-overrides.yaml`，作为 Shell 命令和 Direct 工具的**统一扩展入口**，支持三种操作：别名映射、新命令定义和分类微调。
+
+**Why:**
+- Shell adapter 的分类、路径提取和效果推断共享同一趟参数解析——三者是同一个分析的输出，不是可拆分的"数据"和"逻辑"。强行拆分会造成 YAML 和 TS 描述同一命令的双源真理问题。
+- 内置命令分类是权威语义知识，不是用户面策略。用户真正需要的是「为未知命令添加支持」，而不是「覆盖 git push 的分类」。
+- Direct 工具的 TOOL_SCHEMAS 已是声明式静态映射，但也没有扩展机制。用一个统一入口覆盖 Shell + Direct 两类扩展需求，比只改 Shell adapter 更整体。
+
+**格式：**
+
+```yaml
+# .pi/command-overrides.yaml（可选）
+
+# 别名：让未知命令复用已知 adapter 的完整语义分析
+# 路径提取、效果推断和子命令解析全部沿用目标 adapter 的逻辑
+aliases:
+  fd: find
+  bat: cat
+  exa: ls
+  just: make
+
+# 新命令定义：为没有对应 adapter 的命令提供声明式分类
+# 适合只需分类、不需要路径提取的简单命令
+commands:
+  docker:
+    class: execute
+    effects: [execute, network]
+    subcommands:
+      ps: { class: inspect, effects: [read] }
+      images: { class: inspect, effects: [read] }
+      build: { class: execute, effects: [write, network] }
+
+# 分类微调：修改内置 adapter 的分类结果
+# pattern 是正则，匹配完整的子命令字符串（从第一个非选项参数起，空格连接）
+reclassify:
+  - command: git
+    pattern: "branch -[dD]"
+    class: destroy
+```
+
+**查找顺序：** `commands 定义 → aliases 别名解析 → 内置 adapter → reclassify 覆盖`。
+
+**加载链：** `~/.pi/agent/command-overrides.yaml → .pi/command-overrides.yaml`，项目覆盖全局。无 builtins 层（TypeScript adapter 是内置权威来源）。
+
+**影响：**
+- 内置 adapter 结构和测试不受影响
+- 不改变 Profile、PathPolicy、Gate 或 Shell IR
+- YAML 仅定义 TS 中没有的命令；同名时 commands 段优先，reclassify 在 adapter 返回后覆盖
+- 别名节点替换 executable 名称后传给目标 adapter，adapter 按目标命令规则执行完整分析（含路径提取）

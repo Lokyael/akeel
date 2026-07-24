@@ -41,6 +41,7 @@
 - [D-021 Task Record 术语](docs/decisions.md#d-021-task-record-术语)
 - [D-022 Compiler-Kernel 分层与请求真实性](docs/decisions.md#d-022-compiler-kernel-分层与请求真实性)
 - [D-023 拒绝解释与静态 Guidance](docs/decisions.md#d-023-拒绝解释与静态-guidance)
+- [D-024 命令覆盖层](docs/decisions.md#d-024-命令覆盖层)
 
 ## Negative Space
 
