@@ -266,3 +266,6 @@ reclassify:
 - 不改变 Profile、PathPolicy、Gate 或 Shell IR
 - YAML 仅定义 TS 中没有的命令；同名时 commands 段优先，reclassify 在 adapter 返回后覆盖
 - 别名节点替换 executable 名称后传给目标 adapter，adapter 按目标命令规则执行完整分析（含路径提取）
+
+**已知局限：**
+- `reclassify` 的子命令提取（`fullSubcommand`）不跳过取值选项的值。例如 `cargo --manifest-path Cargo.toml build` 产生的子命令是 `"Cargo.toml build"` 而非 `"build"`。这是因为 `fullSubcommand` 不依赖 per-adapter 的 `valueOpts` 配置。实际影响极小：reclassify 的 pattern 使用 substring 匹配（`"build"` 而非 `"^build$"`），且典型场景（如 git 子命令重分类）不存在此问题。详见 `overrides.ts` 中 `fullSubcommand` 的注释。

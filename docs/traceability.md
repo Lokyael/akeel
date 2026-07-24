@@ -7,7 +7,7 @@
 - pi-keel 提供 Profile 驱动的 command/path access gate，不提供 OS-level sandbox。
 - Profile 统一读取、写入、Shell 分类和一次性批准；网络不是当前独立策略轴。
 - 没有匹配 adapter 的未分类命令由 Profile 的 `shellPolicy.unknown` 决定；`plan`、`code`、`develop`、`query`、`build`（存储为 `keel-plan` 等，显示时去除前缀）可以要求一次性批准。
-- adapter 标记为 `opaque` 的命令表示其效果无法安全解释，始终 hard deny，不受 Profile 或用户批准覆盖。
+- adapter 标记为 `opaque` 的命令表示其效果无法安全解释，hard deny，不受 Profile 或用户批准覆盖。唯一例外：通过 `command-overrides.yaml` 的 `reclassify` 显式提供分类时，`opaque` 标志被清除，命令按新分类进入 Policy Kernel。
 - hard threat、危险命令、unsafe syntax、blocked paths 和 symlink escape 不可被 Profile 或用户批准覆盖。
 - snapshot/rollback、audit runtime、secret replacement 不属于当前 runtime。
 - 用户项目的 `README.md`、`AGENTS.md`、`.gitignore` 和 `package.json` 只读不写；第三方 extension 的直接操作不在本扩展的 enforcement 范围内。
@@ -20,7 +20,7 @@
 | `src/access-gate/` | pi-permission-system、cc-safety-net、pi-hermes-memory、pi-landstrip（部分为历史参考） | 以 Profile 为唯一 Session 权限状态，统一处理工具、Shell、路径和审批。 |
 | `src/access-gate/profile/` | 原创整合 | Profile 校验、继承、分层加载和内置 Profile 唯一来源。 |
 | `src/access-gate/shell-parse/` | 原创 | 受限 Shell IR：lexer（引用感知分词）+ parser（控制操作符、重定向、wrapper）|
-| `src/access-gate/command-semantics/` | 原创整合 | 统一命令语义：wrapper 规范化、control-flow、adapter 注册表（filesystem、text-transform、search、read、noop、git、package、build）|
+| `src/access-gate/command-semantics/` | 原创整合 | 统一命令语义：wrapper 规范化、control-flow、adapter 注册表（filesystem、text-transform、search、read、noop、git、package、build、interpreter）和覆盖层（overrides）|
 | `src/access-gate/path/` | 原创整合 | 统一 `cwd`、`projectRoot`、`stagingDir`、按操作路径决策、blocked paths 和 symlink 检查。 |
 | `src/access-gate/gate/` | 统一 access gate 设计 | `evaluate.ts` 保持唯一运行时入口；`shell-compiler.ts`、`direct-tool-compiler.ts` 生成 AccessRequest，`evaluate-request.ts` 执行 Policy Kernel，`render-decision.ts` 产生 host 兼容结果 |
 | `tests/access-gate/` | 项目行为测试 | 覆盖 Profile、路径、Shell IR、compiler、Kernel、guidance/renderer、invariants、语义 adapter、Gate 和 Extension 状态。 |

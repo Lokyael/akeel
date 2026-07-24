@@ -135,6 +135,11 @@ function firstSubcommand(args: ReadonlyArray<{ value?: string }>): string {
  * 提取完整子命令字符串（用于 pattern 匹配）。
  * 从第一个非选项参数开始，取全部非选项参数，空格连接。
  * 与 git.ts adapter 的提取逻辑一致：args.slice(idx).join(" ")。
+ *
+ * 已知局限：此函数不跳过取值选项的值（如 cargo --manifest-path <v> build
+ * 会得到 "<v> build" 而非 "build"），因为它不依赖 per-adapter 配置。
+ * reclassify 的 pattern 使用 substring 匹配（如 "build" 而非 "^build$"），
+ * 典型场景（git 子命令）无此问题。详见 D-024。
  */
 function fullSubcommand(args: ReadonlyArray<{ value?: string }>): string {
   const parts: string[] = [];
