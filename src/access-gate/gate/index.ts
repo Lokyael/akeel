@@ -4,6 +4,8 @@ export { renderDecision } from "./render-decision";
 export { guidanceFor, guidanceText } from "./guidance-catalog";
 export { DecisionBuilder } from "./decision-builder";
 export { TOOL_SCHEMAS } from "./tool-schemas";
+export { type GateCategory, GATE_CATEGORY_VALUES } from "./categories";
+export { classifyTool } from "./evaluate";
 export type { ToolSchema, FieldSchema } from "./tool-schemas";
 export { runPreflight } from "./preflight";
 export { compileDirectToolCall } from "./direct-tool-compiler";

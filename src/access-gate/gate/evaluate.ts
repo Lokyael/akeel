@@ -6,11 +6,20 @@ import { renderDecision } from "./render-decision";
 import type { HardDenyCode, GateDecision } from "./decision-types";
 import { DecisionBuilder } from "./decision-builder";
 import type { GateResult, GateRuntime, ToolCallInput } from "./types";
+import { TOOL_SCHEMAS } from "./tool-schemas";
+import type { GateCategory } from "./categories";
 
 export type ToolCompilerInput = CompilerContext & {
   surface: string;
   args: unknown;
 };
+
+/** 将 tool surface 映射到 gate 分类。不在管辖范围内的工具 = passthrough。 */
+export function classifyTool(surface: string): { category: GateCategory } {
+  if (surface === "bash") return { category: "shell" };
+  if (TOOL_SCHEMAS[surface]) return { category: "filesystem" };
+  return { category: "passthrough" };
+}
 
 export function compileToolCall(input: ToolCompilerInput): CompileResult {
   if (input.surface === "bash") {
@@ -50,6 +59,11 @@ function compilerRejectToDecision(result: Extract<CompileResult, { kind: "reject
 }
 
 export async function evaluateToolCall(input: ToolCallInput, runtime: GateRuntime): Promise<GateResult> {
+  // 不在 gate 管辖范围内的工具 passthrough，不做任何拦截。
+  if (classifyTool(input.surface).category === "passthrough") {
+    return { kind: "allow" };
+  }
+
   const compiled = compileToolCall({
     surface: input.surface,
     args: input.args,

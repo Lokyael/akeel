@@ -9,9 +9,7 @@ import {
   type DirectToolCompilerInput,
   type ToolSurface,
 } from "./access-request";
-import { TOOL_SCHEMAS, type FieldSchema, type ToolSchema } from "./tool-schemas";
-
-const DIRECT_SURFACES = new Set(Object.keys(TOOL_SCHEMAS));
+import { TOOL_SCHEMAS } from "./tool-schemas";
 
 function validateEditEntries(edits: unknown): string | null {
   if (!Array.isArray(edits)) return "edits must be an array";

@@ -24,7 +24,7 @@ interface SearchConfig {
   patternOpts?: readonly string[];
   /** 文件选项：提取值为 read intent。 */
   fileOpts?: readonly string[];
-  /** 破坏性选项：检测到则分类升级为 modify（如 find -delete、-exec）。 */
+  /** 破坏性选项：检测到则分类升级为 modify（如 find -delete、-exec）。必须在选项解析前通过原始 args 检测，不能依赖解析后的结果。 */
   destructiveOpts?: readonly string[];
   reason: string;
 }
