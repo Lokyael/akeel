@@ -1,7 +1,11 @@
 export { compileToolCall, evaluateToolCall } from "./evaluate";
 export { evaluateRequest } from "./evaluate-request";
 export { renderDecision } from "./render-decision";
-export { guidanceFor } from "./guidance-catalog";
+export { guidanceFor, guidanceText } from "./guidance-catalog";
+export { DecisionBuilder } from "./decision-builder";
+export { TOOL_SCHEMAS } from "./tool-schemas";
+export type { ToolSchema, FieldSchema } from "./tool-schemas";
+export { runPreflight } from "./preflight";
 export { compileDirectToolCall } from "./direct-tool-compiler";
 export { compileShellCall } from "./shell-compiler";
 export type {

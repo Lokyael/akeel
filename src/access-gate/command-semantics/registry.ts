@@ -10,6 +10,7 @@ import { packageAdapter } from "./adapters/package";
 import { buildAdapter } from "./adapters/build";
 import { noopAdapter } from "./adapters/noop";
 import { readAdapter } from "./adapters/read";
+import { interpreterAdapter } from "./adapters/interpreters";
 import { makeSemantics } from "./adapters/shared";
 
 // 注册所有 adapter
@@ -22,6 +23,7 @@ const ADAPTERS: CommandAdapter[] = [
   buildAdapter,
   noopAdapter,
   readAdapter,
+  interpreterAdapter,
 ];
 
 // 按命令名索引

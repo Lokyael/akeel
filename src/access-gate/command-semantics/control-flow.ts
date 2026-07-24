@@ -3,6 +3,7 @@
 // 输出：每个命令节点的 CWD + 是否 opaque
 
 import { isAbsolute, resolve } from "node:path";
+import { homedir } from "node:os";
 import { existsSync, statSync } from "node:fs";
 import type { ShellProgram, ShellCommandNode, ShellOperator } from "../shell-parse/types";
 import type { CwdCandidate, CwdState, CommandSemantics } from "./types";
@@ -56,7 +57,7 @@ export function analyzeCd(node: ShellCommandNode): CdInfo {
  */
 export function resolveCdTarget(target: string, currentCwd: string): { cwd: string; exists: boolean } | null {
   if (target === "~") {
-    const home = process.env.HOME || "/home";
+    const home = homedir();
     return { cwd: home, exists: existsSync(home) && statSync(home).isDirectory() };
   }
   const resolved = isAbsolute(target) ? target : resolve(currentCwd, target);

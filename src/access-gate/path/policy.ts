@@ -9,6 +9,13 @@ export { resolvePath } from "./resolve";
 export type { ResolvedPath } from "./resolve";
 export type { PathOperation } from "../profile/types";
 
+/** Path decision reason constants — keep in sync with gate/decision-code.ts. */
+export const PATH_DENY_REASONS = {
+  blocked: "blocked path",
+  unclassifiable: "path cannot be classified",
+  symlinkEscape: "symlink escapes an allowed root",
+} as const;
+
 export interface PathDecision {
   decision: Decision;
   hard: boolean;
@@ -38,9 +45,9 @@ export function decidePath(
   blockedPaths: readonly string[] = DEFAULT_BLOCKED_PATHS,
 ): PathDecision {
   const blocked = blockedPattern(path, blockedPaths);
-  if (blocked) return { decision: "deny", hard: true, reason: "blocked path", pattern: blocked };
-  if (!path.classifiable) return { decision: "deny", hard: true, reason: "path cannot be classified" };
-  if (path.symlinkEscape) return { decision: "deny", hard: true, reason: "symlink escapes an allowed root" };
+  if (blocked) return { decision: "deny", hard: true, reason: PATH_DENY_REASONS.blocked, pattern: blocked };
+  if (!path.classifiable) return { decision: "deny", hard: true, reason: PATH_DENY_REASONS.unclassifiable };
+  if (path.symlinkEscape) return { decision: "deny", hard: true, reason: PATH_DENY_REASONS.symlinkEscape };
 
   const rule = selectedRule(profile.pathPolicy, path, operation);
   const decision = rule?.[operation] ?? profile.pathPolicy.default[operation];

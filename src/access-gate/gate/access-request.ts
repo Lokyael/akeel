@@ -14,6 +14,7 @@ export const ANALYSIS_LIMITS = {
   maxCwdCandidates: 256,
   maxEvidenceSubjectLength: 1_024,
   maxArgumentLength: 65_536,
+  maxEditEntries: 64,
 } as const;
 
 const TOOL_SURFACES = new Set<ToolSurface>(["bash", "read", "write", "edit", "find", "grep", "ls"]);
@@ -117,11 +118,15 @@ export function reject(code: DecisionCode, subject: string, span?: SourceSpan): 
   };
 }
 
-function evidenceKind(code: DecisionCode): GateEvidence["kind"] {
+
+export function evidenceKind(code: DecisionCode): GateEvidence["kind"] {
   if (code === "dynamic-shell" || code === "unsafe-syntax" || code === "uncertain-cwd") return "syntax";
   if (code === "threat") return "threat";
   if (code === "unknown-tool" || code === "invalid-tool-input") return "tool";
   if (code === "unsupported-redirection") return "redirection";
+  if (code === "blocked-path" || code === "symlink-escape" || code === "path-unclassifiable" || code === "path-denied") return "path";
+  if (code === "dangerous-command" || code === "hard-command-rule" || code === "shell-policy-denied" || code === "opaque-command") return "command";
+  if (code === "resource-limit") return "tool";
   return "command";
 }
 

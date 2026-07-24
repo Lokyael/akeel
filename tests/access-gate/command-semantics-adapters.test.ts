@@ -229,6 +229,51 @@ void test("search: pattern file option makes the first positional argument a roo
   );
 });
 
+// ─── ls adapter ───
+
+void test("ls: defaults to . list intent", () => {
+  const { program } = parse(lex("ls").tokens);
+  const sem = analyzeSemantics(program.commands[0]!, CTX);
+  assert.equal(sem.class, "readOnly");
+  assert.equal(sem.intents.length, 1);
+  assert.equal(sem.intents[0]!.operation, "list");
+  assert.equal(sem.intents[0]!.rawPath, ".");
+});
+
+void test("ls: explicit path produces list intent", () => {
+  const { program } = parse(lex("ls /etc").tokens);
+  const sem = analyzeSemantics(program.commands[0]!, CTX);
+  assert.equal(sem.class, "readOnly");
+  assert.equal(sem.intents.length, 1);
+  assert.equal(sem.intents[0]!.operation, "list");
+  assert.equal(sem.intents[0]!.rawPath, "/etc");
+});
+
+void test("ls: multiple paths produce list intents", () => {
+  const { program } = parse(lex("ls src/ tests/").tokens);
+  const sem = analyzeSemantics(program.commands[0]!, CTX);
+  assert.equal(sem.class, "readOnly");
+  const listIntents = sem.intents.filter((i) => i.operation === "list");
+  assert.equal(listIntents.length, 2);
+  assert.deepEqual(listIntents.map((i) => i.rawPath), ["src/", "tests/"]);
+});
+
+void test("ls: flags like -la are skipped, path still recognized", () => {
+  const { program } = parse(lex("ls -la /home").tokens);
+  const sem = analyzeSemantics(program.commands[0]!, CTX);
+  assert.equal(sem.class, "readOnly");
+  assert.equal(sem.intents.length, 1);
+  assert.equal(sem.intents[0]!.operation, "list");
+  assert.equal(sem.intents[0]!.rawPath, "/home");
+});
+
+void test("ls: -- after options treats everything as path", () => {
+  const { program } = parse(lex("ls -l -- -f").tokens);
+  const sem = analyzeSemantics(program.commands[0]!, CTX);
+  assert.equal(sem.class, "readOnly");
+  assert.ok(sem.intents.some((i) => i.operation === "list" && i.rawPath === "-f"));
+});
+
 // ─── Read adapter ───
 
 void test("read: head -250 reads stdin without a path intent", () => {
@@ -356,7 +401,85 @@ void test("yarn: add is mutating", () => {
   const { program } = parse(lex("yarn add lodash").tokens);
   const sem = analyzeSemantics(program.commands[0]!, CTX);
   assert.equal(sem.class, "mutating");
+})
+
+// ─── npx adapter ───
+
+void test("npx: execute package is mutating", () => {
+  const { program } = parse(lex("npx some-package").tokens);
+  const sem = analyzeSemantics(program.commands[0]!, CTX);
+  assert.equal(sem.class, "mutating");
 });
+
+void test("npx: execute with args is mutating", () => {
+  const { program } = parse(lex("npx tsx --version").tokens);
+  const sem = analyzeSemantics(program.commands[0]!, CTX);
+  assert.equal(sem.class, "mutating");
+});
+
+void test("npx: version flag is readOnly", () => {
+  const { program } = parse(lex("npx --version").tokens);
+  const sem = analyzeSemantics(program.commands[0]!, CTX);
+  assert.equal(sem.class, "readOnly");
+});
+
+void test("npx: help flag is readOnly", () => {
+  const { program } = parse(lex("npx --help").tokens);
+  const sem = analyzeSemantics(program.commands[0]!, CTX);
+  assert.equal(sem.class, "readOnly");
+})
+
+// --- interpreter adapter ---
+
+void test("python: execute script is mutating", () => {
+  const { program } = parse(lex("python script.py").tokens);
+  const sem = analyzeSemantics(program.commands[0]!, CTX);
+  assert.equal(sem.class, "mutating");
+});
+
+void test("python3: execute inline is mutating", () => {
+  const { program } = parse(lex('python3 -c "print(1)"').tokens);
+  const sem = analyzeSemantics(program.commands[0]!, CTX);
+  assert.equal(sem.class, "mutating");
+});
+
+void test("python: version flag is readOnly", () => {
+  const { program } = parse(lex("python --version").tokens);
+  const sem = analyzeSemantics(program.commands[0]!, CTX);
+  assert.equal(sem.class, "readOnly");
+});
+
+void test("python3: -V flag is readOnly", () => {
+  const { program } = parse(lex("python3 -V").tokens);
+  const sem = analyzeSemantics(program.commands[0]!, CTX);
+  assert.equal(sem.class, "readOnly");
+});
+
+void test("node: execute script is mutating", () => {
+  const { program } = parse(lex("node server.js").tokens);
+  const sem = analyzeSemantics(program.commands[0]!, CTX);
+  assert.equal(sem.class, "mutating");
+});
+
+void test("node: version flag is readOnly", () => {
+  const { program } = parse(lex("node --version").tokens);
+  const sem = analyzeSemantics(program.commands[0]!, CTX);
+  assert.equal(sem.class, "readOnly");
+});
+
+void test("ruby: execute is mutating", () => {
+  const { program } = parse(lex("ruby script.rb").tokens);
+  const sem = analyzeSemantics(program.commands[0]!, CTX);
+  assert.equal(sem.class, "mutating");
+});
+
+void test("perl: version is readOnly", () => {
+  const { program } = parse(lex("perl --version").tokens);
+  const sem = analyzeSemantics(program.commands[0]!, CTX);
+  assert.equal(sem.class, "readOnly");
+});
+;
+;
 
 // ─── Build adapter ───
 

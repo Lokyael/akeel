@@ -31,10 +31,18 @@ function buildPkgRules(cmd: string): PkgDef[] {
   ];
 }
 
+// npx always executes (potentially after download).  Flags like --version/--help
+// are readOnly; everything else is mutating + network.
+const NPX_RULES: PkgDef[] = [
+  { cls: "readOnly", pattern: (s) => /^(--version|-v|--help)$/.test(s), reason: "npx version/help" },
+  { cls: "mutating", pattern: () => true, reason: "npx execute package", network: true },
+];
+
 const PKG_RULES: Record<string, PkgDef[]> = {
   npm: buildPkgRules("npm"),
   pnpm: buildPkgRules("pnpm"),
   yarn: buildPkgRules("yarn"),
+  npx: NPX_RULES,
 };
 
 export const packageAdapter: CommandAdapter = {
@@ -45,10 +53,14 @@ export const packageAdapter: CommandAdapter = {
     if (!rules) return makeSemantics("unclassified", { reason: `unknown package manager: ${name}`, opaque: true });
 
     const args = [...node.args];
-    const subcmd = args.find((a) => {
+    let subcmd = args.find((a) => {
       const v = a.value ?? "";
       return !v.startsWith("-") && v !== "--";
     })?.value ?? "";
+    // npx: when no subcommand (all args are flags), use the first flag
+    if (name === "npx" && !subcmd && args.length > 0) {
+      subcmd = args[0]!.value ?? "";
+    }
 
     for (const def of rules) {
       if (def.pattern(subcmd)) {

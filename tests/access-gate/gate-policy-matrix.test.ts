@@ -98,3 +98,33 @@ test("rejects a structurally copied request that was not issued by the compiler"
     env.cleanup();
   }
 });
+
+// ─── Direct edit and ls through Policy Kernel ───
+
+test("allows a complete direct ls request through the kernel", async () => {
+  const env = context();
+  try {
+    const request = complete(compileDirectToolCall({ ...env, surface: "ls", args: { path: "." } }));
+    const decision = await evaluateRequest(request, profile(), { hasUI: false });
+    assert.deepEqual(decision, { disposition: "allow" });
+  } finally {
+    env.cleanup();
+  }
+});
+
+test("asks for a complete direct edit request through the kernel", async () => {
+  const env = context();
+  try {
+    const request = complete(compileDirectToolCall({
+      ...env, surface: "edit",
+      args: { path: "file.ts", edits: [{ oldText: "old", newText: "new" }] },
+    }));
+    const decision = await evaluateRequest(request, profile(), { hasUI: true });
+    assert.equal(decision.disposition, "ask");
+    if (decision.disposition === "ask") {
+      assert.equal(decision.code, "approval-required");
+    }
+  } finally {
+    env.cleanup();
+  }
+});

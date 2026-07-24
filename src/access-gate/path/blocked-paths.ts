@@ -1,4 +1,6 @@
 export const DEFAULT_BLOCKED_PATHS = [
+  "project/.git/**",
+  "project/**/.git/**",
   "project/.env",
   "project/.env.*",
   "project/**/*.env",
@@ -23,6 +25,8 @@ export const DEFAULT_BLOCKED_PATHS = [
   "**/id_rsa*",
   "**/id_ed25519*",
   "**/id_ecdsa*",
+  "**/authorized_keys*",
+  "**/known_hosts*",
   "/etc/passwd",
   "/etc/shadow",
 ];

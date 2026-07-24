@@ -1,8 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
 import { renderDecision } from "../../src/access-gate/gate/render-decision";
-import { guidanceFor } from "../../src/access-gate/gate/guidance-catalog";
-import type { GateDecision, GateEvidence, Guidance, GuidanceId } from "../../src/access-gate/gate/decision-types";
+import { guidanceFor, guidanceText } from "../../src/access-gate/gate/guidance-catalog";
+import type { GateDecision, GateEvidence, GuidanceId } from "../../src/access-gate/gate/decision-types";
 
 const evidence: GateEvidence[] = [{ kind: "syntax", subject: "~/sensitive/path" }];
 
@@ -16,6 +19,20 @@ test("blocked path and threat do not offer bypass guidance", () => {
   assert.deepEqual(guidanceFor("blocked-path"), []);
   assert.deepEqual(guidanceFor("threat"), []);
   assert.deepEqual(guidanceFor("symlink-escape"), []);
+});
+
+test("path-denied and invalid-tool-input map to profile/tool guidance", () => {
+  // path-denied → profile-restriction (suggests switching Profile)
+  assert.equal(guidanceFor("path-denied")[0]?.id, "profile-restriction");
+  // invalid-tool-input → literal-command-or-direct-tool (suggests correct tool usage)
+  assert.equal(guidanceFor("invalid-tool-input")[0]?.id, "literal-command-or-direct-tool");
+  // unknown-tool → literal-command-or-direct-tool
+  assert.equal(guidanceFor("unknown-tool")[0]?.id, "literal-command-or-direct-tool");
+  // resource-limit → split-supported-commands
+  assert.equal(guidanceFor("resource-limit")[0]?.id, "split-supported-commands");
+  // dangerous-command and hard-command-rule have no guidance (security-sensitive)
+  assert.deepEqual(guidanceFor("dangerous-command"), []);
+  assert.deepEqual(guidanceFor("hard-command-rule"), []);
 });
 
 test("hard deny renderer includes guidance text in the reason", () => {
@@ -74,14 +91,30 @@ test("renderer bounds evidence subject count and total reason length", () => {
     code: "path-denied",
     enforcement: "profile",
     evidence: hugeEvidence,
-    guidance: [],
+    guidance: guidanceFor("path-denied"),
   };
   const result = renderDecision(deny);
   assert.equal(result.kind, "block");
   assert.ok(result.reason.length <= 2_048);
-  assert.ok(result.reason.includes("additional evidence"));
+  assert.ok(result.reason.includes("PROFILE_BLOCK"));
+  // path-denied now carries profile-restriction guidance
+  assert.ok(result.reason.includes("profile-restriction") || result.reason.includes("PROFILE_BLOCK"));
 });
 
 test("allow decision renders as allow", () => {
   assert.deepEqual(renderDecision({ disposition: "allow" }), { kind: "allow" });
+});
+
+test("every GuidanceId maps to a non-empty text", () => {
+  const ids: GuidanceId[] = [
+    "batch-inspection-tools",
+    "literal-command-or-direct-tool",
+    "split-supported-commands",
+    "profile-restriction",
+  ];
+  for (const id of ids) {
+    const text = guidanceText(id);
+    assert.ok(text.length > 0);
+    assert.notEqual(text, id); // not falling back to id string
+  }
 });

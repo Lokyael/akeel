@@ -7,7 +7,7 @@
         "test": "npx tsx scripts/validate-skills.ts && npx tsc --noEmit && npm run test:profile && npm run test:path && npm run test:gate && npm run test:shell-parse && npm run test:cmd-semantics && npm run test:index && npm run test:footer",
     "test:profile": "npx tsx tests/access-gate/profile.test.ts && npx tsx tests/access-gate/profile-load.test.ts",
         "test:path": "npx tsx tests/access-gate/path-policy.test.ts",
-    "test:gate": "npx tsx tests/access-gate/gate-decision.test.ts && npx tsx tests/access-gate/gate.test.ts && npx tsx tests/access-gate/access-request.test.ts && npx tsx tests/access-gate/task2-contract.test.ts && npx tsx tests/access-gate/gate-policy-matrix.test.ts && npx tsx tests/access-gate/guidance.test.ts && npx tsx tests/access-gate/access-request-invariants.test.ts",
+    "test:gate": "npx tsx tests/access-gate/decision-builder.test.ts && npx tsx tests/access-gate/gate-decision.test.ts && npx tsx tests/access-gate/gate.test.ts && npx tsx tests/access-gate/access-request.test.ts && npx tsx tests/access-gate/task2-contract.test.ts && npx tsx tests/access-gate/gate-policy-matrix.test.ts && npx tsx tests/access-gate/guidance.test.ts && npx tsx tests/access-gate/access-request-invariants.test.ts",
     "test:shell-parse": "npx tsx tests/access-gate/shell-parse.test.ts",
     "test:cmd-semantics": "npx tsx tests/access-gate/command-semantics-control-flow.test.ts && npx tsx tests/access-gate/command-semantics-adapters.test.ts",
     "test:index": "npx tsx tests/access-gate/index.test.ts",

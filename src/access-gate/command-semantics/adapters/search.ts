@@ -10,6 +10,8 @@ interface SearchConfig {
   defaultRoot: string;
   /** 识别搜索根：从参数中第几个位置开始（0 = 第一个非选项参数）。 */
   rootAtArgIndex: number;
+  /** 路径 intent 操作类型（默认 "search"）。ls 使用 "list"。 */
+  operation?: "search" | "list";
   /** 是否需要递归标记才视为搜索。 */
   needsRecursiveFlag?: boolean;
   /** 递归选项。 */
@@ -61,6 +63,13 @@ const SEARCH_CONFIG: Record<string, SearchConfig> = {
     patternOpts: ["-e", "--regexp", "-f", "--file"],
     fileOpts: ["-f", "--file"],
     reason: "ripgrep search",
+  },
+  ls: {
+    class: "readOnly",
+    defaultRoot: ".",
+    rootAtArgIndex: 0,
+    operation: "list",
+    reason: "list directory",
   },
 };
 
@@ -156,9 +165,10 @@ export const searchAdapter: CommandAdapter = {
       });
     }
 
+    const pathOperation = config.operation ?? "search";
     for (const root of roots) {
       intents.push({
-        operation: "search",
+        operation: pathOperation,
         rawPath: root,
         source: "argument",
         span: { start: 0, end: 0 },

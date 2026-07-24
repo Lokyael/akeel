@@ -4,6 +4,8 @@ import { isRecord, type CompileResult, type CompilerContext } from "./access-req
 import { evaluateRequest } from "./evaluate-request";
 import { renderDecision } from "./render-decision";
 import { askOnce } from "./unknown-command";
+import type { HardDenyCode, GateDecision } from "./decision-types";
+import { DecisionBuilder } from "./decision-builder";
 import type { GateResult, GateRuntime, ToolCallInput } from "./types";
 
 export type ToolCompilerInput = CompilerContext & {
@@ -19,17 +21,33 @@ export function compileToolCall(input: ToolCompilerInput): CompileResult {
   return compileDirectToolCall(input);
 }
 
-function compilerRejectToDecision(result: Extract<CompileResult, { kind: "reject" }>): import("./decision-types").GateDecision {
+// Compiler 可产出的 reject code 集合。新增 compile-stage DecisionCode 时必须加入此集合。
+const COMPILER_REJECT_CODES: ReadonlySet<HardDenyCode> = new Set([
+  "unknown-tool",
+  "invalid-tool-input",
+  "dynamic-shell",
+  "unsafe-syntax",
+  "threat",
+  "opaque-command",
+  "dangerous-command",
+  "hard-command-rule",
+  "unsupported-redirection",
+  "uncertain-cwd",
+  "unknown-effect",
+  "resource-limit",
+]);
+
+function compilerRejectToDecision(result: Extract<CompileResult, { kind: "reject" }>): GateDecision {
   const code = result.code;
   const evidence = result.evidence;
-  if (code === "unknown-tool" || code === "invalid-tool-input"
-    || code === "dynamic-shell" || code === "unsafe-syntax" || code === "threat"
-    || code === "opaque-command" || code === "dangerous-command" || code === "hard-command-rule"
-    || code === "unsupported-redirection" || code === "uncertain-cwd" || code === "unknown-effect"
-    || code === "resource-limit") {
-    return { disposition: "deny", code, enforcement: "hard", evidence, guidance: [] };
+  if (COMPILER_REJECT_CODES.has(code as HardDenyCode)) {
+    const subject = evidence[0]?.subject ?? code;
+    const span = evidence[0]?.span;
+    return new DecisionBuilder().hard(code as HardDenyCode, subject, span).build();
   }
-  return { disposition: "deny", code: "invalid-tool-input", enforcement: "hard", evidence, guidance: [] };
+  // 防御：未知 reject code 不可能到达。如果到达此处，说明 compiler
+  // 产出了一个不在 COMPILER_REJECT_CODES 中的新 code。
+  return DecisionBuilder.hard("unknown-tool", "unexpected compiler reject code");
 }
 
 export async function evaluateToolCall(input: ToolCallInput, runtime: GateRuntime): Promise<GateResult> {
@@ -44,7 +62,7 @@ export async function evaluateToolCall(input: ToolCallInput, runtime: GateRuntim
   return adaptDecision(await evaluateRequest(compiled.request, input.profile, runtime), runtime);
 }
 
-async function adaptDecision(decision: import("./decision-types").GateDecision, runtime: GateRuntime): Promise<GateResult> {
+async function adaptDecision(decision: GateDecision, runtime: GateRuntime): Promise<GateResult> {
   if (decision.disposition === "allow") return { kind: "allow" };
   if (decision.disposition === "ask") {
     const rendered = renderDecision(decision);

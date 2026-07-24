@@ -5,8 +5,7 @@ import { lex } from "../shell-parse/lexer";
 import { parse } from "../shell-parse/parser";
 import type { CwdCandidate } from "../command-semantics/types";
 import type { ShellRedirectionNode, SourceSpan } from "../shell-parse/types";
-import { scanThreats } from "../security/threat-scan";
-import { hardCommandRule } from "./hard-rules";
+import { runPreflight } from "./preflight";
 import {
   ANALYSIS_LIMITS,
   createRequest,
@@ -55,10 +54,8 @@ export function compileShellCall(input: ShellCompilerInput): CompileResult {
   if (parsed.program.dynamic) return reject("dynamic-shell", "dynamic shell token");
   if (parsed.program.unsafeSyntax) return reject("unsafe-syntax", parsed.program.unsafeSyntax);
 
-  const threat = scanThreats(command);
-  if (threat) return reject("threat", threat);
-  const hardRule = hardCommandRule(command);
-  if (hardRule) return reject("hard-command-rule", hardRule);
+  const preflight = runPreflight(command);
+  if (preflight) return preflight;
 
   const flow = analyzeControlFlow(parsed.program, initialCwd(input.cwd));
   if (flow.opaque) return reject("opaque-command", "opaque control flow");
@@ -112,6 +109,9 @@ export function compileShellCall(input: ShellCompilerInput): CompileResult {
     for (const intent of semantics.intents) {
       operations.push(pathOperation(intent.operation, intent.rawPath, flowNode.effectiveCwd, intent.source, intent.confidence, intent.span));
     }
+    // Conservative fallback: mutating Shell commands with no explicit paths
+    // or redirections get a synthetic write intent on cwd.  Direct tools do not
+    // need this fallback because every Direct surface always carries a path arg.
     if (semantics.class === "mutating" && semantics.intents.length === 0 && flowNode.node.redirections.length === 0) {
       operations.push(pathOperation("write", ".", flowNode.effectiveCwd, "cwd", "conservative", flowNode.node.span));
     }

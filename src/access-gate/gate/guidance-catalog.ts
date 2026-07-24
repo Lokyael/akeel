@@ -5,6 +5,10 @@ const GUIDANCE_CATALOG: Readonly<Partial<Record<DecisionCode, readonly Guidance[
   "opaque-command": [{ id: "literal-command-or-direct-tool", safety: "recheck" }],
   "unsafe-syntax": [{ id: "split-supported-commands", safety: "recheck" }],
   "shell-policy-denied": [{ id: "profile-restriction", safety: "recheck" }],
+  "path-denied": [{ id: "profile-restriction", safety: "recheck" }],
+  "unknown-tool": [{ id: "literal-command-or-direct-tool", safety: "recheck" }],
+  "invalid-tool-input": [{ id: "literal-command-or-direct-tool", safety: "recheck" }],
+  "resource-limit": [{ id: "split-supported-commands", safety: "recheck" }],
 };
 
 export function guidanceFor(code: DecisionCode): readonly Guidance[] {
