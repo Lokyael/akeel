@@ -1,11 +1,12 @@
 import { decidePath, resolvePath } from "../path";
+import { PATH_DENY_REASONS } from "../path/policy";
 import type { ResolvedProfile } from "../profile/types";
 import { isCompleteAccessRequest, type CommandAccessOperation, type CompleteAccessRequest, type PathAccessOperation } from "./access-request";
-import { pathDecisionCode } from "./decision-code";
 import type { GateRuntime } from "./types";
 import type { GateDecision, GateEvidence, HardDenyCode } from "./decision-types";
 import { DecisionBuilder } from "./decision-builder";
 import type { Effect } from "../command-semantics/types";
+import type { PathDecision } from "../path";
 
 const EFFECT_POLICY_AXIS: Readonly<Record<Effect, "path" | "shell">> = {
   read: "path",
@@ -77,6 +78,17 @@ export async function evaluateRequest(
   return { disposition: "allow" };
 }
 
+// ── path decision → stable code ──
+
+function pathDecisionCode(decision: Pick<PathDecision, "hard" | "reason">): HardDenyCode | "path-denied" {
+  if (!decision.hard) return "path-denied";
+  if (decision.reason === PATH_DENY_REASONS.blocked) return "blocked-path";
+  if (decision.reason === PATH_DENY_REASONS.symlinkEscape) return "symlink-escape";
+  if (decision.reason === PATH_DENY_REASONS.unclassifiable) return "path-unclassifiable";
+  return "path-denied";
+}
+
+// ── evidence helpers ──
 
 function commandEvidence(operation: CommandAccessOperation): GateEvidence {
   return { kind: "command", subject: `${operation.commandClass} command: ${operation.executable ?? "?"}`, span: operation.span };

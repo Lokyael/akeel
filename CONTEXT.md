@@ -53,6 +53,6 @@
 ## Project Documents
 
 - [`docs/decisions.md`](docs/decisions.md)：长期决策寄存器。
-- [`docs/task.md`](docs/task.md)：当前 Access Gate 安全核查任务。
+- [`docs/task.md`](docs/task.md)：活跃任务记录。
 - [`docs/security-boundaries.md`](docs/security-boundaries.md)：安全承诺和残余风险。
 - [`docs/traceability.md`](docs/traceability.md)：外部来源、融合决策和合规溯源。

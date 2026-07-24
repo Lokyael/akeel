@@ -189,21 +189,21 @@ User projects maintain three document entry points:
 |----------|---------|-----------|
 | `CONTEXT.md` | Current glossary, architecture, invariants, security boundaries, active decisions, and Negative Space | Permanent; update current truth only |
 | `docs/decisions.md` | Load-bearing decisions with rationale and rejected alternatives | Permanent; mark superseded decisions, do not rewrite history |
-| `docs/task.md` | Active feature, bug, refactor, design, plan, or maintenance task | Temporary; remove completed tasks after durable updates |
+| `docs/task.md` | Active feature, bug, refactor, design, plan, or maintenance task | Persistent container; clear completed Task Record sections after durable updates |
 
 Use `docs/task-<topic>.md` only when genuinely independent tasks must have separate lifecycles. Keep these files flat; do not create type-specific subdirectories or date-based copies.
 
 ### Task Lifecycle
 
 ```
-Task:     draft → in-progress → verified → removed
+Task:     draft → in-progress → verified → cleared
 Decision:  active → superseded
 Context:   current truth, no status transition
 ```
 
 A Task Record may use `Kind: feature | bug | refactor | investigation | maintenance`. Its `Out of Scope`, Requirements, Design, Plan, Evidence, and durable-update checklist stay in the same task file.
 
-When a task reaches `verified`, update `CONTEXT.md` and `docs/decisions.md` when needed, then remove the completed task or file. Git and external issue tracking retain process history; do not create a default archive directory.
+When a task reaches `verified`, update `CONTEXT.md` and `docs/decisions.md` when needed, then clear the completed Task Record sections. The file remains as a container for future tasks. Git and external issue tracking retain process history; do not create a default archive directory.
 
 `survey-context` reads only `CONTEXT.md`, `docs/decisions.md`, `docs/task.md`, and `docs/task-*.md`. It does not scan legacy or type-specific artifact paths.
 

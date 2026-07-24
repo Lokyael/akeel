@@ -3,7 +3,6 @@ import { compileShellCall } from "./shell-compiler";
 import { isRecord, type CompileResult, type CompilerContext } from "./access-request";
 import { evaluateRequest } from "./evaluate-request";
 import { renderDecision } from "./render-decision";
-import { askOnce } from "./unknown-command";
 import type { HardDenyCode, GateDecision } from "./decision-types";
 import { DecisionBuilder } from "./decision-builder";
 import type { GateResult, GateRuntime, ToolCallInput } from "./types";
@@ -69,4 +68,20 @@ async function adaptDecision(decision: GateDecision, runtime: GateRuntime): Prom
     return askOnce(runtime, "Access profile approval", rendered.kind === "block" ? rendered.reason : "approval required");
   }
   return renderDecision(decision);
+}
+
+// ── host adapter: approval prompt ──
+
+function clean(value: string): string {
+  return value.replace(/[\r\n\t]/g, " ").replace(/ +/g, " ").trim();
+}
+
+async function askOnce(runtime: GateRuntime, title: string, detail: string): Promise<GateResult> {
+  if (!runtime.hasUI || !runtime.select) {
+    return { kind: "block", reason: "approval required but no interactive UI is available", code: "approval-required" };
+  }
+  const choice = await runtime.select(`${title}\n\n${clean(detail)}\n\nAllow this operation once?`, ["Allow once", "Deny"]);
+  return choice === "Allow once"
+    ? { kind: "allow" }
+    : { kind: "block", reason: "user denied the operation", code: "user-denied" };
 }

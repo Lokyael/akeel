@@ -20,7 +20,7 @@ Principles and the access gate activate automatically. Skills load on demand.
 - **Access profiles** — composable read/write path rules, Shell command decisions, one-time approval, hard protected paths, and threat scanning
 - **Session-safe authorization** — each Session starts from the configured default Profile; approvals are `Allow once` only
 - **Recovery boundary** — no automatic snapshots or rollback extension; use version control, editor history, or pi's session tree
-- **Test coverage** — 24 skill validations and 174 access-gate assertions（Profile 5 + 路径 4 + 加载 4 + Gate 23 + Shell IR 56 + control-flow 21 + adapters 56 + 集成 2 + Footer 3）
+- **Test coverage** — 24 skill validations and access-gate assertions covering Profile, paths, Shell IR, command semantics, compiler, kernel, guidance, invariants, gate decisions, and extension integration
 
 ## Access Gate
 
@@ -43,7 +43,7 @@ Hard threats, unsafe Shell syntax, symlink escapes, and blocked paths always den
 | [USAGE.md](USAGE.md) | Profile configuration, skills, security boundaries, and workflows |
 | [CONTEXT.md](CONTEXT.md) | Current project context and active decision index |
 | [docs/decisions.md](docs/decisions.md) | Long-term architecture and policy decisions |
-| [docs/task.md](docs/task.md) | Current Access Gate security task |
+| [docs/task.md](docs/task.md) | Active task records |
 | [docs/traceability.md](docs/traceability.md) | Sources, fusion decisions, and compliance traceability |
 | [docs/security-boundaries.md](docs/security-boundaries.md) | Residual security boundaries |
 

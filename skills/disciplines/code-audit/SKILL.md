@@ -54,8 +54,12 @@ git log --since=90.days --format=format: --name-only | sort | uniq -c | sort -rn
 - [ ] Dependency Inversion: dependencies injected, not imported globally
 
 ### Code Style
-- [ ] Functions: 4–20 lines; split if longer
-- [ ] Files: under 300 lines
+- [ ] Functions: 4–20 lines; split if longer — unless splitting would scatter a single cohesive concern
+- [ ] Files: ~300 lines target.  Above 350 is a **smell** — investigate, but don't dogmatically split.  Do NOT split if:
+  - the file guards a single concept and splitting would scatter it (§8 Centralize Don't Scatter)
+  - module-private state (WeakSet, closure) couples functions that would need to share exported internals after splitting
+  - the "overhead" section (imports, re-exports, section banners) accounts for the excess and core logic is within budget
+  When the above apply, the file's size is justified — the smell is acknowledged and the limit does not apply.  Above ~500 lines, reconsider whether the module itself is doing too many things, not just whether it can be split.
 - [ ] Names: specific and unique (grep returns < 5 hits)
 - [ ] No duplication — shared logic extracted (DRY)
 - [ ] Early returns over nested ifs; max 2 levels of indentation
@@ -82,8 +86,13 @@ git log --since=90.days --format=format: --name-only | sort | uniq -c | sort -rn
    - 仅抽取"改一处即全局生效"的重复
 
 3. **长文件**
-   - 超过 ~300 行的文件，检查是否有独立职责可拆出
+   - 超过 ~350 行的文件，检查是否有独立职责可拆出
    - 拆分标准：可独立命名、可独立测试、有明确单一职责
+   - **不拆的情形（满足任一即保留原样，不限行数）：**
+     - 模块私有状态（WeakSet、闭包变量）被多个函数共享，拆分后必须导出 → 打破安全边界
+     - 多个函数共同守卫一个概念（如 request 构造+验证），拆开后概念散落两处 → 违反 §8
+     - 超出部分来自 import/export 声明、section banner 等结构性开销，核心逻辑在大约 300 行以内
+   - 不拆但超过 ~500 行：重新审视模块职责是否过于庞杂，考虑通过重构（而非拆分文件）来简化
 
 4. **模块边界**
    - imports 是否形成单向依赖树（不应有循环引用）

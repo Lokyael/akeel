@@ -10,7 +10,7 @@ If you are still in a restrictive profile (e.g. `plan`), tell the user: "Switch 
 
 ## Process
 
-**Lifecycle:** When starting, update the Task Record in `docs/task.md` or `docs/task-<topic>.md` from `draft` to `in-progress`. After fresh verification and durable documentation updates, set it to `verified` and remove the completed Task Record. Per principles.md Quick Reference — Task Lifecycle. If no Task Record is found, ask: "Where is the Task Record, or what task should be recorded?"
+**Lifecycle:** When starting, update the Task Record in `docs/task.md` or `docs/task-<topic>.md` from `draft` to `in-progress`. After fresh verification and durable documentation updates, set it to `verified` and clear the completed Task Record sections. The file remains as a container for future tasks. Per principles.md Quick Reference — Task Lifecycle. If no Task Record is found, ask: "Where is the Task Record, or what task should be recorded?"
 
 Use `/skill:test-driven-development` where possible, at pre-agreed seams (confirm seams with the user before writing tests).
 
@@ -19,4 +19,4 @@ Run typechecking and tests: single test files while iterating, then the full tes
 Once done, use `/skill:code-audit` to self-review, then `/skill:code-review` for independent review.
 Finally, apply `doc-sync`: verify that project documentation reflects the current code. Fix stale counts, broken references, and outdated architecture descriptions.
 
-Commit code and durable documentation changes to the current branch with meaningful messages. Do not commit completed temporary Task Records unless the user explicitly wants them retained.
+Commit code and durable documentation changes to the current branch with meaningful messages. Clear completed Task Record sections; the file remains as a container for future tasks.

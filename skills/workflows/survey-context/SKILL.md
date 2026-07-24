@@ -47,7 +47,7 @@ Based on the project state:
 - No active task → suggest `brainstorm-design` for a new feature or `plan-writing` for explicit requirements.
 - Task Record is `draft` → suggest the next design, requirements, planning, or debugging skill based on its `Kind`.
 - Task Record is `in-progress` → continue it or ask whether to reassess if its evidence is stale.
-- Task Record is `verified` → apply durable updates, then remove the Task Record.
+- Task Record is `verified` → apply durable updates, then clear the completed Task Record sections.
 - A bug is reported → suggest `bug-investigation`.
 - A load-bearing decision is unresolved → suggest `domain-modeling` or `grill-docs`.
 - No `CONTEXT.md` exists → note that current project knowledge has not yet been centralized.

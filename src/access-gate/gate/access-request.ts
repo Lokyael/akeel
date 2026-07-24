@@ -1,114 +1,51 @@
 import type { CommandClass, CwdCandidate, Effect } from "../command-semantics/types";
 import type { SourceSpan } from "../shell-parse/types";
 import type { DecisionCode, GateEvidence } from "./decision-types";
+import type {
+  AccessOperation,
+  CompleteAccessRequest,
+  CompileResult,
+  PathAccessOperation,
+  PathOperationKind,
+  PathSource,
+  RequestCoverage,
+  ToolSurface,
+} from "./access-request-types";
+import {
+  ANALYSIS_LIMITS,
+  COMMAND_CLASSES,
+  COMPILER_VERSION,
+  EFFECTS,
+  PATH_OPERATIONS,
+  REQUEST_BRAND,
+  TOOL_SURFACES,
+} from "./access-request-types";
 
-export type { DecisionCode, GateEvidence } from "./decision-types";
+// Re-export the public surface from the types module.
+export { ANALYSIS_LIMITS } from "./access-request-types";
+export type {
+  AccessOperation,
+  CommandAccessOperation,
+  CompileResult,
+  CompilerContext,
+  CompleteAccessRequest,
+  DecisionCode,
+  DirectToolCompilerInput,
+  EffectAccessOperation,
+  GateEvidence,
+  PathAccessOperation,
+  PathOperationKind,
+  PathSource,
+  RequestCoverage,
+  ResourceUsage,
+  ShellCompilerInput,
+  ToolSurface,
+} from "./access-request-types";
 
-const COMPILER_VERSION = "access-request/v1";
-const REQUEST_BRAND = Symbol("complete-access-request");
+// ── module-private state ──
 const ISSUED_REQUESTS = new WeakSet<object>();
-export const ANALYSIS_LIMITS = {
-  maxInputLength: 65_536,
-  maxCommands: 128,
-  maxOperations: 1_024,
-  maxCwdCandidates: 256,
-  maxEvidenceSubjectLength: 1_024,
-  maxArgumentLength: 65_536,
-  maxEditEntries: 64,
-} as const;
 
-const TOOL_SURFACES = new Set<ToolSurface>(["bash", "read", "write", "edit", "find", "grep", "ls"]);
-const PATH_OPERATIONS = new Set<PathOperationKind>(["read", "list", "search", "write"]);
-const COMMAND_CLASSES = new Set<CommandClass>(["readOnly", "mutating", "dangerous", "unclassified"]);
-const EFFECTS = new Set<Effect>([
-  "read",
-  "search",
-  "write",
-  "delete",
-  "permissionChange",
-  "execute",
-  "network",
-  "cwdChange",
-]);
-
-export type ToolSurface = "bash" | "read" | "write" | "edit" | "find" | "grep" | "ls";
-export type PathOperationKind = "read" | "list" | "search" | "write";
-export type PathSource = "argument" | "option" | "redirection" | "cwd" | "wrapper";
-
-export interface PathAccessOperation {
-  readonly kind: "path";
-  readonly operation: PathOperationKind;
-  readonly input: string;
-  readonly cwdCandidates: readonly CwdCandidate[];
-  readonly source: PathSource;
-  readonly confidence: "exact" | "conservative";
-  readonly span: SourceSpan;
-}
-
-export interface CommandAccessOperation {
-  readonly kind: "command";
-  readonly origin: "shell" | "direct";
-  readonly commandClass: CommandClass;
-  readonly executable: string | null;
-  readonly effects: readonly Effect[];
-  readonly span: SourceSpan;
-}
-
-export interface EffectAccessOperation {
-  readonly kind: "effect";
-  readonly effect: Effect;
-  readonly confidence: "exact" | "conservative";
-  readonly span: SourceSpan;
-}
-
-export type AccessOperation = PathAccessOperation | CommandAccessOperation | EffectAccessOperation;
-
-export interface RequestCoverage {
-  readonly commandSpans: readonly SourceSpan[];
-  readonly redirectionSpans: readonly SourceSpan[];
-  readonly commandCount: number;
-  readonly pathOperationCount: number;
-  readonly effectOperationCount: number;
-  readonly cwdCandidateCount: number;
-}
-
-export interface ResourceUsage {
-  readonly inputLength: number;
-  readonly commandCount: number;
-  readonly operationCount: number;
-  readonly cwdCandidateCount: number;
-}
-
-export interface CompleteAccessRequest {
-  readonly [REQUEST_BRAND]: true;
-  readonly source: ToolSurface;
-  readonly projectRoot: string;
-  readonly stagingDir: string;
-  readonly operations: readonly AccessOperation[];
-  readonly cwdCandidates: readonly CwdCandidate[];
-  readonly coverage: RequestCoverage;
-  readonly resourceUsage: ResourceUsage;
-  readonly compilerVersion: string;
-}
-
-export type CompileResult =
-  | { readonly kind: "complete"; readonly request: CompleteAccessRequest }
-  | { readonly kind: "reject"; readonly code: DecisionCode; readonly evidence: readonly GateEvidence[] };
-
-export interface CompilerContext {
-  readonly cwd: string;
-  readonly projectRoot: string;
-  readonly stagingDir: string;
-}
-
-export interface ShellCompilerInput extends CompilerContext {
-  readonly command: string;
-}
-
-export interface DirectToolCompilerInput extends CompilerContext {
-  readonly surface: string;
-  readonly args: unknown;
-}
+// ── public api ──
 
 export function reject(code: DecisionCode, subject: string, span?: SourceSpan): CompileResult {
   return {
@@ -117,7 +54,6 @@ export function reject(code: DecisionCode, subject: string, span?: SourceSpan): 
     evidence: [{ kind: evidenceKind(code), subject: String(subject).slice(0, ANALYSIS_LIMITS.maxEvidenceSubjectLength), span }],
   };
 }
-
 
 export function evidenceKind(code: DecisionCode): GateEvidence["kind"] {
   if (code === "dynamic-shell" || code === "unsafe-syntax" || code === "uncertain-cwd") return "syntax";
@@ -210,6 +146,31 @@ export function isCompleteAccessRequest(value: unknown): value is CompleteAccess
   }
 }
 
+export function effectsFor(
+  commandClass: CommandClass,
+  effects: readonly Effect[],
+  intents: readonly { operation: PathOperationKind }[],
+  hasRedirection: boolean,
+): readonly Effect[] {
+  const result = new Set<Effect>(effects);
+  for (const intent of intents) result.add(intent.operation === "list" ? "read" : intent.operation);
+  if (hasRedirection) result.add("write");
+  if (commandClass === "dangerous") result.add("execute");
+  if (commandClass === "mutating" && !["write", "delete", "permissionChange"].some((effect) => result.has(effect as Effect))) {
+    result.add("write");
+  }
+  return [...result];
+}
+
+export function validateEffects(effects: readonly Effect[], span: SourceSpan): CompileResult | null {
+  for (const effect of effects) {
+    if (!EFFECTS.has(effect)) return reject("unknown-effect", effect, span);
+  }
+  return null;
+}
+
+// ── internal helpers ──
+
 function validateCompleteAccessRequest(value: unknown): value is CompleteAccessRequest {
   if (!isRecord(value) || (value as Record<PropertyKey, unknown>)[REQUEST_BRAND] !== true || !ISSUED_REQUESTS.has(value)) return false;
   if (typeof value.source !== "string" || !TOOL_SURFACES.has(value.source as ToolSurface)
@@ -254,29 +215,6 @@ function validateCompleteAccessRequest(value: unknown): value is CompleteAccessR
     && value.cwdCandidates.every((candidate, index) => isSameCandidate(candidate, uniquePathCandidates[index]))
     && coverage.commandSpans.every(isSourceSpan)
     && coverage.redirectionSpans.every(isSourceSpan);
-}
-
-export function effectsFor(
-  commandClass: CommandClass,
-  effects: readonly Effect[],
-  intents: readonly { operation: PathOperationKind }[],
-  hasRedirection: boolean,
-): readonly Effect[] {
-  const result = new Set<Effect>(effects);
-  for (const intent of intents) result.add(intent.operation === "list" ? "read" : intent.operation);
-  if (hasRedirection) result.add("write");
-  if (commandClass === "dangerous") result.add("execute");
-  if (commandClass === "mutating" && !["write", "delete", "permissionChange"].some((effect) => result.has(effect as Effect))) {
-    result.add("write");
-  }
-  return [...result];
-}
-
-export function validateEffects(effects: readonly Effect[], span: SourceSpan): CompileResult | null {
-  for (const effect of effects) {
-    if (!EFFECTS.has(effect)) return reject("unknown-effect", effect, span);
-  }
-  return null;
 }
 
 function cloneSpan(span: SourceSpan): SourceSpan {

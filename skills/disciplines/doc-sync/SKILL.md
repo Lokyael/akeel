@@ -27,7 +27,7 @@ Scan the project root for documentation markers. Common files:
 
 Also scan `CONTEXT.md`, `docs/decisions.md`, `docs/task.md`, and `docs/task-*.md`:
 - A Task Record marked `verified` but durable updates are missing → update `CONTEXT.md` or `docs/decisions.md`
-- A Task Record marked `verified` with no remaining action → remove the Task Record
+- A Task Record marked `verified` with no remaining action → clear the completed Task Record sections
 - A superseded decision without a replacement reference → update its status and link
 
 ### Step 2: Verify Each Against Code
@@ -39,7 +39,7 @@ For each identified doc, verify:
 3. **Commands**: all listed commands still exist
 4. **References**: cross-references to other docs/files resolve
 5. **Examples**: code examples still work with current API
-6. **Task lifecycle**: Task Record status matches reality; verified tasks are either removed or clearly blocked on a durable documentation update
+6. **Task lifecycle**: Task Record status matches reality; verified tasks are either cleared or clearly blocked on a durable documentation update
 
 ### Step 3: Fix or Flag
 
