@@ -1,6 +1,6 @@
 ---
 name: code-cleanup
-description: Use when the user says `clean up` or `整理代码`, or at the end of a development phase — systematic deep cleanup: dead code, duplicate logic, long files, module boundaries, test hygiene, and doc sync.
+description: 'Use when the user says `clean up` or `整理代码`, or at the end of a development phase — systematic deep cleanup: dead code, duplicate logic, long files, module boundaries, test hygiene, and doc sync.'
 ---
 
 # Clean Up Code
