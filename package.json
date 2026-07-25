@@ -13,11 +13,13 @@
     "test:index": "npx tsx tests/access-gate/index.test.ts",
     "test:footer": "npx tsx tests/access-gate/profile-footer.test.ts"
   },
+  "dependencies": {
+    "yaml": "^2.9.0"
+  },
   "devDependencies": {
     "@types/node": "24.12.4",
     "tsx": "4.23.1",
-    "typescript": "5.9.3",
-    "yaml": "^2.9.0"
+    "typescript": "5.9.3"
   },
   "pi": {
     "extensions": [
