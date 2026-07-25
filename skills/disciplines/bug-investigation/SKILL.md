@@ -1,11 +1,12 @@
 ---
 name: bug-investigation
-description: Use when the user reports a bug, something is broken but root cause is unknown, or to start the debugging workflow — explore the codebase, then record a Task Record with reproduction steps, evidence, and hypotheses.
+description: Use when the user asks to investigate, track, or record a bug. Gather evidence, generate hypotheses, and produce a Task Record. For unreproducible bugs, invoke bug-diagnosis first.
 ---
 
 # Investigate Bug
 
-End-to-end bug investigation. Produces a bug Task Record that captures everything needed to fix it.
+End-to-end bug investigation. Produces a bug Task Record that captures
+everything needed to fix it.
 
 ## Process
 
@@ -29,7 +30,15 @@ Look for changes that touch the area of the bug.
 
 ### 3. Reproduce the Bug
 
-Create the smallest possible reproduction. Write it down as exact steps. If you can't reproduce, document what you tried — do not guess.
+Create the smallest possible reproduction. Write it down as exact steps.
+
+If the bug is intermittent, flaky, or hard to reproduce, invoke
+`/skill:bug-diagnosis` to build a feedback loop, then return here.
+If bug-diagnosis reports that loop construction failed, skip to Step 4
+with the note that reproduction is unreliable.
+
+If you can't reproduce and haven't invoked bug-diagnosis, document what
+you tried — do not guess.
 
 ### 4. Gather Evidence
 
@@ -38,9 +47,26 @@ Create the smallest possible reproduction. Write it down as exact steps. If you 
 - State of data before/after failure
 - Working examples for comparison
 
-### 5. Record the Bug Task
+### 5. Generate Hypotheses
 
-Add a precise `T-xxx: <bug-topic>` section to `docs/task.md` or the active `docs/task-<topic>.md` file:
+Before recording, generate 3–5 ranked hypotheses about the likely area of
+the root cause. If only one comes to mind, force at least one alternative —
+the first plausible idea anchors.
+
+For each hypothesis, use the format:
+`[Hypothesis] — falsification test: [how to prove it wrong]`
+
+Example:
+`"Auth module returns null for expired tokens" — falsification test: call
+/auth/verify with an unexpired token; if it still returns null, auth module
+is not the cause.`
+
+Show the ranked list to the user. They often know which to re-rank.
+
+### 6. Record the Bug Task
+
+Add a precise `T-xxx: <bug-topic>` section to `docs/task.md` or the active
+`docs/task-<topic>.md` file:
 
 ```markdown
 ## T-001: [Bug Title]
@@ -91,6 +117,7 @@ Add a precise `T-xxx: <bug-topic>` section to `docs/task.md` or the active `docs
 [To be filled by implement-work]
 ```
 
-### 6. Handoff
+### 7. Handoff
 
-After recording the Task Record, hand off to `systematic-debugging` for root cause analysis.
+After recording the Task Record, hand off to `/skill:systematic-debugging` for
+root cause analysis.

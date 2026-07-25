@@ -84,6 +84,7 @@
       "description": "Read anywhere; write all project files freely; run scripts, interpreters, and build tools without approval. Only destructive operations remain denied.",
       "extends": ["keel-develop"],
       "shellPolicy": {
+        "modify": "allow",
         "execute": "allow"
       }
     }

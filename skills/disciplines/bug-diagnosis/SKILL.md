@@ -1,17 +1,14 @@
 ---
 name: bug-diagnosis
-description: Use when the user says "diagnose", "debug this", or reports something broken/throwing/failing/slow — build a tight feedback loop for hard bugs before investigating. Distinct from systematic-debugging which focuses on root cause analysis.
+description: Use when the user reports a bug that is intermittent, flaky, or environment-specific — no reliable reproduction exists. Build a tight feedback loop before any investigation.
 ---
 
-# Diagnosing Bugs
+# Build a Feedback Loop for Hard Bugs
 
-A discipline for hard bugs. Skip phases only when explicitly justified.
+If you have a tight pass/fail signal for the bug — one that goes red on *this*
+bug — you will find the cause. Without one, staring at code won't save you.
 
-## Phase 1 — Build a Feedback Loop
-
-**This is the skill.** If you have a tight pass/fail signal for the bug — one that goes red on *this* bug — you will find the cause. Without one, staring at code won't save you.
-
-### Ways to Construct One (try in order)
+## Ways to Construct a Loop (try in order)
 
 1. **Failing test** at whatever seam reaches the bug
 2. **Curl / HTTP script** against a running dev server
@@ -23,60 +20,41 @@ A discipline for hard bugs. Skip phases only when explicitly justified.
 8. **Bisection harness** — automate `git bisect run`
 9. **Differential loop** — same input through old vs new version, diff outputs
 
-### Tighten the Loop
+## Tighten the Loop
 
 Once you have *a* loop, tighten it:
 - Make it faster (cache setup, skip unrelated init)
 - Make the signal sharper (assert on specific symptom, not "didn't crash")
 - Make it deterministic (pin time, seed RNG, isolate filesystem)
+- **Minimise the scenario** — shrink inputs, callers, and config to the smallest
+  set that still triggers the bug. This is about removing noise (e.g., cut
+  100-line fixture to 3-line payload), not about sharper assertions. A smaller
+  scenario shrinks the hypothesis space.
 
-### Non-Deterministic Bugs
+## Non-Deterministic Bugs
 
 Goal: higher reproduction rate. Loop 100×, parallelise, add stress, inject sleeps.
 A 50%-flake bug is debuggable; 1% is not — keep raising the rate.
 
-### When You Genuinely Cannot Build a Loop
+## When You Genuinely Cannot Build a Loop
 
-Stop and say so. List what you tried. Ask for: (a) access to reproducing environment, (b) captured artifact, or (c) permission for temporary instrumentation. Do **not** hypothesise without a loop.
+Stop and say so. List what you tried. Ask for: (a) access to reproducing
+environment, (b) captured artifact, or (c) permission for temporary
+instrumentation. Do **not** hypothesise without a loop.
 
-### Completion: A Tight Loop That Goes Red
+When returning to the calling skill, explicitly state: "Feedback loop
+construction failed — options: (a) access to reproducing environment,
+(b) captured trace/log, or (c) permission for temporary instrumentation.
+Proceeding with available evidence only."
 
-Phase 1 is done when you can name **one command** that:
+## Completion
+
+A tight loop is one command that:
 - Drives the actual bug code path and asserts the **user's exact symptom**
 - Is deterministic (same verdict every run)
 - Is fast (seconds, not minutes)
 - Is agent-runnable (unattended)
 
-## Phase 2 — Reproduce + Minimise
-
-Run the loop. Watch it go red. Then minimise: shrink to the smallest scenario that still goes red. Cut inputs, callers, config one at a time.
-
-Why: a minimal repro shrinks the hypothesis space and becomes the clean regression test.
-
-## Phase 3 — Hypothesise
-
-Generate **3–5 ranked hypotheses** before testing any. Single-hypothesis generation anchors on the first plausible idea.
-
-Format: "If `<X>` is the cause, then `<changing Y>` will make the bug disappear / `<changing Z>` will make it worse."
-
-Show the ranked list to the user. They often know which to re-rank.
-
-## Phase 4 — Instrument
-
-Each probe maps to a specific prediction from Phase 3. Change one variable at a time. Use debugger/REPL over logs. Tag every debug log with unique prefix `[DEBUG-a4f2]` for cleanup later.
-
-## Phase 5 — Fix + Regression Test
-
-Write the regression test **before the fix** — but only if there's a correct seam.
-
-If no correct seam exists, **that itself is the finding.** Note it. The architecture is preventing the bug from being locked down.
-
-## Phase 6 — Cleanup + Post-Mortem
-
-- [ ] Original repro no longer reproduces
-- [ ] Regression test passes
-- [ ] All `[DEBUG-...]` instrumentation removed (`grep` the prefix)
-- [ ] Throwaway prototypes deleted
-- [ ] Root cause stated in commit/PR message
-
-**Then ask: what would have prevented this bug?** If architectural change, hand off to `/skill:improve-architecture`.
+When the loop is built, hand off to `/skill:bug-investigation` to document the
+bug, or `/skill:systematic-debugging` for root cause analysis if the bug is
+already well-understood.

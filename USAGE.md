@@ -166,9 +166,18 @@ Pi Keel does not create or manage snapshots and does not register a rollback com
 /skill:implement-work
 ```
 
-### Bug Fix
+### Bug Fix — Simple (clear reproduction)
 
 ```text
+/skill:systematic-debugging
+/skill:test-driven-development
+/skill:fix-validation
+```
+
+### Bug Fix — Hard (intermittent or flaky)
+
+```text
+/skill:bug-diagnosis
 /skill:bug-investigation
 /skill:systematic-debugging
 /skill:test-driven-development

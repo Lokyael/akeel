@@ -18,7 +18,7 @@
 |------|---------|-------------|
 | `src/bootstrap/index.ts` + `principles.md` | obra/superpowers、Karpathy principles | 保留 compaction 后重注入；原则和 Quick Reference 外置到 `principles.md`。 |
 | `src/access-gate/` | pi-permission-system、cc-safety-net、pi-hermes-memory、pi-landstrip（部分为历史参考） | 以 Profile 为唯一 Session 权限状态，统一处理工具、Shell、路径和审批。 |
-| `src/access-gate/profile/` | 原创整合 | Profile 校验、继承、分层加载和内置 Profile 唯一来源。 |
+| `src/access-gate/profile/` | 原创整合 | Profile 校验、继承、分层加载和内置 Profile 唯一来源。keel-build 放行 modify 类命令，与 execute: allow 对等。 |
 | `src/access-gate/shell-parse/` | 原创 | 受限 Shell IR：lexer（引用感知分词）+ parser（控制操作符、重定向、wrapper）|
 | `src/access-gate/command-semantics/` | 原创整合 | 统一命令语义：wrapper 规范化、control-flow、adapter 注册表（filesystem、text-transform、search、read、noop、git、package、build、interpreter）和覆盖层（overrides）|
 | `src/access-gate/path/` | 原创整合 | 统一 `cwd`、`projectRoot`、`stagingDir`、按操作路径决策、blocked paths 和 symlink 检查。 |
@@ -29,8 +29,8 @@
 
 | 技能组 | 主要来源 | 融合方式 |
 |--------|---------|---------|
-| Foundations | Karpathy、obra/superpowers | 行为原则和 evidence-first 注入全会话。 |
-| Engineering disciplines | mattpocock/skills、obra/superpowers、bigpowers | 组合 TDD、review、debugging、security、architecture、planning、validation 等实践。 |
+| Foundations | Karpathy、obra/superpowers | evidence-first 注入全会话。 |
+| Engineering disciplines | mattpocock/skills、obra/superpowers、bigpowers | 组合 TDD、review、debugging、security、architecture、planning、validation 等实践。bug 三技能（diagnosis/investigation/debugging）经边界重构为零重叠管道。 |
 | User workflows | mattpocock/skills、obra/superpowers、bigpowers | 组合设计、grilling、文档审查、架构改进、实现、handoff 和上下文调查。 |
 
 ## 关键融合决策

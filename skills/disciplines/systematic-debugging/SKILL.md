@@ -1,6 +1,6 @@
 ---
 name: systematic-debugging
-description: 'Use when encountering any bug, test failure, or unexpected behavior, before proposing fixes — 4-phase root cause analysis: reproduce → pattern → hypothesis → implementation.'
+description: 'Use for root cause analysis of any technical issue. 4-phase from evidence to fix. Works standalone, or after bug-investigation. If the bug is intermittent, flaky, or cannot be reproduced, use bug-diagnosis first.'
 ---
 
 # Systematic Debugging
@@ -13,9 +13,15 @@ NO FIXES WITHOUT ROOT CAUSE INVESTIGATION FIRST
 
 If you haven't completed Phase 1, you cannot propose fixes.
 
+## Before You Start
+
+If a bug-investigation Task Record exists, start from its evidence and
+hypotheses. Otherwise, gather evidence from scratch.
+
 ## When to Use
 
-Use for ANY technical issue: test failures, bugs, unexpected behavior, performance problems, build failures, integration issues.
+Use for ANY technical issue: test failures, bugs, unexpected behavior,
+performance problems, build failures, integration issues.
 
 **Use ESPECIALLY when:**
 - Under time pressure (emergencies make guessing tempting)
@@ -31,6 +37,8 @@ Use for ANY technical issue: test failures, bugs, unexpected behavior, performan
 
 1. **Read Error Messages Carefully** — Don't skip. They often contain the exact solution.
 2. **Reproduce Consistently** — Can you trigger it reliably? What are exact steps?
+   If the bug is intermittent or flaky, pause and invoke `/skill:bug-diagnosis`
+   to build a feedback loop first, then return here.
 3. **Check Recent Changes** — Git diff, recent commits, new dependencies, config changes.
 4. **Gather Evidence in Multi-Component Systems** — For each boundary, log what enters and exits.
 5. **Trace Data Flow** — Where does the bad value originate? Keep tracing up to the source.
@@ -48,21 +56,46 @@ Find the pattern before fixing:
 
 Scientific method:
 
-1. **Form Single Hypothesis** — "I think X is the root cause because Y." Write it down.
-2. **Test Minimally** — Smallest possible change to test hypothesis. One variable at a time.
+1. **Select or Form Hypothesis:**
+   - If a Task Record exists with ranked hypotheses: select the most promising
+     one. Restate it as a testable prediction: "If [hypothesis] is correct, then
+     [specific change] will [observable effect]."
+   - If no Task Record exists: form a single hypothesis based on available
+     evidence. Before settling, ask: is this the only plausible explanation?
+     If yes, force at least one alternative. The first idea anchors.
+2. **Test Minimally** — Smallest possible change to test hypothesis. One variable
+   at a time. Prefer debugger/REPL over logs. Tag any debug log with a unique
+   prefix like `[DEBUG-a4f2]` for cleanup later.
 3. **Verify Before Continuing** — Did it work? Yes → Phase 4. No → Form NEW hypothesis.
 4. **When You Don't Know** — Say "I don't understand X." Don't pretend.
 
 ### Phase 4: Implementation
 
-Fix the root cause, not the symptom:
+Fix the root cause, not the symptom.
+
+**Before writing the fix, verify:** can you write a failing test for this bug?
+If no testable seam exists after trying at least 2 approaches, stop. That IS
+the finding — the architecture prevents locking down this bug. Hand off to
+`/skill:improve-architecture`.
+
+If a seam exists:
 
 1. **Create Failing Test** — Simplest reproduction. Automated if possible.
 2. **Implement Single Fix** — Address root cause. ONE change. No "while I'm here."
-3. **Verify Fix** — Test passes? No other tests broken?
-4. **If Fix Doesn't Work** — STOP. Count: How many fixes tried?
+3. **Verify Fix** — Test passes? No other tests broken? If yes, continue to step 4.
+   Do NOT declare done yet.
+4. **Clean Up:**
+   - Remove all `[DEBUG-...]` instrumentation (`grep` the prefix to confirm zero matches)
+   - Delete throwaway prototypes and harnesses
+   - For full verification: `/skill:fix-validation`
+   - For broader cleanup: `/skill:code-cleanup`
+5. **Post-Mortem** — Ask: what would have prevented this bug? If the answer is
+   architectural, hand off to `/skill:improve-architecture`.
+6. **If Fix Doesn't Work** — STOP. Count: How many fixes tried?
    - If < 3: Return to Phase 1 with new information.
-   - **If ≥ 3: STOP and question the architecture.** Is this pattern fundamentally sound? Discuss with your human partner before attempting more fixes. This is NOT a failed hypothesis — this is a wrong architecture.
+   - **If ≥ 3: STOP and question the architecture.** Is this pattern fundamentally
+     sound? Discuss with your human partner before attempting more fixes.
+     This is NOT a failed hypothesis — this is a wrong architecture.
 
 ## Red Flags — STOP and Follow Process
 
@@ -92,4 +125,4 @@ If you catch yourself thinking:
 | 1. Root Cause | Read errors, reproduce, check changes, gather evidence | Understand WHAT and WHY |
 | 2. Pattern | Find working examples, compare | Identify differences |
 | 3. Hypothesis | Form theory, test minimally | Confirmed or new hypothesis |
-| 4. Implementation | Create test, fix, verify | Bug resolved, tests pass |
+| 4. Implementation | Create test, fix, verify, clean up, post-mortem | Bug resolved, tests pass, cleanup done |

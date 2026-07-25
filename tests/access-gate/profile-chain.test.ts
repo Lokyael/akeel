@@ -114,12 +114,13 @@ test("keel-develop: inherits query's shellPolicy, overrides write ask→allow, e
 
 // ── branch 2: full trust ──
 
-test("keel-build: inherits develop, overrides execute ask→allow", () => {
+test("keel-build: inherits develop, overrides modify ask→allow and execute ask→allow", () => {
   const p = profiles().profiles["keel-build"];
-  // inspect/modify/unknown: inherited from develop
+  // inspect/unknown: inherited from develop
   assert.equal(p.shellPolicy.inspect, "allow");
-  assert.equal(p.shellPolicy.modify, "ask");
   assert.equal(p.shellPolicy.unknown, "ask");
+  // modify: overridden to allow — git add/commit/push without approval
+  assert.equal(p.shellPolicy.modify, "allow");
   // execute: overridden to allow — full trust for scripts and build tools
   assert.equal(p.shellPolicy.execute, "allow");
   // destroy: inherited — must stay deny
