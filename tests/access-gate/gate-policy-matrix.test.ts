@@ -37,7 +37,7 @@ function profile(overrides?: Partial<ResolvedProfile>): ResolvedProfile {
 
 function complete(result: CompileResult): CompleteAccessRequest {
   assert.equal(result.kind, "complete");
-  return result.request;
+  return result.plan;
 }
 
 test("allows a complete direct read request through the kernel", async () => {

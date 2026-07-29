@@ -1,6 +1,6 @@
 import {
   ANALYSIS_LIMITS,
-  createRequest,
+  createAccessPlan,
   isRecord,
   pathOperation,
   reject,
@@ -9,7 +9,7 @@ import {
   type DirectToolCompilerInput,
   type ToolSurface,
 } from "./access-request";
-import { TOOL_SCHEMAS } from "./tool-schemas";
+import { TOOL_SCHEMAS, type ToolSchema } from "./tool-schemas";
 
 function validateEditEntries(edits: unknown): string | null {
   if (!Array.isArray(edits)) return "edits must be an array";
@@ -105,7 +105,7 @@ export function compileDirectToolCall(input: DirectToolCompilerInput): CompileRe
     span,
   }));
   const operations = [command, ...effectOperations, path];
-  return createRequest(
+  return createAccessPlan(
     input.surface as ToolSurface, operations, state.candidates,
     {
       commandSpans: [span],

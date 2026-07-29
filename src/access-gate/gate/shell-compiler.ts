@@ -8,7 +8,7 @@ import type { ShellRedirectionNode, SourceSpan } from "../shell-parse/types";
 import { runPreflight } from "./preflight";
 import {
   ANALYSIS_LIMITS,
-  createRequest,
+  createAccessPlan,
   effectsFor,
   validateInputLength,
   pathOperation,
@@ -124,7 +124,7 @@ export function compileShellCall(input: ShellCompilerInput): CompileResult {
   }
 
   const cwdCandidates = operations.flatMap((operation) => operation.kind === "path" ? operation.cwdCandidates : []);
-  return createRequest("bash", operations, cwdCandidates, {
+  return createAccessPlan("bash", operations, cwdCandidates, {
     commandSpans,
     redirectionSpans,
     commandCount: commandSpans.length,

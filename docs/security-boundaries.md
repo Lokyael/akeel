@@ -20,7 +20,7 @@
 
 **状态：** by design，部分语法仍未覆盖。
 
-Shell IR 不是完整 Bash 语法树；当前只对简单命令、已知 wrapper、控制操作符、重定向和已支持的字面量参数建模。`for`、`while`、`if`、函数定义等结构化控制流没有对应的安全语义。命令中的动态 token（例如 `$f`、命令替换和未引用 glob）会在 Profile 决策前 hard deny。
+Shell IR 不是完整 Bash 语法树；当前只对简单命令、已知 wrapper、控制操作符、重定向和已支持的字面量参数建模。`for`、`while`、`if`、函数定义等结构化控制流没有对应的安全语义。命令中的动态 token（例如 `$f`、命令替换和未引用 glob）会在 Profile 决策前 hard deny。对于原子文件检查，Direct `read`、`grep`、`find` 和 `ls` 是首选入口；安全可分析的字面 Shell inspect 命令仍可使用。拒绝的 Shell 形式应根据反馈改用 Direct 工具或拆分操作，不应原样重试。
 
 没有动态 token 的未知命令仍可能按 `shellPolicy.unknown` 进入 deny、ask 或 allow，这不代表结构化 Shell 语法已经得到验证。需要批量检查文件时，应使用直接 `read`、`grep`、`find` 或 `ls` tool call；这是受支持的访问入口，不是绕过 Shell gate。
 
@@ -46,13 +46,13 @@ access-gate 只拦截 Pi `tool_call` 事件。`user_bash`（`!`/`!!`）、`shell
 
 deny 决策的 reason 经过 sensitive prefix 脱敏（`~/.ssh`、`/home/`、`.env` 等），subject 被截断到 1,024 字符，reason 总长度 ≤ 2,048。ask 决策仍保留完整 evidence 供用户审批判断。renderer 不做完整 security log scrubbing。
 
-## R-13：Compiler-issued request 真实性
+## R-13：Compiler-issued plan 真实性
 
 **状态：** implemented。
 
-`CompleteAccessRequest` 只能由 compiler 构造器发行；构造器 deep-freeze request 后加入模块私有 WeakSet。Kernel 通过 `isCompleteAccessRequest()` 验证 WeakSet 成员资格、递归冻结、exact coverage correspondence 和 resource budget，拒绝复制或伪造的 request。
+`CompleteAccessPlan` 只能由 compiler 构造器发行；构造器 deep-freeze plan 后交给 `access-plan-verifier.ts` 的模块私有 WeakSet。Kernel 通过 `isCompleteAccessPlan()` 验证 WeakSet 成员资格、递归冻结、exact coverage correspondence 和 resource budget，拒绝复制或伪造的 plan。`CompleteAccessRequest` 与 `isCompleteAccessRequest()` 仅保留为兼容别名。
 
-WeakSet 在进程生命周期内保持，request 不跨调用缓存或持久化。
+WeakSet 在进程生命周期内保持，plan 不跨调用缓存或持久化。
 
 ## R-14：Guidance 注入
 

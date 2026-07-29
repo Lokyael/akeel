@@ -183,14 +183,14 @@
 
 **Status:** active
 
-**Decision:** Access Gate 的 enforcement 分为三层：compiler → Policy Kernel → host adapter。Compiler 只生成 `CompleteAccessRequest`（分析证据）或 structured reject，不接 Profile 或审批。Policy Kernel 只消费 compiler-issued request，验证其 authenticity（WeakSet issuance）后执行封闭 policy evaluation。
+**Decision:** Access Gate 的 enforcement 分为三层：compiler → verifier/Policy Kernel → host adapter。Compiler 只生成经过 brand 和 coverage 证明的 `CompleteAccessPlan`，或带明确 category 的 typed compilation outcome，不接 Profile 或审批。Policy Kernel 只消费 compiler-issued plan，验证其 authenticity（WeakSet issuance）后执行封闭 policy evaluation。
 
 **Why:** 分层保证分析证据（request）和授权结果（GateDecision）不混淆；compiler 可以独立证明 fail-closed 边界，Kernel 可以独立证明 monotonic policy。
 
 **Security invariants:**
 
-- 每个 request 由构造器 defensive-copy、deep-freeze 后加入模块私有 WeakSet，只有 issued request 能通过 `isCompleteAccessRequest()`。
-- Kernel 不接收原始 Shell，不重新计算 hard hazard — 所有 dynamic/unsafe/opaque/threat 在 compiler 阶段已 reject。
+- 每个 plan 由构造器 defensive-copy、deep-freeze 后加入 `access-plan-verifier.ts` 的模块私有 WeakSet，只有 issued plan 能通过 `isCompleteAccessPlan()`。`isCompleteAccessRequest()` 作为兼容别名委托给同一 verifier。
+- Kernel 不接收原始 Shell，也不接收未验证的 plan；compiler outcome 将 dynamic/unsafe/opaque/threat 分为 typed unsupported 或 security category，host renderer 不再通过 DecisionCode 反推 compiler failure kind。
 - coverage 必须逐项对应：command/redirection/effect span 与 operation、顶层 cwd candidates 与 path candidates 去重集合。
 - Effect policy axis 是封闭映射：`read/search/write/delete/permissionChange/cwdChange → path`，`execute/network → shell`。
 
@@ -198,7 +198,7 @@
 
 **Status:** active
 
-**Decision:** 拒绝结果的 guidance 只能引用源码内置的静态 `GuidanceId` catalog，不能拼接可执行 Shell、原始 glob 或用户输入。`renderDecision()` 将 `GateDecision` 转为 Pi host `GateResult` 时执行 evidence redact 和长度预算。
+**Decision:** 拒绝结果的 guidance 只能引用源码内置的静态 `GuidanceId` catalog，不能拼接可执行 Shell、原始 glob 或用户输入。`renderDecision()` 处理 Policy Kernel 的 `GateDecision`，`renderCompilationFailure()` 处理 typed compiler outcome；两者都执行 evidence redact 和长度预算。
 
 **Why:** guidance 不能成为间接 code injection 通道；blocked path/threat 不提供绕过建议；evidence 脱敏防止拒绝原因泄露敏感路径。
 
@@ -209,6 +209,8 @@
 | `dynamic-shell` | `batch-inspection-tools` |
 | `opaque-command` | `literal-command-or-direct-tool` |
 | `unsafe-syntax` | `split-supported-commands` |
+| `unsupported-redirection` | `split-supported-commands` |
+| `uncertain-cwd` | `literal-command-or-direct-tool` |
 | `shell-policy-denied` | `profile-restriction` |
 | 其他 deny code | 无（避免诱导绕过）|
 
@@ -219,6 +221,7 @@
 **Status:** active
 
 **Decision:** 不将内置 adapter 的分类规则迁移到声明式文件。改为提供轻量 `command-overrides.yaml`，作为 Shell 命令和 Direct 工具的**统一扩展入口**，支持三种操作：别名映射、新命令定义和分类微调。
+
 
 **Why:**
 - Shell adapter 的分类、路径提取和效果推断共享同一趟参数解析——三者是同一个分析的输出，不是可拆分的"数据"和"逻辑"。强行拆分会造成 YAML 和 TS 描述同一命令的双源真理问题。
@@ -269,3 +272,17 @@ reclassify:
 
 **已知局限：**
 - `reclassify` 的子命令提取（`fullSubcommand`）不跳过取值选项的值。例如 `cargo --manifest-path Cargo.toml build` 产生的子命令是 `"Cargo.toml build"` 而非 `"build"`。这是因为 `fullSubcommand` 不依赖 per-adapter 的 `valueOpts` 配置。实际影响极小：reclassify 的 pattern 使用 substring 匹配（`"build"` 而非 `"^build$"`），且典型场景（如 git 子命令重分类）不存在此问题。详见 `overrides.ts` 中 `fullSubcommand` 的注释。
+
+## D-025: Direct 优先与 Shell 安全子集
+
+**Status:** active
+
+**Decision:** 文件检查场景优先选择 Direct `read`、`grep`、`find`、`ls` 工具，但不因为存在 Direct 等价入口而全局禁用 Shell 命令。字面且能完成路径和效果分析的 Shell inspect 命令继续经过 Profile 和 PathPolicy；只有无法安全建模的 Shell 语法以及明确的安全风险才 hard deny。
+
+**Why:** Direct 工具提供结构化参数和更窄的访问面，适合作为模型默认选择；Shell 仍承载 pipeline、命令特有选项和组合语义。按命令名禁用会把工具选择问题错误地变成能力禁止，并破坏合法的组合操作。
+
+**Deny feedback:** dynamic、unsafe、opaque 和 unsupported 语法的拒绝必须说明“当前 Shell 形式不能批准”，并指向 Direct 工具或更简单的字面命令。threat、blocked path、symlink escape、destroy 和 hard command rule 等不可覆盖边界必须说明不可绕过，不能提供替代执行建议。两类 guidance 都只能使用静态 catalog 文本。compiler outcome 使用封闭 category，并直接进入 host renderer；不通过 DecisionCode 反推失败类型。
+
+**Rejected:** 不采用“Direct 存在即禁用 Shell”等价命令；不把 Direct 工具作为 Shell gate 的绕过路径；不在本决策中实现 Shell glob 的安全展开。
+
+**Current implementation:** Direct-first 当前是 `principles.md` 中的模型工具选择偏好，不是 host 层自动路由或 Policy Kernel 的强制优先级。安全可分析的字面 Shell 仍然允许。compiler 使用 `CompilationCategory` 和 category-specific code union 区分 unsupported form、security block 和 invalid request；完整计划由 `access-plan-verifier.ts` 验证。

@@ -5,8 +5,8 @@ import type { DecisionCode, GateEvidence } from "./decision-types";
 export type { DecisionCode, GateEvidence } from "./decision-types";
 
 // ── compiler identity ──
-export const COMPILER_VERSION = "access-request/v1";
-export const REQUEST_BRAND = Symbol("complete-access-request");
+export const COMPILER_VERSION = "access-plan/v2";
+export const REQUEST_BRAND = Symbol("complete-access-plan");
 
 // ── analysis budgets ──
 export const ANALYSIS_LIMITS = {
@@ -67,7 +67,7 @@ export interface EffectAccessOperation {
 
 export type AccessOperation = PathAccessOperation | CommandAccessOperation | EffectAccessOperation;
 
-export interface RequestCoverage {
+export interface PlanCoverage {
   readonly commandSpans: readonly SourceSpan[];
   readonly redirectionSpans: readonly SourceSpan[];
   readonly commandCount: number;
@@ -76,6 +76,9 @@ export interface RequestCoverage {
   readonly cwdCandidateCount: number;
 }
 
+/** @deprecated Use PlanCoverage in new code. */
+export type RequestCoverage = PlanCoverage;
+
 export interface ResourceUsage {
   readonly inputLength: number;
   readonly commandCount: number;
@@ -83,21 +86,46 @@ export interface ResourceUsage {
   readonly cwdCandidateCount: number;
 }
 
-export interface CompleteAccessRequest {
+export interface CompleteAccessPlan {
   readonly [REQUEST_BRAND]: true;
   readonly source: ToolSurface;
   readonly projectRoot: string;
   readonly stagingDir: string;
   readonly operations: readonly AccessOperation[];
+  readonly commands: readonly CommandAccessOperation[];
+  readonly paths: readonly PathAccessOperation[];
+  readonly effects: readonly EffectAccessOperation[];
   readonly cwdCandidates: readonly CwdCandidate[];
-  readonly coverage: RequestCoverage;
+  readonly coverage: PlanCoverage;
   readonly resourceUsage: ResourceUsage;
   readonly compilerVersion: string;
 }
 
+/** @deprecated Use CompleteAccessPlan in new code. */
+export type CompleteAccessRequest = CompleteAccessPlan;
+
+export type CompilationCategory = "unsupported-form" | "security-block" | "invalid-request";
+
+export type SecurityCompilationCode =
+  | "threat"
+  | "hard-command-rule"
+  | "destroy-command"
+  | "blocked-path"
+  | "symlink-escape"
+  | "path-unclassifiable";
+
+export type InvalidCompilationCode = "unknown-tool" | "invalid-tool-input" | "resource-limit";
+export type CompilerDecisionCode = Exclude<DecisionCode, "path-denied" | "shell-policy-denied" | "approval-required" | "user-denied">;
+export type UnsupportedCompilationCode = Exclude<CompilerDecisionCode, SecurityCompilationCode | InvalidCompilationCode>;
+
+export type CompilationReject =
+  | { readonly kind: "reject"; readonly category: "security-block"; readonly code: SecurityCompilationCode; readonly evidence: readonly GateEvidence[] }
+  | { readonly kind: "reject"; readonly category: "invalid-request"; readonly code: InvalidCompilationCode; readonly evidence: readonly GateEvidence[] }
+  | { readonly kind: "reject"; readonly category: "unsupported-form"; readonly code: UnsupportedCompilationCode; readonly evidence: readonly GateEvidence[] };
+
 export type CompileResult =
-  | { readonly kind: "complete"; readonly request: CompleteAccessRequest }
-  | { readonly kind: "reject"; readonly code: DecisionCode; readonly evidence: readonly GateEvidence[] };
+  | { readonly kind: "complete"; readonly plan: CompleteAccessPlan }
+  | CompilationReject;
 
 export interface CompilerContext {
   readonly cwd: string;

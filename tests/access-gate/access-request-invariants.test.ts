@@ -28,7 +28,7 @@ function profile(): ResolvedProfile {
 
 function complete(result: CompileResult) {
   assert.equal(result.kind, "complete");
-  return result.request;
+  return result.plan;
 }
 
 function disposition(decision: GateDecision): string {

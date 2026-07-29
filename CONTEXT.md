@@ -4,19 +4,20 @@
 
 - **Profile**：当前 Session 唯一的访问策略入口，组合 Shell 决策、路径规则和审批行为。
 - **Access Gate**：拦截 Pi `tool_call` 并执行 compiler → Policy Kernel → guidance renderer → host adapter 的统一策略层。
-- **CompleteAccessRequest**：compiler 产出的不可变、可验证的访问证据；不包含 allow/deny 等授权结果。
-- **Policy Kernel**：消费 `CompleteAccessRequest` 和 `Profile`，产出结构化 `GateDecision`；不依赖原始 Shell。
+- **CompleteAccessPlan**：compiler 产出的不可变、可验证的访问计划；不包含 allow/deny 等授权结果。`CompleteAccessRequest` 是兼容别名。
+- **Policy Kernel**：消费经过 verifier 验证的 `CompleteAccessPlan` 和 `Profile`，产出结构化 `GateDecision`；不依赖原始 Shell。
 - **GateDecision**：`allow | ask | deny(hard/profile/user)` 的封闭决策类型；每个 deny 附带稳定 `DecisionCode`。
 - **Guidance**：从 `DecisionCode` 到静态 `GuidanceId` 的封闭映射，不携带可执行 Shell。
 - **Task Record**：具有目标、范围、验收和验证边界的短期任务，使用 `T-xxx` 标识。
 - **Decision**：需要长期保留的架构、领域或安全取舍，记录在 [`docs/decisions.md`](docs/decisions.md)。
+- **Direct-first**：文件检查优先使用 Direct `read`、`grep`、`find`、`ls`；安全可分析的字面 Shell 仍可使用，Gate 不因存在 Direct 等价入口而自动拒绝 Shell。
 
 ## Architecture
 
 - `src/bootstrap/` 在 Session 启动和 compaction 后注入工程原则。
 - `src/access-gate/` 统一处理 Profile、Shell IR、命令语义、路径策略、Gate、Session 状态和 Footer。
 - `shell-parse/` 输出受限 Shell IR；`command-semantics/` 提取命令类别、路径意图、效果和 cwd 转换。
-- `gate/` 编译器将 Shell IR 和 Direct tool 参数转换为 `CompleteAccessRequest`，Policy Kernel 根据 Profile 产出 `GateDecision`，renderer 将决策转为带 guidance 的 host 兼容结果。
+- `gate/` 编译器将 Shell IR 和 Direct tool 参数转换为 `CompleteAccessPlan`；compiler outcome 另外区分 unsupported form、security block 和 invalid request。Policy Kernel 只消费经过 verifier 验证的 plan，产出 `GateDecision`，renderer 将决策转为 host 兼容结果。
 - Direct tool（`read`、`write`、`edit`、`find`、`grep`、`ls`）和 Shell 命令经过各自的 compiler 后进入同一 Policy Kernel。
 - 用户项目运行时文档入口为 `CONTEXT.md`、`docs/decisions.md` 和 `docs/task.md`。
 
@@ -42,6 +43,7 @@
 - [D-022 Compiler-Kernel 分层与请求真实性](docs/decisions.md#d-022-compiler-kernel-分层与请求真实性)
 - [D-023 拒绝解释与静态 Guidance](docs/decisions.md#d-023-拒绝解释与静态-guidance)
 - [D-024 命令覆盖层](docs/decisions.md#d-024-命令覆盖层)
+- [D-025 Direct 优先与 Shell 安全子集](docs/decisions.md#d-025-direct-优先与-shell-安全子集)
 
 ## Negative Space
 

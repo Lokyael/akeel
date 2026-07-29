@@ -1,5 +1,6 @@
-import { guidanceFor, guidanceText } from "./guidance-catalog";
-import type { GateDecision } from "./decision-types";
+import { denyResponseKindFor, guidanceFor, guidanceText } from "./guidance-catalog";
+import type { CompileResult } from "./access-request";
+import type { GateDecision, Guidance } from "./decision-types";
 import type { GateResult } from "./types";
 
 const MAX_RENDERED_REASON = 2_048;
@@ -24,6 +25,30 @@ function redactSubject(subject: string): string {
   return subject.slice(0, 1_024);
 }
 
+function renderGuidance(guidance: readonly Guidance[]): string {
+  return guidance.map((item) => guidanceText(item.id)).join("; ");
+}
+
+export function renderCompilationFailure(result: Extract<CompileResult, { kind: "reject" }>): GateResult {
+  const head = result.evidence[0];
+  const subject = head ? redactSubject(head.subject) : "request denied";
+  const guidance = result.category === "unsupported-form" ? guidanceFor(result.code) : [];
+  let reason: string;
+
+  if (result.category === "security-block") {
+    reason = "This operation is blocked by a non-overridable security boundary. Do not retry or bypass it.";
+  } else if (result.category === "unsupported-form") {
+    reason = "This Shell form cannot be approved as written.";
+    if (guidance.length > 0) reason += " " + renderGuidance(guidance);
+  } else {
+    reason = "This tool request could not be analyzed in its current form. Correct the input and try again.";
+    if (guidance.length > 0) reason += " " + renderGuidance(guidance);
+  }
+
+  if (subject !== "request denied") reason += " Affected operation: " + subject + ".";
+  return { kind: "block", reason: reason.slice(0, MAX_RENDERED_REASON), code: result.code };
+}
+
 export function renderDecision(decision: GateDecision): GateResult {
   if (decision.disposition === "allow") return { kind: "allow" };
 
@@ -35,23 +60,30 @@ export function renderDecision(decision: GateDecision): GateResult {
     return { kind: "block", reason: reason.slice(0, MAX_RENDERED_REASON), code: decision.code };
   }
 
-  const head = decision.evidence[0];
-  const subject = head ? redactSubject(head.subject) : "request denied";
-  const g = decision.guidance ?? guidanceFor(decision.code);
-  const enf = (decision as { enforcement?: string }).enforcement;
+  const subject = decision.evidence[0] ? redactSubject(decision.evidence[0].subject) : "request denied";
+  const guidance = decision.guidance ?? guidanceFor(decision.code);
   let reason: string;
 
-  if (enf === "hard") {
-    reason = "HARD_BLOCK: " + decision.code + " - " + subject;
-    if (g.length > 0) reason += " | Guidance: " + g.map((x) => x.id + ": " + guidanceText(x.id)).join("; ");
-    reason += " | Permanently blocked for security reasons. Do not retry or work around.";
-  } else if (enf === "profile") {
-    reason = "PROFILE_BLOCK: " + decision.code + " - " + subject;
-    if (g.length > 0) reason += " | Guidance: " + g.map((x) => x.id + ": " + guidanceText(x.id)).join("; ");
-    reason += " | Not allowed by active Profile. Suggest /profile keel-code or /profile keel-develop.";
+  if (decision.enforcement === "hard") {
+    const responseKind = denyResponseKindFor(decision.code);
+    reason = responseKind === "security-boundary"
+      ? "This operation is blocked by a non-overridable security boundary."
+      : responseKind === "shell-form"
+        ? "This Shell form cannot be approved as written."
+        : "This request cannot be approved in its current form.";
+    if (guidance.length > 0) reason += " " + renderGuidance(guidance);
+    reason += responseKind === "security-boundary"
+      ? " Do not retry or bypass it."
+      : responseKind === "shell-form"
+        ? " Use a different entry point or a simpler literal command."
+        : " Correct the request and try again.";
+  } else if (decision.enforcement === "profile") {
+    reason = "This request is not allowed by the active Profile.";
+    if (guidance.length > 0) reason += " " + renderGuidance(guidance);
+    else reason += " Use an allowed Profile or wait for approval.";
   } else {
-    reason = "USER_BLOCK: " + decision.code + " - " + subject;
-    reason += " | User declined. Wait for alternative instructions.";
+    reason = "The user declined this operation. Wait for alternative instructions.";
   }
+  if (subject !== "request denied" && decision.enforcement !== "user") reason += " Affected operation: " + subject + ".";
   return { kind: "block", reason: reason.slice(0, MAX_RENDERED_REASON), code: decision.code };
 }

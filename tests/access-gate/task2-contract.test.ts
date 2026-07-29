@@ -152,9 +152,9 @@ test("records coverage and resource usage for a complete request", () => {
   try {
     const result = compileShellCall({ ...env, command: "cat file > output" });
     assert.equal(result.kind, "complete");
-    assert.equal(result.request.coverage.commandCount, 1);
-    assert.equal(result.request.coverage.pathOperationCount, 2);
-    assert.equal(result.request.resourceUsage.operationCount, result.request.operations.length);
+    assert.equal(result.plan.coverage.commandCount, 1);
+    assert.equal(result.plan.coverage.pathOperationCount, 2);
+    assert.equal(result.plan.resourceUsage.operationCount, result.plan.operations.length);
   } finally {
     env.cleanup();
   }

@@ -1,7 +1,8 @@
 import { decidePath, resolvePath } from "../path";
 import { PATH_DENY_REASONS } from "../path/policy";
 import type { ResolvedProfile } from "../profile/types";
-import { isCompleteAccessRequest, type CommandAccessOperation, type CompleteAccessRequest, type PathAccessOperation } from "./access-request";
+import { isCompleteAccessPlan } from "./access-plan-verifier";
+import { type CommandAccessOperation, type CompleteAccessPlan, type PathAccessOperation } from "./access-request";
 import type { GateRuntime } from "./types";
 import type { GateDecision, GateEvidence, HardDenyCode } from "./decision-types";
 import { DecisionBuilder } from "./decision-builder";
@@ -20,47 +21,45 @@ const EFFECT_POLICY_AXIS: Readonly<Record<Effect, "path" | "shell">> = {
 };
 
 export async function evaluateRequest(
-  request: CompleteAccessRequest,
+  plan: CompleteAccessPlan,
   profile: ResolvedProfile,
   _runtime: GateRuntime,
 ): Promise<GateDecision> {
-  if (!isCompleteAccessRequest(request)) {
-    return DecisionBuilder.hard("invalid-tool-input", "request is not a compiler-issued CompleteAccessRequest");
+  if (!isCompleteAccessPlan(plan)) {
+    return DecisionBuilder.hard("invalid-tool-input", "plan is not a compiler-issued CompleteAccessPlan");
   }
 
   const asks: GateEvidence[] = [];
   let profileDeny: GateDecision | null = null;
 
-  for (const operation of request.operations) {
-    if (operation.kind === "command") {
-      const shellOnlyEffect = operation.origin === "direct"
-        ? operation.effects.find((effect) => EFFECT_POLICY_AXIS[effect] === "shell")
-        : undefined;
-      if (shellOnlyEffect) {
-        return DecisionBuilder.hard("unknown-effect", `Direct tool cannot produce ${shellOnlyEffect}`, operation.span);
-      }
-      if (operation.commandClass === "destroy") {
-        return DecisionBuilder.hard("destroy-command", `${operation.commandClass} command: ${operation.executable ?? "?"}`, operation.span);
-      }
-      // Direct tools bypass Shell policy — their effects are checked by the
-      // EFFECT_POLICY_AXIS (shell-only effects like execute/network are hard-denied
-      // for Direct tools above).  cd is a Shell-only builtin whose list path
-      // operation is handled by the path loop below.
-      if (operation.origin === "direct" || operation.executable === "cd") continue;
-      const decision = profile.shellPolicy[operation.commandClass];
-      const evidence = [commandEvidence(operation)];
-      if (decision === "deny" && !profileDeny) {
-        profileDeny = DecisionBuilder.profile("shell-policy-denied", evidence[0]!.subject);
-      } else if (decision === "ask") {
-        asks.push(...evidence);
-      }
-      continue;
+  for (const operation of plan.commands) {
+    const shellOnlyEffect = operation.origin === "direct"
+      ? operation.effects.find((effect) => EFFECT_POLICY_AXIS[effect] === "shell")
+      : undefined;
+    if (shellOnlyEffect) {
+      return DecisionBuilder.hard("unknown-effect", `Direct tool cannot produce ${shellOnlyEffect}`, operation.span);
     }
+    if (operation.commandClass === "destroy") {
+      return DecisionBuilder.hard("destroy-command", `${operation.commandClass} command: ${operation.executable ?? "?"}`, operation.span);
+    }
+    // Direct tools bypass Shell policy — their effects are checked by the
+    // EFFECT_POLICY_AXIS (shell-only effects like execute/network are hard-denied
+    // for Direct tools above). cd is a Shell-only builtin whose list path
+    // operation is handled by the path loop below.
+    if (operation.origin === "direct" || operation.executable === "cd") continue;
+    const decision = profile.shellPolicy[operation.commandClass];
+    const evidence = [commandEvidence(operation)];
+    if (decision === "deny" && !profileDeny) {
+      profileDeny = DecisionBuilder.profile("shell-policy-denied", evidence[0]!.subject);
+    } else if (decision === "ask") {
+      asks.push(...evidence);
+    }
+  }
 
-    if (operation.kind !== "path") continue;
+  for (const operation of plan.paths) {
     if (operation.source === "redirection" && operation.input === "/dev/null") continue;
     for (const candidate of operation.cwdCandidates) {
-      const resolved = resolvePath(candidate.cwd, request.projectRoot, request.stagingDir, operation.input);
+      const resolved = resolvePath(candidate.cwd, plan.projectRoot, plan.stagingDir, operation.input);
       const decision = decidePath(resolved, profile, operation.operation);
       const evidence = [pathEvidence(operation, candidate.cwd)];
       if (decision.decision === "deny") {

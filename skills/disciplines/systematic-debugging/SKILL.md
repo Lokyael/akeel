@@ -1,6 +1,6 @@
 ---
 name: systematic-debugging
-description: 'Use for root cause analysis of any technical issue. 4-phase from evidence to fix. Works standalone, or after bug-investigation. If the bug is intermittent, flaky, or cannot be reproduced, use bug-diagnosis first.'
+description: Use when performing root cause analysis of any technical issue. 4-phase from evidence to fix. Works standalone, or after bug-investigation. If the bug is intermittent, flaky, or cannot be reproduced, use bug-diagnosis first.
 ---
 
 # Systematic Debugging

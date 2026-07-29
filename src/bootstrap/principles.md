@@ -58,6 +58,17 @@ For multi-step tasks, state a plan:
 2. [Step] → verify: [check]
 ```
 
+### 4a. Direct Tools Before Shell
+
+For filesystem inspection, prefer Direct `read`, `grep`, `find`, and `ls` tool
+calls because their structured arguments make the intended path and operation
+explicit. Use Shell when composition, command-specific semantics, or output
+formatting is required. Avoid Shell expansion such as variables, command
+substitution, and unquoted globs. The Access Gate decides whether a Shell
+command can be handled; do not inspect its internals or retry a rejected Shell
+form unchanged. Follow the returned guidance and use a Direct tool or a simpler
+operation when advised.
+
 ### 5. Verify Before Claiming
 
 *Evidence before assertions, always.*

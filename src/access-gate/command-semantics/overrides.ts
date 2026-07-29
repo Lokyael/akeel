@@ -10,6 +10,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { parse as parseYaml } from "yaml";
 import type { CommandClass, CommandSemantics, Effect } from "./types";
+import type { ShellArg } from "../shell-parse/types";
 import { makeSemantics } from "./adapters/shared";
 
 // ─── 类型 ───
@@ -122,7 +123,7 @@ export function resetOverrides(): void {
 /**
  * 提取第一个非选项参数（用于子命令分发）。
  */
-function firstSubcommand(args: ReadonlyArray<{ value?: string }>): string {
+function firstSubcommand(args: ReadonlyArray<{ value?: string | null }>): string {
   for (const arg of args) {
     const v = arg.value ?? "";
     if (v === "--") return "";
@@ -141,7 +142,7 @@ function firstSubcommand(args: ReadonlyArray<{ value?: string }>): string {
  * reclassify 的 pattern 使用 substring 匹配（如 "build" 而非 "^build$"），
  * 典型场景（git 子命令）无此问题。详见 D-024。
  */
-function fullSubcommand(args: ReadonlyArray<{ value?: string }>): string {
+function fullSubcommand(args: ReadonlyArray<{ value?: string | null }>): string {
   const parts: string[] = [];
   let started = false;
   for (const arg of args) {
@@ -160,7 +161,7 @@ function fullSubcommand(args: ReadonlyArray<{ value?: string }>): string {
  */
 export function applyCommandDef(
   def: CommandDef,
-  args: ReadonlyArray<{ value?: string }>,
+  args: ReadonlyArray<{ value?: string | null }>,
   commandName: string,
 ): CommandSemantics {
   // 无子命令定义 → 直接返回基类
@@ -198,7 +199,7 @@ export function applyReclassify(
   rules: readonly ReclassifyEntry[],
   originalName: string,
   resolvedName: string,
-  args: ReadonlyArray<{ value?: string }>,
+  args: ReadonlyArray<{ value?: string | null }>,
 ): CommandClass | null {
   const subcmd = fullSubcommand(args);
   const names = originalName === resolvedName ? [originalName] : [originalName, resolvedName];
@@ -220,9 +221,9 @@ export function applyReclassify(
  * 使 adapter 按目标命令的规则进行分析。
  */
 export function aliasNode(
-  executable: { value?: string; span: { start: number; end: number }; quoted: boolean; raw: string } | null,
+  executable: ShellArg | null,
   targetName: string,
-): typeof executable {
-  if (!executable) return { value: targetName, span: { start: 0, end: 0 }, quoted: false, raw: targetName };
+): ShellArg | null {
+  if (!executable) return { value: targetName, dynamic: false, span: { start: 0, end: 0 }, quoted: false, raw: targetName };
   return { ...executable, value: targetName };
 }

@@ -3,9 +3,10 @@ import test from "node:test";
 import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { renderDecision } from "../../src/access-gate/gate/render-decision";
-import { guidanceFor, guidanceText } from "../../src/access-gate/gate/guidance-catalog";
-import type { GateDecision, GateEvidence, GuidanceId } from "../../src/access-gate/gate/decision-types";
+import { renderCompilationFailure, renderDecision } from "../../src/access-gate/gate/render-decision";
+import { denyResponseKindFor, guidanceFor, guidanceText } from "../../src/access-gate/gate/guidance-catalog";
+import type { DenyResponseKind } from "../../src/access-gate/gate/guidance-catalog";
+import type { GateDecision, GateEvidence, GuidanceId, DecisionCode } from "../../src/access-gate/gate/decision-types";
 
 const evidence: GateEvidence[] = [{ kind: "syntax", subject: "~/sensitive/path" }];
 
@@ -30,12 +31,14 @@ test("path-denied and invalid-tool-input map to profile/tool guidance", () => {
   assert.equal(guidanceFor("unknown-tool")[0]?.id, "literal-command-or-direct-tool");
   // resource-limit → split-supported-commands
   assert.equal(guidanceFor("resource-limit")[0]?.id, "split-supported-commands");
-  // destroy-command and hard-command-rule have no guidance (security-sensitive)
+  // unsupported redirections and uncertain cwd use recovery guidance rather than security bypass text
+  assert.equal(guidanceFor("unsupported-redirection")[0]?.id, "split-supported-commands");
+  assert.equal(guidanceFor("uncertain-cwd")[0]?.id, "literal-command-or-direct-tool");
   assert.deepEqual(guidanceFor("destroy-command"), []);
   assert.deepEqual(guidanceFor("hard-command-rule"), []);
 });
 
-test("hard deny renderer includes guidance text in the reason", () => {
+test("hard deny renderer explains that unsupported Shell forms need a different entry point", () => {
   const decision: GateDecision = {
     disposition: "deny",
     code: "dynamic-shell",
@@ -46,7 +49,26 @@ test("hard deny renderer includes guidance text in the reason", () => {
   const result = renderDecision(decision);
   assert.equal(result.kind, "block");
   assert.equal(result.code, "dynamic-shell");
-  assert.ok(result.reason.includes("batch-inspection-tools"));
+  assert.ok(result.reason.includes("Shell form cannot be approved"));
+  assert.ok(result.reason.includes("Direct"));
+  assert.equal(result.reason.includes("batch-inspection-tools"), false);
+  assert.equal(result.reason.includes("Permanently blocked"), false);
+  assert.equal(result.reason.includes("work around"), false);
+});
+
+test("hard security deny explains that the boundary cannot be bypassed", () => {
+  const decision: GateDecision = {
+    disposition: "deny",
+    code: "threat",
+    enforcement: "hard",
+    evidence: [{ kind: "threat", subject: "remote content" }],
+    guidance: guidanceFor("threat"),
+  };
+  const result = renderDecision(decision);
+  assert.equal(result.kind, "block");
+  assert.ok(result.reason.includes("non-overridable security boundary"));
+  assert.ok(result.reason.includes("Do not retry or bypass"));
+  assert.equal(result.reason.includes("Direct"), false);
 });
 
 test("renderer does not embed raw evidence paths when security-sensitive", () => {
@@ -96,14 +118,63 @@ test("renderer bounds evidence subject count and total reason length", () => {
   const result = renderDecision(deny);
   assert.equal(result.kind, "block");
   assert.ok(result.reason.length <= 2_048);
-  assert.ok(result.reason.includes("PROFILE_BLOCK"));
-  // path-denied now carries profile-restriction guidance
-  assert.ok(result.reason.includes("profile-restriction") || result.reason.includes("PROFILE_BLOCK"));
+  assert.equal(result.reason.includes("This operation is not allowed by the active Profile"), true);
+  assert.equal(result.reason.includes("PROFILE_BLOCK"), false);
+  assert.equal(result.reason.includes("profile-restriction"), false);
+});
+
+test("renders compiler outcomes by category without internal identifiers", () => {
+  const unsupported = renderCompilationFailure({
+    kind: "reject",
+    category: "unsupported-form",
+    code: "dynamic-shell",
+    evidence,
+  });
+  const security = renderCompilationFailure({
+    kind: "reject",
+    category: "security-block",
+    code: "threat",
+    evidence: [{ kind: "threat", subject: "remote content" }],
+  });
+  const invalid = renderCompilationFailure({
+    kind: "reject",
+    category: "invalid-request",
+    code: "invalid-tool-input",
+    evidence,
+  });
+
+  assert.equal(unsupported.kind, "block");
+  assert.ok(unsupported.reason.includes("Direct"));
+  assert.equal(unsupported.reason.includes("dynamic-shell"), false);
+  assert.equal(security.kind, "block");
+  assert.ok(security.reason.includes("non-overridable security boundary"));
+  assert.equal(security.reason.includes("Direct"), false);
+  assert.equal(invalid.kind, "block");
+  assert.ok(invalid.reason.includes("could not be analyzed"));
+});
+
+test("classifies every DecisionCode into one renderer response kind", () => {
+  const codes: readonly DecisionCode[] = [
+    "dynamic-shell", "unsafe-syntax", "threat", "opaque-command", "destroy-command",
+    "hard-command-rule", "blocked-path", "symlink-escape", "path-unclassifiable", "path-denied",
+    "shell-policy-denied", "approval-required", "user-denied", "unknown-tool", "invalid-tool-input",
+    "unsupported-redirection", "uncertain-cwd", "unknown-effect", "resource-limit",
+  ];
+  const expected: Record<DecisionCode, DenyResponseKind> = {
+    "dynamic-shell": "shell-form", "unsafe-syntax": "shell-form", threat: "security-boundary",
+    "opaque-command": "shell-form", "destroy-command": "security-boundary", "hard-command-rule": "security-boundary",
+    "blocked-path": "security-boundary", "symlink-escape": "security-boundary", "path-unclassifiable": "security-boundary",
+    "path-denied": "generic", "shell-policy-denied": "generic", "approval-required": "generic", "user-denied": "generic",
+    "unknown-tool": "generic", "invalid-tool-input": "generic", "unsupported-redirection": "shell-form",
+    "uncertain-cwd": "shell-form", "unknown-effect": "generic", "resource-limit": "generic",
+  };
+  for (const code of codes) assert.equal(denyResponseKindFor(code), expected[code]);
 });
 
 test("allow decision renders as allow", () => {
   assert.deepEqual(renderDecision({ disposition: "allow" }), { kind: "allow" });
 });
+
 
 test("every GuidanceId maps to a non-empty text", () => {
   const ids: GuidanceId[] = [

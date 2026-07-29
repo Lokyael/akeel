@@ -268,5 +268,6 @@ test("denies opaque command semantics even when unknown commands are allowed", a
   const result = await evaluateBash("git unknown-subcommand", activeProfile, "Allow once");
   assert.equal(result.kind, "block");
   assert.equal(result.code, "opaque-command");
-  assert.ok(result.reason.includes("opaque-command"));
+  assert.ok(result.reason.includes("Shell form cannot be approved"));
+  assert.equal(result.reason.includes("opaque-command"), false);
 });
