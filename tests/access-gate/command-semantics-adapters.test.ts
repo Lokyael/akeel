@@ -638,3 +638,21 @@ void test("builtins: . with no args has no path intent", () => {
   assert.equal(sem.class, "execute");
   assert.equal(sem.intents.length, 0);
 });
+
+void test("builtins: source --help has path intent (source has no options)", () => {
+  // source has no options in bash; --help is the filename
+  const { program } = parse(lex("source --help").tokens);
+  const sem = analyzeSemantics(program.commands[0]!, CTX);
+  assert.equal(sem.class, "execute");
+  assert.equal(sem.intents.length, 1);
+  assert.equal(sem.intents[0]!.rawPath, "--help");
+  assert.equal(sem.intents[0]!.confidence, "conservative");
+});
+
+void test("builtins: . file.sh has exact confidence (POSIX dot does not search PATH)", () => {
+  const { program } = parse(lex(". file.sh").tokens);
+  const sem = analyzeSemantics(program.commands[0]!, CTX);
+  assert.equal(sem.intents.length, 1);
+  assert.equal(sem.intents[0]!.rawPath, "file.sh");
+  assert.equal(sem.intents[0]!.confidence, "exact");
+});

@@ -81,11 +81,16 @@
     },
 
     "keel-build": {
-      "description": "Read anywhere; write all project files freely; run scripts, interpreters, and build tools without approval. Only destructive operations remain denied.",
+      "description": "Read anywhere; write all project files and /tmp freely; run scripts, interpreters, and build tools without approval. Only destructive operations remain denied.",
       "extends": ["keel-develop"],
       "shellPolicy": {
         "modify": "allow",
         "execute": "allow"
+      },
+      "pathPolicy": {
+        "rules": [
+          { "path": "/tmp/**", "read": "allow", "list": "allow", "search": "allow", "write": "allow" }
+        ]
       }
     }
   }

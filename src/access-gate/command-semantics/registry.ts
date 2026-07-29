@@ -12,6 +12,7 @@ import { noopAdapter } from "./adapters/noop";
 import { readAdapter } from "./adapters/read";
 import { interpreterAdapter } from "./adapters/interpreters";
 import { shellBuiltinsAdapter } from "./adapters/shell-builtins";
+import { pythonToolsAdapter } from "./adapters/python-tools";
 import { makeSemantics } from "./adapters/shared";
 import {
   loadOverrides,
@@ -32,6 +33,7 @@ const ADAPTERS: CommandAdapter[] = [
   readAdapter,
   interpreterAdapter,
   shellBuiltinsAdapter,
+  pythonToolsAdapter,
 ];
 
 // 按命令名索引
