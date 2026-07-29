@@ -7,9 +7,15 @@ import { lex } from "../../src/access-gate/shell-parse/lexer";
 import { parse } from "../../src/access-gate/shell-parse/parser";
 import { normalizeCommand } from "../../src/access-gate/command-semantics/normalize";
 import { analyzeSemantics } from "../../src/access-gate/command-semantics/registry";
-import type { SemanticContext } from "../../src/access-gate/command-semantics/types";
+import type { CommandSemantics, SemanticContext } from "../../src/access-gate/command-semantics/types";
 
 const CTX: SemanticContext = { projectRoot: "/p", stagingDir: "/s", cwd: "/p" };
+
+/** Parse a command string and run semantic analysis on its first command node. */
+function analyzeCmd(cmd: string): CommandSemantics {
+  const { program } = parse(lex(cmd).tokens);
+  return analyzeSemantics(program.commands[0]!, CTX);
+}
 
 void test("fs: rm produces write intent", () => {
   const { program } = parse(lex("rm file.txt").tokens);
@@ -570,169 +576,132 @@ void test("noop: : (colon noop) is inspect", () => {
 // ─── Shell builtins adapter ───
 
 void test("builtins: source file.sh is execute with conservative read intent", () => {
-  const { program } = parse(lex("source file.sh").tokens);
-  const sem = analyzeSemantics(program.commands[0]!, CTX);
-  assert.equal(sem.class, "execute");
-  assert.equal(sem.intents.length, 1);
-  assert.equal(sem.intents[0]!.operation, "read");
-  assert.equal(sem.intents[0]!.rawPath, "file.sh");
-  assert.equal(sem.intents[0]!.confidence, "conservative");
-  assert.ok(sem.effects.includes("execute"));
+  const s = analyzeCmd("source file.sh");
+  assert.equal(s.class, "execute");
+  assert.equal(s.intents.length, 1);
+  assert.equal(s.intents[0]!.operation, "read");
+  assert.equal(s.intents[0]!.rawPath, "file.sh");
+  assert.equal(s.intents[0]!.confidence, "conservative");
+  assert.ok(s.effects.includes("execute"));
 });
 
 void test("builtins: source ./file.sh is execute with exact read intent", () => {
-  const { program } = parse(lex("source ./file.sh").tokens);
-  const sem = analyzeSemantics(program.commands[0]!, CTX);
-  assert.equal(sem.class, "execute");
-  assert.equal(sem.intents.length, 1);
-  assert.equal(sem.intents[0]!.operation, "read");
-  assert.equal(sem.intents[0]!.rawPath, "./file.sh");
-  assert.equal(sem.intents[0]!.confidence, "exact");
+  const s = analyzeCmd("source ./file.sh");
+  assert.equal(s.class, "execute");
+  assert.equal(s.intents.length, 1);
+  assert.equal(s.intents[0]!.operation, "read");
+  assert.equal(s.intents[0]!.rawPath, "./file.sh");
+  assert.equal(s.intents[0]!.confidence, "exact");
 });
 
 void test("builtins: . ./file.sh is execute (dot command)", () => {
-  const { program } = parse(lex(". ./file.sh").tokens);
-  const sem = analyzeSemantics(program.commands[0]!, CTX);
-  assert.equal(sem.class, "execute");
-  assert.equal(sem.intents.length, 1);
-  assert.equal(sem.intents[0]!.operation, "read");
-  assert.equal(sem.intents[0]!.rawPath, "./file.sh");
-  assert.equal(sem.intents[0]!.confidence, "exact");
+  const s = analyzeCmd(". ./file.sh");
+  assert.equal(s.class, "execute");
+  assert.equal(s.intents.length, 1);
+  assert.equal(s.intents[0]!.operation, "read");
+  assert.equal(s.intents[0]!.rawPath, "./file.sh");
+  assert.equal(s.intents[0]!.confidence, "exact");
 });
 
 void test("builtins: source - has no path intent (stdin)", () => {
-  const { program } = parse(lex("source -").tokens);
-  const sem = analyzeSemantics(program.commands[0]!, CTX);
-  assert.equal(sem.class, "execute");
-  assert.equal(sem.intents.length, 0);
+  const s = analyzeCmd("source -");
+  assert.equal(s.class, "execute");
+  assert.equal(s.intents.length, 0);
 });
 
 void test("builtins: source with no args has no path intent", () => {
-  const { program } = parse(lex("source").tokens);
-  const sem = analyzeSemantics(program.commands[0]!, CTX);
-  assert.equal(sem.class, "execute");
-  assert.equal(sem.intents.length, 0);
+  const s = analyzeCmd("source");
+  assert.equal(s.class, "execute");
+  assert.equal(s.intents.length, 0);
 });
 
 void test("builtins: source file.sh arg1 arg2 only extracts first non-option arg", () => {
-  const { program } = parse(lex("source file.sh arg1 arg2").tokens);
-  const sem = analyzeSemantics(program.commands[0]!, CTX);
-  assert.equal(sem.class, "execute");
-  assert.equal(sem.intents.length, 1);
-  assert.equal(sem.intents[0]!.rawPath, "file.sh");
+  const s = analyzeCmd("source file.sh arg1 arg2");
+  assert.equal(s.class, "execute");
+  assert.equal(s.intents.length, 1);
+  assert.equal(s.intents[0]!.rawPath, "file.sh");
 });
 
 void test("builtins: source /absolute/path.sh is execute with exact read intent", () => {
-  const { program } = parse(lex("source /absolute/path.sh").tokens);
-  const sem = analyzeSemantics(program.commands[0]!, CTX);
-  assert.equal(sem.class, "execute");
-  assert.equal(sem.intents.length, 1);
-  assert.equal(sem.intents[0]!.operation, "read");
-  assert.equal(sem.intents[0]!.rawPath, "/absolute/path.sh");
-  assert.equal(sem.intents[0]!.confidence, "exact");
+  const s = analyzeCmd("source /absolute/path.sh");
+  assert.equal(s.class, "execute");
+  assert.equal(s.intents.length, 1);
+  assert.equal(s.intents[0]!.operation, "read");
+  assert.equal(s.intents[0]!.rawPath, "/absolute/path.sh");
+  assert.equal(s.intents[0]!.confidence, "exact");
 });
 
 void test("builtins: . with no args has no path intent", () => {
-  const { program } = parse(lex(".").tokens);
-  const sem = analyzeSemantics(program.commands[0]!, CTX);
-  assert.equal(sem.class, "execute");
-  assert.equal(sem.intents.length, 0);
+  const s = analyzeCmd(".");
+  assert.equal(s.class, "execute");
+  assert.equal(s.intents.length, 0);
 });
 
 void test("builtins: source --help has path intent (source has no options)", () => {
-  // source has no options in bash; --help is the filename
-  const { program } = parse(lex("source --help").tokens);
-  const sem = analyzeSemantics(program.commands[0]!, CTX);
-  assert.equal(sem.class, "execute");
-  assert.equal(sem.intents.length, 1);
-  assert.equal(sem.intents[0]!.rawPath, "--help");
-  assert.equal(sem.intents[0]!.confidence, "conservative");
+  const s = analyzeCmd("source --help");
+  assert.equal(s.class, "execute");
+  assert.equal(s.intents.length, 1);
+  assert.equal(s.intents[0]!.rawPath, "--help");
+  assert.equal(s.intents[0]!.confidence, "conservative");
 });
 
 void test("builtins: . file.sh has exact confidence (POSIX dot does not search PATH)", () => {
-  const { program } = parse(lex(". file.sh").tokens);
-  const sem = analyzeSemantics(program.commands[0]!, CTX);
-  assert.equal(sem.intents.length, 1);
-  assert.equal(sem.intents[0]!.rawPath, "file.sh");
-  assert.equal(sem.intents[0]!.confidence, "exact");
+  const s = analyzeCmd(". file.sh");
+  assert.equal(s.intents.length, 1);
+  assert.equal(s.intents[0]!.rawPath, "file.sh");
+  assert.equal(s.intents[0]!.confidence, "exact");
 });
 
 // ─── Python tools adapter ───
 
 void test("python: ruff check is inspect", () => {
-  const { program } = parse(lex("ruff check src/").tokens);
-  const sem = analyzeSemantics(program.commands[0]!, CTX);
-  assert.equal(sem.class, "inspect");
+  assert.equal(analyzeCmd("ruff check src/").class, "inspect");
 });
 
 void test("python: ruff format is modify", () => {
-  const { program } = parse(lex("ruff format src/").tokens);
-  const sem = analyzeSemantics(program.commands[0]!, CTX);
-  assert.equal(sem.class, "modify");
+  assert.equal(analyzeCmd("ruff format src/").class, "modify");
 });
 
 void test("python: ruff format --check is inspect (check-only)", () => {
-  const { program } = parse(lex("ruff format --check src/").tokens);
-  const sem = analyzeSemantics(program.commands[0]!, CTX);
-  assert.equal(sem.class, "inspect");
+  assert.equal(analyzeCmd("ruff format --check src/").class, "inspect");
 });
 
 void test("python: ruff check --fix upgrades to modify", () => {
-  const { program } = parse(lex("ruff check --fix src/").tokens);
-  const sem = analyzeSemantics(program.commands[0]!, CTX);
-  assert.equal(sem.class, "modify");
+  assert.equal(analyzeCmd("ruff check --fix src/").class, "modify");
 });
 
 void test("python: ruff defaults to inspect", () => {
-  const { program } = parse(lex("ruff").tokens);
-  const sem = analyzeSemantics(program.commands[0]!, CTX);
-  assert.equal(sem.class, "inspect");
+  assert.equal(analyzeCmd("ruff").class, "inspect");
 });
 
 void test("python: mypy is inspect", () => {
-  const { program } = parse(lex("mypy src/").tokens);
-  const sem = analyzeSemantics(program.commands[0]!, CTX);
-  assert.equal(sem.class, "inspect");
+  assert.equal(analyzeCmd("mypy src/").class, "inspect");
 });
 
 void test("python: mypy with flags is inspect", () => {
-  const { program } = parse(lex("mypy src/ --ignore-missing-imports").tokens);
-  const sem = analyzeSemantics(program.commands[0]!, CTX);
-  assert.equal(sem.class, "inspect");
+  assert.equal(analyzeCmd("mypy src/ --ignore-missing-imports").class, "inspect");
 });
 
 void test("python: black is modify", () => {
-  const { program } = parse(lex("black src/").tokens);
-  const sem = analyzeSemantics(program.commands[0]!, CTX);
-  assert.equal(sem.class, "modify");
+  assert.equal(analyzeCmd("black src/").class, "modify");
 });
 
 void test("python: black --check is inspect", () => {
-  const { program } = parse(lex("black --check src/").tokens);
-  const sem = analyzeSemantics(program.commands[0]!, CTX);
-  assert.equal(sem.class, "inspect");
+  assert.equal(analyzeCmd("black --check src/").class, "inspect");
 });
 
 void test("python: isort --check-only is inspect", () => {
-  const { program } = parse(lex("isort --check-only src/").tokens);
-  const sem = analyzeSemantics(program.commands[0]!, CTX);
-  assert.equal(sem.class, "inspect");
+  assert.equal(analyzeCmd("isort --check-only src/").class, "inspect");
 });
 
 void test("python: pytest is execute", () => {
-  const { program } = parse(lex("pytest tests/").tokens);
-  const sem = analyzeSemantics(program.commands[0]!, CTX);
-  assert.equal(sem.class, "execute");
+  assert.equal(analyzeCmd("pytest tests/").class, "execute");
 });
 
 void test("python: pyright is inspect", () => {
-  const { program } = parse(lex("pyright src/").tokens);
-  const sem = analyzeSemantics(program.commands[0]!, CTX);
-  assert.equal(sem.class, "inspect");
+  assert.equal(analyzeCmd("pyright src/").class, "inspect");
 });
 
 void test("python: pylint is inspect", () => {
-  const { program } = parse(lex("pylint src/").tokens);
-  const sem = analyzeSemantics(program.commands[0]!, CTX);
-  assert.equal(sem.class, "inspect");
+  assert.equal(analyzeCmd("pylint src/").class, "inspect");
 });

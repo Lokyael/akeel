@@ -66,11 +66,11 @@ test("keel-explore: inherits read's shellPolicy, overrides path defaults to allo
 
 // ── branch 2: planning ──
 
-test("keel-plan: inherits explore's defaults, adds docs writes, shell commands ask", () => {
+test("keel-plan: inherits explore's defaults, adds docs writes, execute denied", () => {
   const p = profiles().profiles["keel-plan"];
   assert.equal(p.shellPolicy.inspect, "allow");
   assert.equal(p.shellPolicy.modify, "ask");
-  assert.equal(p.shellPolicy.execute, "ask");
+  assert.equal(p.shellPolicy.execute, "deny");
   assert.equal(p.shellPolicy.unknown, "ask");
   assert.equal(p.shellPolicy.destroy, "deny");
   assert.equal(p.pathPolicy.default.read, "allow");
@@ -82,9 +82,9 @@ test("keel-plan: inherits explore's defaults, adds docs writes, shell commands a
 
 // ── branch 2: cautious full access ──
 
-test("keel-query: inherits plan's shellPolicy, adds project-wide writes requiring approval", () => {
+test("keel-query: inherits plan, explicitly allows execute with approval, adds project-wide writes requiring approval", () => {
   const p = profiles().profiles["keel-query"];
-  // shell: inherited from plan (no explicit shellPolicy)
+  // shell: execute explicitly overrides plan's deny with ask
   assert.equal(p.shellPolicy.modify, "ask");
   assert.equal(p.shellPolicy.execute, "ask");
   // path defaults: inherited from plan (from explore)
@@ -96,14 +96,14 @@ test("keel-query: inherits plan's shellPolicy, adds project-wide writes requirin
 
 // ── branch 2: productive full access ──
 
-test("keel-develop: inherits query's shellPolicy, overrides write ask→allow, execute STILL ask", () => {
+test("keel-develop: inherits query, explicitly keeps execute approval, overrides write ask→allow", () => {
   const p = profiles().profiles["keel-develop"];
   // inspect: inherited from plan (allow)
   assert.equal(p.shellPolicy.inspect, "allow");
   // modify: inherited, remains ask — but write path is allow via pathPolicy
   assert.equal(p.shellPolicy.modify, "ask");
-  // execute: inherited from plan — must remain ask
-  // Regression guard: interpreters and build tools must still be reviewed.
+  // execute: explicitly inherited as ask from query, not plan's deny
+  // Regression guard: interpreters and build tools still require approval.
   assert.equal(p.shellPolicy.execute, "ask");
   assert.equal(p.shellPolicy.unknown, "ask");
   assert.equal(p.shellPolicy.destroy, "deny");

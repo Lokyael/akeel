@@ -44,11 +44,11 @@
     },
 
     "keel-plan": {
-      "description": "Read anywhere; write docs/, CONTEXT.md, and /tmp/pi-work/ for reviewing external code. Shell commands require approval. No source-tree writes.",
+      "description": "Read anywhere; write docs/, CONTEXT.md, and /tmp/pi-work/ for reviewing external code. Shell commands and scripts are denied. No source-tree writes.",
       "extends": ["keel-explore"],
       "shellPolicy": {
         "modify": "ask",
-        "execute": "ask",
+        "execute": "deny",
         "unknown": "ask"
       },
       "pathPolicy": {
@@ -63,6 +63,9 @@
     "keel-query": {
       "description": "Read anywhere; write all project files but every write and shell command requires one-time approval.",
       "extends": ["keel-plan"],
+      "shellPolicy": {
+        "execute": "ask"
+      },
       "pathPolicy": {
         "rules": [
           { "path": "project/**", "write": "ask" }
@@ -73,6 +76,9 @@
     "keel-develop": {
       "description": "Read anywhere; write all project files freely. Scripts and build tools still require approval (interpreters and build commands are not blind-trusted).",
       "extends": ["keel-query"],
+      "shellPolicy": {
+        "execute": "ask"
+      },
       "pathPolicy": {
         "rules": [
           { "path": "project/**", "write": "allow" }

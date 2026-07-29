@@ -14,7 +14,7 @@
 
 import type { ShellCommandNode, ShellArg } from "../../shell-parse/types";
 import type { CommandAdapter, CommandSemantics, SemanticContext } from "../types";
-import { makeSemantics } from "./shared";
+import { makeSemantics, extractSubcommand } from "./shared";
 
 // ─── config types ───
 
@@ -104,27 +104,6 @@ const VALUE_OPTS = new Set([
   "-n", "--numprocesses", "--dist", "--timeout",
 ]);
 
-/**
- * Extract the subcommand from tool arguments.
- * Skips known value-taking options and their values.
- * Returns "" when no subcommand is present (all args are flags).
- */
-function extractSubcommand(args: readonly ShellArg[]): string {
-  const parts: string[] = [];
-  for (let i = 0; i < args.length; i++) {
-    const v = args[i]!.value ?? "";
-    if (v === "--") break;
-    if (v.startsWith("-")) {
-      if (VALUE_OPTS.has(v) && !v.includes("=") && i + 1 < args.length) {
-        i++; // skip option value
-      }
-      continue;
-    }
-    parts.push(v);
-  }
-  return parts.join(" ");
-}
-
 /** Check if any of the given flags are present in args (exact or --flag=value form). */
 function hasFlag(args: readonly ShellArg[], flags: string[]): boolean {
   return args.some((a) => {
@@ -145,7 +124,7 @@ export const pythonToolsAdapter: CommandAdapter = {
     // 1. Resolve base class: subcommand overrides default
     let cls = def.cls;
     let reason = def.reason;
-    const subcmd = extractSubcommand(node.args);
+    const subcmd = extractSubcommand(node.args, VALUE_OPTS);
     if (def.subcommands && subcmd) {
       const firstToken = subcmd.split(" ")[0]!;
       const sub = def.subcommands[firstToken];

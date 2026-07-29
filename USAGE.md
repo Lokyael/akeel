@@ -49,7 +49,7 @@ Profile names are stored with a `keel-` prefix (`keel-read`, `keel-explore`, …
 | `read` | Inspect `projectRoot` only; no writes, no shell commands |
 | `explore` | Inspect anywhere on the filesystem; no writes, no shell commands |
 | `code` | Inspect `projectRoot`; write `src/`, `tests/`, `/tmp/pi-work/`; shell commands require approval |
-| `plan` | Inspect anywhere; write `docs/`, `CONTEXT.md`, `/tmp/pi-work/`; shell commands require approval |
+| `plan` | Inspect anywhere; write `docs/`, `CONTEXT.md`, `/tmp/pi-work/`; scripts and build tools are denied, other shell commands require approval |
 | `query` | Inspect anywhere; write all project files (each write asks); shell commands require approval |
 | `develop` | Inspect anywhere; write all project files freely; scripts and build tools still require approval |
 | `full` | Inspect anywhere; write all project files freely; scripts and build tools allowed without approval |

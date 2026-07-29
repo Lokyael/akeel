@@ -1,4 +1,4 @@
-// Shell builtin commands — source (.), and future builtins.
+// Shell builtin commands — source (.).
 //
 // source / . reads and executes a file in the current shell environment.
 // Classified as execute (consistent with python/node interpreters) because

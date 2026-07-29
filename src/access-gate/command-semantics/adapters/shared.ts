@@ -1,5 +1,6 @@
 // command-semantics/adapters/shared.ts — adapter 共享工具
 
+import type { ShellArg } from "../../shell-parse/types";
 import type { CommandSemantics, CommandClass, Effect, PathIntent } from "../types";
 
 export interface MakeSemanticsOpts {
@@ -16,6 +17,31 @@ function defaultEffects(cls: CommandClass): readonly Effect[] {
   if (cls === "execute") return ["execute"];
   if (cls === "destroy") return ["execute"];
   return [];
+}
+
+/**
+ * Extract the subcommand from tool arguments.
+ * Skips known value-taking options and their values.
+ * Returns "" when no subcommand is present (all args are flags).
+ *
+ * @param valueOptions — options that consume the next token as their value.
+ *   Accepts both string[] and Set<string> for caller convenience.
+ */
+export function extractSubcommand(args: readonly ShellArg[], valueOptions: Iterable<string>): string {
+  const opts = new Set(valueOptions);
+  const parts: string[] = [];
+  for (let i = 0; i < args.length; i++) {
+    const v = args[i]!.value ?? "";
+    if (v === "--") break;
+    if (v.startsWith("-")) {
+      if (opts.has(v) && !v.includes("=") && i + 1 < args.length) {
+        i++; // 跳过选项值
+      }
+      continue;
+    }
+    parts.push(v);
+  }
+  return parts.join(" ");
 }
 
 export function makeSemantics(

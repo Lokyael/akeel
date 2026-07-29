@@ -1,8 +1,8 @@
 // 构建工具命令 — cargo, go, make 的语义
 
-import type { ShellCommandNode, ShellArg } from "../../shell-parse/types";
+import type { ShellCommandNode } from "../../shell-parse/types";
 import type { CommandAdapter, CommandSemantics, SemanticContext } from "../types";
-import { makeSemantics } from "./shared";
+import { makeSemantics, extractSubcommand } from "./shared";
 
 interface BuildDef {
   cls: "inspect" | "modify" | "execute" | "unknown";
@@ -15,28 +15,6 @@ interface BuildToolConfig {
   rules: BuildDef[];
   /** 取值选项：选项之后的 token 是值而非子命令的一部分。不穷举，未覆盖的选项导致 unknown（安全降级）。 */
   valueOpts?: readonly string[];
-}
-
-/**
- * 提取构建工具的子命令字符串。
- * 跳过取值选项及其值后，从第一个非选项参数开始，取全部非选项参数，空格连接。
- * go mod tidy、go mod download 等多词子命令依赖此逻辑。
- */
-function extractSubcommand(args: readonly ShellArg[], valueOpts: readonly string[]): string {
-  const parts: string[] = [];
-  for (let i = 0; i < args.length; i++) {
-    const v = args[i]!.value ?? "";
-    if (v === "--") break;
-    if (v.startsWith("-")) {
-      // 取值选项且不是 attached-value 形式（如 --opt=val），跳过下一个 token
-      if (valueOpts.includes(v) && !v.includes("=") && i + 1 < args.length) {
-        i++;
-      }
-      continue;
-    }
-    parts.push(v);
-  }
-  return parts.join(" ");
 }
 
 const BUILD_CONFIG: Record<string, BuildToolConfig> = {
