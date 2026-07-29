@@ -3,11 +3,11 @@ import type { SourceSpan } from "../shell-parse/types";
 import type { DecisionCode, GateEvidence } from "./decision-types";
 import type {
   AccessOperation,
-  CompleteAccessPlan,
-  CompleteAccessRequest,
+  AccessPlanDraft,
   CompilationCategory,
   CompilationReject,
   CompilerDecisionCode,
+  CompilerDraftResult,
   CompileResult,
   InvalidCompilationCode,
   PathAccessOperation,
@@ -16,25 +16,23 @@ import type {
   UnsupportedCompilationCode,
   PathOperationKind,
   PathSource,
-  RequestCoverage,
   ToolSurface,
 } from "./access-request-types";
-import { issueAccessPlan, isCompleteAccessPlan } from "./access-plan-verifier";
 import {
   ANALYSIS_LIMITS,
-  COMPILER_VERSION,
   EFFECTS,
-  REQUEST_BRAND,
 } from "./access-request-types";
 
 // Re-export the public surface from the types module.
 export { ANALYSIS_LIMITS } from "./access-request-types";
 export type {
   AccessOperation,
+  AccessPlanDraft,
   CommandAccessOperation,
   CompilationCategory,
   CompilationReject,
   CompilerDecisionCode,
+  CompilerDraftResult,
   CompileResult,
   CompilerContext,
   CompleteAccessPlan,
@@ -58,7 +56,7 @@ export type {
 
 // ── public api ──
 
-export function reject(code: CompilerDecisionCode, subject: string, span?: SourceSpan): CompileResult {
+export function reject(code: CompilerDecisionCode, subject: string, span?: SourceSpan): CompilationReject {
   const category = compilationCategoryFor(code);
   const evidence = [{ kind: evidenceKind(code), subject: String(subject).slice(0, ANALYSIS_LIMITS.maxEvidenceSubjectLength), span }] as const;
   if (category === "security-block") {
@@ -107,14 +105,14 @@ export function pathOperation(
   return { kind: "path", operation, input, cwdCandidates: cwdCandidates(state), source, confidence, span };
 }
 
-export function createAccessPlan(
+export function createPlanDraft(
   source: ToolSurface,
   operations: readonly AccessOperation[],
   candidates: readonly CwdCandidate[],
   coverage: PlanCoverage,
   inputLength: number,
   context: { readonly projectRoot: string; readonly stagingDir: string },
-): CompileResult {
+): CompilerDraftResult {
   const unique = uniqueCandidates(candidates);
   if (operations.length > ANALYSIS_LIMITS.maxOperations
     || coverage.commandCount > ANALYSIS_LIMITS.maxCommands
@@ -124,37 +122,19 @@ export function createAccessPlan(
     || inputLength > ANALYSIS_LIMITS.maxInputLength) {
     return reject("resource-limit", "request analysis budget exceeded");
   }
-  const copiedOperations = operations.map(cloneOperation);
-  const plan = deepFreeze({
-    [REQUEST_BRAND]: true as const,
+  const draft: AccessPlanDraft = {
     source,
     projectRoot: context.projectRoot,
     stagingDir: context.stagingDir,
-    operations: copiedOperations,
-    commands: copiedOperations.filter((operation): operation is Extract<AccessOperation, { kind: "command" }> => operation.kind === "command"),
-    paths: copiedOperations.filter((operation): operation is Extract<AccessOperation, { kind: "path" }> => operation.kind === "path"),
-    effects: copiedOperations.filter((operation): operation is Extract<AccessOperation, { kind: "effect" }> => operation.kind === "effect"),
-    cwdCandidates: unique.map(cloneCandidate),
-    coverage: {
-      ...coverage,
-      commandSpans: coverage.commandSpans.map(cloneSpan),
-      redirectionSpans: coverage.redirectionSpans.map(cloneSpan),
-    },
-    resourceUsage: {
-      inputLength,
-      commandCount: coverage.commandCount,
-      operationCount: operations.length,
-      cwdCandidateCount: coverage.cwdCandidateCount,
-    },
-    compilerVersion: COMPILER_VERSION,
-  });
-  issueAccessPlan(plan);
-  return { kind: "complete", plan: plan as CompleteAccessPlan };
+    operations,
+    cwdCandidates: unique,
+    coverage,
+    inputLength,
+  };
+  return { kind: "draft", draft };
 }
 
-export const createRequest = createAccessPlan;
-
-export function validateInputLength(value: string, subject: string): CompileResult | null {
+export function validateInputLength(value: string, subject: string): CompilationReject | null {
   return value.length > ANALYSIS_LIMITS.maxArgumentLength
     ? reject("resource-limit", subject)
     : null;
@@ -168,10 +148,6 @@ export function isRecord(value: unknown): value is Record<string, unknown> {
   } catch {
     return false;
   }
-}
-
-export function isCompleteAccessRequest(value: unknown): value is CompleteAccessRequest {
-  return isCompleteAccessPlan(value);
 }
 
 export function effectsFor(
@@ -190,7 +166,7 @@ export function effectsFor(
   return [...result];
 }
 
-export function validateEffects(effects: readonly Effect[], span: SourceSpan): CompileResult | null {
+export function validateEffects(effects: readonly Effect[], span: SourceSpan): CompilationReject | null {
   for (const effect of effects) {
     if (!EFFECTS.has(effect)) return reject("unknown-effect", effect, span);
   }
@@ -198,29 +174,6 @@ export function validateEffects(effects: readonly Effect[], span: SourceSpan): C
 }
 
 // ── internal helpers ──
-
-function cloneSpan(span: SourceSpan): SourceSpan {
-  return { start: span.start, end: span.end };
-}
-
-function cloneCandidate(candidate: CwdCandidate): CwdCandidate {
-  return { cwd: candidate.cwd, certainty: candidate.certainty, branch: candidate.branch };
-}
-
-function cloneOperation(operation: AccessOperation): AccessOperation {
-  if (operation.kind === "path") return { ...operation, cwdCandidates: operation.cwdCandidates.map(cloneCandidate), span: cloneSpan(operation.span) };
-  if (operation.kind === "command") return { ...operation, effects: [...operation.effects], span: cloneSpan(operation.span) };
-  return { ...operation, span: cloneSpan(operation.span) };
-}
-
-function deepFreeze<T>(value: T): T {
-  if (value && typeof value === "object" && !Object.isFrozen(value)) {
-    for (const child of Object.values(value as Record<string, unknown>)) deepFreeze(child);
-    for (const symbol of Object.getOwnPropertySymbols(value)) deepFreeze((value as Record<PropertyKey, unknown>)[symbol]);
-    Object.freeze(value);
-  }
-  return value;
-}
 
 function uniqueCandidates(values: readonly CwdCandidate[]): readonly CwdCandidate[] {
   const seen = new Set<string>();

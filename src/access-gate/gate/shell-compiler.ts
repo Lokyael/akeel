@@ -8,14 +8,14 @@ import type { ShellRedirectionNode, SourceSpan } from "../shell-parse/types";
 import { runPreflight } from "./preflight";
 import {
   ANALYSIS_LIMITS,
-  createAccessPlan,
+  createPlanDraft,
   effectsFor,
   validateInputLength,
   pathOperation,
   reject,
   validateEffects,
   type AccessOperation,
-  type CompileResult,
+  type CompilerDraftResult,
   type PathAccessOperation,
   type ShellCompilerInput,
 } from "./access-request";
@@ -31,7 +31,7 @@ const REDIRECTION_PATH_KINDS = new Set([
 function redirectionOperation(
   redirection: ShellRedirectionNode,
   state: { cwd: string; candidates?: readonly CwdCandidate[] },
-): PathAccessOperation | CompileResult {
+): PathAccessOperation | CompilerDraftResult {
   if (!REDIRECTION_PATH_KINDS.has(redirection.kind)) {
     return reject("unsupported-redirection", redirection.kind, redirection.span);
   }
@@ -40,7 +40,7 @@ function redirectionOperation(
   return pathOperation(operation, redirection.target.value, state, "redirection", "exact", redirection.span);
 }
 
-export function compileShellCall(input: ShellCompilerInput): CompileResult {
+export function compileShellDraft(input: ShellCompilerInput): CompilerDraftResult {
   const command = input.command.trim();
   if (!command) return reject("unsafe-syntax", "bash command is missing");
   const inputLimit = validateInputLength(command, "shell command");
@@ -124,7 +124,7 @@ export function compileShellCall(input: ShellCompilerInput): CompileResult {
   }
 
   const cwdCandidates = operations.flatMap((operation) => operation.kind === "path" ? operation.cwdCandidates : []);
-  return createAccessPlan("bash", operations, cwdCandidates, {
+  return createPlanDraft("bash", operations, cwdCandidates, {
     commandSpans,
     redirectionSpans,
     commandCount: commandSpans.length,

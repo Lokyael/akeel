@@ -1,7 +1,7 @@
 import { decidePath, resolvePath } from "../path";
 import { PATH_DENY_REASONS } from "../path/policy";
 import type { ResolvedProfile } from "../profile/types";
-import { isCompleteAccessPlan } from "./access-plan-verifier";
+import { isCompleteAccessPlan } from "./compiler-entry";
 import { type CommandAccessOperation, type CompleteAccessPlan, type PathAccessOperation } from "./access-request";
 import type { GateRuntime } from "./types";
 import type { GateDecision, GateEvidence, HardDenyCode } from "./decision-types";

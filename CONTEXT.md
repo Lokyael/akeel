@@ -17,7 +17,7 @@
 - `src/bootstrap/` 在 Session 启动和 compaction 后注入工程原则。
 - `src/access-gate/` 统一处理 Profile、Shell IR、命令语义、路径策略、Gate、Session 状态和 Footer。
 - `shell-parse/` 输出受限 Shell IR；`command-semantics/` 提取命令类别、路径意图、效果和 cwd 转换。
-- `gate/` 编译器将 Shell IR 和 Direct tool 参数转换为 `CompleteAccessPlan`；compiler outcome 另外区分 unsupported form、security block 和 invalid request。Policy Kernel 只消费经过 verifier 验证的 plan，产出 `GateDecision`，renderer 将决策转为 host 兼容结果。
+- `gate/` 编译器将 Shell IR 和 Direct tool 参数转换为 `CompleteAccessPlan`；compiler outcome 另外区分 unsupported form、security block 和 invalid request。`compiler-entry.ts` 是唯一 plan sealing boundary，Policy Kernel 只消费经过 verifier 验证的 plan，产出 `GateDecision`，renderer 将决策转为 host 兼容结果。
 - Direct tool（`read`、`write`、`edit`、`find`、`grep`、`ls`）和 Shell 命令经过各自的 compiler 后进入同一 Policy Kernel。
 - 用户项目运行时文档入口为 `CONTEXT.md`、`docs/decisions.md` 和 `docs/task.md`。
 

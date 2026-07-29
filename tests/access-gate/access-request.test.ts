@@ -3,7 +3,6 @@ import test from "node:test";
 import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { createAccessPlan } from "../../src/access-gate/gate/access-request";
 import {
   compileDirectToolCall,
   compileShellCall,
@@ -40,6 +39,26 @@ function paths(operations: readonly AccessOperation[]) {
   return operations.filter((operation) => operation.kind === "path");
 }
 
+function deepFreeze<T>(value: T): T {
+  if (value && typeof value === "object" && !Object.isFrozen(value)) {
+    for (const child of Object.values(value as Record<string, unknown>)) deepFreeze(child);
+    for (const symbol of Object.getOwnPropertySymbols(value)) deepFreeze((value as Record<PropertyKey, unknown>)[symbol]);
+    Object.freeze(value);
+  }
+  return value;
+}
+
+test("does not expose a raw plan issuer", async () => {
+  const verifier = await import("../../src/access-gate/gate/access-plan-verifier");
+  assert.equal("issueAccessPlan" in verifier, false);
+});
+
+test("does not expose raw plan constructors", async () => {
+  const request = await import("../../src/access-gate/gate/access-request");
+  assert.equal("createAccessPlan" in request, false);
+  assert.equal("createRequest" in request, false);
+});
+
 test("routes both tool surfaces through the compiler dispatcher", () => {
   const env = context();
   try {
@@ -49,6 +68,8 @@ test("routes both tool surfaces through the compiler dispatcher", () => {
     env.cleanup();
   }
 });
+
+
 
 test("compiles Shell grep and Direct grep to equivalent search operations", () => {
   const shell = context();
@@ -107,6 +128,42 @@ test("verifies complete plans through the public plan seam", () => {
   }
 });
 
+test("verifier rejects an issued plan above the command budget", async () => {
+  const env = context();
+  try {
+    const request = complete(compileDirectToolCall({ ...env, surface: "read", args: { path: "allowed/file.ts" } }));
+    const command = { ...request.commands[0]!, effects: [] };
+    const commands = Array.from({ length: ANALYSIS_LIMITS.maxCommands + 1 }, () => command);
+    const operations = [...commands, ...request.paths];
+    const coverage = {
+      ...request.coverage,
+      commandCount: commands.length,
+      commandSpans: Array.from({ length: commands.length }, () => request.coverage.commandSpans[0]!),
+      effectOperationCount: 0,
+      redirectionSpans: [],
+    };
+    const overBudget = deepFreeze({
+      ...request,
+      operations,
+      commands,
+      effects: [],
+      coverage,
+      resourceUsage: {
+        ...request.resourceUsage,
+        commandCount: commands.length,
+        operationCount: operations.length,
+        cwdCandidateCount: coverage.cwdCandidateCount,
+      },
+    });
+    const issuedPlans = new WeakSet<object>();
+    issuedPlans.add(overBudget);
+    const verifier = await import("../../src/access-gate/gate/access-plan-verifier");
+    assert.equal(verifier.validateCompleteAccessPlan(overBudget, issuedPlans), false);
+  } finally {
+    env.cleanup();
+  }
+});
+
 test("tracks the cwd target used by a command after cd", () => {
   const env = context();
   try {
@@ -119,6 +176,7 @@ test("tracks the cwd target used by a command after cd", () => {
     env.cleanup();
   }
 });
+
 
 test("preserves all cwd candidates for a failure branch", () => {
   const env = context();
@@ -185,20 +243,10 @@ test("rejects malformed Direct args and empty required paths", () => {
   }
 });
 
-test("rejects forged and incomplete frozen requests", () => {
+test("rejects forged and incomplete frozen plans", () => {
   const env = context();
   try {
     const request = complete(compileShellCall({ ...env, command: "cat file > output" }));
-    const incompleteCoverage = createAccessPlan("bash", request.operations, request.cwdCandidates, {
-      ...request.coverage,
-      redirectionSpans: [],
-    }, request.resourceUsage.inputLength, { projectRoot: env.projectRoot, stagingDir: env.stagingDir });
-    assert.equal(incompleteCoverage.kind, "complete");
-    if (incompleteCoverage.kind === "complete") assert.equal(isCompleteAccessRequest(incompleteCoverage.plan), false);
-    const incompleteCwd = createAccessPlan("bash", request.operations, [], request.coverage, request.resourceUsage.inputLength, { projectRoot: env.projectRoot, stagingDir: env.stagingDir });
-    assert.equal(incompleteCwd.kind, "complete");
-    if (incompleteCwd.kind === "complete") assert.equal(isCompleteAccessRequest(incompleteCwd.plan), false);
-
     const forgedCoverage = { ...request.coverage, redirectionSpans: Object.freeze([]) };
     Object.freeze(forgedCoverage);
     const forged = { ...request, coverage: forgedCoverage };

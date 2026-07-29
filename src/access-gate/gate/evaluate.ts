@@ -1,6 +1,4 @@
-import { compileDirectToolCall } from "./direct-tool-compiler";
-import { compileShellCall } from "./shell-compiler";
-import { isRecord, type CompileResult, type CompilerContext } from "./access-request";
+import { compileToolCall } from "./compiler-entry";
 import { evaluateRequest } from "./evaluate-request";
 import { renderCompilationFailure, renderDecision } from "./render-decision";
 import type { GateDecision } from "./decision-types";
@@ -8,24 +6,14 @@ import type { GateResult, GateRuntime, ToolCallInput } from "./types";
 import { TOOL_SCHEMAS } from "./tool-schemas";
 import type { GateCategory } from "./categories";
 
-export type ToolCompilerInput = CompilerContext & {
-  surface: string;
-  args: unknown;
-};
+export { compileToolCall } from "./compiler-entry";
+export type { ToolCompilerInput } from "./compiler-entry";
 
 /** 将 tool surface 映射到 gate 分类。不在管辖范围内的工具 = passthrough。 */
 export function classifyTool(surface: string): { category: GateCategory } {
   if (surface === "bash") return { category: "shell" };
   if (TOOL_SCHEMAS[surface]) return { category: "filesystem" };
   return { category: "passthrough" };
-}
-
-export function compileToolCall(input: ToolCompilerInput): CompileResult {
-  if (input.surface === "bash") {
-    const args = isRecord(input.args) ? input.args : {};
-    return compileShellCall({ ...input, command: typeof args.command === "string" ? args.command : "" });
-  }
-  return compileDirectToolCall(input);
 }
 
 export async function evaluateToolCall(input: ToolCallInput, runtime: GateRuntime): Promise<GateResult> {

@@ -1,0 +1,127 @@
+import type { CwdCandidate } from "../command-semantics/types";
+import { compileDirectToolDraft } from "./direct-tool-compiler";
+import { compileShellDraft } from "./shell-compiler";
+import { validateCompleteAccessPlan } from "./access-plan-verifier";
+import {
+  COMPILER_VERSION,
+  REQUEST_BRAND,
+} from "./access-request-types";
+import {
+  isRecord,
+  reject,
+  type CompilerContext,
+  type CompilerDraftResult,
+  type CompileResult,
+  type DirectToolCompilerInput,
+  type ShellCompilerInput,
+} from "./access-request";
+import type {
+  AccessOperation,
+  AccessPlanDraft,
+  CompleteAccessPlan,
+  CompleteAccessRequest,
+} from "./access-request-types";
+
+export type ToolCompilerInput = CompilerContext & {
+  readonly surface: string;
+  readonly args: unknown;
+};
+
+// The only code that can turn a compiler draft into a Kernel-acceptable plan.
+const ISSUED_PLANS = new WeakSet<object>();
+
+export function compileShellCall(input: ShellCompilerInput): CompileResult {
+  return finalize(compileShellDraft(input));
+}
+
+export function compileDirectToolCall(input: DirectToolCompilerInput): CompileResult {
+  return finalize(compileDirectToolDraft(input));
+}
+
+export function compileToolCall(input: ToolCompilerInput): CompileResult {
+  if (input.surface === "bash") {
+    const args = isRecord(input.args) ? input.args : {};
+    return compileShellCall({
+      ...input,
+      command: typeof args.command === "string" ? args.command : "",
+    });
+  }
+  return compileDirectToolCall(input);
+}
+
+export function isCompleteAccessPlan(value: unknown): value is CompleteAccessPlan {
+  try {
+    return validateCompleteAccessPlan(value, ISSUED_PLANS);
+  } catch {
+    return false;
+  }
+}
+
+export function isCompleteAccessRequest(value: unknown): value is CompleteAccessRequest {
+  return isCompleteAccessPlan(value);
+}
+
+function finalize(result: CompilerDraftResult): CompileResult {
+  if (result.kind === "reject") return result;
+  const plan = sealPlan(result.draft);
+  if (!validateCompleteAccessPlan(plan, ISSUED_PLANS)) {
+    return reject("invalid-tool-input", "compiler produced an invalid access plan");
+  }
+  return { kind: "complete", plan };
+}
+
+function sealPlan(draft: AccessPlanDraft): CompleteAccessPlan {
+  const copiedOperations = draft.operations.map(cloneOperation);
+  const plan = deepFreeze({
+    [REQUEST_BRAND]: true as const,
+    source: draft.source,
+    projectRoot: draft.projectRoot,
+    stagingDir: draft.stagingDir,
+    operations: copiedOperations,
+    commands: copiedOperations.filter((operation): operation is Extract<AccessOperation, { kind: "command" }> => operation.kind === "command"),
+    paths: copiedOperations.filter((operation): operation is Extract<AccessOperation, { kind: "path" }> => operation.kind === "path"),
+    effects: copiedOperations.filter((operation): operation is Extract<AccessOperation, { kind: "effect" }> => operation.kind === "effect"),
+    cwdCandidates: draft.cwdCandidates.map(cloneCandidate),
+    coverage: {
+      ...draft.coverage,
+      commandSpans: draft.coverage.commandSpans.map(cloneSpan),
+      redirectionSpans: draft.coverage.redirectionSpans.map(cloneSpan),
+    },
+    resourceUsage: {
+      inputLength: draft.inputLength,
+      commandCount: draft.coverage.commandCount,
+      operationCount: draft.operations.length,
+      cwdCandidateCount: draft.coverage.cwdCandidateCount,
+    },
+    compilerVersion: COMPILER_VERSION,
+  });
+  ISSUED_PLANS.add(plan);
+  return plan as CompleteAccessPlan;
+}
+
+function cloneSpan(span: { readonly start: number; readonly end: number }): { start: number; end: number } {
+  return { start: span.start, end: span.end };
+}
+
+function cloneCandidate(candidate: CwdCandidate): CwdCandidate {
+  return { cwd: candidate.cwd, certainty: candidate.certainty, branch: candidate.branch };
+}
+
+function cloneOperation(operation: AccessOperation): AccessOperation {
+  if (operation.kind === "path") {
+    return { ...operation, cwdCandidates: operation.cwdCandidates.map(cloneCandidate), span: cloneSpan(operation.span) };
+  }
+  if (operation.kind === "command") {
+    return { ...operation, effects: [...operation.effects], span: cloneSpan(operation.span) };
+  }
+  return { ...operation, span: cloneSpan(operation.span) };
+}
+
+function deepFreeze<T>(value: T): T {
+  if (value && typeof value === "object" && !Object.isFrozen(value)) {
+    for (const child of Object.values(value as Record<string, unknown>)) deepFreeze(child);
+    for (const symbol of Object.getOwnPropertySymbols(value)) deepFreeze((value as Record<PropertyKey, unknown>)[symbol]);
+    Object.freeze(value);
+  }
+  return value;
+}

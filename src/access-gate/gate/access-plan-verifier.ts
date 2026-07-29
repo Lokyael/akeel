@@ -16,23 +16,11 @@ import {
   TOOL_SURFACES,
 } from "./access-request-types";
 
-const ISSUED_PLANS = new WeakSet<object>();
-
-export function issueAccessPlan<T extends object>(plan: T): T {
-  ISSUED_PLANS.add(plan);
-  return plan;
-}
-
-export function isCompleteAccessPlan(value: unknown): value is CompleteAccessPlan {
-  try {
-    return validateCompleteAccessPlan(value);
-  } catch {
-    return false;
-  }
-}
-
-function validateCompleteAccessPlan(value: unknown): value is CompleteAccessPlan {
-  if (!isRecord(value) || (value as Record<PropertyKey, unknown>)[REQUEST_BRAND] !== true || !ISSUED_PLANS.has(value)) return false;
+export function validateCompleteAccessPlan(
+  value: unknown,
+  issuedPlans: WeakSet<object>,
+): value is CompleteAccessPlan {
+  if (!isRecord(value) || (value as Record<PropertyKey, unknown>)[REQUEST_BRAND] !== true || !issuedPlans.has(value)) return false;
   if (typeof value.source !== "string" || !TOOL_SURFACES.has(value.source as ToolSurface)
     || typeof value.projectRoot !== "string" || typeof value.stagingDir !== "string"
     || value.compilerVersion !== COMPILER_VERSION) return false;
@@ -55,7 +43,13 @@ function validateCompleteAccessPlan(value: unknown): value is CompleteAccessPlan
   const usage = value.resourceUsage as Record<string, unknown>;
   const coverageCounts = [coverage.commandCount, coverage.pathOperationCount, coverage.effectOperationCount, coverage.cwdCandidateCount];
   const usageCounts = [usage.inputLength, usage.commandCount, usage.operationCount, usage.cwdCandidateCount];
-  if (!coverageCounts.every(isNonNegativeInteger) || !usageCounts.every(isNonNegativeInteger)) return false;
+  const commandCount = coverage.commandCount;
+  const cwdCandidateCount = coverage.cwdCandidateCount;
+  if (!coverageCounts.every(isNonNegativeInteger) || !usageCounts.every(isNonNegativeInteger)
+    || !isNonNegativeInteger(commandCount) || !isNonNegativeInteger(cwdCandidateCount)) return false;
+  if (commandCount > ANALYSIS_LIMITS.maxCommands
+    || cwdCandidateCount > ANALYSIS_LIMITS.maxCwdCandidates
+    || commandCount > value.operations.length) return false;
   const inputLength = usage.inputLength;
   if (!isNonNegativeInteger(inputLength)) return false;
   if (!Array.isArray(coverage.commandSpans) || !Array.isArray(coverage.redirectionSpans)) return false;

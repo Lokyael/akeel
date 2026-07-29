@@ -50,7 +50,7 @@ deny 决策的 reason 经过 sensitive prefix 脱敏（`~/.ssh`、`/home/`、`.e
 
 **状态：** implemented。
 
-`CompleteAccessPlan` 只能由 compiler 构造器发行；构造器 deep-freeze plan 后交给 `access-plan-verifier.ts` 的模块私有 WeakSet。Kernel 通过 `isCompleteAccessPlan()` 验证 WeakSet 成员资格、递归冻结、exact coverage correspondence 和 resource budget，拒绝复制或伪造的 plan。`CompleteAccessRequest` 与 `isCompleteAccessRequest()` 仅保留为兼容别名。
+`CompleteAccessPlan` 只能由 `compiler-entry.ts` 的官方 compiler sealing boundary 发行；Shell/Direct compiler 只产生不可提交的 draft。sealing boundary defensive-copy、deep-freeze plan 后加入私有 WeakSet，`access-plan-verifier.ts` 只执行无副作用的完整性和 resource budget proof。Kernel 通过 `isCompleteAccessPlan()` 验证 WeakSet 成员资格、递归冻结、exact coverage correspondence 和所有 analysis budgets，拒绝复制、伪造或 over-budget plan。`CompleteAccessRequest` 与 `isCompleteAccessRequest()` 仅保留为兼容别名。
 
 WeakSet 在进程生命周期内保持，plan 不跨调用缓存或持久化。
 

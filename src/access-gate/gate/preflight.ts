@@ -1,5 +1,5 @@
 import { scanThreats } from "../security/threat-scan";
-import { reject, type CompileResult } from "./access-request";
+import { reject, type CompilationReject } from "./access-request";
 
 // ── hard command rules ──
 // Patterns that are unconditionally blocked regardless of Profile or user approval.
@@ -36,7 +36,7 @@ const PREFLIGHT_CHECKS: readonly PreflightCheck[] = [
   { name: "hard-rule", check: hardCommandRule, code: "hard-command-rule" },
 ];
 
-export function runPreflight(command: string): CompileResult | null {
+export function runPreflight(command: string): CompilationReject | null {
   for (const check of PREFLIGHT_CHECKS) {
     const result = check.check(command);
     if (result) return reject(check.code, result);

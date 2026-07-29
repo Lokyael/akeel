@@ -104,6 +104,16 @@ export interface CompleteAccessPlan {
 /** @deprecated Use CompleteAccessPlan in new code. */
 export type CompleteAccessRequest = CompleteAccessPlan;
 
+export interface AccessPlanDraft {
+  readonly source: ToolSurface;
+  readonly projectRoot: string;
+  readonly stagingDir: string;
+  readonly operations: readonly AccessOperation[];
+  readonly cwdCandidates: readonly CwdCandidate[];
+  readonly coverage: PlanCoverage;
+  readonly inputLength: number;
+}
+
 export type CompilationCategory = "unsupported-form" | "security-block" | "invalid-request";
 
 export type SecurityCompilationCode =
@@ -122,6 +132,10 @@ export type CompilationReject =
   | { readonly kind: "reject"; readonly category: "security-block"; readonly code: SecurityCompilationCode; readonly evidence: readonly GateEvidence[] }
   | { readonly kind: "reject"; readonly category: "invalid-request"; readonly code: InvalidCompilationCode; readonly evidence: readonly GateEvidence[] }
   | { readonly kind: "reject"; readonly category: "unsupported-form"; readonly code: UnsupportedCompilationCode; readonly evidence: readonly GateEvidence[] };
+
+export type CompilerDraftResult =
+  | { readonly kind: "draft"; readonly draft: AccessPlanDraft }
+  | CompilationReject;
 
 export type CompileResult =
   | { readonly kind: "complete"; readonly plan: CompleteAccessPlan }

@@ -183,15 +183,15 @@
 
 **Status:** active
 
-**Decision:** Access Gate 的 enforcement 分为三层：compiler → verifier/Policy Kernel → host adapter。Compiler 只生成经过 brand 和 coverage 证明的 `CompleteAccessPlan`，或带明确 category 的 typed compilation outcome，不接 Profile 或审批。Policy Kernel 只消费 compiler-issued plan，验证其 authenticity（WeakSet issuance）后执行封闭 policy evaluation。
+**Decision:** Access Gate 的 enforcement pipeline 为 compiler → compiler-entry sealing boundary/verifier → Policy Kernel → host adapter。Compiler 只生成经过 brand 和 coverage 证明的 `CompleteAccessPlan`，或带明确 category 的 typed compilation outcome，不接 Profile 或审批。Policy Kernel 只消费 compiler-entry 发行、verifier 验证的 plan，验证其 authenticity（WeakSet issuance）后执行封闭 policy evaluation。
 
 **Why:** 分层保证分析证据（request）和授权结果（GateDecision）不混淆；compiler 可以独立证明 fail-closed 边界，Kernel 可以独立证明 monotonic policy。
 
 **Security invariants:**
 
-- 每个 plan 由构造器 defensive-copy、deep-freeze 后加入 `access-plan-verifier.ts` 的模块私有 WeakSet，只有 issued plan 能通过 `isCompleteAccessPlan()`。`isCompleteAccessRequest()` 作为兼容别名委托给同一 verifier。
+- 每个 plan 由 `compiler-entry.ts` 的私有 sealing boundary defensive-copy、deep-freeze 后加入私有 WeakSet；只有官方 compiler entry 能发行 plan，`access-plan-verifier.ts` 只负责无副作用的完整性和 budget proof。`isCompleteAccessRequest()` 作为兼容别名委托给同一 predicate。
 - Kernel 不接收原始 Shell，也不接收未验证的 plan；compiler outcome 将 dynamic/unsafe/opaque/threat 分为 typed unsupported 或 security category，host renderer 不再通过 DecisionCode 反推 compiler failure kind。
-- coverage 必须逐项对应：command/redirection/effect span 与 operation、顶层 cwd candidates 与 path candidates 去重集合。
+- coverage 必须逐项对应：command/redirection/effect span 与 operation、顶层 cwd candidates 与 path candidates 去重集合；verifier 独立复核 `maxCommands`、`maxOperations`、`maxCwdCandidates` 和 `maxInputLength`。
 - Effect policy axis 是封闭映射：`read/search/write/delete/permissionChange/cwdChange → path`，`execute/network → shell`。
 
 ## D-023: 拒绝解释与静态 Guidance

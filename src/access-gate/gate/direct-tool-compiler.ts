@@ -1,11 +1,11 @@
 import {
   ANALYSIS_LIMITS,
-  createAccessPlan,
+  createPlanDraft,
   isRecord,
   pathOperation,
   reject,
   validateInputLength,
-  type CompileResult,
+  type CompilerDraftResult,
   type DirectToolCompilerInput,
   type ToolSurface,
 } from "./access-request";
@@ -58,7 +58,7 @@ function validateAgainstSchema(
   return null;
 }
 
-export function compileDirectToolCall(input: DirectToolCompilerInput): CompileResult {
+export function compileDirectToolDraft(input: DirectToolCompilerInput): CompilerDraftResult {
   const schema = TOOL_SCHEMAS[input.surface];
   if (!schema) return reject("unknown-tool", input.surface);
   if (!isRecord(input.args)) return reject("invalid-tool-input", "Direct tool args must be a plain object");
@@ -105,7 +105,7 @@ export function compileDirectToolCall(input: DirectToolCompilerInput): CompileRe
     span,
   }));
   const operations = [command, ...effectOperations, path];
-  return createAccessPlan(
+  return createPlanDraft(
     input.surface as ToolSurface, operations, state.candidates,
     {
       commandSpans: [span],

@@ -1,4 +1,5 @@
-export { compileToolCall, evaluateToolCall } from "./evaluate";
+export { evaluateToolCall } from "./evaluate";
+export { compileToolCall, compileDirectToolCall, compileShellCall, isCompleteAccessPlan, isCompleteAccessRequest } from "./compiler-entry";
 export { evaluateRequest } from "./evaluate-request";
 export { renderCompilationFailure, renderDecision } from "./render-decision";
 export { guidanceFor, guidanceText } from "./guidance-catalog";
@@ -8,8 +9,6 @@ export { type GateCategory, GATE_CATEGORY_VALUES } from "./categories";
 export { classifyTool } from "./evaluate";
 export type { ToolSchema, FieldSchema } from "./tool-schemas";
 export { runPreflight } from "./preflight";
-export { compileDirectToolCall } from "./direct-tool-compiler";
-export { compileShellCall } from "./shell-compiler";
 export type {
   AccessOperation,
   CompleteAccessPlan,
@@ -30,9 +29,7 @@ export type {
   ShellCompilerInput,
   UnsupportedCompilationCode,
 } from "./access-request";
-export { isCompleteAccessPlan } from "./access-plan-verifier";
-export { isCompleteAccessRequest } from "./access-request";
 export { ANALYSIS_LIMITS } from "./access-request";
 export type { ApprovalRequest, Enforcement, GateDecision, Guidance, GuidanceId, HardDenyCode, ProfileDenyCode } from "./decision-types";
-export type { ToolCompilerInput } from "./evaluate";
+export type { ToolCompilerInput } from "./compiler-entry";
 export type { GateResult, GateRuntime, ToolCallInput } from "./types";
