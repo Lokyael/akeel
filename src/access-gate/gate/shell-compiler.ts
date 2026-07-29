@@ -103,6 +103,10 @@ export function compileShellCall(input: ShellCompilerInput): CompileResult {
     }
 
     for (const redirection of flowNode.node.redirections) {
+      // fdDuplicate (2>&1) 和 fdClose (2>&-) 不引用文件路径，跳过
+      if (redirection.kind === "fdDuplicate" || redirection.kind === "fdClose") {
+        continue;
+      }
       const operation = redirectionOperation(redirection, flowNode.effectiveCwd);
       if (operation.kind !== "path") return operation;
       operations.push(operation);

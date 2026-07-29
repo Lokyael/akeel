@@ -273,13 +273,14 @@ test("preserves hard command rules in the compiler", () => {
   }
 });
 
-test("rejects redirections whose semantics are not represented as file paths", () => {
+test("fdDuplicate and fdClose pass through; heredoc and here-string are rejected", () => {
   const env = context();
   try {
+    // fdDuplicate (2>&1, 2>&-) has no file path — safe to skip
     const fdDuplicate = compileShellCall({ ...env, command: "cat allowed/file 2>&1" });
+    assert.equal(fdDuplicate.kind, "complete");
+
     const heredoc = compileShellCall({ ...env, command: "cat allowed/file <<EOF\nbody\nEOF" });
-    assert.equal(fdDuplicate.kind, "reject");
-    assert.equal(fdDuplicate.code, "unsupported-redirection");
     assert.equal(heredoc.kind, "reject");
     assert.equal(heredoc.code, "unsupported-redirection");
   } finally {
