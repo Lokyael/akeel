@@ -656,3 +656,83 @@ void test("builtins: . file.sh has exact confidence (POSIX dot does not search P
   assert.equal(sem.intents[0]!.rawPath, "file.sh");
   assert.equal(sem.intents[0]!.confidence, "exact");
 });
+
+// ─── Python tools adapter ───
+
+void test("python: ruff check is inspect", () => {
+  const { program } = parse(lex("ruff check src/").tokens);
+  const sem = analyzeSemantics(program.commands[0]!, CTX);
+  assert.equal(sem.class, "inspect");
+});
+
+void test("python: ruff format is modify", () => {
+  const { program } = parse(lex("ruff format src/").tokens);
+  const sem = analyzeSemantics(program.commands[0]!, CTX);
+  assert.equal(sem.class, "modify");
+});
+
+void test("python: ruff format --check is inspect (check-only)", () => {
+  const { program } = parse(lex("ruff format --check src/").tokens);
+  const sem = analyzeSemantics(program.commands[0]!, CTX);
+  assert.equal(sem.class, "inspect");
+});
+
+void test("python: ruff check --fix upgrades to modify", () => {
+  const { program } = parse(lex("ruff check --fix src/").tokens);
+  const sem = analyzeSemantics(program.commands[0]!, CTX);
+  assert.equal(sem.class, "modify");
+});
+
+void test("python: ruff defaults to inspect", () => {
+  const { program } = parse(lex("ruff").tokens);
+  const sem = analyzeSemantics(program.commands[0]!, CTX);
+  assert.equal(sem.class, "inspect");
+});
+
+void test("python: mypy is inspect", () => {
+  const { program } = parse(lex("mypy src/").tokens);
+  const sem = analyzeSemantics(program.commands[0]!, CTX);
+  assert.equal(sem.class, "inspect");
+});
+
+void test("python: mypy with flags is inspect", () => {
+  const { program } = parse(lex("mypy src/ --ignore-missing-imports").tokens);
+  const sem = analyzeSemantics(program.commands[0]!, CTX);
+  assert.equal(sem.class, "inspect");
+});
+
+void test("python: black is modify", () => {
+  const { program } = parse(lex("black src/").tokens);
+  const sem = analyzeSemantics(program.commands[0]!, CTX);
+  assert.equal(sem.class, "modify");
+});
+
+void test("python: black --check is inspect", () => {
+  const { program } = parse(lex("black --check src/").tokens);
+  const sem = analyzeSemantics(program.commands[0]!, CTX);
+  assert.equal(sem.class, "inspect");
+});
+
+void test("python: isort --check-only is inspect", () => {
+  const { program } = parse(lex("isort --check-only src/").tokens);
+  const sem = analyzeSemantics(program.commands[0]!, CTX);
+  assert.equal(sem.class, "inspect");
+});
+
+void test("python: pytest is execute", () => {
+  const { program } = parse(lex("pytest tests/").tokens);
+  const sem = analyzeSemantics(program.commands[0]!, CTX);
+  assert.equal(sem.class, "execute");
+});
+
+void test("python: pyright is inspect", () => {
+  const { program } = parse(lex("pyright src/").tokens);
+  const sem = analyzeSemantics(program.commands[0]!, CTX);
+  assert.equal(sem.class, "inspect");
+});
+
+void test("python: pylint is inspect", () => {
+  const { program } = parse(lex("pylint src/").tokens);
+  const sem = analyzeSemantics(program.commands[0]!, CTX);
+  assert.equal(sem.class, "inspect");
+});
