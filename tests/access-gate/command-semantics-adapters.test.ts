@@ -566,3 +566,75 @@ void test("noop: : (colon noop) is inspect", () => {
   const sem = analyzeSemantics(program.commands[0]!, CTX);
   assert.equal(sem.class, "inspect");
 });
+
+// ─── Shell builtins adapter ───
+
+void test("builtins: source file.sh is execute with conservative read intent", () => {
+  const { program } = parse(lex("source file.sh").tokens);
+  const sem = analyzeSemantics(program.commands[0]!, CTX);
+  assert.equal(sem.class, "execute");
+  assert.equal(sem.intents.length, 1);
+  assert.equal(sem.intents[0]!.operation, "read");
+  assert.equal(sem.intents[0]!.rawPath, "file.sh");
+  assert.equal(sem.intents[0]!.confidence, "conservative");
+  assert.ok(sem.effects.includes("execute"));
+});
+
+void test("builtins: source ./file.sh is execute with exact read intent", () => {
+  const { program } = parse(lex("source ./file.sh").tokens);
+  const sem = analyzeSemantics(program.commands[0]!, CTX);
+  assert.equal(sem.class, "execute");
+  assert.equal(sem.intents.length, 1);
+  assert.equal(sem.intents[0]!.operation, "read");
+  assert.equal(sem.intents[0]!.rawPath, "./file.sh");
+  assert.equal(sem.intents[0]!.confidence, "exact");
+});
+
+void test("builtins: . ./file.sh is execute (dot command)", () => {
+  const { program } = parse(lex(". ./file.sh").tokens);
+  const sem = analyzeSemantics(program.commands[0]!, CTX);
+  assert.equal(sem.class, "execute");
+  assert.equal(sem.intents.length, 1);
+  assert.equal(sem.intents[0]!.operation, "read");
+  assert.equal(sem.intents[0]!.rawPath, "./file.sh");
+  assert.equal(sem.intents[0]!.confidence, "exact");
+});
+
+void test("builtins: source - has no path intent (stdin)", () => {
+  const { program } = parse(lex("source -").tokens);
+  const sem = analyzeSemantics(program.commands[0]!, CTX);
+  assert.equal(sem.class, "execute");
+  assert.equal(sem.intents.length, 0);
+});
+
+void test("builtins: source with no args has no path intent", () => {
+  const { program } = parse(lex("source").tokens);
+  const sem = analyzeSemantics(program.commands[0]!, CTX);
+  assert.equal(sem.class, "execute");
+  assert.equal(sem.intents.length, 0);
+});
+
+void test("builtins: source file.sh arg1 arg2 only extracts first non-option arg", () => {
+  const { program } = parse(lex("source file.sh arg1 arg2").tokens);
+  const sem = analyzeSemantics(program.commands[0]!, CTX);
+  assert.equal(sem.class, "execute");
+  assert.equal(sem.intents.length, 1);
+  assert.equal(sem.intents[0]!.rawPath, "file.sh");
+});
+
+void test("builtins: source /absolute/path.sh is execute with exact read intent", () => {
+  const { program } = parse(lex("source /absolute/path.sh").tokens);
+  const sem = analyzeSemantics(program.commands[0]!, CTX);
+  assert.equal(sem.class, "execute");
+  assert.equal(sem.intents.length, 1);
+  assert.equal(sem.intents[0]!.operation, "read");
+  assert.equal(sem.intents[0]!.rawPath, "/absolute/path.sh");
+  assert.equal(sem.intents[0]!.confidence, "exact");
+});
+
+void test("builtins: . with no args has no path intent", () => {
+  const { program } = parse(lex(".").tokens);
+  const sem = analyzeSemantics(program.commands[0]!, CTX);
+  assert.equal(sem.class, "execute");
+  assert.equal(sem.intents.length, 0);
+});

@@ -22,8 +22,9 @@ export interface LexToken {
  * lexer 内部状态：每个 word 独立追踪引用状态。
  */
 interface WordBuilder {
-  raw: string;       // 原始字符（含引号）
-  hadQuote: boolean; // word 内出现过引号
+  raw: string;              // 原始字符（含引号）
+  hadQuote: boolean;        // word 内出现过引号
+  hadDynamicInDouble: boolean;  // $ 或 ` 出现在双引号内（触发命令替换）
 }
 
 function isDynamic(ch: string): boolean {
@@ -48,14 +49,16 @@ export function lex(text: string): { tokens: LexToken[]; unsafeSyntax: string | 
   let unsafeSyntax: string | null = null;
 
   // 当前 word
-  let wb: WordBuilder = { raw: "", hadQuote: false };
+  let wb: WordBuilder = { raw: "", hadQuote: false, hadDynamicInDouble: false };
   let inSingle = false;
   let inDouble = false;
 
   const flush = () => {
     if (wb.raw.length === 0) return;
     const quoted = wb.hadQuote;
-    const dynamic = !quoted && [...wb.raw].some(isDynamic);
+    // 未引用 → 检查原始字符中的动态模式
+    // 双引号内出现 $ 或 ` → 命令替换仍然生效，标记为动态
+    const dynamic = (!quoted && [...wb.raw].some(isDynamic)) || wb.hadDynamicInDouble;
     tokens.push({
       kind: "word",
       value: wb.raw,
@@ -64,7 +67,7 @@ export function lex(text: string): { tokens: LexToken[]; unsafeSyntax: string | 
       quoted,
       dynamic,
     });
-    wb = { raw: "", hadQuote: false };
+    wb = { raw: "", hadQuote: false, hadDynamicInDouble: false };
   };
 
   const emitRedirect = (op: string, start: number) => {
@@ -129,10 +132,16 @@ export function lex(text: string): { tokens: LexToken[]; unsafeSyntax: string | 
       continue;
     }
     if (inDouble) {
+      // 反斜杠转义：跳过下一个字符（"\$" → 字面量 "$"）
       if (ch === "\\" && i + 1 < text.length && /[$`"\\\n]/.test(text[i + 1]!)) {
         wb.raw += ch;
-        i++;
+        wb.raw += text[i + 1]!;
+        i += 2;
         continue;
+      }
+      // $ 和 ` 在双引号内仍然触发命令替换（与单引号不同）
+      if (ch === "$" || ch === "`") {
+        wb.hadDynamicInDouble = true;
       }
       wb.raw += ch;
       i++;

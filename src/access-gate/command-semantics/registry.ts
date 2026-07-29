@@ -11,6 +11,7 @@ import { buildAdapter } from "./adapters/build";
 import { noopAdapter } from "./adapters/noop";
 import { readAdapter } from "./adapters/read";
 import { interpreterAdapter } from "./adapters/interpreters";
+import { shellBuiltinsAdapter } from "./adapters/shell-builtins";
 import { makeSemantics } from "./adapters/shared";
 import {
   loadOverrides,
@@ -30,6 +31,7 @@ const ADAPTERS: CommandAdapter[] = [
   noopAdapter,
   readAdapter,
   interpreterAdapter,
+  shellBuiltinsAdapter,
 ];
 
 // 按命令名索引

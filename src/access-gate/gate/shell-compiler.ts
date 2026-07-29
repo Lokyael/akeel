@@ -51,11 +51,13 @@ export function compileShellCall(input: ShellCompilerInput): CompileResult {
   const parsed = parse(lexResult.tokens);
   if (parsed.error || parsed.program.commands.length === 0) return reject("unsafe-syntax", parsed.error ?? "empty command");
   if (parsed.program.commands.length > ANALYSIS_LIMITS.maxCommands) return reject("resource-limit", "command count exceeds the analysis budget");
-  if (parsed.program.dynamic) return reject("dynamic-shell", "dynamic shell token");
   if (parsed.program.unsafeSyntax) return reject("unsafe-syntax", parsed.program.unsafeSyntax);
 
+  // preflight 在 dynamic 检查之前运行，以便硬规则和威胁扫描提供更具体的错误信息
   const preflight = runPreflight(command);
   if (preflight) return preflight;
+
+  if (parsed.program.dynamic) return reject("dynamic-shell", "dynamic shell token");
 
   const flow = analyzeControlFlow(parsed.program, initialCwd(input.cwd));
   if (flow.opaque) return reject("opaque-command", "opaque control flow");

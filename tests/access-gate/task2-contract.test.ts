@@ -32,9 +32,11 @@ function allowAllProfile(): ResolvedProfile {
   };
 }
 
-test("runtime rejects an unknown tool before the legacy evaluator can allow it", async () => {
+test("unknown tools pass through without gate intervention", async () => {
   const env = context();
   try {
+    // classifyTool 将未知工具标为 passthrough — gate 只拦截已知的
+    // filesystem/shell 工具，其余放行给 pi 处理。
     const result = await evaluateToolCall({
       surface: "unknown-tool",
       args: {},
@@ -43,8 +45,7 @@ test("runtime rejects an unknown tool before the legacy evaluator can allow it",
       stagingDir: env.stagingDir,
       profile: allowAllProfile(),
     }, { hasUI: false });
-    assert.equal(result.kind, "block");
-    assert.equal(result.code, "unknown-tool");
+    assert.equal(result.kind, "allow");
   } finally {
     env.cleanup();
   }

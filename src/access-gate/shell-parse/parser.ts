@@ -293,8 +293,10 @@ function wordToArg(tok: LexToken): ShellArg {
     value = tok.value;
   }
 
-  // 动态 token 判断（未引用的 $ ` * ? [ ( 等）
-  const dynamic = !quoted && [...value].some((ch) => "$`*?[{(".includes(ch));
+  // 动态 token 判断：信任 lexer 的 dynamic 标记。
+  // lexer 已正确处理：未引用字符中的动态模式 + 双引号内的 $ 和 `。
+  // 单引号内的所有字符（包括 $ `）都是字面量，dynamic 保持 false。
+  const dynamic = tok.dynamic;
 
   return {
     raw: tok.rawValue,
