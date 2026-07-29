@@ -6,9 +6,6 @@ import type { GateResult, GateRuntime, ToolCallInput } from "./types";
 import { TOOL_SCHEMAS } from "./tool-schemas";
 import type { GateCategory } from "./categories";
 
-export { compileToolCall } from "./compiler-entry";
-export type { ToolCompilerInput } from "./compiler-entry";
-
 /** 将 tool surface 映射到 gate 分类。不在管辖范围内的工具 = passthrough。 */
 export function classifyTool(surface: string): { category: GateCategory } {
   if (surface === "bash") return { category: "shell" };
