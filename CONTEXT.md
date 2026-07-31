@@ -44,6 +44,7 @@
 - [D-023 拒绝解释与静态 Guidance](docs/decisions.md#d-023-拒绝解释与静态-guidance)
 - [D-024 命令覆盖层](docs/decisions.md#d-024-命令覆盖层)
 - [D-025 Direct 优先与 Shell 安全子集](docs/decisions.md#d-025-direct-优先与-shell-安全子集)
+- [D-026 本地约束与溯源文档边界](docs/decisions.md#d-026-本地约束与溯源文档边界)
 
 ## Negative Space
 
@@ -58,4 +59,4 @@
 - [`docs/decisions.md`](docs/decisions.md)：长期决策寄存器。
 - [`docs/task.md`](docs/task.md)：活跃任务记录。
 - [`docs/security-boundaries.md`](docs/security-boundaries.md)：安全承诺和残余风险。
-- [`docs/traceability.md`](docs/traceability.md)：外部来源、融合决策和合规溯源。
+- [`docs/traceability.md`](docs/traceability.md)：外部来源、采用方式、文件映射和许可证义务；不定义当前架构、行为或决策。

@@ -286,3 +286,19 @@ reclassify:
 **Rejected:** 不采用“Direct 存在即禁用 Shell”等价命令；不把 Direct 工具作为 Shell gate 的绕过路径；不在本决策中实现 Shell glob 的安全展开。
 
 **Current implementation:** Direct-first 当前是 `principles.md` 中的模型工具选择偏好，不是 host 层自动路由或 Policy Kernel 的强制优先级。安全可分析的字面 Shell 仍然允许。compiler 使用 `CompilationCategory` 和 category-specific code union 区分 unsupported form、security block 和 invalid request；完整计划由 `access-plan-verifier.ts` 验证。
+
+## D-026: 本地约束与溯源文档边界
+
+**Status:** active
+
+**Decision:** `AGENTS.md` 只定义 pi-keel 自身的维护入口和仓库约定，不复制注入原则、Task 生命周期或当前架构。`docs/traceability.md` 只记录外部来源、采用方式、当前文件映射和许可证义务；当前架构、安全边界和长期取舍分别由 `CONTEXT.md`、`docs/security-boundaries.md` 和本决策寄存器维护。
+
+**Why:** 同一规则或行为在多个长期文档中重复描述会产生漂移。溯源文件只有在来源、revision、采用范围和许可证证据可核查时才具有合规价值；运行时行为和融合取舍放入其中会把它变成第二份架构与决策文档。
+
+**Impact:** 修改运行时行为不再自动更新 `docs/traceability.md`；只有第三方来源映射或许可证义务变化时才更新。新增或同步外部内容必须记录固定的上游 commit 或 release。
+
+**Rejected:** 不保留按当前模块罗列“来源 + 融合决策”的架构摘要，也不使用主观原创占比作为合规证据。
+
+**Out of Scope:**
+
+- **恢复初始引入的精确上游 revision**: 本地提交 `2f4a3ef` 未保存这些 revision，现有 Git 历史无法可靠还原。仅在获得可验证的历史快照或导入元数据时补录。

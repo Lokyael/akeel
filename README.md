@@ -14,13 +14,13 @@ Principles and the access gate activate automatically. Skills load on demand.
 
 ## What's Inside
 
-- **2 foundations** — always-on engineering principles and evidence-first verification
-- **12 disciplines** — TDD, code review, debugging, security review, domain modeling, planning, documentation sync, and related practices
-- **10 workflows** — design, grilling, implementation, rollback, handoff, and context workflows
+- **Injected principles and evidence-first verification** — session-wide engineering guidance plus explicit completion checks
+- **Engineering disciplines** — TDD, code review, debugging, security review, domain modeling, planning, documentation sync, and related practices
+- **User workflows** — design, grilling, implementation, rollback, handoff, and context workflows
 - **Access profiles** — composable read/write path rules, Shell command decisions, one-time approval, hard protected paths, and threat scanning
 - **Session-safe authorization** — each Session starts from the configured default Profile; approvals are `Allow once` only
 - **Recovery boundary** — no automatic snapshots or rollback extension; use version control, editor history, or pi's session tree
-- **Test coverage** — 24 skill validations and access-gate assertions covering Profile, paths, Shell IR, command semantics, compiler, kernel, guidance, invariants, gate decisions, and extension integration
+- **Test coverage** — skill validation and access-gate assertions covering Profile, paths, Shell IR, command semantics, compiler, kernel, guidance, invariants, gate decisions, and extension integration
 
 ## Access Gate
 
@@ -44,7 +44,7 @@ Hard threats, unsafe Shell syntax, symlink escapes, and blocked paths always den
 | [CONTEXT.md](CONTEXT.md) | Current project context and active decision index |
 | [docs/decisions.md](docs/decisions.md) | Long-term architecture and policy decisions |
 | [docs/task.md](docs/task.md) | Active task records |
-| [docs/traceability.md](docs/traceability.md) | Sources, fusion decisions, and compliance traceability |
+| [docs/traceability.md](docs/traceability.md) | External sources, adoption mapping, and license obligations |
 | [docs/security-boundaries.md](docs/security-boundaries.md) | Residual security boundaries |
 
 ## License
