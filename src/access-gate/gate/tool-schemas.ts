@@ -1,6 +1,5 @@
 import type { Effect, CommandClass } from "../command-semantics/types";
 import type { PathOperationKind } from "./access-request";
-import type { GateCategory } from "./categories";
 
 // Centralized tool schema definitions — single source of truth for Direct tool
 // parameter validation.  Adding a new tool or parameter only requires a schema
@@ -14,7 +13,6 @@ export interface FieldSchema {
 }
 
 export interface ToolSchema {
-  readonly category: GateCategory;
   readonly fields: Record<string, FieldSchema>;
   readonly pathOperation: PathOperationKind;
   readonly effects: readonly Effect[];
@@ -23,7 +21,6 @@ export interface ToolSchema {
 
 export const TOOL_SCHEMAS: Record<string, ToolSchema> = {
   read: {
-    category: "filesystem",
     fields: {
       path:   { type: "string", required: true },
       offset: { type: "integer", required: false, min: 0 },
@@ -34,7 +31,6 @@ export const TOOL_SCHEMAS: Record<string, ToolSchema> = {
     commandClass: "inspect",
   },
   write: {
-    category: "filesystem",
     fields: {
       path:    { type: "string", required: true },
       content: { type: "string", required: true },
@@ -44,7 +40,6 @@ export const TOOL_SCHEMAS: Record<string, ToolSchema> = {
     commandClass: "modify",
   },
   edit: {
-    category: "filesystem",
     fields: {
       path:  { type: "string", required: true },
       edits: { type: "array", required: true, items: { oldText: "string", newText: "string" } },
@@ -54,7 +49,6 @@ export const TOOL_SCHEMAS: Record<string, ToolSchema> = {
     commandClass: "modify",
   },
   find: {
-    category: "filesystem",
     fields: {
       path:    { type: "string", required: false },
       pattern: { type: "string", required: false },
@@ -64,7 +58,6 @@ export const TOOL_SCHEMAS: Record<string, ToolSchema> = {
     commandClass: "inspect",
   },
   grep: {
-    category: "filesystem",
     fields: {
       path:    { type: "string", required: false },
       pattern: { type: "string", required: true },
@@ -75,7 +68,6 @@ export const TOOL_SCHEMAS: Record<string, ToolSchema> = {
     commandClass: "inspect",
   },
   ls: {
-    category: "filesystem",
     fields: {
       path: { type: "string", required: false },
     },

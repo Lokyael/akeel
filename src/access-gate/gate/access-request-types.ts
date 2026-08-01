@@ -76,9 +76,6 @@ export interface PlanCoverage {
   readonly cwdCandidateCount: number;
 }
 
-/** @deprecated Use PlanCoverage in new code. */
-export type RequestCoverage = PlanCoverage;
-
 export interface ResourceUsage {
   readonly inputLength: number;
   readonly commandCount: number;
@@ -100,9 +97,6 @@ export interface CompleteAccessPlan {
   readonly resourceUsage: ResourceUsage;
   readonly compilerVersion: string;
 }
-
-/** @deprecated Use CompleteAccessPlan in new code. */
-export type CompleteAccessRequest = CompleteAccessPlan;
 
 export interface AccessPlanDraft {
   readonly source: ToolSurface;

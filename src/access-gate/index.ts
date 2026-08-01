@@ -9,14 +9,27 @@ import { displayName, PROFILE_PREFIX } from "./profile/defaults";
 import { findProjectRoot, createProfileState, type ProfileState } from "./session/profile-state";
 import { clearProfileStatus, installProfileFooter, type ProfileFooterHandle } from "./ui/profile-status";
 
+const SHELL_CLASSES = ["inspect", "modify", "execute", "destroy", "unknown"] as const;
+const PATH_OPERATIONS = ["read", "list", "search", "write"] as const;
+
+function formatDecisions<T extends string>(keys: readonly T[], values: Partial<Record<T, string>>): string {
+  return keys.flatMap((key) => values[key] ? [`${key}=${values[key]}`] : []).join(" ");
+}
+
 function profileStatus(state: ProfileState, profiles: ResolvedProfiles): string {
   const profile = state.getProfile();
-  const pathRules = profile.pathPolicy.rules.length;
+  const pathRules = profile.pathPolicy.rules.length > 0
+    ? profile.pathPolicy.rules.map((rule) => `  ${rule.path}: ${formatDecisions(PATH_OPERATIONS, rule)}`)
+    : ["  (none)"];
   return [
     `Profile: ${displayName(state.getName())}`,
     `Description: ${profile.description}`,
-    `Shell: inspect=${profile.shellPolicy.inspect}, modify=${profile.shellPolicy.modify}, execute=${profile.shellPolicy.execute}, unknown=${profile.shellPolicy.unknown}`,
-    `Path rules: ${pathRules}`,
+    "Shell:",
+    `  ${formatDecisions(SHELL_CLASSES, profile.shellPolicy)}`,
+    "Path defaults:",
+    `  ${formatDecisions(PATH_OPERATIONS, profile.pathPolicy.default)}`,
+    "Path rules:",
+    ...pathRules,
     `Available profiles: ${Object.keys(profiles.profiles).map(displayName).join(", ")}`,
   ].join("\n");
 }
@@ -62,7 +75,11 @@ export default function accessGate(pi: ExtensionAPI): void {
 
   pi.on("session_start", async (_event, ctx) => {
     projectRoot = findProjectRoot(ctx.cwd);
-    profiles = loadProfiles(projectRoot, undefined, ctx.isProjectTrusted?.() === true);
+    profiles = loadProfiles({
+      onError: (message) => {
+        if (ctx.hasUI) ctx.ui.notify(message, "error");
+      },
+    });
     state = createProfileState(profiles);
     footer?.dispose();
     footer = installProfileFooter(

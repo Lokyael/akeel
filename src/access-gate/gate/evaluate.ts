@@ -7,15 +7,15 @@ import { TOOL_SCHEMAS } from "./tool-schemas";
 import type { GateCategory } from "./categories";
 
 /** 将 tool surface 映射到 gate 分类。不在管辖范围内的工具 = passthrough。 */
-export function classifyTool(surface: string): { category: GateCategory } {
-  if (surface === "bash") return { category: "shell" };
-  if (TOOL_SCHEMAS[surface]) return { category: "filesystem" };
-  return { category: "passthrough" };
+export function classifyTool(surface: string): GateCategory {
+  if (surface === "bash") return "shell";
+  if (TOOL_SCHEMAS[surface]) return "filesystem";
+  return "passthrough";
 }
 
 export async function evaluateToolCall(input: ToolCallInput, runtime: GateRuntime): Promise<GateResult> {
   // 不在 gate 管辖范围内的工具 passthrough，不做任何拦截。
-  if (classifyTool(input.surface).category === "passthrough") {
+  if (classifyTool(input.surface) === "passthrough") {
     return { kind: "allow" };
   }
 
@@ -27,7 +27,7 @@ export async function evaluateToolCall(input: ToolCallInput, runtime: GateRuntim
     stagingDir: input.stagingDir,
   });
   if (compiled.kind === "reject") return renderCompilationFailure(compiled);
-  return adaptDecision(await evaluateRequest(compiled.plan, input.profile, runtime), runtime);
+  return adaptDecision(evaluateRequest(compiled.plan, input.profile), runtime);
 }
 
 async function adaptDecision(decision: GateDecision, runtime: GateRuntime): Promise<GateResult> {

@@ -6,9 +6,13 @@ import test from "node:test";
 import { lex } from "../../src/access-gate/shell-parse/lexer";
 import { parse } from "../../src/access-gate/shell-parse/parser";
 import { normalizeCommand } from "../../src/access-gate/command-semantics/normalize";
-import { analyzeControlFlow, initialCwd } from "../../src/access-gate/command-semantics/control-flow";
+import { analyzeControlFlow, initialCwd, resolveCdTarget } from "../../src/access-gate/command-semantics/control-flow";
 
-// ─── Wrapper Normalization ───
+void test("control: unavailable cd target returns exists=false without throwing", () => {
+  const result = resolveCdTarget("missing/subdir", "/path/that/does/not/exist");
+  assert.deepEqual(result, { cwd: "/path/that/does/not/exist/missing/subdir", exists: false });
+});
+
 
 void test("normalize: env rm keeps underlying executable", () => {
   const { program } = parse(lex("env rm file").tokens);

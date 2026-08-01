@@ -9,7 +9,6 @@ import {
   ANALYSIS_LIMITS,
   compileToolCall,
   isCompleteAccessPlan,
-  isCompleteAccessRequest,
   type AccessOperation,
   type CompileResult,
   type CompilerContext,
@@ -97,7 +96,7 @@ test("validates complete Shell requests that include cd coverage", () => {
   const env = context();
   try {
     const request = complete(compileShellCall({ ...env, command: "cd allowed && grep -rn pattern ." }));
-    assert.equal(isCompleteAccessRequest(request), true);
+    assert.equal(isCompleteAccessPlan(request), true);
   } finally {
     env.cleanup();
   }
@@ -122,7 +121,6 @@ test("verifies complete plans through the public plan seam", () => {
   try {
     const plan = complete(compileShellCall({ ...env, command: "find allowed" }));
     assert.equal(isCompleteAccessPlan(plan), true);
-    assert.equal(isCompleteAccessRequest(plan), true);
   } finally {
     env.cleanup();
   }
@@ -251,7 +249,7 @@ test("rejects forged and incomplete frozen plans", () => {
     Object.freeze(forgedCoverage);
     const forged = { ...request, coverage: forgedCoverage };
     Object.freeze(forged);
-    assert.equal(isCompleteAccessRequest(forged), false);
+    assert.equal(isCompleteAccessPlan(forged), false);
   } finally {
     env.cleanup();
   }
@@ -266,16 +264,16 @@ test("bounds evidence subjects and freezes complete requests", () => {
     if (invalid.kind === "reject") assert.equal(invalid.evidence[0]?.subject.length, ANALYSIS_LIMITS.maxEvidenceSubjectLength);
 
     const request = complete(compileDirectToolCall({ ...env, surface: "read", args: { path: "allowed/file.ts" } }));
-    assert.equal(isCompleteAccessRequest(request), true);
+    assert.equal(isCompleteAccessPlan(request), true);
     assert.equal(Object.isFrozen(request), true);
     assert.equal(Object.isFrozen(request.operations), true);
     assert.equal(Object.isFrozen(request.coverage), true);
-    assert.equal(isCompleteAccessRequest({}), false);
+    assert.equal(isCompleteAccessPlan({}), false);
     const forged = {
       ...request,
       operations: request.operations.map((operation) => operation.kind === "command" ? { ...operation, effects: [] } : operation),
     };
-    assert.equal(isCompleteAccessRequest(forged), false);
+    assert.equal(isCompleteAccessPlan(forged), false);
 
   } finally {
     env.cleanup();
@@ -429,7 +427,7 @@ test("compiles Direct edit with multiple edits", () => {
         ],
       },
     }));
-    assert.equal(isCompleteAccessRequest(request), true);
+    assert.equal(isCompleteAccessPlan(request), true);
     assert.equal(paths(request.operations).length, 1);
   } finally {
     env.cleanup();
@@ -509,7 +507,7 @@ test("compiles Direct read with offset and limit", () => {
       ...env, surface: "read",
       args: { path: "allowed/file.ts", offset: 50, limit: 100 },
     }));
-    assert.equal(isCompleteAccessRequest(request), true);
+    assert.equal(isCompleteAccessPlan(request), true);
     assert.equal(paths(request.operations)[0]?.input, "allowed/file.ts");
   } finally {
     env.cleanup();
@@ -523,7 +521,7 @@ test("compiles Direct read with offset only", () => {
       ...env, surface: "read",
       args: { path: "allowed/file.ts", offset: 200 },
     }));
-    assert.equal(isCompleteAccessRequest(request), true);
+    assert.equal(isCompleteAccessPlan(request), true);
   } finally {
     env.cleanup();
   }
@@ -536,7 +534,7 @@ test("compiles Direct read with limit only", () => {
       ...env, surface: "read",
       args: { path: "allowed/file.ts", limit: 50 },
     }));
-    assert.equal(isCompleteAccessRequest(request), true);
+    assert.equal(isCompleteAccessPlan(request), true);
   } finally {
     env.cleanup();
   }

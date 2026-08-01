@@ -60,7 +60,7 @@ export function analyzeSemantics(
   context: SemanticContext,
 ): CommandSemantics {
   const name = node.executable?.value?.toLowerCase() ?? "";
-  const ov = loadOverrides(context.projectRoot);
+  const ov = loadOverrides();
 
   // 1. 用户定义的完整命令 — 直接返回，不走 adapter
   if (ov.commands?.[name]) {

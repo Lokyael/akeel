@@ -11,22 +11,22 @@ import type { ResolvedProfile } from "../../src/access-gate/profile/types";
 
 void test("classify: read, write, edit, find, grep, ls are filesystem", () => {
   for (const surface of Object.keys(TOOL_SCHEMAS)) {
-    assert.equal(classifyTool(surface).category, "filesystem", `${surface} should be filesystem`);
+    assert.equal(classifyTool(surface), "filesystem", `${surface} should be filesystem`);
   }
 });
 
 void test("classify: bash is shell", () => {
-  assert.equal(classifyTool("bash").category, "shell");
+  assert.equal(classifyTool("bash"), "shell");
 });
 
 void test("classify: unknown tool surfpases passthrough", () => {
   // Gate 不应拦截它不认识的工具
-  assert.equal(classifyTool("web_search").category, "passthrough");
-  assert.equal(classifyTool("fetch_content").category, "passthrough");
-  assert.equal(classifyTool("get_search_content").category, "passthrough");
-  assert.equal(classifyTool("task").category, "passthrough");
-  assert.equal(classifyTool("notify").category, "passthrough");
-  assert.equal(classifyTool("nonexistent_tool_xyz").category, "passthrough");
+  assert.equal(classifyTool("web_search"), "passthrough");
+  assert.equal(classifyTool("fetch_content"), "passthrough");
+  assert.equal(classifyTool("get_search_content"), "passthrough");
+  assert.equal(classifyTool("task"), "passthrough");
+  assert.equal(classifyTool("notify"), "passthrough");
+  assert.equal(classifyTool("nonexistent_tool_xyz"), "passthrough");
 });
 
 // ── passthrough 行为 ──
@@ -124,9 +124,8 @@ void test("filesystem: write is still denied under restrictive profile", async (
   }
 });
 
-void test("filesystem: TOOL_SCHEMAS 每个条目都有 category", () => {
+void test("filesystem: TOOL_SCHEMAS derive category from registry membership", () => {
   for (const [name, schema] of Object.entries(TOOL_SCHEMAS)) {
-    assert.ok(schema.category, `${name} must have a category`);
-    assert.equal(schema.category, "filesystem", `${name} should be filesystem`);
+    assert.equal("category" in schema, false, `${name} should not duplicate its derived category`);
   }
 });

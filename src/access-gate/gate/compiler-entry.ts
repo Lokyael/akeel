@@ -19,7 +19,6 @@ import type {
   AccessOperation,
   AccessPlanDraft,
   CompleteAccessPlan,
-  CompleteAccessRequest,
 } from "./access-request-types";
 
 export type ToolCompilerInput = CompilerContext & {
@@ -55,10 +54,6 @@ export function isCompleteAccessPlan(value: unknown): value is CompleteAccessPla
   } catch {
     return false;
   }
-}
-
-export function isCompleteAccessRequest(value: unknown): value is CompleteAccessRequest {
-  return isCompleteAccessPlan(value);
 }
 
 function finalize(result: CompilerDraftResult): CompileResult {

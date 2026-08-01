@@ -4,7 +4,7 @@
 
 import { isAbsolute, resolve } from "node:path";
 import { homedir } from "node:os";
-import { existsSync, statSync } from "node:fs";
+import { statSync } from "node:fs";
 import type { ShellProgram, ShellCommandNode, ShellOperator } from "../shell-parse/types";
 import type { CwdCandidate, CwdState, CommandSemantics } from "./types";
 
@@ -51,6 +51,14 @@ export function analyzeCd(node: ShellCommandNode): CdInfo {
   return { target: arg.value, opaque: false };
 }
 
+function isDirectory(path: string): boolean {
+  try {
+    return statSync(path).isDirectory();
+  } catch {
+    return false;
+  }
+}
+
 /**
  * 在给定 cwd 下解析 cd target。
  * 返回新的 cwd，或 null（目标不可用）。
@@ -58,11 +66,10 @@ export function analyzeCd(node: ShellCommandNode): CdInfo {
 export function resolveCdTarget(target: string, currentCwd: string): { cwd: string; exists: boolean } | null {
   if (target === "~") {
     const home = homedir();
-    return { cwd: home, exists: existsSync(home) && statSync(home).isDirectory() };
+    return { cwd: home, exists: isDirectory(home) };
   }
   const resolved = isAbsolute(target) ? target : resolve(currentCwd, target);
-  const exists = existsSync(resolved) && statSync(resolved).isDirectory();
-  return { cwd: resolved, exists };
+  return { cwd: resolved, exists: isDirectory(resolved) };
 }
 
 // ─── 主控制流分析 ───

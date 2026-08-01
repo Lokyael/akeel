@@ -129,7 +129,8 @@
 - `blockedPaths`、威胁模式、unsafe syntax 和 symlink escape 是不可覆盖的 hard deny。
 - `ask` 只提供 `Allow once` 和 `Deny`，不跨调用或 Session 持久化。
 - 每次 Session 从配置的 `defaultProfile` 开始，不继承其他 Session 的临时 Profile。
-- 配置按内置、全局、受信项目顺序合并，后层同名 Profile 替换前层定义。
+- 配置按内置、用户全局顺序合并，全局同名 Profile 替换内置定义；项目仓库不提供 Profile 配置。
+- 全局配置无效时保留内置 Profiles，并将当前 Session 默认项收紧为 `keel-read`。
 
 ## D-018: Shell IR 与 Access Gate
 
@@ -145,11 +146,10 @@
 - modify 命令的源路径按 `read` 检查，目标、删除和权限变化按 `write` 检查。
 - 无法确定分支 cwd 时不得 allow。
 - 一个 tool call 的所有 ask intent 聚合为一次审批。
-- 项目 Profile 仅在项目受信时参与合并。
 
 **Enforcement scope:**
 
-只拦截 Pi `tool_call` 事件，不承诺全局 enforcement。`user_bash`、`shellCommandPrefix`、Bash `spawnHook`、tool override、custom tool backend 和后续 handler 对 input 的修改不在范围内。
+只对 Pi `tool_call` 中的 `bash` 和 `TOOL_SCHEMAS` 已知 Direct surface 执行策略；未知 Direct surface passthrough。它不承诺全局 enforcement，`user_bash`、`shellCommandPrefix`、Bash `spawnHook`、tool override、custom tool backend 和后续 handler 对 input 的修改不在范围内。
 
 ## D-019: 两行 Profile Footer
 
@@ -183,13 +183,13 @@
 
 **Status:** active
 
-**Decision:** Access Gate 的 enforcement pipeline 为 compiler → compiler-entry sealing boundary/verifier → Policy Kernel → host adapter。Compiler 只生成经过 brand 和 coverage 证明的 `CompleteAccessPlan`，或带明确 category 的 typed compilation outcome，不接 Profile 或审批。Policy Kernel 只消费 compiler-entry 发行、verifier 验证的 plan，验证其 authenticity（WeakSet issuance）后执行封闭 policy evaluation。
+**Decision:** Access Gate 的 enforcement pipeline 为 compiler → compiler-entry sealing boundary/verifier → Policy Kernel → host adapter。Compiler 只生成经过 brand 和 coverage 证明的 `CompleteAccessPlan`，或带明确 category 的 typed compilation outcome，不接 Profile 或审批。Policy Kernel 是同步纯函数，只消费 compiler-entry 发行、verifier 验证的 plan 和 Profile，验证其 authenticity（WeakSet issuance）后执行封闭 policy evaluation。
 
 **Why:** 分层保证分析证据（request）和授权结果（GateDecision）不混淆；compiler 可以独立证明 fail-closed 边界，Kernel 可以独立证明 monotonic policy。
 
 **Security invariants:**
 
-- 每个 plan 由 `compiler-entry.ts` 的私有 sealing boundary defensive-copy、deep-freeze 后加入私有 WeakSet；只有官方 compiler entry 能发行 plan，`access-plan-verifier.ts` 只负责无副作用的完整性和 budget proof。`isCompleteAccessRequest()` 作为兼容别名委托给同一 predicate。
+- 每个 plan 由 `compiler-entry.ts` 的私有 sealing boundary defensive-copy、deep-freeze 后加入私有 WeakSet；只有官方 compiler entry 能发行 plan，`access-plan-verifier.ts` 只负责无副作用的完整性和 budget proof，`isCompleteAccessPlan()` 是唯一公开完整性 predicate。
 - Kernel 不接收原始 Shell，也不接收未验证的 plan；compiler outcome 将 dynamic/unsafe/opaque/threat 分为 typed unsupported 或 security category，host renderer 不再通过 DecisionCode 反推 compiler failure kind。
 - coverage 必须逐项对应：command/redirection/effect span 与 operation、顶层 cwd candidates 与 path candidates 去重集合；verifier 独立复核 `maxCommands`、`maxOperations`、`maxCwdCandidates` 和 `maxInputLength`。
 - Effect policy axis 是封闭映射：`read/search/write/delete/permissionChange/cwdChange → path`，`execute/network → shell`。
@@ -220,18 +220,19 @@
 
 **Status:** active
 
-**Decision:** 不将内置 adapter 的分类规则迁移到声明式文件。改为提供轻量 `command-overrides.yaml`，作为 Shell 命令和 Direct 工具的**统一扩展入口**，支持三种操作：别名映射、新命令定义和分类微调。
+**Decision:** 不将内置 adapter 的分类规则迁移到声明式文件。提供用户全局 `command-overrides.yaml` 作为 Shell 命令扩展入口，支持别名映射、新命令定义和分类微调。Direct 工具继续由源码 `TOOL_SCHEMAS` 管理。
 
 
 **Why:**
 - Shell adapter 的分类、路径提取和效果推断共享同一趟参数解析——三者是同一个分析的输出，不是可拆分的"数据"和"逻辑"。强行拆分会造成 YAML 和 TS 描述同一命令的双源真理问题。
-- 内置命令分类是权威语义知识，不是用户面策略。用户真正需要的是「为未知命令添加支持」，而不是「覆盖 git push 的分类」。
-- Direct 工具的 TOOL_SCHEMAS 已是声明式静态映射，但也没有扩展机制。用一个统一入口覆盖 Shell + Direct 两类扩展需求，比只改 Shell adapter 更整体。
+- 内置命令分类是权威语义知识；覆盖层用于用户主动补充本机 Shell 命令语义。
+- 仓库内容不应改变 Gate 对命令的理解，因此不加载项目级 command overrides。
+- Direct 工具需要精确参数 schema、路径字段和 effect 证明，继续通过源码和测试扩展，不开放 YAML schema。
 
 **格式：**
 
 ```yaml
-# .pi/command-overrides.yaml（可选）
+# ~/.pi/agent/command-overrides.yaml（可选）
 
 # 别名：让未知命令复用已知 adapter 的完整语义分析
 # 路径提取、效果推断和子命令解析全部沿用目标 adapter 的逻辑
@@ -262,12 +263,13 @@ reclassify:
 
 **查找顺序：** `commands 定义 → aliases 别名解析 → 内置 adapter → reclassify 覆盖`。
 
-**加载链：** `~/.pi/agent/command-overrides.yaml → .pi/command-overrides.yaml`，项目覆盖全局。无 builtins 层（TypeScript adapter 是内置权威来源）。
+**加载：** 只读取用户全局 `~/.pi/agent/command-overrides.yaml`（`PI_CODING_AGENT_DIR` 可改变 agent 目录）；项目仓库中的同名文件不参与加载。TypeScript adapter 是内置权威来源。
 
 **影响：**
 - 内置 adapter 结构和测试不受影响
 - 不改变 Profile、PathPolicy、Gate 或 Shell IR
-- YAML 仅定义 TS 中没有的命令；同名时 commands 段优先，reclassify 在 adapter 返回后覆盖
+- Direct 工具和未知 Direct tool passthrough 行为不由本配置改变
+- 全局 YAML 可以按名称定义或覆盖 Shell 命令语义；同名时 commands 段优先，reclassify 在 adapter 返回后覆盖
 - 别名节点替换 executable 名称后传给目标 adapter，adapter 按目标命令规则执行完整分析（含路径提取）
 
 **已知局限：**

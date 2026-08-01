@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import accessGate from "../../src/access-gate/index";
@@ -19,6 +19,7 @@ function createHarness(root: string) {
   const handlers = new Map<string, Handler>();
   let footerFactory: FooterFactory | undefined;
   let renderRequests = 0;
+  const notifications: { message: string; level: string }[] = [];
   const sessionManager = {
     getSessionId: () => "test-session",
     getCwd: () => root,
@@ -40,7 +41,7 @@ function createHarness(root: string) {
     sessionManager,
     ui: {
       select: async () => undefined,
-      notify: () => undefined,
+      notify: (message: string, level: string) => { notifications.push({ message, level }); },
       setFooter: (factory: FooterFactory | undefined) => {
         footerFactory = factory;
       },
@@ -61,6 +62,7 @@ function createHarness(root: string) {
       );
     },
     getRenderRequests: () => renderRequests,
+    getNotifications: () => notifications,
     pi,
   };
 }
@@ -80,6 +82,58 @@ async function startSessionWithFooter(): Promise<{ harness: ReturnType<typeof cr
   const footer = harness.startFooter();
   return { harness, footer, cleanup };
 }
+
+test("reports invalid global profile configuration at session start", async () => {
+  const agentDir = mkdtempSync(join(tmpdir(), "pi-access-invalid-agent-"));
+  mkdirSync(join(agentDir, "extensions", "access-gate"), { recursive: true });
+  writeFileSync(join(agentDir, "extensions", "access-gate", "profiles.json"), "{ bad json");
+  const previous = process.env.PI_CODING_AGENT_DIR;
+  process.env.PI_CODING_AGENT_DIR = agentDir;
+  const { harness, cleanup } = startSession();
+  try {
+    await harness.handlers.get("session_start")!(undefined, harness.ctx);
+    assert.ok(harness.getNotifications().some((entry) => entry.level === "error" && entry.message.includes("failed to load")));
+  } finally {
+    if (previous === undefined) delete process.env.PI_CODING_AGENT_DIR;
+    else process.env.PI_CODING_AGENT_DIR = previous;
+    cleanup();
+    rmSync(agentDir, { recursive: true, force: true });
+  }
+});
+
+test("/profile status reports the complete resolved policy", async () => {
+  const agentDir = mkdtempSync(join(tmpdir(), "pi-access-status-agent-"));
+  mkdirSync(join(agentDir, "extensions", "access-gate"), { recursive: true });
+  writeFileSync(join(agentDir, "extensions", "access-gate", "profiles.json"), JSON.stringify({
+    defaultProfile: "status-test",
+    profiles: {
+      "status-test": {
+        description: "Status test profile.",
+        shellPolicy: { inspect: "allow", modify: "ask", execute: "deny", destroy: "deny", unknown: "ask" },
+        pathPolicy: {
+          default: { read: "allow", list: "allow", search: "ask", write: "deny" },
+          rules: [{ path: "project/docs/**", write: "allow" }],
+        },
+      },
+    },
+  }));
+  const previous = process.env.PI_CODING_AGENT_DIR;
+  process.env.PI_CODING_AGENT_DIR = agentDir;
+  const { harness, cleanup } = startSession();
+  try {
+    await harness.handlers.get("session_start")!(undefined, harness.ctx);
+    await harness.commands.get("profile")!("status", harness.ctx);
+    const message = harness.getNotifications().at(-1)?.message ?? "";
+    assert.match(message, /Shell:\n  inspect=allow modify=ask execute=deny destroy=deny unknown=ask/);
+    assert.match(message, /Path defaults:\n  read=allow list=allow search=ask write=deny/);
+    assert.match(message, /Path rules:\n  project\/docs\/\*\*: write=allow/);
+  } finally {
+    if (previous === undefined) delete process.env.PI_CODING_AGENT_DIR;
+    else process.env.PI_CODING_AGENT_DIR = previous;
+    cleanup();
+    rmSync(agentDir, { recursive: true, force: true });
+  }
+});
 
 test("renders the active Profile in a two-line Footer and refreshes after switching", async () => {
   const { harness, footer, cleanup } = await startSessionWithFooter();

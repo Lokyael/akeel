@@ -17,7 +17,7 @@ function profiles(): ResolvedProfiles {
 
 // ── root ──
 
-test("keel-read: project-only reads, no writes, no shell commands", () => {
+test("keel-read: project-only reads, no writes, literal inspect Shell commands allowed", () => {
   const p = profiles().profiles["keel-read"];
   assert.equal(p.shellPolicy.inspect, "allow");
   assert.equal(p.shellPolicy.modify, "deny");

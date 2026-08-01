@@ -5,7 +5,7 @@ import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import { compileDirectToolCall, compileShellCall } from "../../src/access-gate/gate";
 import { evaluateRequest } from "../../src/access-gate/gate/evaluate-request";
-import type { CompleteAccessRequest, CompileResult, CompilerContext } from "../../src/access-gate/gate/access-request";
+import type { CompleteAccessPlan, CompileResult, CompilerContext } from "../../src/access-gate/gate/access-request";
 import type { ResolvedProfile } from "../../src/access-gate/profile/types";
 
 function context(): CompilerContext & { cleanup: () => void } {
@@ -35,23 +35,24 @@ function profile(overrides?: Partial<ResolvedProfile>): ResolvedProfile {
   };
 }
 
-function complete(result: CompileResult): CompleteAccessRequest {
+function complete(result: CompileResult): CompleteAccessPlan {
   assert.equal(result.kind, "complete");
   return result.plan;
 }
 
-test("allows a complete direct read request through the kernel", async () => {
+test("allows a complete direct read request through the kernel synchronously", () => {
   const env = context();
   try {
     const request = complete(compileDirectToolCall({ ...env, surface: "read", args: { path: "file.ts" } }));
-    const decision = await evaluateRequest(request, profile(), { hasUI: false });
+    const decision = evaluateRequest(request, profile());
+    assert.equal(decision instanceof Promise, false);
     assert.deepEqual(decision, { disposition: "allow" });
   } finally {
     env.cleanup();
   }
 });
 
-test("hard-denies blocked paths before profile evaluation", async () => {
+test("hard-denies blocked paths before profile evaluation", () => {
   const env = context();
   try {
     const request = complete(compileDirectToolCall({
@@ -59,7 +60,7 @@ test("hard-denies blocked paths before profile evaluation", async () => {
       surface: "read",
       args: { path: join(homedir(), ".ssh", "id_rsa") },
     }));
-    const decision = await evaluateRequest(request, profile({ pathPolicy: { default: { read: "allow", list: "allow", search: "allow", write: "allow" }, rules: [] } }), { hasUI: false });
+    const decision = evaluateRequest(request, profile({ pathPolicy: { default: { read: "allow", list: "allow", search: "allow", write: "allow" }, rules: [] } }));
     assert.equal(decision.disposition, "deny");
     if (decision.disposition === "deny") {
       assert.equal(decision.code, "blocked-path");
@@ -70,11 +71,11 @@ test("hard-denies blocked paths before profile evaluation", async () => {
   }
 });
 
-test("aggregates all path approval evidence into one ask", async () => {
+test("aggregates all path approval evidence into one ask", () => {
   const env = context();
   try {
     const request = complete(compileShellCall({ ...env, command: "echo data > first.txt > second.txt" }));
-    const decision = await evaluateRequest(request, profile(), { hasUI: true });
+    const decision = evaluateRequest(request, profile());
     assert.equal(decision.disposition, "ask");
     if (decision.disposition === "ask") {
       assert.equal(decision.code, "approval-required");
@@ -85,13 +86,13 @@ test("aggregates all path approval evidence into one ask", async () => {
   }
 });
 
-test("rejects a structurally copied request that was not issued by the compiler", async () => {
+test("rejects a structurally copied request that was not issued by the compiler", () => {
   const env = context();
   try {
     const request = complete(compileDirectToolCall({ ...env, surface: "read", args: { path: "file.ts" } }));
     const copied = { ...request };
     Object.freeze(copied);
-    const decision = await evaluateRequest(copied, profile(), { hasUI: false });
+    const decision = evaluateRequest(copied, profile());
     assert.equal(decision.disposition, "deny");
     if (decision.disposition === "deny") assert.equal(decision.code, "invalid-tool-input");
   } finally {
@@ -101,25 +102,25 @@ test("rejects a structurally copied request that was not issued by the compiler"
 
 // ─── Direct edit and ls through Policy Kernel ───
 
-test("allows a complete direct ls request through the kernel", async () => {
+test("allows a complete direct ls request through the kernel", () => {
   const env = context();
   try {
     const request = complete(compileDirectToolCall({ ...env, surface: "ls", args: { path: "." } }));
-    const decision = await evaluateRequest(request, profile(), { hasUI: false });
+    const decision = evaluateRequest(request, profile());
     assert.deepEqual(decision, { disposition: "allow" });
   } finally {
     env.cleanup();
   }
 });
 
-test("asks for a complete direct edit request through the kernel", async () => {
+test("asks for a complete direct edit request through the kernel", () => {
   const env = context();
   try {
     const request = complete(compileDirectToolCall({
       ...env, surface: "edit",
       args: { path: "file.ts", edits: [{ oldText: "old", newText: "new" }] },
     }));
-    const decision = await evaluateRequest(request, profile(), { hasUI: true });
+    const decision = evaluateRequest(request, profile());
     assert.equal(decision.disposition, "ask");
     if (decision.disposition === "ask") {
       assert.equal(decision.code, "approval-required");

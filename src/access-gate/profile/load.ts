@@ -24,31 +24,45 @@ function mergeSources(base: RawProfiles, override: unknown): RawProfiles {
   };
 }
 
-function loadLayer(base: RawProfiles, path: string): RawProfiles {
-  if (!existsSync(path)) return base;
+interface LayerResult {
+  raw: RawProfiles;
+  error?: string;
+}
+
+function loadLayer(base: RawProfiles, path: string): LayerResult {
+  if (!existsSync(path)) return { raw: base };
   try {
     const parsed = readJson(path);
     const candidate = mergeSources(base, parsed);
     const resolved = resolveProfiles(candidate);
     if (!resolved.ok) throw new Error(resolved.error);
-    return candidate;
+    return { raw: candidate };
   } catch (error) {
-    console.error(`access-gate: failed to load ${path}: ${error instanceof Error ? error.message : String(error)}`);
-    return base;
+    const message = `access-gate: failed to load ${path}: ${error instanceof Error ? error.message : String(error)}`;
+    console.error(message);
+    return { raw: base, error: message };
   }
 }
 
-export function loadProfiles(projectRoot: string, agentDir = getAgentDir(), includeProject = true): ResolvedProfiles {
+export interface ProfileLoadOptions {
+  agentDir?: string;
+  onError?: (message: string) => void;
+}
+
+export function loadProfiles(options: ProfileLoadOptions = {}): ResolvedProfiles {
   const builtinRaw = readJson(BUILTIN_PROFILES_PATH);
   const builtin = resolveProfiles(builtinRaw);
   if (!builtin.ok) throw new Error(`invalid built-in profiles: ${builtin.error}`);
 
-  let raw = structuredClone(builtinRaw) as RawProfiles;
-  raw.defaultProfile ||= builtin.value.defaultProfile || DEFAULT_PROFILE_NAME;
-  raw = loadLayer(raw, join(agentDir, "extensions", "access-gate", "profiles.json"));
-  if (includeProject) raw = loadLayer(raw, join(projectRoot, ".pi", "extensions", "access-gate", "profiles.json"));
+  const base = structuredClone(builtinRaw) as RawProfiles;
+  base.defaultProfile ||= builtin.value.defaultProfile || DEFAULT_PROFILE_NAME;
+  const global = loadLayer(base, join(options.agentDir ?? getAgentDir(), "extensions", "access-gate", "profiles.json"));
+  if (global.error) {
+    options.onError?.(global.error);
+    return { ...builtin.value, defaultProfile: "keel-read" };
+  }
 
-  const resolved = resolveProfiles(raw);
+  const resolved = resolveProfiles(global.raw);
   if (!resolved.ok) throw new Error(`invalid active profiles: ${resolved.error}`);
   return resolved.value;
 }

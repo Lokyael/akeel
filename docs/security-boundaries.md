@@ -32,7 +32,7 @@ pi-keel 的 Profile、命令分类 adapter 和路径 gate 是用户态策略，�
 
 **状态：** by design。
 
-access-gate 只拦截 Pi `tool_call` 事件。`user_bash`（`!`/`!!`）、`shellCommandPrefix`、Bash `spawnHook`、tool override、custom tool backend 和其他 Extension 的 handler 不在 enforcement 范围内。用户安装的其他 Extension 可直接调用 Node fs/child_process。
+access-gate 只拦截并理解受管的 Pi `tool_call` surface。`user_bash`（`!`/`!!`）、`shellCommandPrefix`、Bash `spawnHook`、tool override、custom tool backend 和其他 Extension 的 handler 不在 enforcement 范围内；不在 `TOOL_SCHEMAS` 中的未知 Direct tool surface 会 passthrough。用户安装的其他 Extension 可直接调用 Node fs/child_process。
 
 ## R-10：审批后的实际 side effect
 
@@ -50,7 +50,7 @@ deny 决策的 reason 经过 sensitive prefix 脱敏（`~/.ssh`、`/home/`、`.e
 
 **状态：** implemented。
 
-`CompleteAccessPlan` 只能由 `compiler-entry.ts` 的官方 compiler sealing boundary 发行；Shell/Direct compiler 只产生不可提交的 draft。sealing boundary defensive-copy、deep-freeze plan 后加入私有 WeakSet，`access-plan-verifier.ts` 只执行无副作用的完整性和 resource budget proof。Kernel 通过 `isCompleteAccessPlan()` 验证 WeakSet 成员资格、递归冻结、exact coverage correspondence 和所有 analysis budgets，拒绝复制、伪造或 over-budget plan。`CompleteAccessRequest` 与 `isCompleteAccessRequest()` 仅保留为兼容别名。
+`CompleteAccessPlan` 只能由 `compiler-entry.ts` 的官方 compiler sealing boundary 发行；Shell/Direct compiler 只产生不可提交的 draft。sealing boundary defensive-copy、deep-freeze plan 后加入私有 WeakSet，`access-plan-verifier.ts` 只执行无副作用的完整性和 resource budget proof。Kernel 通过 `isCompleteAccessPlan()` 验证 WeakSet 成员资格、递归冻结、exact coverage correspondence 和所有 analysis budgets，拒绝复制、伪造或 over-budget plan。
 
 WeakSet 在进程生命周期内保持，plan 不跨调用缓存或持久化。
 

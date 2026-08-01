@@ -40,19 +40,7 @@ pi starts
 
 The active Profile is the only access mode. A new Session starts from `defaultProfile` and does not inherit a temporary Profile from another Session.
 
-Built-in Profiles:
-
-Profile names are stored with a `keel-` prefix (`keel-read`, `keel-explore`, …) to avoid ambiguity with path operations and common words. The prefix is stripped for display. `/profile` accepts both forms: `/profile read` and `/profile keel-read` are equivalent.
-
-| Profile | Description |
-|---------|-------------|
-| `read` | Inspect `projectRoot` only; no writes, no shell commands |
-| `explore` | Inspect anywhere on the filesystem; no writes, no shell commands |
-| `code` | Inspect `projectRoot`; write `src/`, `tests/`, `/tmp/pi-work/`; shell commands require approval |
-| `plan` | Inspect anywhere; write `docs/`, `CONTEXT.md`, `/tmp/pi-work/`; scripts and build tools are denied, other shell commands require approval |
-| `query` | Inspect anywhere; write all project files (each write asks); shell commands require approval |
-| `develop` | Inspect anywhere; write all project files freely; scripts and build tools still require approval |
-| `full` | Inspect anywhere; write all project files freely; scripts and build tools allowed without approval |
+Profile names are stored with a `keel-` prefix to avoid ambiguity with path operations and common words. The prefix is stripped for display, and `/profile` accepts both the display and storage forms. Built-in definitions live in `src/access-gate/profile/builtins.json`; use `/profile status` to inspect the active resolved policy.
 
 Commands:
 
@@ -72,13 +60,7 @@ Global:
 ~/.pi/agent/extensions/access-gate/profiles.json
 ```
 
-Project:
-
-```text
-.pi/extensions/access-gate/profiles.json
-```
-
-The loading order is built-ins, global configuration, then project configuration. Project configuration is loaded only when Pi marks the project as trusted. A same-name Profile in a later layer replaces the earlier definition. Profiles compose with `extends`.
+Profiles compose with `extends`. Built-ins load first, then the user global file replaces same-name definitions. Project repositories do not provide Profile configuration. If the global file is invalid, the Session reports the error and starts from the built-in `keel-read` Profile.
 
 Example:
 
@@ -106,10 +88,20 @@ Example:
 ```text
 allow    Execute without a prompt
 ask      Show Allow once / Deny
- deny    Block without an approval prompt
+deny     Block without an approval prompt
 ```
 
-`pathPolicy` makes decisions independently for `read`, `list`, `search`, and `write`. More-specific paths win. `blockedPaths` are global hard denials and cannot be relaxed.
+`pathPolicy` makes decisions independently for `read`, `list`, `search`, and `write`. Rules use declaration-order, per-operation first-match semantics. `blockedPaths` are global hard denials and cannot be relaxed.
+
+### Shell Command Overrides
+
+Shell command aliases, new command definitions, and reclassification rules load only from the user global file:
+
+```text
+~/.pi/agent/command-overrides.yaml
+```
+
+Project repositories cannot provide command overrides. Direct tools are defined in source by `TOOL_SCHEMAS`; unknown Direct tool surfaces passthrough and are outside Access Gate enforcement.
 
 Commands without a matching adapter use the Profile's `shellPolicy.unknown` decision. Commands that an adapter marks opaque because their effects cannot be safely classified are hard-denied.
 

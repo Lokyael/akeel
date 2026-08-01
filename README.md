@@ -24,7 +24,7 @@ Principles and the access gate activate automatically. Skills load on demand.
 
 ## Access Gate
 
-The active Profile is the only permission mode exposed to users. Built-ins include `read`, `explore`, `plan`, `code`, `develop`, and `query` (stored as `keel-read` etc., prefix hidden in display). Project-local Profile overrides are read only for Pi-trusted projects.
+The active Profile is the only permission mode exposed to users. Built-in definitions live in `src/access-gate/profile/builtins.json`; user Profiles load only from the global agent configuration. Use `/profile status` for the complete resolved policy instead of relying on a duplicated profile list.
 
 ```text
 /profile                 # Select a Profile

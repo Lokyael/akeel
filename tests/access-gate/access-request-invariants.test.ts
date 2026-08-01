@@ -51,25 +51,25 @@ test("Shell grep and Direct grep produce equivalent search path operations", () 
   } finally { shell.cleanup(); direct.cleanup(); }
 });
 
-test("Shell and Direct read produce equivalent decisions for an allowed file", async () => {
+test("Shell and Direct read produce equivalent decisions for an allowed file", () => {
   const shell = context();
   const direct = context();
   try {
     const p = profile();
-    const shellDec = await evaluateRequest(complete(compileShellCall({ ...shell, command: "cat allowed" })), p, { hasUI: false });
-    const directDec = await evaluateRequest(complete(compileDirectToolCall({ ...direct, surface: "read", args: { path: "allowed" } })), p, { hasUI: false });
+    const shellDec = evaluateRequest(complete(compileShellCall({ ...shell, command: "cat allowed" })), p);
+    const directDec = evaluateRequest(complete(compileDirectToolCall({ ...direct, surface: "read", args: { path: "allowed" } })), p);
     assert.equal(disposition(shellDec), "allow");
     assert.equal(disposition(directDec), "allow");
   } finally { shell.cleanup(); direct.cleanup(); }
 });
 
-test("both Shell and Direct deny write on a write-denied profile", async () => {
+test("both Shell and Direct deny write on a write-denied profile", () => {
   const shell = context();
   const direct = context();
   try {
     const p = profile();
-    const shellDec = await evaluateRequest(complete(compileShellCall({ ...shell, command: "touch allowed/new" })), p, { hasUI: false });
-    const directDec = await evaluateRequest(complete(compileDirectToolCall({ ...direct, surface: "write", args: { path: "allowed/new", content: "x" } })), p, { hasUI: false });
+    const shellDec = evaluateRequest(complete(compileShellCall({ ...shell, command: "touch allowed/new" })), p);
+    const directDec = evaluateRequest(complete(compileDirectToolCall({ ...direct, surface: "write", args: { path: "allowed/new", content: "x" } })), p);
     assert.equal(disposition(shellDec), "deny");
     assert.equal(disposition(directDec), "deny");
   } finally { shell.cleanup(); direct.cleanup(); }
@@ -103,14 +103,14 @@ test("pipeline does not propagate cd cwd across stages", () => {
   } finally { env.cleanup(); }
 });
 
-test("adding a path intent does not make a decision weaker", async () => {
+test("adding a path intent does not make a decision weaker", () => {
   const env = context();
   try {
     const p: ResolvedProfile = { ...profile(), pathPolicy: { default: { read: "allow" as const, list: "allow" as const, search: "allow" as const, write: "ask" as const }, rules: [] } };
     const single = complete(compileShellCall({ ...env, command: "echo data > first.txt" }));
     const double = complete(compileShellCall({ ...env, command: "echo data > first.txt > second.txt" }));
-    const singleDec = await evaluateRequest(single, p, { hasUI: false });
-    const doubleDec = await evaluateRequest(double, p, { hasUI: false });
+    const singleDec = evaluateRequest(single, p);
+    const doubleDec = evaluateRequest(double, p);
     assert.equal(disposition(singleDec), "ask");
     assert.equal(disposition(doubleDec), "ask");
     const doubleEvidence = doubleDec.disposition === "ask" ? doubleDec.evidence.length : 0;
@@ -119,12 +119,12 @@ test("adding a path intent does not make a decision weaker", async () => {
   } finally { env.cleanup(); }
 });
 
-test("denied path blocks even when another path is allowed", async () => {
+test("denied path blocks even when another path is allowed", () => {
   const env = context();
   try {
     const p = profile();
     const req = complete(compileShellCall({ ...env, command: "cat allowed /etc/passwd" }));
-    const dec = await evaluateRequest(req, p, { hasUI: false });
+    const dec = evaluateRequest(req, p);
     assert.equal(disposition(dec), "deny");
   } finally { env.cleanup(); }
 });

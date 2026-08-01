@@ -3,9 +3,8 @@ import { PATH_DENY_REASONS } from "../path/policy";
 import type { ResolvedProfile } from "../profile/types";
 import { isCompleteAccessPlan } from "./compiler-entry";
 import { type CommandAccessOperation, type CompleteAccessPlan, type PathAccessOperation } from "./access-request";
-import type { GateRuntime } from "./types";
 import type { GateDecision, GateEvidence, HardDenyCode } from "./decision-types";
-import { DecisionBuilder } from "./decision-builder";
+import { hardDeny, profileDeny, requireApproval } from "./decision-builder";
 import type { Effect } from "../command-semantics/types";
 import type { PathDecision } from "../path";
 
@@ -20,27 +19,26 @@ const EFFECT_POLICY_AXIS: Readonly<Record<Effect, "path" | "shell">> = {
   network: "shell",
 };
 
-export async function evaluateRequest(
+export function evaluateRequest(
   plan: CompleteAccessPlan,
   profile: ResolvedProfile,
-  _runtime: GateRuntime,
-): Promise<GateDecision> {
+): GateDecision {
   if (!isCompleteAccessPlan(plan)) {
-    return DecisionBuilder.hard("invalid-tool-input", "plan is not a compiler-issued CompleteAccessPlan");
+    return hardDeny("invalid-tool-input", "plan is not a compiler-issued CompleteAccessPlan");
   }
 
   const asks: GateEvidence[] = [];
-  let profileDeny: GateDecision | null = null;
+  let profileDenial: GateDecision | null = null;
 
   for (const operation of plan.commands) {
     const shellOnlyEffect = operation.origin === "direct"
       ? operation.effects.find((effect) => EFFECT_POLICY_AXIS[effect] === "shell")
       : undefined;
     if (shellOnlyEffect) {
-      return DecisionBuilder.hard("unknown-effect", `Direct tool cannot produce ${shellOnlyEffect}`, operation.span);
+      return hardDeny("unknown-effect", `Direct tool cannot produce ${shellOnlyEffect}`, operation.span);
     }
     if (operation.commandClass === "destroy") {
-      return DecisionBuilder.hard("destroy-command", `${operation.commandClass} command: ${operation.executable ?? "?"}`, operation.span);
+      return hardDeny("destroy-command", `${operation.commandClass} command: ${operation.executable ?? "?"}`, operation.span);
     }
     // Direct tools bypass Shell policy — their effects are checked by the
     // EFFECT_POLICY_AXIS (shell-only effects like execute/network are hard-denied
@@ -49,8 +47,8 @@ export async function evaluateRequest(
     if (operation.origin === "direct" || operation.executable === "cd") continue;
     const decision = profile.shellPolicy[operation.commandClass];
     const evidence = [commandEvidence(operation)];
-    if (decision === "deny" && !profileDeny) {
-      profileDeny = DecisionBuilder.profile("shell-policy-denied", evidence[0]!.subject);
+    if (decision === "deny" && !profileDenial) {
+      profileDenial = profileDeny("shell-policy-denied", evidence[0]!.subject);
     } else if (decision === "ask") {
       asks.push(...evidence);
     }
@@ -64,16 +62,16 @@ export async function evaluateRequest(
       const evidence = [pathEvidence(operation, candidate.cwd)];
       if (decision.decision === "deny") {
         const code = pathDecisionCode(decision);
-        if (decision.hard) return DecisionBuilder.hard(code === "path-denied" ? "path-unclassifiable" : code, evidence[0]!.subject, evidence[0]!.span);
-        if (code === "path-denied" && !profileDeny) profileDeny = DecisionBuilder.profile(code, evidence[0]!.subject);
+        if (decision.hard) return hardDeny(code === "path-denied" ? "path-unclassifiable" : code, evidence[0]!.subject, evidence[0]!.span);
+        if (code === "path-denied" && !profileDenial) profileDenial = profileDeny(code, evidence[0]!.subject);
       } else if (decision.decision === "ask") {
         asks.push(...evidence);
       }
     }
   }
 
-  if (profileDeny) return profileDeny;
-  if (asks.length > 0) return DecisionBuilder.approval(asks);
+  if (profileDenial) return profileDenial;
+  if (asks.length > 0) return requireApproval(asks);
   return { disposition: "allow" };
 }
 

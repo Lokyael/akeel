@@ -4,7 +4,7 @@
 
 - **Profile**：当前 Session 唯一的访问策略入口，组合 Shell 决策、路径规则和审批行为。
 - **Access Gate**：拦截 Pi `tool_call` 并执行 compiler → Policy Kernel → guidance renderer → host adapter 的统一策略层。
-- **CompleteAccessPlan**：compiler 产出的不可变、可验证的访问计划；不包含 allow/deny 等授权结果。`CompleteAccessRequest` 是兼容别名。
+- **CompleteAccessPlan**：compiler 产出的不可变、可验证的访问计划；不包含 allow/deny 等授权结果。
 - **Policy Kernel**：消费经过 verifier 验证的 `CompleteAccessPlan` 和 `Profile`，产出结构化 `GateDecision`；不依赖原始 Shell。
 - **GateDecision**：`allow | ask | deny(hard/profile/user)` 的封闭决策类型；每个 deny 附带稳定 `DecisionCode`。
 - **Guidance**：从 `DecisionCode` 到静态 `GuidanceId` 的封闭映射，不携带可执行 Shell。
@@ -15,9 +15,9 @@
 ## Architecture
 
 - `src/bootstrap/` 在 Session 启动和 compaction 后注入工程原则。
-- `src/access-gate/` 统一处理 Profile、Shell IR、命令语义、路径策略、Gate、Session 状态和 Footer。
-- `shell-parse/` 输出受限 Shell IR；`command-semantics/` 提取命令类别、路径意图、效果和 cwd 转换。
-- `gate/` 编译器将 Shell IR 和 Direct tool 参数转换为 `CompleteAccessPlan`；compiler outcome 另外区分 unsupported form、security block 和 invalid request。`compiler-entry.ts` 是唯一 plan sealing boundary，Policy Kernel 只消费经过 verifier 验证的 plan，产出 `GateDecision`，renderer 将决策转为 host 兼容结果。
+- `src/access-gate/` 统一处理用户全局 Profile、Shell IR、命令语义、路径策略、Gate、Session 状态和 Footer。
+- `shell-parse/` 输出受限 Shell IR；`command-semantics/` 提取命令类别、路径意图、效果和 cwd 转换，用户全局 `command-overrides.yaml` 只扩展 Shell 命令语义。
+- `gate/` 编译器将 Shell IR 和 Direct tool 参数转换为 `CompleteAccessPlan`；compiler outcome 另外区分 unsupported form、security block 和 invalid request。`compiler-entry.ts` 是唯一 plan sealing boundary，同步 Policy Kernel 只消费经过 verifier 验证的 plan 和 Profile，产出 `GateDecision`，renderer 将决策转为 host 兼容结果。
 - Direct tool（`read`、`write`、`edit`、`find`、`grep`、`ls`）和 Shell 命令经过各自的 compiler 后进入同一 Policy Kernel。
 - 用户项目运行时文档入口为 `CONTEXT.md`、`docs/decisions.md` 和 `docs/task.md`。
 
@@ -50,7 +50,7 @@
 
 - 不提供 OS-level sandbox、容器、VM、seccomp、Landlock、network namespace 或独立 network policy 轴。
 - 不承诺 pathname check 与实际文件操作之间的 TOCTOU 消除。
-- 不拦截 `user_bash`、`shellCommandPrefix`、Bash `spawnHook`、tool override、custom tool backend 或其他 Extension 的直接操作。
+- 不拦截 `user_bash`、`shellCommandPrefix`、Bash `spawnHook`、tool override、custom tool backend、未知 Direct tool surface 或其他 Extension 的直接操作。
 - 不把短期 Task Record、实施过程或审查报告作为永久项目知识。
 - 不修改用户项目的 `README.md`、`AGENTS.md`、`.gitignore` 和 `package.json`，除非用户明确要求。
 

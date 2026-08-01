@@ -2,7 +2,7 @@
   "defaultProfile": "keel-plan",
   "profiles": {
     "keel-read": {
-      "description": "Read and search projectRoot only. No writes, no external paths, no shell commands.",
+      "description": "Read and search projectRoot only. Literal inspect Shell commands are allowed; writes and external paths are denied.",
       "shellPolicy": {
         "inspect": "allow",
         "modify": "deny",
@@ -19,7 +19,7 @@
     },
 
     "keel-code": {
-      "description": "Read projectRoot; write src/, tests/, and /tmp/pi-work/ for dependencies. Shell commands require approval.",
+      "description": "Read projectRoot; write src/, tests/, and /tmp/pi-work/. Inspect Shell commands are allowed; modify, execute, and unknown commands require approval.",
       "extends": ["keel-read"],
       "shellPolicy": {
         "modify": "ask",
@@ -36,7 +36,7 @@
     },
 
     "keel-explore": {
-      "description": "Read and search anywhere on the filesystem. No writes, no shell commands.",
+      "description": "Read and search anywhere on the filesystem. Literal inspect Shell commands are allowed; writes are denied.",
       "extends": ["keel-read"],
       "pathPolicy": {
         "default": { "read": "allow", "list": "allow", "search": "allow", "write": "deny" }
@@ -44,7 +44,7 @@
     },
 
     "keel-plan": {
-      "description": "Read anywhere; write docs/, CONTEXT.md, and /tmp/pi-work/ for reviewing external code. Shell commands and scripts are denied. No source-tree writes.",
+      "description": "Read anywhere; write docs/, CONTEXT.md, and /tmp/pi-work/. Inspect Shell commands are allowed, modify and unknown commands require approval, and execute commands are denied.",
       "extends": ["keel-explore"],
       "shellPolicy": {
         "modify": "ask",
@@ -61,7 +61,7 @@
     },
 
     "keel-query": {
-      "description": "Read anywhere; write all project files but every write and shell command requires one-time approval.",
+      "description": "Read anywhere; ask before project writes and modify, execute, or unknown Shell commands.",
       "extends": ["keel-plan"],
       "shellPolicy": {
         "execute": "ask"
@@ -74,7 +74,7 @@
     },
 
     "keel-develop": {
-      "description": "Read anywhere; write all project files freely. Scripts and build tools still require approval (interpreters and build commands are not blind-trusted).",
+      "description": "Read and write project files freely; modify, execute, and unknown Shell commands still require approval.",
       "extends": ["keel-query"],
       "shellPolicy": {
         "execute": "ask"
@@ -87,7 +87,7 @@
     },
 
     "keel-build": {
-      "description": "Read anywhere; write all project files and /tmp freely; run scripts, interpreters, and build tools without approval. Only destructive operations remain denied.",
+      "description": "Read and write project files and /tmp freely; known modify and execute commands are allowed, unknown commands require approval, and destroy commands are denied.",
       "extends": ["keel-develop"],
       "shellPolicy": {
         "modify": "allow",

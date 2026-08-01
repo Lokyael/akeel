@@ -1,13 +1,13 @@
 // command-semantics/overrides.ts — 命令覆盖层
 //
-// 为 Shell 命令和 Direct 工具提供统一的轻量扩展入口。
+// 为 Shell 命令提供用户全局的轻量扩展入口。
 // 内置 adapter 仍是权威来源；此文件只处理用户定义的扩展和覆盖。
 //
-// 加载链：Agent 全局 ~/.pi/agent/command-overrides.yaml → 项目 .pi/command-overrides.yaml
-// 先加载全局作为 base，再加载项目作为 overlay（项目覆盖全局）。
+// 配置路径：$PI_CODING_AGENT_DIR/command-overrides.yaml，默认 ~/.pi/agent/command-overrides.yaml。
 
 import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
+import { join } from "node:path";
 import { parse as parseYaml } from "yaml";
 import type { CommandClass, CommandSemantics, Effect } from "./types";
 import type { ShellArg } from "../shell-parse/types";
@@ -80,36 +80,32 @@ function mergeOverrides(base: CommandOverrides | null, overlay: CommandOverrides
   return merged;
 }
 
-const AGENT_GLOBAL_PATH = `${homedir()}/.pi/agent/command-overrides.yaml`;
+function getAgentDir(): string {
+  return process.env.PI_CODING_AGENT_DIR || join(homedir(), ".pi", "agent");
+}
 
-const PROJECT_OVERRIDES_PATH = ".pi/command-overrides.yaml";
-
-export function loadOverrides(projectRoot: string): CommandOverrides {
-  const projectPath = `${projectRoot}/${PROJECT_OVERRIDES_PATH}`;
-  const cached = _cache.get(projectPath);
+export function loadOverrides(agentDir = getAgentDir()): CommandOverrides {
+  const globalPath = join(agentDir, "command-overrides.yaml");
+  const cached = _cache.get(globalPath);
   if (cached) return cached;
 
-  // 先加载全局，再加载项目（项目覆盖全局）
-  let merged: CommandOverrides | null = null;
-  merged = mergeOverrides(merged, loadFile(AGENT_GLOBAL_PATH));
-  merged = mergeOverrides(merged, loadFile(projectPath));
+  const result = mergeOverrides(null, loadFile(globalPath));
 
   // 运行时校验 class 字段（commands 和 reclassify）
-  if (merged.commands) {
-    for (const [name, def] of Object.entries(merged.commands)) {
+  if (result.commands) {
+    for (const [name, def] of Object.entries(result.commands)) {
       validateCommandDef(name, def);
     }
   }
-  if (merged.reclassify) {
-    for (const rule of merged.reclassify) {
+  if (result.reclassify) {
+    for (const rule of result.reclassify) {
       if (!VALID_CLASSES.has(rule.class)) {
         throw new Error(`command-overrides: reclassify[${rule.command}]: invalid class "${rule.class}"`);
       }
     }
   }
 
-  const result = merged ?? {};
-  _cache.set(projectPath, result);
+  _cache.set(globalPath, result);
   return result;
 }
 

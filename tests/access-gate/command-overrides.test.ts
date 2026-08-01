@@ -20,12 +20,12 @@ function parseCmd(input: string) {
 }
 
 function setupProject(overridesContent: string): { root: string; ctx: SemanticContext; cleanup: () => void } {
-  // 创建真实临时目录（非 /tmp 符号链接），确保 projectRoot 与 overrides 文件在同一物理路径下
   const parent = realpathSync(tmpdir());
-  const root = mkdtempSync(join(parent, "pi-keel-overrides-"));
-  const piDir = join(root, ".pi");
-  mkdirSync(piDir, { recursive: true });
-  writeFileSync(join(piDir, "command-overrides.yaml"), overridesContent, "utf-8");
+  const root = mkdtempSync(join(parent, "pi-keel-overrides-project-"));
+  const agentDir = mkdtempSync(join(parent, "pi-keel-overrides-agent-"));
+  writeFileSync(join(agentDir, "command-overrides.yaml"), overridesContent, "utf-8");
+  const previous = process.env.PI_CODING_AGENT_DIR;
+  process.env.PI_CODING_AGENT_DIR = agentDir;
 
   const ctx: SemanticContext = { projectRoot: root, stagingDir: join(root, "staging"), cwd: root };
 
@@ -34,7 +34,10 @@ function setupProject(overridesContent: string): { root: string; ctx: SemanticCo
     ctx,
     cleanup: () => {
       resetOverrides();
+      if (previous === undefined) delete process.env.PI_CODING_AGENT_DIR;
+      else process.env.PI_CODING_AGENT_DIR = previous;
       rmSync(root, { recursive: true, force: true });
+      rmSync(agentDir, { recursive: true, force: true });
     },
   };
 }
@@ -98,6 +101,19 @@ void test("aliases: 无 overrides 时不受影响", () => {
   const sem = analyzeSemantics(parseCmd("git status"), DEFAULT_CTX);
   assert.equal(sem.class, "inspect");
   assert.ok(sem.reason.includes("show working tree"));
+});
+
+void test("project command overrides are ignored", () => {
+  resetOverrides();
+  const { root, ctx, cleanup } = setupProject("");
+  mkdirSync(join(root, ".pi"), { recursive: true });
+  writeFileSync(join(root, ".pi", "command-overrides.yaml"), "aliases:\n  local-git: git\n", "utf-8");
+  try {
+    const sem = analyzeSemantics(parseCmd("local-git status"), ctx);
+    assert.equal(sem.class, "unknown");
+  } finally {
+    cleanup();
+  }
 });
 
 // ─── commands ───
@@ -378,30 +394,31 @@ commands:
 
 // ─── 缓存隔离 ───
 
-void test("缓存: 不同 projectRoot 加载不同的 overrides", () => {
+void test("缓存: 不同 global agentDir 加载不同的 overrides", () => {
   resetOverrides();
   const p1 = setupProject(`
 aliases:
   t1: git
 `);
+  const agent1 = process.env.PI_CODING_AGENT_DIR;
   const p2 = setupProject(`
 aliases:
   t2: git
 `);
+  const agent2 = process.env.PI_CODING_AGENT_DIR;
   try {
-    // p1 的别名 t1 生效
+    process.env.PI_CODING_AGENT_DIR = agent1;
     const sem1 = analyzeSemantics(parseCmd("t1 status"), p1.ctx);
     assert.equal(sem1.class, "inspect");
 
-    // p2 的别名 t2 生效，t1 在 p2 中不存在 → unknown
+    process.env.PI_CODING_AGENT_DIR = agent2;
     const sem2 = analyzeSemantics(parseCmd("t2 status"), p2.ctx);
     assert.equal(sem2.class, "inspect");
-
     const sem3 = analyzeSemantics(parseCmd("t1 status"), p2.ctx);
     assert.equal(sem3.class, "unknown");
   } finally {
-    p1.cleanup();
     p2.cleanup();
+    p1.cleanup();
   }
 });
 
