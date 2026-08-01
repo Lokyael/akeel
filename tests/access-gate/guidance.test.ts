@@ -51,11 +51,11 @@ test("blocked path and threat do not offer bypass guidance", () => {
 });
 
 test("path-denied and tool-input codes map to profile/tool guidance", () => {
-  // path-denied → profile-restriction（建议让用户调整 Profile）
+  // path-denied → profile-restriction (tells the agent to ask the user)
   assert.equal(guidanceFor("path-denied")[0]?.id, "profile-restriction");
-  // invalid-tool-input → check-tool-input（修正参数，而非 Shell 形式）
+  // invalid-tool-input → check-tool-input (fix parameters, not the Shell form)
   assert.equal(guidanceFor("invalid-tool-input")[0]?.id, "check-tool-input");
-  // unknown-tool → check-tool-input（使用已知工具）
+  // unknown-tool → check-tool-input (use a known tool)
   assert.equal(guidanceFor("unknown-tool")[0]?.id, "check-tool-input");
   // resource-limit → split-supported-commands
   assert.equal(guidanceFor("resource-limit")[0]?.id, "split-supported-commands");
@@ -205,6 +205,22 @@ test("classifies every DecisionCode into one renderer response kind", () => {
 
 test("allow decision renders as allow", () => {
   assert.deepEqual(renderDecision({ disposition: "allow" }), { kind: "allow" });
+});
+
+test("user deny renderer explains the operation was not executed", () => {
+  const decision: GateDecision = {
+    disposition: "deny",
+    code: "user-denied",
+    enforcement: "user",
+    evidence,
+    guidance: [],
+  };
+  const result = renderDecision(decision);
+  assert.equal(result.kind, "block");
+  assert.equal(result.code, "user-denied");
+  assert.ok(result.reason.includes("not executed"));
+  assert.ok(result.reason.includes("wait for the user"));
+  assert.equal(result.reason.includes("Affected operation"), false);
 });
 
 

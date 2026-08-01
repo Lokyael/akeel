@@ -87,7 +87,7 @@ export function renderDecision(decision: GateDecision): GateResult {
       ? renderGuidance(guidance)
       : "This request is not allowed by the active Profile. Ask the user to update the Profile or approve the operation.";
   } else {
-    reason = "The user declined this operation. Wait for alternative instructions.";
+    reason = "The user denied this operation. It was not executed; wait for the user's next instruction.";
   }
   if (subject !== "request denied" && decision.enforcement !== "user") reason += " Affected operation: " + subject + ".";
   return { kind: "block", reason: reason.slice(0, MAX_RENDERED_REASON), code: decision.code };
