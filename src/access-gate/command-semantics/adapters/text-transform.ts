@@ -15,40 +15,53 @@ interface OptionSchema {
   valueSource: "next" | "inline";
   /**
    * 值的性质: "file"（值是一个文件路径，产生路径 intent）或
-   * "expression"（值是程序/表达式，如 sed -e、awk -e —— 值被消费但不产生路径 intent）。
+   * "expression"（值是程序/表达式，如 sed -e、awk -e/-F/-v —— 值被消费但不产生路径 intent）。
    */
   valueKind?: "file" | "expression";
   /** 是否支持 inline 后缀（如 sed -i.bak、--in-place=.bak）。 */
   inlineSuffix?: boolean;
+  /** 无值行为修饰符（如 sed -n、-E）：不产生文件 intent，也不置 opaque。 */
+  flag?: boolean;
 }
 
 const SED_OPTS: OptionSchema[] = [
   { names: ["-i", "--in-place"], takesValue: false, operation: "write", valueSource: "next", inlineSuffix: true },
   { names: ["-e", "--expression"], takesValue: true, operation: "read", valueSource: "next", valueKind: "expression" },
   { names: ["-f", "--file"], takesValue: true, operation: "read", valueSource: "next" },
+  { names: ["-l", "--line-length"], takesValue: true, operation: "read", valueSource: "next", valueKind: "expression" },
+  { names: ["-n", "--quiet", "--silent"], takesValue: false, operation: "read", valueSource: "next", flag: true },
+  { names: ["-E", "-r", "-z", "-s", "-u", "--sandbox", "--debug"], takesValue: false, operation: "read", valueSource: "next", flag: true },
 ];
 
 const AWK_OPTS: OptionSchema[] = [
   { names: ["-i", "--in-place"], takesValue: false, operation: "write", valueSource: "next", inlineSuffix: true },
   { names: ["-f", "--file"], takesValue: true, operation: "read", valueSource: "next" },
   { names: ["-e"], takesValue: true, operation: "read", valueSource: "next", valueKind: "expression" },
+  { names: ["-F", "--field-separator"], takesValue: true, operation: "read", valueSource: "next", valueKind: "expression" },
+  { names: ["-v", "--assign"], takesValue: true, operation: "read", valueSource: "next", valueKind: "expression" },
+  { names: ["-V", "--version", "-h", "--help"], takesValue: false, operation: "read", valueSource: "next", flag: true },
 ];
 
 const SORT_OPTS: OptionSchema[] = [
   { names: ["-o", "--output"], takesValue: true, operation: "write", valueSource: "next" },
+  { names: ["-t", "--field-separator", "-k", "--key"], takesValue: true, operation: "read", valueSource: "next", valueKind: "expression" },
+  { names: ["-n", "-r", "-u", "-f", "-b", "-c", "-m", "-h", "-V", "-s", "--numeric-sort", "--reverse", "--unique", "--ignore-case", "--stable", "--check", "--merge", "--version", "--help"], takesValue: false, operation: "read", valueSource: "next", flag: true },
 ];
 
 const UNIQ_OPTS: OptionSchema[] = [
   { names: ["-o", "--output"], takesValue: true, operation: "write", valueSource: "next" },
+  { names: ["-c", "-d", "-u", "-i", "--count", "--repeated", "--unique", "--ignore-case", "--version", "--help"], takesValue: false, operation: "read", valueSource: "next", flag: true },
 ];
 
 const TEXT_CONFIG: Record<string, {
   class: "inspect" | "modify" | "unknown";
   schemas: OptionSchema[];
   reason: string;
+  /** sed/awk 在出现写选项（-i）时，位置参数是原地修改目标而非只读输入。 */
+  inPlace?: boolean;
 }> = {
-  sed: { class: "inspect", schemas: SED_OPTS, reason: "stream editor" },
-  awk: { class: "inspect", schemas: AWK_OPTS, reason: "pattern scanning" },
+  sed: { class: "inspect", schemas: SED_OPTS, reason: "stream editor", inPlace: true },
+  awk: { class: "inspect", schemas: AWK_OPTS, reason: "pattern scanning", inPlace: true },
   sort: { class: "inspect", schemas: SORT_OPTS, reason: "sort lines" },
   uniq: { class: "inspect", schemas: UNIQ_OPTS, reason: "unique lines" },
 };
@@ -61,16 +74,30 @@ function parseOptions(
   args: ShellArg[],
   schemas: OptionSchema[],
   index: number,
+  inPlace: boolean,
 ): { intents: PathIntent[]; opaque: boolean } {
   const intents: PathIntent[] = [];
   let opaque = false;
+  let afterDoubleDash = false;
 
   while (index < args.length) {
     const token = args[index]!;
     const val = token.value ?? "";
 
-    if (val === "--") { index++; break; }
-    if (!val.startsWith("-")) break; // 非选项 → 结束
+    if (!afterDoubleDash && val === "--") { afterDoubleDash = true; index++; continue; } // 之后的 token 全部按位置参数处理
+    if (afterDoubleDash || !val.startsWith("-")) {
+      // 位置参数：输入文件（in-place 模式下出现写选项时是原地修改目标）
+      const sawWrite = intents.some((i) => i.operation === "write");
+      intents.push({
+        operation: inPlace && sawWrite ? "write" : "read",
+        rawPath: val,
+        source: "argument",
+        span: token.span,
+        confidence: "exact",
+      });
+      index++;
+      continue;
+    }
 
     // 查找匹配的 schema
     const schema = schemas.find((s) => s.names.includes(val));
@@ -91,6 +118,24 @@ function parseOptions(
         index++;
         continue;
       }
+      // 短选项内联值：-F,、-vfoo、-es/x/y/（值紧附在选项名后）
+      const short = schemas.find((s) => !s.flag && s.takesValue && s.names.some((n) =>
+        n.length === 2 && n.startsWith("-") && val.startsWith(n) && val.length > 2,
+      ));
+      if (short) {
+        const inlineVal = val.slice(2);
+        if (short.valueKind !== "expression" && inlineVal.length > 0) {
+          intents.push({
+            operation: short.operation,
+            rawPath: inlineVal,
+            source: "option",
+            span: { start: 0, end: 0 },
+            confidence: "conservative",
+          });
+        }
+        index++;
+        continue;
+      }
       // 不认识这个选项 → opaque
       opaque = true;
       index++;
@@ -98,14 +143,16 @@ function parseOptions(
     }
 
     if (!schema.takesValue) {
-      // 无值选项（如 sed -i）
-      intents.push({
-        operation: schema.operation,
-        rawPath: "",
-        source: "option",
-        span: { start: 0, end: 0 },
-        confidence: "conservative",
-      });
+      if (!schema.flag) {
+        // 无值选项（如 sed -i）
+        intents.push({
+          operation: schema.operation,
+          rawPath: "",
+          source: "option",
+          span: { start: 0, end: 0 },
+          confidence: "conservative",
+        });
+      }
       index++;
       continue;
     }
@@ -161,7 +208,7 @@ export const textTransformAdapter: CommandAdapter = {
     if (!config) return makeSemantics("unknown", { reason: `unknown text command: ${name}`, opaque: true });
 
     // 解析选项
-    const { intents: optionIntents, opaque } = parseOptions([...node.args], config.schemas, 0);
+    const { intents: optionIntents, opaque } = parseOptions([...node.args], config.schemas, 0, config.inPlace === true);
 
     // 如果产生了写 intent，升级为 modify
     const hasWrite = optionIntents.some((i) => i.operation === "write");

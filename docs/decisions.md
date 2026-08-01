@@ -267,8 +267,8 @@ reclassify:
 
 **Decision:** `text-transform` 适配器的取值选项按值性质分类：`file`（值是一个文件路径，产生 read/write 路径 intent）和 `expression`（值是程序/表达式，值被消费但不产生路径 intent）。`sed -e`/`--expression`、`awk -e` 归为 `expression`；`sed -f`/`--file`、`awk -f` 归为 `file`。支持 inline 后缀形式（`sed -i.bak`、`--in-place=.bak`），视为与 `-i`/`--in-place` 相同的 conservative write intent 且不降级为 opaque。
 
-**Why:** `sed -e 's/foo/bar/' file` 的表达式不是文件；把它当 read 路径 intent 会把表达式字符串交给 PathPolicy 做路径检查，产生无意义的拦截。`sed -i.bak` 是 macOS 常见用法，此前因未知选项被整体 opaque 拒绝。区分值性质保留 `-f` 脚本文件的真实路径检查，同时不再把表达式误判为路径。
+**Why:** `sed -e 's/foo/bar/' file` 的表达式不是文件；把它当 read 路径 intent 会把表达式字符串交给 PathPolicy 做路径检查，产生无意义的拦截。`sed -i.bak` 是 macOS 常见用法，此前因未知选项被整体 opaque 拒绝。区分值性质保留 `-f` 脚本文件的真实路径检查，同时不再把表达式误判为路径。位置参数是输入文件，必须产生路径 intent——此前 sed/awk/sort/uniq 的 positional 完全被忽略，`sed 's/x/y/' /etc/passwd` 等命令不产生任何路径检查，PathPolicy 被整体绕过。
 
-**Rejected:** 不把 `-e` 移除出 schema（会导致 opaque 降级）；不为每个取值选项创建独立 adapter；不把 awk `-i`（gawk include 与 in-place 语义冲突）纳入本次修复——保持 fail-closed 的保守 write 分类。
+**Rejected:** 不把 `-e` 移除出 schema（会导致 opaque 降级）；不为每个取值选项创建独立 adapter；不把 awk `-i`（gawk include 与 in-place 语义冲突）纳入本次修复——保持 fail-closed 的保守 write 分类。不因 sed/awk 的程序/文件位置歧义而放弃 positional 检查——宁可把 program 误判为额外 read 路径（fail-closed 噪声），也不漏掉输入文件（fail-open 漏报）。
 
-**Current implementation:** `OptionSchema.valueKind` 与 `inlineSuffix` 字段；parseOptions 对 expression 值消费但不 push intent，对 inline 后缀产生 conservative write intent。同时修复两个被测试暴露的既有缺陷：`gitEffects` 正则字面量 `\\b` 导致 `git rm` 的 delete effect 与 `git push` 等 network effect 从未生效（改为 `\b` 单词边界）；`cargo --version` 等全选项输入因 `extractSubcommand` 返回空串而落入 unknown（analyze 在 subcmd 为空时回退到第一个选项，对齐 npx 处理）。
+**Current implementation:** `OptionSchema.valueKind` 与 `inlineSuffix` 字段；parseOptions 对 expression 值消费但不 push intent，对 inline 后缀产生 conservative write intent。位置参数一律产生路径 intent：sed/awk 在出现写选项（-i）时 positional 升级为 write（原地修改目标），否则为 read；`--` 之后的 token 按文件参数处理。常用无值修饰符（sed -n/-E/-r/-z/-s/-u/--sandbox、awk -V/-h、sort/uniq 常用 flag）标记为 `flag`，不产生 intent 也不置 opaque；awk -F/-v、sed -l、sort -t/-k 等取值选项按 expression 消费；支持短选项内联值（-F,、-vfoo、-es/x/y/）。同时修复两个被测试暴露的既有缺陷：`gitEffects` 正则字面量 `\\b` 导致 `git rm` 的 delete effect 与 `git push` 等 network effect 从未生效（改为 `\b` 单词边界）；`cargo --version` 等全选项输入因 `extractSubcommand` 返回空串而落入 unknown（analyze 在 subcmd 为空时回退到第一个选项，对齐 npx 处理）。gate 对 bash 命令按 `commandClass` 决策，effects 仅用于 direct-origin 拒绝，因此 git effect 恢复不改变任何审批路径。

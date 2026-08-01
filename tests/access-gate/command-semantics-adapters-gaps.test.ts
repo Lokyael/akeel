@@ -63,7 +63,8 @@ test("fs: cp with a single arg has no path intents", () => {
 test("tx: sed -e does not treat the expression as a path", () => {
   const sem = analyzeCmd("sed -e 's/foo/bar/' file.txt");
   assert.equal(sem.class, "inspect");
-  assert.equal(sem.intents.length, 0);
+  assert.ok(!sem.intents.some((i) => i.rawPath === "s/foo/bar/"));
+  assert.ok(sem.intents.some((i) => i.operation === "read" && i.rawPath === "file.txt"));
 });
 
 test("tx: sed -f keeps the script file read intent", () => {
@@ -75,7 +76,8 @@ test("tx: sed -f keeps the script file read intent", () => {
 test("tx: awk -e does not treat the program as a path", () => {
   const sem = analyzeCmd("awk -e '{ print }' file.txt");
   assert.equal(sem.class, "inspect");
-  assert.equal(sem.intents.length, 0);
+  assert.ok(!sem.intents.some((i) => i.rawPath === "{ print }"));
+  assert.ok(sem.intents.some((i) => i.operation === "read" && i.rawPath === "file.txt"));
 });
 
 test("tx: awk -f keeps the script file read intent", () => {
@@ -112,16 +114,81 @@ test("tx: uniq --output writes to the output file", () => {
   assert.ok(sem.intents.some((i) => i.operation === "write" && i.rawPath === "out.txt"));
 });
 
-test("tx: options after -- are not parsed", () => {
+test("tx: options after -- are treated as file arguments", () => {
   const sem = analyzeCmd("sort -- -o out.txt");
   assert.equal(sem.opaque, false);
   assert.equal(sem.class, "inspect");
-  assert.equal(sem.intents.length, 0);
+  assert.ok(sem.intents.every((i) => i.operation === "read"));
+  assert.ok(sem.intents.some((i) => i.rawPath === "-o"));
+  assert.ok(sem.intents.some((i) => i.rawPath === "out.txt"));
 });
 
 test("tx: awk without -i is inspect", () => {
   const sem = analyzeCmd("awk '{ print }' data.txt");
   assert.equal(sem.class, "inspect");
+});
+
+// ─── text-transform: 遗漏修复 —— 常用修饰符 flag、取值表达式、位置参数路径意图 ───
+
+test("tx: awk -F field separator is consumed without a path intent", () => {
+  const sem = analyzeCmd("awk -F, '{ print $1 }' data.txt");
+  assert.equal(sem.opaque, false);
+  assert.equal(sem.class, "inspect");
+  assert.ok(!sem.intents.some((i) => i.rawPath === ","));
+});
+
+test("tx: awk -F attached value form is not opaque", () => {
+  const sem = analyzeCmd("awk -F, '{ print }' data.txt");
+  assert.equal(sem.opaque, false);
+  assert.equal(sem.class, "inspect");
+});
+
+test("tx: awk -v assignment is consumed without a path intent", () => {
+  const sem = analyzeCmd("awk -v x=1 '{ print x }' data.txt");
+  assert.equal(sem.opaque, false);
+  assert.ok(!sem.intents.some((i) => i.rawPath === "x=1"));
+});
+
+test("tx: sed -n -e combo is not opaque", () => {
+  const sem = analyzeCmd("sed -n -e 's/x/y/p' file.txt");
+  assert.equal(sem.opaque, false);
+  assert.equal(sem.class, "inspect");
+});
+
+test("tx: sed -E and --sandbox are flags, not opaque", () => {
+  const sem = analyzeCmd("sed --sandbox -E -e 's/x/y/' file.txt");
+  assert.equal(sem.opaque, false);
+  assert.equal(sem.class, "inspect");
+});
+
+test("tx: sed -l line length is an expression value", () => {
+  const sem = analyzeCmd("sed -l 80 file.txt");
+  assert.equal(sem.opaque, false);
+  assert.ok(!sem.intents.some((i) => i.rawPath === "80"));
+});
+
+test("tx: positional files produce read intents (path check not bypassed)", () => {
+  const sed = analyzeCmd("sed 's/x/y/' /etc/passwd");
+  assert.ok(sed.intents.some((i) => i.operation === "read" && i.rawPath === "/etc/passwd"));
+  const awk = analyzeCmd("awk '{ print $1 }' ~/.ssh/config");
+  assert.ok(awk.intents.some((i) => i.operation === "read" && i.rawPath === "~/.ssh/config"));
+  const sort = analyzeCmd("sort -n file1.txt file2.txt");
+  assert.ok(sort.intents.some((i) => i.operation === "read" && i.rawPath === "file1.txt"));
+  const uniq = analyzeCmd("uniq -c /etc/passwd");
+  assert.ok(uniq.intents.some((i) => i.operation === "read" && i.rawPath === "/etc/passwd"));
+});
+
+test("tx: sed -i turns positional files into write intents (in-place)", () => {
+  const sem = analyzeCmd("sed -i 's/x/y/' file.txt");
+  assert.equal(sem.class, "modify");
+  assert.ok(sem.intents.some((i) => i.operation === "write" && i.rawPath === "file.txt"));
+});
+
+test("tx: sort common flags are not opaque", () => {
+  const sem = analyzeCmd("sort -t, -k2 -n -r file.txt");
+  assert.equal(sem.opaque, false);
+  assert.equal(sem.class, "inspect");
+  assert.ok(sem.intents.some((i) => i.operation === "read" && i.rawPath === "file.txt"));
 });
 
 // ─── search: 破坏性变体与取值选项 ───
