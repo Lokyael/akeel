@@ -50,7 +50,7 @@ test("blocked path and threat do not offer bypass guidance", () => {
   assert.deepEqual(guidanceFor("symlink-escape"), []);
 });
 
-test("path-denied and invalid-tool-input map to profile/tool guidance", () => {
+test("path-denied and tool-input codes map to profile/tool guidance", () => {
   // path-denied → profile-restriction（建议让用户调整 Profile）
   assert.equal(guidanceFor("path-denied")[0]?.id, "profile-restriction");
   // invalid-tool-input → check-tool-input（修正参数，而非 Shell 形式）
