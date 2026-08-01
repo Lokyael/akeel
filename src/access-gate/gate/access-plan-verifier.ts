@@ -15,6 +15,7 @@ import {
   REQUEST_BRAND,
   TOOL_SURFACES,
 } from "./access-request-types";
+import { isRecord } from "./access-request";
 
 export function validateCompleteAccessPlan(
   value: unknown,
@@ -76,16 +77,6 @@ export function validateCompleteAccessPlan(
     && value.cwdCandidates.every((candidate, index) => isSameCandidate(candidate, uniquePathCandidates[index]))
     && coverage.commandSpans.every(isSourceSpan)
     && coverage.redirectionSpans.every(isSourceSpan);
-}
-
-function isRecord(value: unknown): value is Record<PropertyKey, unknown> {
-  try {
-    if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
-    const prototype = Object.getPrototypeOf(value);
-    return prototype === Object.prototype || prototype === null;
-  } catch {
-    return false;
-  }
 }
 
 function isNonNegativeInteger(value: unknown): value is number {

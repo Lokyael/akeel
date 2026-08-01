@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
+import { mkdirSync } from "node:fs";
 import { join } from "node:path";
-import { tmpdir } from "node:os";
+import { makeContext } from "./helpers";
 import {
   compileDirectToolCall,
   compileShellCall,
@@ -14,19 +14,10 @@ import {
   type CompilerContext,
 } from "../../src/access-gate/gate";
 
-function context(): CompilerContext & { cleanup: () => void } {
-  const root = mkdtempSync(join(tmpdir(), "pi-access-request-"));
-  const staging = mkdtempSync(join(tmpdir(), "pi-access-request-staging-"));
-  mkdirSync(join(root, "allowed"));
-  return {
-    cwd: root,
-    projectRoot: root,
-    stagingDir: staging,
-    cleanup: () => {
-      rmSync(root, { recursive: true, force: true });
-      rmSync(staging, { recursive: true, force: true });
-    },
-  };
+type TestContext = CompilerContext & { cleanup: () => void };
+
+function context(): TestContext {
+  return makeContext("pi-access-request-", (root) => mkdirSync(join(root, "allowed")));
 }
 
 function complete(result: CompileResult) {

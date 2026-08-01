@@ -1,25 +1,15 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { mkdtempSync, rmSync } from "node:fs";
-import { homedir, tmpdir } from "node:os";
+import { homedir } from "node:os";
 import { join } from "node:path";
 import { compileDirectToolCall, compileShellCall } from "../../src/access-gate/gate";
 import { evaluateRequest } from "../../src/access-gate/gate/evaluate-request";
 import type { CompleteAccessPlan, CompileResult, CompilerContext } from "../../src/access-gate/gate/access-request";
 import type { ResolvedProfile } from "../../src/access-gate/profile/types";
+import { makeContext } from "./helpers";
 
 function context(): CompilerContext & { cleanup: () => void } {
-  const root = mkdtempSync(join(tmpdir(), "pi-policy-kernel-"));
-  const staging = mkdtempSync(join(tmpdir(), "pi-policy-kernel-stage-"));
-  return {
-    cwd: root,
-    projectRoot: root,
-    stagingDir: staging,
-    cleanup: () => {
-      rmSync(root, { recursive: true, force: true });
-      rmSync(staging, { recursive: true, force: true });
-    },
-  };
+  return makeContext("pi-policy-kernel-");
 }
 
 function profile(overrides?: Partial<ResolvedProfile>): ResolvedProfile {

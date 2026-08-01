@@ -138,7 +138,7 @@ export function validateInputLength(value: string, subject: string): Compilation
     : null;
 }
 
-export function isRecord(value: unknown): value is Record<string, unknown> {
+export function isRecord(value: unknown): value is Record<PropertyKey, unknown> {
   try {
     if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
     const prototype = Object.getPrototypeOf(value);

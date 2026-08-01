@@ -2,7 +2,7 @@ import { decidePath, resolvePath } from "../path";
 import { PATH_DENY_REASONS } from "../path/policy";
 import type { ResolvedProfile } from "../profile/types";
 import { isCompleteAccessPlan } from "./compiler-entry";
-import { type CommandAccessOperation, type CompleteAccessPlan, type PathAccessOperation } from "./access-request";
+import { ANALYSIS_LIMITS, type CommandAccessOperation, type CompleteAccessPlan, type PathAccessOperation } from "./access-request";
 import type { GateDecision, GateEvidence, HardDenyCode } from "./decision-types";
 import { hardDeny, profileDeny, requireApproval } from "./decision-builder";
 import type { Effect } from "../command-semantics/types";
@@ -92,5 +92,5 @@ function commandEvidence(operation: CommandAccessOperation): GateEvidence {
 }
 
 function pathEvidence(operation: PathAccessOperation, cwd: string): GateEvidence {
-  return { kind: "path", subject: `${operation.operation} path: ${operation.input} @ ${cwd}`.slice(0, 1_024), span: operation.span };
+  return { kind: "path", subject: `${operation.operation} path: ${operation.input} @ ${cwd}`.slice(0, ANALYSIS_LIMITS.maxEvidenceSubjectLength), span: operation.span };
 }

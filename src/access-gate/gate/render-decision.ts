@@ -1,5 +1,5 @@
 import { denyResponseKindFor, guidanceFor, guidanceText } from "./guidance-catalog";
-import type { CompileResult } from "./access-request";
+import { ANALYSIS_LIMITS, type CompileResult } from "./access-request";
 import type { GateDecision, Guidance } from "./decision-types";
 import type { GateResult } from "./types";
 
@@ -26,7 +26,7 @@ function redactSubject(subject: string): string {
     const after = idx + prefix.length >= lower.length || lower[idx+prefix.length] === "/" || lower[idx+prefix.length] === "\\";
     if (before && after) return subject.slice(0, 32).replace(/[^\/\s]{3,}/g, "***");
   }
-  return subject.slice(0, 1_024);
+  return subject.slice(0, ANALYSIS_LIMITS.maxEvidenceSubjectLength);
 }
 
 function renderGuidance(guidance: readonly Guidance[]): string {
@@ -58,7 +58,7 @@ export function renderDecision(decision: GateDecision): GateResult {
   if (decision.disposition === "allow") return { kind: "allow" };
 
   if (decision.disposition === "ask") {
-    const items = decision.evidence.slice(0, MAX_EVIDENCE_ITEMS).map((e) => e.subject.slice(0, 1_024));
+    const items = decision.evidence.slice(0, MAX_EVIDENCE_ITEMS).map((e) => e.subject.slice(0, ANALYSIS_LIMITS.maxEvidenceSubjectLength));
     const reason = items.length < decision.evidence.length
       ? items.join("; ") + " and " + (decision.evidence.length - items.length) + " additional items"
       : items.join("; ");

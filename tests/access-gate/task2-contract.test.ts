@@ -1,22 +1,16 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { mkdtempSync, rmSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { tmpdir } from "node:os";
 import { compileShellCall, evaluateToolCall } from "../../src/access-gate/gate";
 import { analyzeSemantics } from "../../src/access-gate/command-semantics/registry";
 import { lex } from "../../src/access-gate/shell-parse/lexer";
 import { parse } from "../../src/access-gate/shell-parse/parser";
 import type { ResolvedProfile } from "../../src/access-gate/profile/types";
+import { makeContext } from "./helpers";
 
 function context() {
-  const root = mkdtempSync(join(tmpdir(), "pi-task2-contract-"));
-  const stagingDir = mkdtempSync(join(tmpdir(), "pi-task2-contract-stage-"));
-  return { cwd: root, projectRoot: root, stagingDir, cleanup: () => {
-    rmSync(root, { recursive: true, force: true });
-    rmSync(stagingDir, { recursive: true, force: true });
-  } };
+  return makeContext("pi-task2-contract-");
 }
 
 function allowAllProfile(): ResolvedProfile {

@@ -1,21 +1,14 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { mkdtempSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
 import { compileShellCall, compileDirectToolCall } from "../../src/access-gate/gate";
 import { evaluateRequest } from "../../src/access-gate/gate/evaluate-request";
 import type { CompileResult, CompilerContext } from "../../src/access-gate/gate/access-request";
 import type { GateDecision } from "../../src/access-gate/gate/decision-types";
 import type { ResolvedProfile } from "../../src/access-gate/profile/types";
+import { makeContext } from "./helpers";
 
 function context(): CompilerContext & { cleanup: () => void } {
-  const root = mkdtempSync(join(tmpdir(), "pi-invariants-"));
-  const staging = mkdtempSync(join(tmpdir(), "pi-invariants-stage-"));
-  return {
-    cwd: root, projectRoot: root, stagingDir: staging,
-    cleanup: () => { rmSync(root, { recursive: true, force: true }); rmSync(staging, { recursive: true, force: true }); },
-  };
+  return makeContext("pi-invariants-");
 }
 
 function profile(): ResolvedProfile {
