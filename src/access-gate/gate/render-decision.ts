@@ -5,6 +5,10 @@ import type { GateResult } from "./types";
 
 const MAX_RENDERED_REASON = 2_048;
 const MAX_EVIDENCE_ITEMS = 32;
+
+const SHELL_FORM_DENY_BASE = "This Shell form cannot be approved as written.";
+const SECURITY_BOUNDARY_DENY =
+  "This operation is blocked by a non-overridable security boundary. Do not retry or bypass it.";
 const SENSITIVE_PREFIXES = [
   "~/", "~\\", "/home/", "/root/",
   "/etc/passwd", "/etc/shadow",
@@ -36,9 +40,9 @@ export function renderCompilationFailure(result: Extract<CompileResult, { kind: 
   let reason: string;
 
   if (result.category === "security-block") {
-    reason = "This operation is blocked by a non-overridable security boundary. Do not retry or bypass it.";
+    reason = SECURITY_BOUNDARY_DENY;
   } else if (result.category === "unsupported-form") {
-    reason = "This Shell form cannot be approved as written.";
+    reason = SHELL_FORM_DENY_BASE;
     if (guidance.length > 0) reason += " " + renderGuidance(guidance);
   } else {
     reason = "This request could not be analyzed in its current form.";
@@ -68,9 +72,9 @@ export function renderDecision(decision: GateDecision): GateResult {
   if (decision.enforcement === "hard") {
     const responseKind = denyResponseKindFor(decision.code);
     if (responseKind === "security-boundary") {
-      reason = "This operation is blocked by a non-overridable security boundary. Do not retry or bypass it.";
+      reason = SECURITY_BOUNDARY_DENY;
     } else if (responseKind === "shell-form") {
-      reason = "This Shell form cannot be approved as written.";
+      reason = SHELL_FORM_DENY_BASE;
       if (guidance.length > 0) reason += " " + renderGuidance(guidance);
       else reason += " Use a literal command or a Direct tool instead.";
     } else {
