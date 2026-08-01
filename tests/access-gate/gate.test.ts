@@ -4,6 +4,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { evaluateToolCall } from "../../src/access-gate/gate/evaluate";
+import type { GateRuntime } from "../../src/access-gate/gate/types";
 import type { ResolvedProfile } from "../../src/access-gate/profile/types";
 
 function profile(overrides?: Partial<ResolvedProfile>): ResolvedProfile {
@@ -65,93 +66,79 @@ async function evaluateBash(command: string, activeProfile = profile(), selectio
   }
 }
 
-test("allows a project read through the direct read tool", async () => {
+async function evaluateTool(
+  surface: string,
+  args: Record<string, unknown>,
+  runtime: GateRuntime,
+  options: { profile?: ResolvedProfile; prepare?: (root: string) => void } = {},
+): Promise<Awaited<ReturnType<typeof evaluateToolCall>>> {
   const root = mkdtempSync(join(tmpdir(), "pi-access-gate-"));
   const staging = mkdtempSync(join(tmpdir(), "pi-access-staging-"));
   try {
-    writeFileSync(join(root, "file.ts"), "source");
-    const { runtime } = makeRuntime();
-    const result = await evaluateToolCall({
-      surface: "read",
-      args: { path: "file.ts" },
+    options.prepare?.(root);
+    return await evaluateToolCall({
+      surface,
+      args,
       cwd: root,
       projectRoot: root,
       stagingDir: staging,
-      profile: profile(),
+      profile: options.profile ?? profile(),
     }, runtime);
-    assert.deepEqual(result, { kind: "allow" });
   } finally {
     rmSync(root, { recursive: true, force: true });
     rmSync(staging, { recursive: true, force: true });
   }
+}
+
+test("allows a project read through the direct read tool", async () => {
+  const { runtime } = makeRuntime();
+  const result = await evaluateTool("read", { path: "file.ts" }, runtime, {
+    prepare: (root) => writeFileSync(join(root, "file.ts"), "source"),
+  });
+  assert.deepEqual(result, { kind: "allow" });
 });
 
 test("allows task document writes but denies source writes", async () => {
-  const root = mkdtempSync(join(tmpdir(), "pi-access-gate-"));
-  const staging = mkdtempSync(join(tmpdir(), "pi-access-staging-"));
-  try {
-    mkdirSync(join(root, "docs"));
-    const planProfile = profile({
-      name: "plan",
-      shellPolicy: { inspect: "allow", modify: "deny", execute: "deny", destroy: "deny", unknown: "deny" },
-      pathPolicy: {
-        default: { read: "deny", list: "deny", search: "deny", write: "deny" },
-        rules: [
-          { path: "project/**", read: "allow", list: "allow", search: "allow" },
-          { path: "project/docs/**", write: "allow" },
-        ],
-      },
-    });
-    const planResult = await evaluateToolCall({ surface: "write", args: { path: "docs/task.md", content: "task" }, cwd: root, projectRoot: root, stagingDir: staging, profile: planProfile }, { hasUI: true, select: async () => "Deny" });
-    const sourceResult = await evaluateToolCall({ surface: "write", args: { path: "src/main.ts", content: "code" }, cwd: root, projectRoot: root, stagingDir: staging, profile: planProfile }, { hasUI: true, select: async () => "Deny" });
-    assert.deepEqual(planResult, { kind: "allow" });
-    assert.equal(sourceResult.kind, "block");
-  } finally {
-    rmSync(root, { recursive: true, force: true });
-    rmSync(staging, { recursive: true, force: true });
-  }
+  const planProfile = profile({
+    name: "plan",
+    shellPolicy: { inspect: "allow", modify: "deny", execute: "deny", destroy: "deny", unknown: "deny" },
+    pathPolicy: {
+      default: { read: "deny", list: "deny", search: "deny", write: "deny" },
+      rules: [
+        { path: "project/**", read: "allow", list: "allow", search: "allow" },
+        { path: "project/docs/**", write: "allow" },
+      ],
+    },
+  });
+  const runtime = { hasUI: true, select: async () => "Deny" };
+  const planResult = await evaluateTool("write", { path: "docs/task.md", content: "task" }, runtime, {
+    profile: planProfile,
+    prepare: (root) => mkdirSync(join(root, "docs")),
+  });
+  const sourceResult = await evaluateTool("write", { path: "src/main.ts", content: "code" }, runtime, { profile: planProfile });
+  assert.deepEqual(planResult, { kind: "allow" });
+  assert.equal(sourceResult.kind, "block");
 });
 
 test("asks once for a guarded project write", async () => {
-  const root = mkdtempSync(join(tmpdir(), "pi-access-gate-"));
-  const staging = mkdtempSync(join(tmpdir(), "pi-access-staging-"));
-  try {
-    const { runtime, prompts } = makeRuntime(["Allow once"]);
-    const result = await evaluateToolCall({ surface: "write", args: { path: "src/main.ts", content: "code" }, cwd: root, projectRoot: root, stagingDir: staging, profile: profile() }, runtime);
-    assert.deepEqual(result, { kind: "allow" });
-    assert.equal(prompts.length, 1);
-  } finally {
-    rmSync(root, { recursive: true, force: true });
-    rmSync(staging, { recursive: true, force: true });
-  }
+  const { runtime, prompts } = makeRuntime(["Allow once"]);
+  const result = await evaluateTool("write", { path: "src/main.ts", content: "code" }, runtime);
+  assert.deepEqual(result, { kind: "allow" });
+  assert.equal(prompts.length, 1);
 });
 
 test("asks for an unknown network command", async () => {
-  const root = mkdtempSync(join(tmpdir(), "pi-access-gate-"));
-  const staging = mkdtempSync(join(tmpdir(), "pi-access-staging-"));
-  try {
-    const { runtime, prompts } = makeRuntime(["Allow once"]);
-    const result = await evaluateToolCall({ surface: "bash", args: { command: "git clone https://example.test/repo /tmp/repo" }, cwd: root, projectRoot: root, stagingDir: staging, profile: profile() }, runtime);
-    assert.deepEqual(result, { kind: "allow" });
-    assert.equal(prompts.length, 1);
-  } finally {
-    rmSync(root, { recursive: true, force: true });
-    rmSync(staging, { recursive: true, force: true });
-  }
+  const { runtime, prompts } = makeRuntime(["Allow once"]);
+  const result = await evaluateTool("bash", { command: "git clone https://example.test/repo /tmp/repo" }, runtime);
+  assert.deepEqual(result, { kind: "allow" });
+  assert.equal(prompts.length, 1);
 });
 
 test("hard destroy commands are denied without asking", async () => {
-  const root = mkdtempSync(join(tmpdir(), "pi-access-gate-"));
-  const staging = mkdtempSync(join(tmpdir(), "pi-access-staging-"));
-  try {
-    const { runtime, prompts } = makeRuntime(["Allow once"]);
-    const result = await evaluateToolCall({ surface: "bash", args: { command: "rm -rf /" }, cwd: root, projectRoot: root, stagingDir: staging, profile: profile() }, runtime);
-    assert.equal(result.kind, "block");
-    assert.equal(prompts.length, 0);
-  } finally {
-    rmSync(root, { recursive: true, force: true });
-    rmSync(staging, { recursive: true, force: true });
-  }
+  const { runtime, prompts } = makeRuntime(["Allow once"]);
+  const result = await evaluateTool("bash", { command: "rm -rf /" }, runtime);
+  assert.equal(result.kind, "block");
+  assert.equal(prompts.length, 0);
 });
 
 test("denies modify commands that target protected paths", async () => {
@@ -273,31 +260,17 @@ test("denies opaque command semantics even when unknown commands are allowed", a
 });
 
 test("ask without UI reports that the operation was not executed", async () => {
-  const root = mkdtempSync(join(tmpdir(), "pi-access-gate-"));
-  const staging = mkdtempSync(join(tmpdir(), "pi-access-staging-"));
-  try {
-    const result = await evaluateToolCall({ surface: "write", args: { path: "src/main.ts", content: "code" }, cwd: root, projectRoot: root, stagingDir: staging, profile: profile() }, { hasUI: false });
-    assert.equal(result.kind, "block");
-    assert.equal(result.code, "approval-required");
-    assert.ok(result.reason.includes("was not executed"));
-    assert.ok(result.reason.includes("no interactive approval UI"));
-  } finally {
-    rmSync(root, { recursive: true, force: true });
-    rmSync(staging, { recursive: true, force: true });
-  }
+  const result = await evaluateTool("write", { path: "src/main.ts", content: "code" }, { hasUI: false });
+  assert.equal(result.kind, "block");
+  assert.equal(result.code, "approval-required");
+  assert.ok(result.reason.includes("was not executed"));
+  assert.ok(result.reason.includes("no interactive approval UI"));
 });
 
 test("user denial reports the operation was not executed", async () => {
-  const root = mkdtempSync(join(tmpdir(), "pi-access-gate-"));
-  const staging = mkdtempSync(join(tmpdir(), "pi-access-staging-"));
-  try {
-    const result = await evaluateToolCall({ surface: "write", args: { path: "src/main.ts", content: "code" }, cwd: root, projectRoot: root, stagingDir: staging, profile: profile() }, { hasUI: true, select: async () => "Deny" });
-    assert.equal(result.kind, "block");
-    assert.equal(result.code, "user-denied");
-    assert.ok(result.reason.includes("The user denied the operation"));
-    assert.ok(result.reason.includes("was not executed"));
-  } finally {
-    rmSync(root, { recursive: true, force: true });
-    rmSync(staging, { recursive: true, force: true });
-  }
+  const result = await evaluateTool("write", { path: "src/main.ts", content: "code" }, { hasUI: true, select: async () => "Deny" });
+  assert.equal(result.kind, "block");
+  assert.equal(result.code, "user-denied");
+  assert.ok(result.reason.includes("The user denied the operation"));
+  assert.ok(result.reason.includes("was not executed"));
 });

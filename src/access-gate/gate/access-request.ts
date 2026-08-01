@@ -66,7 +66,7 @@ export function reject(code: CompilerDecisionCode, subject: string, span?: Sourc
   return { kind: "reject", category, code: code as UnsupportedCompilationCode, evidence };
 }
 
-export function compilationCategoryFor(code: CompilerDecisionCode): CompilationCategory {
+function compilationCategoryFor(code: CompilerDecisionCode): CompilationCategory {
   if (code === "threat" || code === "hard-command-rule" || code === "destroy-command"
     || code === "blocked-path" || code === "symlink-escape" || code === "path-unclassifiable") {
     return "security-block";

@@ -7,7 +7,7 @@ import { parse } from "../../src/access-gate/shell-parse/parser";
 
 // ─── Lexer Tests ───
 
-void test("lexer: tokenizes a simple command", () => {
+test("lexer: tokenizes a simple command", () => {
   const { tokens, unsafeSyntax } = lex("cat file.txt");
   assert.equal(unsafeSyntax, null);
   assert.equal(tokens.length, 2);
@@ -17,7 +17,7 @@ void test("lexer: tokenizes a simple command", () => {
   assert.equal(tokens[1]!.kind, "word");
 });
 
-void test("lexer: tracks source spans", () => {
+test("lexer: tracks source spans", () => {
   const { tokens } = lex("cat file.txt");
   assert.equal(tokens[0]!.span.start, 0);
   assert.equal(tokens[0]!.span.end, 3);
@@ -25,7 +25,7 @@ void test("lexer: tracks source spans", () => {
   assert.equal(tokens[1]!.span.end, 12);
 });
 
-void test("lexer: control operators (&&, ||, ;, |, &)", () => {
+test("lexer: control operators (&&, ||, ;, |, &)", () => {
   const { tokens } = lex("a && b || c; d | e & f");
   assert.equal(tokens.length, 11);
   assert.equal(tokens[1]!.value, "&&");
@@ -40,27 +40,27 @@ void test("lexer: control operators (&&, ||, ;, |, &)", () => {
   assert.equal(tokens[9]!.kind, "operator");
 });
 
-void test("lexer: stdout redirect (>)", () => {
+test("lexer: stdout redirect (>)", () => {
   const { tokens } = lex("echo hello > out.txt");
   assert.equal(tokens[2]!.kind, "redirect");
   assert.equal(tokens[2]!.value, ">");
   assert.equal(tokens[3]!.value, "out.txt");
 });
 
-void test("lexer: stdout append (>>)", () => {
+test("lexer: stdout append (>>)", () => {
   const { tokens } = lex("echo hello >> out.txt");
   assert.equal(tokens[2]!.kind, "redirect");
   assert.equal(tokens[2]!.value, ">>");
 });
 
-void test("lexer: stdin (<)", () => {
+test("lexer: stdin (<)", () => {
   const { tokens } = lex("cat < in.txt");
   assert.equal(tokens[1]!.kind, "redirect");
   assert.equal(tokens[1]!.value, "<");
   assert.equal(tokens[2]!.value, "in.txt");
 });
 
-void test("lexer: stderr redirect (2>)", () => {
+test("lexer: stderr redirect (2>)", () => {
   const { tokens } = lex("cmd 2> err.txt");
   assert.equal(tokens[1]!.value, "2");
   assert.equal(tokens[1]!.kind, "word");
@@ -69,91 +69,91 @@ void test("lexer: stderr redirect (2>)", () => {
   assert.equal(tokens[3]!.value, "err.txt");
 });
 
-void test("lexer: &> redirect", () => {
+test("lexer: &> redirect", () => {
   const { tokens } = lex("cmd &> out.txt");
   assert.equal(tokens[1]!.kind, "redirect");
   assert.equal(tokens[1]!.value, "&>");
   assert.equal(tokens[2]!.value, "out.txt");
 });
 
-void test("lexer: &>> redirect", () => {
+test("lexer: &>> redirect", () => {
   const { tokens } = lex("cmd &>> out.txt");
   assert.equal(tokens[1]!.kind, "redirect");
   assert.equal(tokens[1]!.value, "&>>");
 });
 
-void test("lexer: heredoc (<<)", () => {
+test("lexer: heredoc (<<)", () => {
   const { tokens } = lex("cat << EOF");
   assert.equal(tokens[1]!.kind, "redirect");
   assert.equal(tokens[1]!.value, "<<");
   assert.equal(tokens[2]!.value, "EOF");
 });
 
-void test("lexer: here-string (<<<)", () => {
+test("lexer: here-string (<<<)", () => {
   const { tokens } = lex("cat <<< \"hello world\"");
   assert.equal(tokens[1]!.kind, "redirect");
   assert.equal(tokens[1]!.value, "<<<");
   assert.equal(tokens[2]!.value, '"hello world"');
 });
 
-void test("lexer: single-quoted strings", () => {
+test("lexer: single-quoted strings", () => {
   const { tokens } = lex("echo 'hello world'");
   assert.equal(tokens[1]!.value, "'hello world'");
   assert.equal(tokens[1]!.quoted, true);
 });
 
-void test("lexer: double-quoted strings", () => {
+test("lexer: double-quoted strings", () => {
   const { tokens } = lex('echo "hello world"');
   assert.equal(tokens[1]!.value, '"hello world"');
   assert.equal(tokens[1]!.quoted, true);
 });
 
-void test("lexer: unquoted wildcards are dynamic", () => {
+test("lexer: unquoted wildcards are dynamic", () => {
   const { tokens } = lex("cat *.txt");
   assert.equal(tokens[1]!.dynamic, true);
 });
 
-void test("lexer: unquoted dollar is dynamic", () => {
+test("lexer: unquoted dollar is dynamic", () => {
   const { tokens } = lex("echo $HOME");
   assert.equal(tokens[1]!.dynamic, true);
 });
 
-void test("lexer: quoted wildcards are not dynamic", () => {
+test("lexer: quoted wildcards are not dynamic", () => {
   const { tokens } = lex('cat "*.txt"');
   assert.equal(tokens[1]!.quoted, true);
   assert.equal(tokens[1]!.dynamic, false);
 });
 
-void test("lexer: unterminated single quote", () => {
+test("lexer: unterminated single quote", () => {
   const { tokens, unsafeSyntax } = lex("echo 'hello");
   assert.equal(unsafeSyntax, "unterminated quote");
 });
 
-void test("lexer: unterminated double quote", () => {
+test("lexer: unterminated double quote", () => {
   const { tokens, unsafeSyntax } = lex('echo "hello');
   assert.equal(unsafeSyntax, "unterminated quote");
 });
 
-void test("lexer: comment (strips # to end)", () => {
+test("lexer: comment (strips # to end)", () => {
   const { tokens } = lex("echo hello # this is a comment");
   assert.equal(tokens.length, 2);
   assert.equal(tokens[0]!.value, "echo");
   assert.equal(tokens[1]!.value, "hello");
 });
 
-void test("lexer: backslash continuation (\\\\n)", () => {
+test("lexer: backslash continuation (\\\\n)", () => {
   const { tokens } = lex("echo \\\nhello");
   assert.equal(tokens.length, 2);
   assert.equal(tokens[0]!.value, "echo");
   assert.equal(tokens[1]!.value, "hello");
 });
 
-void test("lexer: empty input", () => {
+test("lexer: empty input", () => {
   const { tokens } = lex("");
   assert.equal(tokens.length, 0);
 });
 
-void test("lexer: comment does not strip in middle of word", () => {
+test("lexer: comment does not strip in middle of word", () => {
   const { tokens } = lex("echo foo#bar");
   // 没有前导空白的 # 不是注释
   assert.equal(tokens.length, 2);
@@ -162,7 +162,7 @@ void test("lexer: comment does not strip in middle of word", () => {
 
 // ─── Parser Tests ───
 
-void test("parser: simple command", () => {
+test("parser: simple command", () => {
   const { program, error } = parse(lex("cat file.txt").tokens);
   assert.equal(error, null);
   assert.equal(program.commands.length, 1);
@@ -172,7 +172,7 @@ void test("parser: simple command", () => {
   assert.equal(cmd.args[0]!.value, "file.txt");
 });
 
-void test("parser: control operators separate commands", () => {
+test("parser: control operators separate commands", () => {
   const { program } = parse(lex("cd dir && cat file").tokens);
   assert.equal(program.commands.length, 2);
   assert.equal(program.commands[0]!.executable?.value, "cd");
@@ -181,21 +181,21 @@ void test("parser: control operators separate commands", () => {
   assert.equal(program.commands[1]!.operatorBefore, "&&");
 });
 
-void test("parser: semicolon separated", () => {
+test("parser: semicolon separated", () => {
   const { program } = parse(lex("echo a; echo b").tokens);
   assert.equal(program.commands.length, 2);
   assert.equal(program.commands[0]!.operatorBefore, "start");
   assert.equal(program.commands[1]!.operatorBefore, ";");
 });
 
-void test("parser: pipeline", () => {
+test("parser: pipeline", () => {
   const { program } = parse(lex("cat file | grep pattern").tokens);
   assert.equal(program.commands.length, 2);
   assert.equal(program.commands[0]!.operatorBefore, "start");
   assert.equal(program.commands[1]!.operatorBefore, "|");
 });
 
-void test("parser: stdout redirection", () => {
+test("parser: stdout redirection", () => {
   const { program } = parse(lex("echo hello > out.txt").tokens);
   const cmd = program.commands[0]!;
   assert.equal(cmd.redirections.length, 1);
@@ -204,7 +204,7 @@ void test("parser: stdout redirection", () => {
   assert.equal(cmd.redirections[0]!.target?.value, "out.txt");
 });
 
-void test("parser: consumes an adjacent stderr fd prefix", () => {
+test("parser: consumes an adjacent stderr fd prefix", () => {
   const { program } = parse(lex("cmd 2> err.txt").tokens);
   const cmd = program.commands[0]!;
   assert.equal(cmd.executable?.value, "cmd");
@@ -213,7 +213,7 @@ void test("parser: consumes an adjacent stderr fd prefix", () => {
   assert.equal(cmd.redirections[0]!.fd, 2);
 });
 
-void test("parser: preserves a spaced numeric argument before redirect", () => {
+test("parser: preserves a spaced numeric argument before redirect", () => {
   const { program } = parse(lex("cmd 2 > err.txt").tokens);
   const cmd = program.commands[0]!;
   assert.deepEqual(cmd.args.map((arg) => arg.value), ["2"]);
@@ -221,7 +221,7 @@ void test("parser: preserves a spaced numeric argument before redirect", () => {
   assert.equal(cmd.redirections[0]!.fd, 1);
 });
 
-void test("parser: stdin redirection", () => {
+test("parser: stdin redirection", () => {
   const { program } = parse(lex("sort < in.txt").tokens);
   const cmd = program.commands[0]!;
   assert.equal(cmd.redirections.length, 1);
@@ -230,14 +230,14 @@ void test("parser: stdin redirection", () => {
   assert.equal(cmd.redirections[0]!.target?.value, "in.txt");
 });
 
-void test("parser: append redirection", () => {
+test("parser: append redirection", () => {
   const { program } = parse(lex("echo hello >> out.txt").tokens);
   const cmd = program.commands[0]!;
   assert.equal(cmd.redirections.length, 1);
   assert.equal(cmd.redirections[0]!.kind, "stdoutAppend");
 });
 
-void test("parser: distinguishes fd duplication from file redirection", () => {
+test("parser: distinguishes fd duplication from file redirection", () => {
   const { program } = parse(lex("cat file 2>&1").tokens);
   const cmd = program.commands[0]!;
   assert.equal(cmd.redirections[0]!.kind, "fdDuplicate");
@@ -245,7 +245,7 @@ void test("parser: distinguishes fd duplication from file redirection", () => {
   assert.equal(cmd.redirections[0]!.target?.value, "1");
 });
 
-void test("parser: env assignments", () => {
+test("parser: env assignments", () => {
   const { program } = parse(lex("VAR=value cmd").tokens);
   const cmd = program.commands[0]!;
   assert.equal(cmd.envAssignments.length, 1);
@@ -253,14 +253,14 @@ void test("parser: env assignments", () => {
   assert.equal(cmd.executable?.value, "cmd");
 });
 
-void test("parser: multiple env assignments", () => {
+test("parser: multiple env assignments", () => {
   const { program } = parse(lex("A=1 B=2 cmd arg").tokens);
   const cmd = program.commands[0]!;
   assert.equal(cmd.envAssignments.length, 2);
   assert.equal(cmd.executable?.value, "cmd");
 });
 
-void test("parser: env wrapper", () => {
+test("parser: env wrapper", () => {
   const { program } = parse(lex("env rm file").tokens);
   const cmd = program.commands[0]!;
   assert.equal(cmd.wrapper.length, 1);
@@ -268,7 +268,7 @@ void test("parser: env wrapper", () => {
   assert.equal(cmd.executable?.value, "rm");
 });
 
-void test("parser: env with PATH override", () => {
+test("parser: env with PATH override", () => {
   const lexResult = lex("env PATH=/tmp rm file");
   const { program } = parse(lexResult.tokens);
   const cmd = program.commands[0]!;
@@ -281,7 +281,7 @@ void test("parser: env with PATH override", () => {
   assert.equal(cmd.executable?.value, "rm");
 });
 
-void test("parser: command wrapper", () => {
+test("parser: command wrapper", () => {
   const { program } = parse(lex("command cp src dst").tokens);
   const cmd = program.commands[0]!;
   assert.equal(cmd.wrapper.length, 1);
@@ -290,7 +290,7 @@ void test("parser: command wrapper", () => {
   assert.equal(cmd.args.length, 2);
 });
 
-void test("parser: timeout wrapper", () => {
+test("parser: timeout wrapper", () => {
   const lexResult = lex("timeout 5 sleep 10");
   assert.equal(lexResult.tokens.length, 4);
   const { program } = parse(lexResult.tokens);
@@ -300,7 +300,7 @@ void test("parser: timeout wrapper", () => {
   assert.equal(cmd.executable?.value, "sleep", `got '${cmd.executable?.value}'`);
 });
 
-void test("parser: nohup wrapper", () => {
+test("parser: nohup wrapper", () => {
   const { program } = parse(lex("nohup long-running &").tokens);
   const cmd = program.commands[0]!;
   assert.equal(cmd.wrapper.length, 1);
@@ -308,7 +308,7 @@ void test("parser: nohup wrapper", () => {
   assert.equal(cmd.executable?.value, "long-running");
 });
 
-void test("parser: exec wrapper", () => {
+test("parser: exec wrapper", () => {
   const { program } = parse(lex("exec bash -c 'echo hi'").tokens);
   const cmd = program.commands[0]!;
   assert.equal(cmd.wrapper.length, 1);
@@ -316,7 +316,7 @@ void test("parser: exec wrapper", () => {
   assert.equal(cmd.executable?.value, "bash");
 });
 
-void test("parser: cd && cat", () => {
+test("parser: cd && cat", () => {
   const { program } = parse(lex("cd project/sub && cat file").tokens);
   assert.equal(program.commands.length, 2);
   assert.equal(program.commands[0]!.executable?.value, "cd");
@@ -324,29 +324,29 @@ void test("parser: cd && cat", () => {
   assert.equal(program.commands[0]!.args[0]!.value, "project/sub");
 });
 
-void test("parser: dynamic token from glob", () => {
+test("parser: dynamic token from glob", () => {
   const { program } = parse(lex("ls *.ts").tokens);
   assert.equal(program.dynamic, true);
 });
 
-void test("parser: dynamic token from variable", () => {
+test("parser: dynamic token from variable", () => {
   const lexResult = lex("cat $HOME/file");
   const cmd = parse(lexResult.tokens).program.commands[0]!;
   // $HOME/file is dynamic
   assert.ok(cmd.args.some((a) => a.dynamic));
 });
 
-void test("parser: empty command produces error", () => {
+test("parser: empty command produces error", () => {
   const { error } = parse(lex("").tokens);
   assert.equal(error, "empty command");
 });
 
-void test("parser: unterminated quote propagated from lexer", () => {
+test("parser: unterminated quote propagated from lexer", () => {
   const lexResult = lex("echo 'hello");
   assert.equal(lexResult.unsafeSyntax, "unterminated quote");
 });
 
-void test("parser: redirect target not in args", () => {
+test("parser: redirect target not in args", () => {
   const { program } = parse(lex("cat > output.txt").tokens);
   const cmd = program.commands[0]!;
   assert.equal(cmd.redirections.length, 1);
@@ -355,7 +355,7 @@ void test("parser: redirect target not in args", () => {
   assert.equal(cmd.args.length, 0);
 });
 
-void test("parser: preserving quoted arguments", () => {
+test("parser: preserving quoted arguments", () => {
   const { program } = parse(lex('grep "hello world" file.txt').tokens);
   const cmd = program.commands[0]!;
   assert.equal(cmd.args.length, 2);
@@ -364,7 +364,7 @@ void test("parser: preserving quoted arguments", () => {
   assert.equal(cmd.args[1]!.value, "file.txt");
 });
 
-void test("parser: a && b || c chain", () => {
+test("parser: a && b || c chain", () => {
   const { program } = parse(lex("a && b || c").tokens);
   assert.equal(program.commands.length, 3);
   assert.equal(program.commands[0]!.operatorBefore, "start");
@@ -372,7 +372,7 @@ void test("parser: a && b || c chain", () => {
   assert.equal(program.commands[2]!.operatorBefore, "||");
 });
 
-void test("parser: background operator", () => {
+test("parser: background operator", () => {
   const { program } = parse(lex("sleep 10 & wait").tokens);
   assert.equal(program.commands.length, 2);
   assert.equal(program.commands[0]!.executable?.value, "sleep");
@@ -380,7 +380,7 @@ void test("parser: background operator", () => {
   assert.equal(program.commands[1]!.operatorBefore, "&");
 });
 
-void test("parser: here-string target", () => {
+test("parser: here-string target", () => {
   const { program } = parse(lex("cat <<< \"hello world\"").tokens);
   const cmd = program.commands[0]!;
   assert.equal(cmd.redirections.length, 1);
@@ -388,7 +388,7 @@ void test("parser: here-string target", () => {
   assert.equal(cmd.redirections[0]!.target?.value, "hello world");
 });
 
-void test("parser: sort -o flags are args (parser is semantic-free)", () => {
+test("parser: sort -o flags are args (parser is semantic-free)", () => {
   const { program } = parse(lex("sort -o output.txt input.txt").tokens);
   const cmd = program.commands[0]!;
   assert.equal(cmd.executable?.value, "sort");
@@ -398,7 +398,7 @@ void test("parser: sort -o flags are args (parser is semantic-free)", () => {
   assert.equal(cmd.args[2]!.value, "input.txt");
 });
 
-void test("parser: dd arg parsing", () => {
+test("parser: dd arg parsing", () => {
   const { program } = parse(lex("dd if=/dev/zero of=out.bin bs=1024 count=1").tokens);
   const cmd = program.commands[0]!;
   assert.equal(cmd.executable?.value, "dd");
@@ -406,7 +406,7 @@ void test("parser: dd arg parsing", () => {
   assert.ok(cmd.args.some((a) => a.value === "of=out.bin"));
 });
 
-void test("lexer+parser: end-to-end env rm path", () => {
+test("lexer+parser: end-to-end env rm path", () => {
   // env rm ~/.ssh/id_rsa: wrapper=env, executable=rm, args=[~/.ssh/id_rsa]
   const { program } = parse(lex("env rm ~/.ssh/id_rsa").tokens);
   const cmd = program.commands[0]!;
@@ -417,7 +417,7 @@ void test("lexer+parser: end-to-end env rm path", () => {
   assert.equal(cmd.args[0]!.value, "~/.ssh/id_rsa");
 });
 
-void test("lexer+parser: end-to-end command cp", () => {
+test("lexer+parser: end-to-end command cp", () => {
   const { program } = parse(lex("command cp src dst").tokens);
   const cmd = program.commands[0]!;
   assert.equal(cmd.wrapper.length, 1);
@@ -426,7 +426,7 @@ void test("lexer+parser: end-to-end command cp", () => {
   assert.equal(cmd.args.length, 2);
 });
 
-void test("lexer+parser: end-to-end cd && cat", () => {
+test("lexer+parser: end-to-end cd && cat", () => {
   const { program } = parse(lex("cd /etc && cat shadow").tokens);
   assert.equal(program.commands.length, 2);
   assert.equal(program.commands[0]!.executable?.value, "cd");
@@ -434,7 +434,7 @@ void test("lexer+parser: end-to-end cd && cat", () => {
   assert.equal(program.commands[1]!.operatorBefore, "&&");
 });
 
-void test("lexer+parser: sort -o output.txt input.txt is all args", () => {
+test("lexer+parser: sort -o output.txt input.txt is all args", () => {
   const { program } = parse(lex("sort -o output.txt input.txt").tokens);
   const cmd = program.commands[0]!;
   assert.equal(cmd.executable?.value, "sort");
@@ -445,7 +445,7 @@ void test("lexer+parser: sort -o output.txt input.txt is all args", () => {
   assert.equal(cmd.args[2]!.value, "input.txt");
 });
 
-void test("lexer+parser: sed --in-place is args", () => {
+test("lexer+parser: sed --in-place is args", () => {
   const { program } = parse(lex("sed --in-place -e 's/foo/bar/' file.txt").tokens);
   const cmd = program.commands[0]!;
   assert.equal(cmd.executable?.value, "sed");

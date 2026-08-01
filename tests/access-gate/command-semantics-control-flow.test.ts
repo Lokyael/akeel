@@ -8,13 +8,13 @@ import { parse } from "../../src/access-gate/shell-parse/parser";
 import { normalizeCommand } from "../../src/access-gate/command-semantics/normalize";
 import { analyzeControlFlow, initialCwd, resolveCdTarget } from "../../src/access-gate/command-semantics/control-flow";
 
-void test("control: unavailable cd target returns exists=false without throwing", () => {
+test("control: unavailable cd target returns exists=false without throwing", () => {
   const result = resolveCdTarget("missing/subdir", "/path/that/does/not/exist");
   assert.deepEqual(result, { cwd: "/path/that/does/not/exist/missing/subdir", exists: false });
 });
 
 
-void test("normalize: env rm keeps underlying executable", () => {
+test("normalize: env rm keeps underlying executable", () => {
   const { program } = parse(lex("env rm file").tokens);
   const cmd = program.commands[0]!;
   const norm = normalizeCommand(cmd);
@@ -24,7 +24,7 @@ void test("normalize: env rm keeps underlying executable", () => {
   assert.equal(norm!.command.args[0]!.value, "file");
 });
 
-void test("normalize: env with VAR=value keeps rm", () => {
+test("normalize: env with VAR=value keeps rm", () => {
   const { program } = parse(lex("env PATH=/tmp rm file").tokens);
   const norm = normalizeCommand(program.commands[0]!);
   assert.notEqual(norm, null);
@@ -33,7 +33,7 @@ void test("normalize: env with VAR=value keeps rm", () => {
   assert.equal(norm!.command.args[0]!.value, "file");
 });
 
-void test("normalize: command cp keeps underlying executable", () => {
+test("normalize: command cp keeps underlying executable", () => {
   const { program } = parse(lex("command cp src dst").tokens);
   const norm = normalizeCommand(program.commands[0]!);
   assert.notEqual(norm, null);
@@ -41,7 +41,7 @@ void test("normalize: command cp keeps underlying executable", () => {
   assert.equal(norm!.command.args.length, 2);
 });
 
-void test("normalize: timeout 5 sleep 10 becomes sleep", () => {
+test("normalize: timeout 5 sleep 10 becomes sleep", () => {
   const { program } = parse(lex("timeout 5 sleep 10").tokens);
   const norm = normalizeCommand(program.commands[0]!);
   assert.notEqual(norm, null);
@@ -50,21 +50,21 @@ void test("normalize: timeout 5 sleep 10 becomes sleep", () => {
   assert.equal(norm!.command.args[0]!.value, "10");
 });
 
-void test("normalize: nohup command preserves executable", () => {
+test("normalize: nohup command preserves executable", () => {
   const { program } = parse(lex("nohup long-running &").tokens);
   const norm = normalizeCommand(program.commands[0]!);
   assert.notEqual(norm, null);
   assert.equal(norm!.executable, "long-running");
 });
 
-void test("normalize: exec bash -c preserves bash", () => {
+test("normalize: exec bash -c preserves bash", () => {
   const { program } = parse(lex("exec bash -c 'echo hi'").tokens);
   const norm = normalizeCommand(program.commands[0]!);
   assert.notEqual(norm, null);
   assert.equal(norm!.executable, "bash");
 });
 
-void test("normalize: naked command stays unchanged", () => {
+test("normalize: naked command stays unchanged", () => {
   const { program } = parse(lex("cat file.txt").tokens);
   const norm = normalizeCommand(program.commands[0]!);
   assert.notEqual(norm, null);
@@ -72,7 +72,7 @@ void test("normalize: naked command stays unchanged", () => {
   assert.equal(norm!.wrappers.length, 0);
 });
 
-void test("normalize: env rm ~/.ssh/id_rsa has correct path arg", () => {
+test("normalize: env rm ~/.ssh/id_rsa has correct path arg", () => {
   const { program } = parse(lex("env rm ~/.ssh/id_rsa").tokens);
   const norm = normalizeCommand(program.commands[0]!);
   assert.notEqual(norm, null);
@@ -80,7 +80,7 @@ void test("normalize: env rm ~/.ssh/id_rsa has correct path arg", () => {
   assert.equal(norm!.command.args[0]!.value, "~/.ssh/id_rsa");
 });
 
-void test("normalize: command cp src dst has correct args", () => {
+test("normalize: command cp src dst has correct args", () => {
   const { program } = parse(lex("command cp src dst").tokens);
   const norm = normalizeCommand(program.commands[0]!);
   assert.notEqual(norm, null);
@@ -89,7 +89,7 @@ void test("normalize: command cp src dst has correct args", () => {
   assert.equal(norm!.command.args[1]!.value, "dst");
 });
 
-void test("normalize: nested timeout env rm", () => {
+test("normalize: nested timeout env rm", () => {
   const { program } = parse(lex("timeout 30 env rm file").tokens);
   const norm = normalizeCommand(program.commands[0]!);
   assert.notEqual(norm, null);
@@ -98,7 +98,7 @@ void test("normalize: nested timeout env rm", () => {
   assert.equal(norm!.command.args[0]!.value, "file");
 });
 
-void test("normalize: env with options before command", () => {
+test("normalize: env with options before command", () => {
   const { program } = parse(lex("env -i PATH=/usr/bin rm file").tokens);
   const norm = normalizeCommand(program.commands[0]!);
   assert.notEqual(norm, null);
@@ -107,7 +107,7 @@ void test("normalize: env with options before command", () => {
 
 // ─── Control Flow ───
 
-void test("control: simple command keeps initial cwd", () => {
+test("control: simple command keeps initial cwd", () => {
   const { program } = parse(lex("cat file.txt").tokens);
   const result = analyzeControlFlow(program, initialCwd("/project"));
   assert.equal(result.opaque, false);
@@ -116,7 +116,7 @@ void test("control: simple command keeps initial cwd", () => {
   assert.equal(result.nodes[0]!.effectiveCwd.certainty, "exact");
 });
 
-void test("control: cd changes cwd for next command", () => {
+test("control: cd changes cwd for next command", () => {
   const { program } = parse(lex("cd subdir && cat file").tokens);
   const result = analyzeControlFlow(program, initialCwd("/project"));
   assert.equal(result.nodes.length, 2);
@@ -126,19 +126,19 @@ void test("control: cd changes cwd for next command", () => {
   assert.equal(result.nodes[1]!.effectiveCwd.cwd, "/project/subdir");
 });
 
-void test("control: cd path is opaque", () => {
+test("control: cd path is opaque", () => {
   const { program } = parse(lex("cd - && cat file").tokens);
   const result = analyzeControlFlow(program, initialCwd("/project"));
   assert.equal(result.opaque, true);
 });
 
-void test("control: pipeline does not propagate cwd changes", () => {
+test("control: pipeline does not propagate cwd changes", () => {
   const { program } = parse(lex("cd subdir | cat file").tokens);
   const result = analyzeControlFlow(program, initialCwd("/project"));
   assert.equal(result.nodes.length, 2);
 });
 
-void test("control: multiple sequential cd commands", () => {
+test("control: multiple sequential cd commands", () => {
   const { program } = parse(lex("cd a && cd b && cat file").tokens);
   const result = analyzeControlFlow(program, initialCwd("/project"));
   assert.equal(result.nodes.length, 3);
@@ -147,33 +147,33 @@ void test("control: multiple sequential cd commands", () => {
   assert.equal(result.nodes[2]!.effectiveCwd.cwd, "/project/a/b");
 });
 
-void test("control: cd to absolute path", () => {
+test("control: cd to absolute path", () => {
   const { program } = parse(lex("cd /etc && cat shadow").tokens);
   const result = analyzeControlFlow(program, initialCwd("/project"));
   assert.equal(result.nodes.length, 2);
   assert.equal(result.nodes[1]!.effectiveCwd.cwd, "/etc");
 });
 
-void test("control: dynamic program is opaque", () => {
+test("control: dynamic program is opaque", () => {
   const { program } = parse(lex("cat $HOME/file").tokens);
   const result = analyzeControlFlow(program, initialCwd("/project"));
   assert.equal(result.opaque, true);
 });
 
-void test("control: glob in command is opaque", () => {
+test("control: glob in command is opaque", () => {
   const { program } = parse(lex("ls *.ts").tokens);
   const result = analyzeControlFlow(program, initialCwd("/project"));
   assert.equal(result.opaque, true);
 });
 
-void test("control: empty cwd analysis for env rm", () => {
+test("control: empty cwd analysis for env rm", () => {
   const { program } = parse(lex("env rm ~/.ssh/id_rsa").tokens);
   const norm = normalizeCommand(program.commands[0]!);
   assert.notEqual(norm, null);
   assert.equal(norm!.executable, "rm");
 });
 
-void test("control: nohup wrapper preserves cwd", () => {
+test("control: nohup wrapper preserves cwd", () => {
   const { program } = parse(lex("nohup sleep 10 &").tokens);
   const result = analyzeControlFlow(program, initialCwd("/project"));
   assert.equal(result.nodes.length, 1);

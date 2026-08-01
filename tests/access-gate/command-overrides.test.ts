@@ -47,7 +47,7 @@ const DEFAULT_CTX: SemanticContext = { projectRoot: "/tmp/pi-keel-test", staging
 
 // ─── aliases ───
 
-void test("aliases: fd → find（search adapter 接管）", () => {
+test("aliases: fd → find（search adapter 接管）", () => {
   resetOverrides();
   const { ctx: _ctx, cleanup } = setupProject(`
 aliases:
@@ -64,7 +64,7 @@ aliases:
   }
 });
 
-void test("aliases: bat → cat（read adapter 接管）", () => {
+test("aliases: bat → cat（read adapter 接管）", () => {
   resetOverrides();
   const { ctx: _ctx, cleanup } = setupProject(`
 aliases:
@@ -80,7 +80,7 @@ aliases:
   }
 });
 
-void test("aliases: 别名目标不存在 → unknown", () => {
+test("aliases: 别名目标不存在 → unknown", () => {
   resetOverrides();
   const { ctx: _ctx, cleanup } = setupProject(`
 aliases:
@@ -95,7 +95,7 @@ aliases:
   }
 });
 
-void test("aliases: 无 overrides 时不受影响", () => {
+test("aliases: 无 overrides 时不受影响", () => {
   resetOverrides();
   // DEFAULT_CTX 指向不存在的目录 → loadOverrides 找不到文件，回退到空配置
   const sem = analyzeSemantics(parseCmd("git status"), DEFAULT_CTX);
@@ -103,7 +103,7 @@ void test("aliases: 无 overrides 时不受影响", () => {
   assert.ok(sem.reason.includes("show working tree"));
 });
 
-void test("project command overrides are ignored", () => {
+test("project command overrides are ignored", () => {
   resetOverrides();
   const { root, ctx, cleanup } = setupProject("");
   mkdirSync(join(root, ".pi"), { recursive: true });
@@ -118,7 +118,7 @@ void test("project command overrides are ignored", () => {
 
 // ─── commands ───
 
-void test("commands: 简单命令（无子命令）→ 使用 YAML 定义的 class", () => {
+test("commands: 简单命令（无子命令）→ 使用 YAML 定义的 class", () => {
   resetOverrides();
   const { ctx, cleanup } = setupProject(`
 commands:
@@ -136,7 +136,7 @@ commands:
   }
 });
 
-void test("commands: 带子命令定义 → 子命令匹配", () => {
+test("commands: 带子命令定义 → 子命令匹配", () => {
   resetOverrides();
   const { ctx, cleanup } = setupProject(`
 commands:
@@ -162,7 +162,7 @@ commands:
   }
 });
 
-void test("commands: 子命令未匹配 → 基类 + opaque", () => {
+test("commands: 子命令未匹配 → 基类 + opaque", () => {
   resetOverrides();
   const { ctx, cleanup } = setupProject(`
 commands:
@@ -182,7 +182,7 @@ commands:
   }
 });
 
-void test("commands: 同名命令覆盖内置 adapter（用户定义优先）", () => {
+test("commands: 同名命令覆盖内置 adapter（用户定义优先）", () => {
   resetOverrides();
   const { ctx, cleanup } = setupProject(`
 commands:
@@ -202,7 +202,7 @@ commands:
 
 // ─── reclassify ───
 
-void test("reclassify: 匹配 pattern 时覆盖分类", () => {
+test("reclassify: 匹配 pattern 时覆盖分类", () => {
   resetOverrides();
   const { ctx, cleanup } = setupProject(`
 reclassify:
@@ -225,7 +225,7 @@ reclassify:
   }
 });
 
-void test("reclassify: 不匹配时保留原分类", () => {
+test("reclassify: 不匹配时保留原分类", () => {
   resetOverrides();
   const { ctx, cleanup } = setupProject(`
 reclassify:
@@ -242,7 +242,7 @@ reclassify:
   }
 });
 
-void test("reclassify: pattern 是无效正则时跳过", () => {
+test("reclassify: pattern 是无效正则时跳过", () => {
   resetOverrides();
   const { ctx, cleanup } = setupProject(`
 reclassify:
@@ -258,7 +258,7 @@ reclassify:
   }
 });
 
-void test("reclassify: 只匹配指定命令名", () => {
+test("reclassify: 只匹配指定命令名", () => {
   resetOverrides();
   const { ctx, cleanup } = setupProject(`
 reclassify:
@@ -277,7 +277,7 @@ reclassify:
 
 // ─── 组合 ───
 
-void test("组合: aliases + reclassify 同时生效", () => {
+test("组合: aliases + reclassify 同时生效", () => {
   resetOverrides();
   const { ctx, cleanup } = setupProject(`
 aliases:
@@ -296,7 +296,7 @@ reclassify:
   }
 });
 
-void test("组合: commands 定义优先于别名和内置", () => {
+test("组合: commands 定义优先于别名和内置", () => {
   resetOverrides();
   const { ctx, cleanup } = setupProject(`
 aliases:
@@ -316,7 +316,7 @@ commands:
   }
 });
 
-void test("组合: 别名 + commands → commands 优先于别名", () => {
+test("组合: 别名 + commands → commands 优先于别名", () => {
   resetOverrides();
   const { ctx, cleanup } = setupProject(`
 aliases:
@@ -338,7 +338,7 @@ commands:
 
 // ─── 运行时校验 ───
 
-void test("校验: commands 中无效 class 抛出明确错误", () => {
+test("校验: commands 中无效 class 抛出明确错误", () => {
   resetOverrides();
   const { ctx, cleanup } = setupProject(`
 commands:
@@ -355,7 +355,7 @@ commands:
   }
 });
 
-void test("校验: reclassify 中无效 class 抛出明确错误", () => {
+test("校验: reclassify 中无效 class 抛出明确错误", () => {
   resetOverrides();
   const { ctx, cleanup } = setupProject(`
 reclassify:
@@ -373,7 +373,7 @@ reclassify:
   }
 });
 
-void test("校验: subcommands 中无效 class 抛出明确错误", () => {
+test("校验: subcommands 中无效 class 抛出明确错误", () => {
   resetOverrides();
   const { ctx, cleanup } = setupProject(`
 commands:
@@ -394,7 +394,7 @@ commands:
 
 // ─── 缓存隔离 ───
 
-void test("缓存: 不同 global agentDir 加载不同的 overrides", () => {
+test("缓存: 不同 global agentDir 加载不同的 overrides", () => {
   resetOverrides();
   const p1 = setupProject(`
 aliases:
@@ -424,7 +424,7 @@ aliases:
 
 // ─── 边界 ───
 
-void test("边界: 空 overrides 不影响正常分析", () => {
+test("边界: 空 overrides 不影响正常分析", () => {
   resetOverrides();
   const { ctx, cleanup } = setupProject(`
 # 只有注释，无实际内容
@@ -437,7 +437,7 @@ void test("边界: 空 overrides 不影响正常分析", () => {
   }
 });
 
-void test("边界: 无效 YAML 不崩溃，回退到空配置", () => {
+test("边界: 无效 YAML 不崩溃，回退到空配置", () => {
   resetOverrides();
   const { ctx, cleanup } = setupProject(`{invalid: [::`);
   try {

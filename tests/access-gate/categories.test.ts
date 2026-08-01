@@ -9,17 +9,17 @@ import type { ResolvedProfile } from "../../src/access-gate/profile/types";
 
 // ── classifyTool ──
 
-void test("classify: read, write, edit, find, grep, ls are filesystem", () => {
+test("classify: read, write, edit, find, grep, ls are filesystem", () => {
   for (const surface of Object.keys(TOOL_SCHEMAS)) {
     assert.equal(classifyTool(surface), "filesystem", `${surface} should be filesystem`);
   }
 });
 
-void test("classify: bash is shell", () => {
+test("classify: bash is shell", () => {
   assert.equal(classifyTool("bash"), "shell");
 });
 
-void test("classify: unknown tool surfpases passthrough", () => {
+test("classify: unknown tool surfpases passthrough", () => {
   // Gate 不应拦截它不认识的工具
   assert.equal(classifyTool("web_search"), "passthrough");
   assert.equal(classifyTool("fetch_content"), "passthrough");
@@ -44,7 +44,7 @@ function runtime() {
   return { hasUI: false } as const;
 }
 
-void test("passthrough: web_search is allowed without schema", async () => {
+test("passthrough: web_search is allowed without schema", async () => {
   const root = mkdtempSync(join(tmpdir(), "pi-access-cat-"));
   const staging = mkdtempSync(join(tmpdir(), "pi-access-stg-"));
   try {
@@ -63,7 +63,7 @@ void test("passthrough: web_search is allowed without schema", async () => {
   }
 });
 
-void test("passthrough: fetch_content is allowed without schema", async () => {
+test("passthrough: fetch_content is allowed without schema", async () => {
   const root = mkdtempSync(join(tmpdir(), "pi-access-cat-"));
   const staging = mkdtempSync(join(tmpdir(), "pi-access-stg-"));
   try {
@@ -82,7 +82,7 @@ void test("passthrough: fetch_content is allowed without schema", async () => {
   }
 });
 
-void test("passthrough: passthrough tools ignore restrictive profiles", async () => {
+test("passthrough: passthrough tools ignore restrictive profiles", async () => {
   // 用最严格的 profile（全部 deny），passthrough 工具仍然允许
   const strict = profile();
   const root = mkdtempSync(join(tmpdir(), "pi-access-cat-"));
@@ -105,7 +105,7 @@ void test("passthrough: passthrough tools ignore restrictive profiles", async ()
 
 // ── 已知工具仍然受 gate 管辖 ──
 
-void test("filesystem: write is still denied under restrictive profile", async () => {
+test("filesystem: write is still denied under restrictive profile", async () => {
   const root = mkdtempSync(join(tmpdir(), "pi-access-cat-"));
   const staging = mkdtempSync(join(tmpdir(), "pi-access-stg-"));
   try {
@@ -124,7 +124,7 @@ void test("filesystem: write is still denied under restrictive profile", async (
   }
 });
 
-void test("filesystem: TOOL_SCHEMAS derive category from registry membership", () => {
+test("filesystem: TOOL_SCHEMAS derive category from registry membership", () => {
   for (const [name, schema] of Object.entries(TOOL_SCHEMAS)) {
     assert.equal("category" in schema, false, `${name} should not duplicate its derived category`);
   }
