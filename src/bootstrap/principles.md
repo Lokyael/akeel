@@ -188,7 +188,7 @@ orient.
 | Document | Purpose | Lifecycle |
 |----------|---------|-----------|
 | `CONTEXT.md` | Current glossary, architecture, invariants, security boundaries, active decisions, Negative Space | Permanent; update current truth only |
-| `docs/decisions.md` | Load-bearing decisions with rationale and rejected alternatives | Permanent; mark superseded, do not rewrite history |
+| `docs/decisions.md` | Load-bearing decisions with rationale and rejected alternatives | Permanent for active decisions; prune entries fully absorbed by a replacement after Git retains history |
 | `docs/task.md` | Active feature, bug, refactor, design, plan, or maintenance task | Persistent container; clear completed sections after durable updates |
 
 Use `docs/task-<topic>.md` only when genuinely independent tasks must have
@@ -198,7 +198,7 @@ separate lifecycles. Keep files flat — no subdirectories, no dated copies.
 
 ```
 Task:     draft → in-progress → verified → cleared
-Decision:  active → superseded
+Decision:  active → superseded → pruned when a replacement fully absorbs its durable content; Git retains the historical record
 Context:   current truth, no status transition
 ```
 
@@ -211,6 +211,10 @@ When a task reaches `verified`, update `CONTEXT.md` and `docs/decisions.md` as
 needed, then clear the completed Task Record sections. The file remains as a
 container for future tasks. Git and external issue tracking retain process
 history; do not create a default archive directory.
+
+Decision records may be pruned when a replacement fully absorbs their current
+conclusion, rationale, and rejected alternatives. Do not renumber remaining
+IDs; Git retains the removed record's history.
 
 `survey-context` reads only: `CONTEXT.md`, `docs/decisions.md`, `docs/task.md`,
 `docs/task-*.md`. It does not scan legacy or type-specific artifact paths.

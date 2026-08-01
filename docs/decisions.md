@@ -1,6 +1,6 @@
 # Pi Keel Decisions
 
-本文集中记录 pi-keel 的长期架构、工程和安全决策。每条决策只保留当前结论、理由、必要的替代方案和影响；历史决策标记为 `superseded`。
+本文集中记录 pi-keel 的长期架构、工程和安全决策。每条决策只保留当前结论、理由、必要的替代方案和影响；被后续决策完整吸收的条目从当前寄存器删除，历史由 Git 保留。仅在替代内容尚未完成迁移时暂留 `superseded` 状态并指向承接条目。
 
 ## D-001: Soft 技能匹配
 
@@ -58,14 +58,6 @@
 
 **Why:** 名称需要帮助模型和维护者推断用途、加载机制和技能职责。
 
-## D-007: 安全扩展模块化拆分
-
-**Status:** superseded by D-017 and D-018
-
-**Decision:** 旧安全扩展按配置、命令分类、安全检测、路径与权限策略、生命周期状态和事件管道拆分，入口只负责注册和组装。
-
-**Why:** 职责边界可以独立理解和测试，避免入口承载策略细节。
-
 ## D-009: 项目分发与文档边界
 
 **Status:** active
@@ -73,30 +65,6 @@
 **Decision:** 移除不必要的 npm 元数据和用户 `AGENTS.md` 模板；使用文档放在根目录，长期安全和溯源文档保留在 `docs/`。
 
 **Why:** 每个文件都应有明确的维护对象和用户价值；pi-keel 不应越过用户项目工程约定文件的所有权边界。
-
-## D-010: Shell 写入统一门控
-
-**Status:** active
-
-**Decision:** Shell 文件修改统一纳入受限 Shell analysis、command semantics 和 canonical path policy。写入 intent 与其他路径操作使用同一套 hard boundary 和 Profile gate。
-
-**Why:** `write`/`edit` 工具保护无法覆盖重定向、`tee`、`cp`、`mv` 等 Shell 写入入口；secret-pattern scan 不承担访问控制职责。
-
-## D-011: 统一命令分类
-
-**Status:** superseded by D-017 and D-018
-
-**Decision:** 命令语义集中管理，由受限 Shell 分析提取命令类别和文件操作意图，再交给路径策略和权限决策。
-
-**Why:** 分散的模式列表会造成命令分类和安全策略漂移。
-
-## D-012: Pipeline 与 Bootstrap 简化
-
-**Status:** superseded by D-017 and D-018; principles deployment retained by D-013
-
-**Decision:** 事件入口只负责注册和组装，策略逻辑按职责分层；原则内容独立于 TypeScript；注入状态使用表达实际语义的最小状态。
-
-**Why:** 职责分层便于测试，原则内容可独立编辑，最小状态减少重复注入。
 
 ## D-013: 原则部署
 
@@ -107,14 +75,6 @@
 **Why:** 用户项目中可稳定获得的渠道是会话注入内容和按需加载的技能，集中定义可以避免规则分叉和死链。
 
 **Impact:** `principles.md` 是通用参考数据的唯一注入来源；用户项目使用 `CONTEXT.md`、`docs/decisions.md` 和 `docs/task.md`。
-
-## D-016: 安全门控边界与命名
-
-**Status:** superseded by D-017 and D-018
-
-**Decision:** 安全门控按领域职责拆分模块，文件名表达领域概念，入口负责生命周期和组装，策略模块负责具体决策。
-
-**Why:** 清晰的职责和命名降低耦合，使依赖方向、公共入口和测试边界可直接理解。
 
 ## D-017: Profile 访问策略
 
@@ -136,7 +96,9 @@
 
 **Status:** active
 
-**Decision:** 采用 `shell-parse/`、`command-semantics/`、`gate/` 三层架构，以不可执行的 Shell IR 传递结构化结果。
+**Decision:** 采用 `shell-parse/`、`command-semantics/`、`gate/` 三层架构，以不可执行的 Shell IR 传递结构化结果。Shell 文件修改与其他路径操作使用同一套 hard boundary、canonical path policy 和 Profile gate。
+
+**Why:** `write`/`edit` 工具保护无法覆盖重定向、`tee`、`cp`、`mv` 等 Shell 写入入口，secret-pattern scan 也不承担访问控制职责；统一 IR 和语义层可以集中提取命令类别、路径 intent 与 effect，避免分类和策略漂移。
 
 **Security invariants:**
 
@@ -158,14 +120,6 @@
 **Decision:** TUI 使用 `setFooter()` 包装 Pi 原生 Footer，固定渲染两行；第一行显示位置、Session 和 Profile，第二行保留原生运行统计和扩展状态；Pi 主包不可用时使用本地 fallback。
 
 **Why:** `setStatus()` 无法控制 Footer 整体布局，`setFooter()` 才能稳定保留原生信息并放置 Profile。
-
-## D-020: 用户项目文档统一模型
-
-**Status:** superseded by D-021
-
-**Decision:** 用户项目使用 `CONTEXT.md`、`docs/decisions.md` 和统一工作文件集中管理当前知识、长期决策和短期过程。
-
-**Why:** 按 spec、plan、design、ticket、bug 分目录会导致过程文档膨胀和重复引用。
 
 ## D-021: Task Record 术语
 

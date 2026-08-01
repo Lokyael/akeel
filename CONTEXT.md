@@ -34,7 +34,6 @@
 - [D-005 技能三目录](docs/decisions.md#d-005-技能三目录)
 - [D-006 统一命名](docs/decisions.md#d-006-统一命名)
 - [D-009 项目分发与文档边界](docs/decisions.md#d-009-项目分发与文档边界)
-- [D-010 Shell 写入统一门控](docs/decisions.md#d-010-shell-写入统一门控)
 - [D-013 原则部署](docs/decisions.md#d-013-原则部署)
 - [D-017 Profile 访问策略](docs/decisions.md#d-017-profile-访问策略)
 - [D-018 Shell IR 与 Access Gate](docs/decisions.md#d-018-shell-ir-与-access-gate)
