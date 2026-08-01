@@ -33,8 +33,8 @@ const GUIDANCE_CATALOG: Readonly<Partial<Record<DecisionCode, readonly Guidance[
   "uncertain-cwd": [{ id: "literal-command-or-direct-tool", safety: "recheck" }],
   "shell-policy-denied": [{ id: "profile-restriction", safety: "recheck" }],
   "path-denied": [{ id: "profile-restriction", safety: "recheck" }],
-  "unknown-tool": [{ id: "literal-command-or-direct-tool", safety: "recheck" }],
-  "invalid-tool-input": [{ id: "literal-command-or-direct-tool", safety: "recheck" }],
+  "unknown-tool": [{ id: "check-tool-input", safety: "recheck" }],
+  "invalid-tool-input": [{ id: "check-tool-input", safety: "recheck" }],
   "resource-limit": [{ id: "split-supported-commands", safety: "recheck" }],
 };
 
@@ -44,9 +44,10 @@ export function guidanceFor(code: DecisionCode): readonly Guidance[] {
 
 const GUIDANCE_TEXT: Readonly<Record<GuidanceId, string>> = {
   "batch-inspection-tools": "Use a Direct read, grep, find, or ls tool for this inspection. Do not retry this Shell form unchanged.",
-  "literal-command-or-direct-tool": "Use a simple literal command or a Direct tool.",
-  "split-supported-commands": "Split the operation into simpler commands or use Direct tools.",
-  "profile-restriction": "This operation is not allowed by the active Profile. Use an allowed Profile or wait for approval.",
+  "literal-command-or-direct-tool": "Use a literal Shell command or a Direct tool (read, grep, find, ls). A literal command has no dynamic tokens: every argument must be fixed text, so single-quote any argument containing $, a backtick, or the glob/expansion characters * ? [ { ( , and do not use command substitution. Do not retry the same Shell form unchanged.",
+  "split-supported-commands": "Split the operation into separate commands joined by && or ;, one action per command, and avoid command substitution and complex redirection; when redirection is needed, use only simple forms such as >, >>, 2>, or < with a plain file path. For inspection, use Direct tools (read, grep, find, ls). Do not retry the same Shell form unchanged.",
+  "check-tool-input": "The requested tool or its input is not supported. Use a known Direct tool (read, write, edit, find, grep, ls) or a literal Shell command; if you retry the same tool, correct its parameters to match the tool schema.",
+  "profile-restriction": "This operation is not allowed by the active Profile. You cannot change the Profile yourself; ask the user to update the Profile or approve the operation.",
 };
 
 export function guidanceText(id: GuidanceId): string {

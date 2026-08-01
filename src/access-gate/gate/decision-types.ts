@@ -36,6 +36,7 @@ export type GuidanceId =
   | "batch-inspection-tools"
   | "literal-command-or-direct-tool"
   | "split-supported-commands"
+  | "check-tool-input"
   | "profile-restriction";
 
 export interface Guidance {

@@ -16,6 +16,34 @@ test("maps dynamic-shell to batch-inspection-tools guidance", () => {
   assert.equal(guidance[0]!.id, "batch-inspection-tools");
 });
 
+test("literal command guidance states a verifiable literal criterion", () => {
+  const text = guidanceText("literal-command-or-direct-tool");
+  assert.ok(text.includes("single-quote"));
+  assert.ok(text.includes("command substitution"));
+  assert.ok(text.includes("Do not retry"));
+});
+
+test("split command guidance names supported separators and redirects", () => {
+  const text = guidanceText("split-supported-commands");
+  assert.ok(text.includes("&&"));
+  assert.ok(text.includes(";"));
+  assert.ok(text.includes(">>"));
+  assert.ok(text.includes("Do not retry"));
+});
+
+test("profile guidance tells the agent to ask the user instead of self-serving", () => {
+  const text = guidanceText("profile-restriction");
+  assert.ok(text.includes("ask the user"));
+  assert.equal(text.includes("wait for approval"), false);
+  assert.equal(text.includes("Use an allowed Profile"), false);
+});
+
+test("check-tool-input guidance covers both unknown tool and bad input", () => {
+  const text = guidanceText("check-tool-input");
+  assert.ok(text.includes("not supported"));
+  assert.ok(text.includes("schema"));
+});
+
 test("blocked path and threat do not offer bypass guidance", () => {
   assert.deepEqual(guidanceFor("blocked-path"), []);
   assert.deepEqual(guidanceFor("threat"), []);
@@ -23,12 +51,12 @@ test("blocked path and threat do not offer bypass guidance", () => {
 });
 
 test("path-denied and invalid-tool-input map to profile/tool guidance", () => {
-  // path-denied → profile-restriction (suggests switching Profile)
+  // path-denied → profile-restriction（建议让用户调整 Profile）
   assert.equal(guidanceFor("path-denied")[0]?.id, "profile-restriction");
-  // invalid-tool-input → literal-command-or-direct-tool (suggests correct tool usage)
-  assert.equal(guidanceFor("invalid-tool-input")[0]?.id, "literal-command-or-direct-tool");
-  // unknown-tool → literal-command-or-direct-tool
-  assert.equal(guidanceFor("unknown-tool")[0]?.id, "literal-command-or-direct-tool");
+  // invalid-tool-input → check-tool-input（修正参数，而非 Shell 形式）
+  assert.equal(guidanceFor("invalid-tool-input")[0]?.id, "check-tool-input");
+  // unknown-tool → check-tool-input（使用已知工具）
+  assert.equal(guidanceFor("unknown-tool")[0]?.id, "check-tool-input");
   // resource-limit → split-supported-commands
   assert.equal(guidanceFor("resource-limit")[0]?.id, "split-supported-commands");
   // unsupported redirections and uncertain cwd use recovery guidance rather than security bypass text
@@ -182,6 +210,7 @@ test("every GuidanceId maps to a non-empty text", () => {
     "literal-command-or-direct-tool",
     "split-supported-commands",
     "profile-restriction",
+    "check-tool-input",
   ];
   for (const id of ids) {
     const text = guidanceText(id);
