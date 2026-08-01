@@ -271,3 +271,33 @@ test("denies opaque command semantics even when unknown commands are allowed", a
   assert.ok(result.reason.includes("Shell form cannot be approved"));
   assert.equal(result.reason.includes("opaque-command"), false);
 });
+
+test("ask without UI reports that the operation was not executed", async () => {
+  const root = mkdtempSync(join(tmpdir(), "pi-access-gate-"));
+  const staging = mkdtempSync(join(tmpdir(), "pi-access-staging-"));
+  try {
+    const result = await evaluateToolCall({ surface: "write", args: { path: "src/main.ts", content: "code" }, cwd: root, projectRoot: root, stagingDir: staging, profile: profile() }, { hasUI: false });
+    assert.equal(result.kind, "block");
+    assert.equal(result.code, "approval-required");
+    assert.ok(result.reason.includes("was not executed"));
+    assert.ok(result.reason.includes("no interactive approval UI"));
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+    rmSync(staging, { recursive: true, force: true });
+  }
+});
+
+test("user denial reports the operation was not executed", async () => {
+  const root = mkdtempSync(join(tmpdir(), "pi-access-gate-"));
+  const staging = mkdtempSync(join(tmpdir(), "pi-access-staging-"));
+  try {
+    const result = await evaluateToolCall({ surface: "write", args: { path: "src/main.ts", content: "code" }, cwd: root, projectRoot: root, stagingDir: staging, profile: profile() }, { hasUI: true, select: async () => "Deny" });
+    assert.equal(result.kind, "block");
+    assert.equal(result.code, "user-denied");
+    assert.ok(result.reason.includes("The user denied the operation"));
+    assert.ok(result.reason.includes("was not executed"));
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+    rmSync(staging, { recursive: true, force: true });
+  }
+});

@@ -47,10 +47,18 @@ function clean(value: string): string {
 
 async function askOnce(runtime: GateRuntime, title: string, detail: string): Promise<GateResult> {
   if (!runtime.hasUI || !runtime.select) {
-    return { kind: "block", reason: "approval required but no interactive UI is available", code: "approval-required" };
+    return {
+      kind: "block",
+      reason: "The operation is pending approval, but no interactive approval UI is available in this environment. The operation was not executed. Do not retry it automatically; tell the user it needs approval.",
+      code: "approval-required",
+    };
   }
   const choice = await runtime.select(`${title}\n\n${clean(detail)}\n\nAllow this operation once?`, ["Allow once", "Deny"]);
   return choice === "Allow once"
     ? { kind: "allow" }
-    : { kind: "block", reason: "user denied the operation", code: "user-denied" };
+    : {
+        kind: "block",
+        reason: "The user denied the operation. It was not executed. Do not retry it; wait for the user's next instruction.",
+        code: "user-denied",
+      };
 }
