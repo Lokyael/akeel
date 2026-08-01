@@ -66,7 +66,7 @@ test("path-denied and invalid-tool-input map to profile/tool guidance", () => {
   assert.deepEqual(guidanceFor("hard-command-rule"), []);
 });
 
-test("hard deny renderer explains that unsupported Shell forms need a different entry point", () => {
+test("hard deny renderer explains that unsupported Shell forms need a different form or Direct tool", () => {
   const decision: GateDecision = {
     disposition: "deny",
     code: "dynamic-shell",
@@ -82,6 +82,7 @@ test("hard deny renderer explains that unsupported Shell forms need a different 
   assert.equal(result.reason.includes("batch-inspection-tools"), false);
   assert.equal(result.reason.includes("Permanently blocked"), false);
   assert.equal(result.reason.includes("work around"), false);
+  assert.equal(result.reason.includes("different entry point"), false);
 });
 
 test("hard security deny explains that the boundary cannot be bypassed", () => {
@@ -149,6 +150,9 @@ test("renderer bounds evidence subject count and total reason length", () => {
   assert.equal(result.reason.includes("This operation is not allowed by the active Profile"), true);
   assert.equal(result.reason.includes("PROFILE_BLOCK"), false);
   assert.equal(result.reason.includes("profile-restriction"), false);
+  assert.equal(result.reason.includes("Use an allowed Profile"), false);
+  assert.equal(result.reason.includes("wait for approval"), false);
+  assert.ok(result.reason.includes("ask the user"));
 });
 
 test("renders compiler outcomes by category without internal identifiers", () => {

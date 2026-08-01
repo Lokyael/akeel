@@ -41,8 +41,9 @@ export function renderCompilationFailure(result: Extract<CompileResult, { kind: 
     reason = "This Shell form cannot be approved as written.";
     if (guidance.length > 0) reason += " " + renderGuidance(guidance);
   } else {
-    reason = "This tool request could not be analyzed in its current form. Correct the input and try again.";
+    reason = "This request could not be analyzed in its current form.";
     if (guidance.length > 0) reason += " " + renderGuidance(guidance);
+    else reason += " Fix the input and try again.";
   }
 
   if (subject !== "request denied") reason += " Affected operation: " + subject + ".";
@@ -66,21 +67,21 @@ export function renderDecision(decision: GateDecision): GateResult {
 
   if (decision.enforcement === "hard") {
     const responseKind = denyResponseKindFor(decision.code);
-    reason = responseKind === "security-boundary"
-      ? "This operation is blocked by a non-overridable security boundary."
-      : responseKind === "shell-form"
-        ? "This Shell form cannot be approved as written."
-        : "This request cannot be approved in its current form.";
-    if (guidance.length > 0) reason += " " + renderGuidance(guidance);
-    reason += responseKind === "security-boundary"
-      ? " Do not retry or bypass it."
-      : responseKind === "shell-form"
-        ? " Use a different entry point or a simpler literal command."
-        : " Correct the request and try again.";
+    if (responseKind === "security-boundary") {
+      reason = "This operation is blocked by a non-overridable security boundary. Do not retry or bypass it.";
+    } else if (responseKind === "shell-form") {
+      reason = "This Shell form cannot be approved as written.";
+      if (guidance.length > 0) reason += " " + renderGuidance(guidance);
+      else reason += " Use a literal command or a Direct tool instead.";
+    } else {
+      reason = "This request cannot be approved in its current form.";
+      if (guidance.length > 0) reason += " " + renderGuidance(guidance);
+      else reason += " Do not retry it unchanged; correct the request first.";
+    }
   } else if (decision.enforcement === "profile") {
-    reason = "This request is not allowed by the active Profile.";
-    if (guidance.length > 0) reason += " " + renderGuidance(guidance);
-    else reason += " Use an allowed Profile or wait for approval.";
+    reason = guidance.length > 0
+      ? renderGuidance(guidance)
+      : "This request is not allowed by the active Profile. Ask the user to update the Profile or approve the operation.";
   } else {
     reason = "The user declined this operation. Wait for alternative instructions.";
   }
