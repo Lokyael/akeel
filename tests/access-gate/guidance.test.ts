@@ -1,8 +1,5 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
-import { join } from "node:path";
-import { tmpdir } from "node:os";
 import { renderCompilationFailure, renderDecision } from "../../src/access-gate/gate/render-decision";
 import { denyResponseKindFor, guidanceFor, guidanceText } from "../../src/access-gate/gate/guidance-catalog";
 import type { DenyResponseKind } from "../../src/access-gate/gate/guidance-catalog";

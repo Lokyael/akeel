@@ -3,6 +3,7 @@ import test from "node:test";
 import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
+import { makeContext } from "./helpers";
 import { decidePath, resolvePath } from "../../src/access-gate/path/policy";
 import { DEFAULT_BLOCKED_PATHS } from "../../src/access-gate/path/blocked-paths";
 import type { ResolvedProfile } from "../../src/access-gate/profile/types";
@@ -24,31 +25,28 @@ function profile(): ResolvedProfile {
 }
 
 test("resolves project and staging paths separately from external paths", () => {
-  const root = mkdtempSync(join(tmpdir(), "pi-access-path-"));
-  const staging = mkdtempSync(join(tmpdir(), "pi-access-staging-"));
-  try {
+  const ctx = makeContext("pi-access-path-", (root) => {
     mkdirSync(join(root, "docs"));
     writeFileSync(join(root, "docs", "task.md"), "task");
-    const project = resolvePath(root, root, staging, "docs/task.md");
-    const staged = resolvePath(root, root, staging, join(staging, "remote.md"));
-    const external = resolvePath(root, root, staging, "/tmp/other.md");
+  });
+  try {
+    const project = resolvePath(ctx.cwd, ctx.projectRoot, ctx.stagingDir, "docs/task.md");
+    const staged = resolvePath(ctx.cwd, ctx.projectRoot, ctx.stagingDir, join(ctx.stagingDir, "remote.md"));
+    const external = resolvePath(ctx.cwd, ctx.projectRoot, ctx.stagingDir, "/tmp/other.md");
     assert.equal(project.scope, "project");
     assert.equal(project.virtualPath, "project/docs/task.md");
     assert.equal(staged.scope, "staging");
     assert.equal(staged.virtualPath, "staging/remote.md");
     assert.equal(external.scope, "external");
   } finally {
-    rmSync(root, { recursive: true, force: true });
-    rmSync(staging, { recursive: true, force: true });
+    ctx.cleanup();
   }
 });
 
 test("uses the first matching rule for each path operation", () => {
-  const root = mkdtempSync(join(tmpdir(), "pi-access-path-"));
-  const staging = mkdtempSync(join(tmpdir(), "pi-access-staging-"));
+  const ctx = makeContext("pi-access-path-", (root) => mkdirSync(join(root, "docs")));
   try {
-    mkdirSync(join(root, "docs"));
-    const path = resolvePath(root, root, staging, "docs/new.md");
+    const path = resolvePath(ctx.cwd, ctx.projectRoot, ctx.stagingDir, "docs/new.md");
     assert.equal(decidePath(path, profile(), "read").decision, "allow");
     assert.equal(decidePath(path, profile(), "write").decision, "allow");
     const firstMatchWins = profile();
@@ -57,28 +55,24 @@ test("uses the first matching rule for each path operation", () => {
       { path: "project/docs/**", write: "allow" },
     ];
     assert.equal(decidePath(path, firstMatchWins, "write").decision, "deny");
-    const source = resolvePath(root, root, staging, "src/new.ts");
+    const source = resolvePath(ctx.cwd, ctx.projectRoot, ctx.stagingDir, "src/new.ts");
     assert.equal(decidePath(source, profile(), "write").decision, "ask", source.virtualPath);
   } finally {
-    rmSync(root, { recursive: true, force: true });
-    rmSync(staging, { recursive: true, force: true });
+    ctx.cleanup();
   }
 });
 
 test("blocked paths are hard denied for every operation", () => {
-  const root = mkdtempSync(join(tmpdir(), "pi-access-path-"));
-  const staging = mkdtempSync(join(tmpdir(), "pi-access-staging-"));
+  const ctx = makeContext("pi-access-path-", (root) => writeFileSync(join(root, ".env"), "SECRET"));
   try {
-    writeFileSync(join(root, ".env"), "SECRET");
-    const path = resolvePath(root, root, staging, ".env");
+    const path = resolvePath(ctx.cwd, ctx.projectRoot, ctx.stagingDir, ".env");
     for (const operation of ["read", "list", "search", "write"] as const) {
       const result = decidePath(path, profile(), operation, DEFAULT_BLOCKED_PATHS);
       assert.equal(result.decision, "deny");
       assert.equal(result.hard, true);
     }
   } finally {
-    rmSync(root, { recursive: true, force: true });
-    rmSync(staging, { recursive: true, force: true });
+    ctx.cleanup();
   }
 });
 

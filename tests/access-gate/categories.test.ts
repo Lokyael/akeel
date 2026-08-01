@@ -1,11 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { mkdtempSync, rmSync } from "node:fs";
-import { join } from "node:path";
-import { tmpdir } from "node:os";
 import { classifyTool, evaluateToolCall } from "../../src/access-gate/gate/evaluate";
 import { TOOL_SCHEMAS } from "../../src/access-gate/gate/tool-schemas";
 import type { ResolvedProfile } from "../../src/access-gate/profile/types";
+import { makeContext } from "./helpers";
 
 // ── classifyTool ──
 
@@ -19,7 +17,7 @@ test("classify: bash is shell", () => {
   assert.equal(classifyTool("bash"), "shell");
 });
 
-test("classify: unknown tool surfpases passthrough", () => {
+test("classify: unknown tool surfaces passthrough", () => {
   // Gate 不应拦截它不认识的工具
   assert.equal(classifyTool("web_search"), "passthrough");
   assert.equal(classifyTool("fetch_content"), "passthrough");
@@ -45,82 +43,73 @@ function runtime() {
 }
 
 test("passthrough: web_search is allowed without schema", async () => {
-  const root = mkdtempSync(join(tmpdir(), "pi-access-cat-"));
-  const staging = mkdtempSync(join(tmpdir(), "pi-access-stg-"));
+  const ctx = makeContext("pi-access-cat-");
   try {
     const result = await evaluateToolCall({
       surface: "web_search",
       args: { query: "test" },
-      cwd: root,
-      projectRoot: root,
-      stagingDir: staging,
+      cwd: ctx.cwd,
+      projectRoot: ctx.projectRoot,
+      stagingDir: ctx.stagingDir,
       profile: profile(),
     }, runtime());
     assert.deepEqual(result, { kind: "allow" });
   } finally {
-    rmSync(root, { recursive: true, force: true });
-    rmSync(staging, { recursive: true, force: true });
+    ctx.cleanup();
   }
 });
 
 test("passthrough: fetch_content is allowed without schema", async () => {
-  const root = mkdtempSync(join(tmpdir(), "pi-access-cat-"));
-  const staging = mkdtempSync(join(tmpdir(), "pi-access-stg-"));
+  const ctx = makeContext("pi-access-cat-");
   try {
     const result = await evaluateToolCall({
       surface: "fetch_content",
       args: { url: "https://example.com" },
-      cwd: root,
-      projectRoot: root,
-      stagingDir: staging,
+      cwd: ctx.cwd,
+      projectRoot: ctx.projectRoot,
+      stagingDir: ctx.stagingDir,
       profile: profile(),
     }, runtime());
     assert.deepEqual(result, { kind: "allow" });
   } finally {
-    rmSync(root, { recursive: true, force: true });
-    rmSync(staging, { recursive: true, force: true });
+    ctx.cleanup();
   }
 });
 
 test("passthrough: passthrough tools ignore restrictive profiles", async () => {
   // 用最严格的 profile（全部 deny），passthrough 工具仍然允许
-  const strict = profile();
-  const root = mkdtempSync(join(tmpdir(), "pi-access-cat-"));
-  const staging = mkdtempSync(join(tmpdir(), "pi-access-stg-"));
+  const ctx = makeContext("pi-access-cat-");
   try {
     const result = await evaluateToolCall({
       surface: "web_search",
       args: { queries: ["a", "b"] },
-      cwd: root,
-      projectRoot: root,
-      stagingDir: staging,
-      profile: strict,
+      cwd: ctx.cwd,
+      projectRoot: ctx.projectRoot,
+      stagingDir: ctx.stagingDir,
+      profile: profile(),
     }, runtime());
     assert.deepEqual(result, { kind: "allow" });
   } finally {
-    rmSync(root, { recursive: true, force: true });
-    rmSync(staging, { recursive: true, force: true });
+    ctx.cleanup();
   }
 });
 
 // ── 已知工具仍然受 gate 管辖 ──
 
 test("filesystem: write is still denied under restrictive profile", async () => {
-  const root = mkdtempSync(join(tmpdir(), "pi-access-cat-"));
-  const staging = mkdtempSync(join(tmpdir(), "pi-access-stg-"));
+  const ctx = makeContext("pi-access-cat-");
   try {
     const result = await evaluateToolCall({
       surface: "write",
       args: { path: "file.txt", content: "data" },
-      cwd: root,
-      projectRoot: root,
-      stagingDir: staging,
+      cwd: ctx.cwd,
+      projectRoot: ctx.projectRoot,
+      stagingDir: ctx.stagingDir,
       profile: profile(),
     }, runtime());
     assert.equal(result.kind, "block");
   } finally {
-    rmSync(root, { recursive: true, force: true });
-    rmSync(staging, { recursive: true, force: true });
+    ctx.cleanup();
   }
 });
 

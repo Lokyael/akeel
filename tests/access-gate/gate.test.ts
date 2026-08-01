@@ -1,11 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { tmpdir } from "node:os";
 import { evaluateToolCall } from "../../src/access-gate/gate/evaluate";
 import type { GateRuntime } from "../../src/access-gate/gate/types";
 import type { ResolvedProfile } from "../../src/access-gate/profile/types";
+import { makeContext } from "./helpers";
 
 function profile(overrides?: Partial<ResolvedProfile>): ResolvedProfile {
   return {
@@ -49,20 +49,18 @@ function projectWriteProfile(): ResolvedProfile {
 }
 
 async function evaluateBash(command: string, activeProfile = profile(), selection?: string): Promise<Awaited<ReturnType<typeof evaluateToolCall>>> {
-  const root = mkdtempSync(join(tmpdir(), "pi-access-gate-"));
-  const staging = mkdtempSync(join(tmpdir(), "pi-access-staging-"));
+  const ctx = makeContext("pi-access-gate-");
   try {
     return await evaluateToolCall({
       surface: "bash",
       args: { command },
-      cwd: root,
-      projectRoot: root,
-      stagingDir: staging,
+      cwd: ctx.cwd,
+      projectRoot: ctx.projectRoot,
+      stagingDir: ctx.stagingDir,
       profile: activeProfile,
     }, { hasUI: true, select: async () => selection });
   } finally {
-    rmSync(root, { recursive: true, force: true });
-    rmSync(staging, { recursive: true, force: true });
+    ctx.cleanup();
   }
 }
 
@@ -72,21 +70,19 @@ async function evaluateTool(
   runtime: GateRuntime,
   options: { profile?: ResolvedProfile; prepare?: (root: string) => void } = {},
 ): Promise<Awaited<ReturnType<typeof evaluateToolCall>>> {
-  const root = mkdtempSync(join(tmpdir(), "pi-access-gate-"));
-  const staging = mkdtempSync(join(tmpdir(), "pi-access-staging-"));
+  const ctx = makeContext("pi-access-gate-");
   try {
-    options.prepare?.(root);
+    options.prepare?.(ctx.cwd);
     return await evaluateToolCall({
       surface,
       args,
-      cwd: root,
-      projectRoot: root,
-      stagingDir: staging,
+      cwd: ctx.cwd,
+      projectRoot: ctx.projectRoot,
+      stagingDir: ctx.stagingDir,
       profile: options.profile ?? profile(),
     }, runtime);
   } finally {
-    rmSync(root, { recursive: true, force: true });
-    rmSync(staging, { recursive: true, force: true });
+    ctx.cleanup();
   }
 }
 
