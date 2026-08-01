@@ -36,6 +36,22 @@ The Footer wraps Pi's native `FooterComponent` when available and uses two lines
 
 Hard threats, unsafe Shell syntax, symlink escapes, and blocked paths always deny and cannot be overridden by a Profile or approval.
 
+## Companion Packages
+
+Recommended third-party packages that pair well with Pi Keel:
+
+| Package | Source | What it adds |
+|---------|--------|--------------|
+| pi-search | `npm:@heyhuynhgiabuu/pi-search` | Research tools for the agent: web search, code search, library docs, repo Q&A, URL fetching, and Firecrawl scraping/crawling |
+| pi-sticky-input | `npm:pi-sticky-input` | Keeps chat input, status widgets, and footer controls anchored while session history updates |
+
+```bash
+pi install npm:@heyhuynhgiabuu/pi-search
+pi install npm:pi-sticky-input
+```
+
+Review the source of any third-party package before installing — Pi packages run with full system access.
+
 ## Documentation
 
 | Document | For |
