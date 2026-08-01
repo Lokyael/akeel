@@ -169,6 +169,22 @@ test("checks explicit files in read-only file commands", async () => {
   assert.equal(catResult.kind, "block");
 });
 
+test("checks positional files in text-transform commands", async () => {
+  const sedResult = await evaluateBash("sed 's/x/y/' /etc/passwd");
+  const awkResult = await evaluateBash("awk '{ print $1 }' /etc/passwd");
+  const sortResult = await evaluateBash("sort /etc/passwd");
+  const uniqResult = await evaluateBash("uniq /etc/passwd");
+  assert.equal(sedResult.kind, "block");
+  assert.equal(awkResult.kind, "block");
+  assert.equal(sortResult.kind, "block");
+  assert.equal(uniqResult.kind, "block");
+});
+
+test("allows text-transform reads inside the project", async () => {
+  const result = await evaluateBash("sed 's/x/y/' project/docs/README.md");
+  assert.equal(result.kind, "allow");
+});
+
 test("allows rg context options without treating the count as a search root", async () => {
   const result = await evaluateBash("rg -n -C 3 pattern AGENTS.md");
   assert.deepEqual(result, { kind: "allow" });
