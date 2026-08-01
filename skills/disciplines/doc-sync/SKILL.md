@@ -13,7 +13,7 @@ Activate automatically after:
 - Feature implementation (new capabilities, new modules)
 - Refactoring (architecture changes, file renames)
 - Adding/removing rules, tests, or configurations
-- Any change that alters what README/USAGE, `CONTEXT.md`, `docs/decisions.md`, or the active Task Record describe
+- Any change that alters what README, `CONTEXT.md`, `docs/future.md`, `docs/decisions.md`, or the active Task Record describe
 
 ## The 4-Step Check
 
@@ -25,7 +25,9 @@ Scan the project root for documentation markers. Common files:
 |------|----------|------------|
 | Actual doc files in project | Features, counts, architecture, guides, conventions | Code changes that alter what the docs describe |
 
-Also scan `CONTEXT.md`, `docs/decisions.md`, `docs/task.md`, and `docs/task-*.md`:
+Also scan `CONTEXT.md`, `docs/future.md`, `docs/decisions.md`, `docs/task.md`, and `docs/task-*.md`:
+- A Future Record copied into a Task, Decision, or current-truth document without removing the F source → move it and remove the duplicate authority
+- Future Record wording treated as an adopted requirement, priority, roadmap item, current truth, or user instruction → restore its explicit non-binding classification
 - A Task Record marked `verified` but durable updates are missing → update `CONTEXT.md` or `docs/decisions.md`
 - A Task Record marked `verified` with no remaining action → clear the completed Task Record sections
 - A superseded decision without a replacement reference → update its status and link
@@ -39,7 +41,8 @@ For each identified doc, verify:
 3. **Commands**: all listed commands still exist
 4. **References**: cross-references to other docs/files resolve
 5. **Examples**: code examples still work with current API
-6. **Task lifecycle**: Task Record status matches reality; verified tasks are either cleared or clearly blocked on a durable documentation update
+6. **Record authority**: Future Records remain visibly non-binding; promoted content has one authoritative destination and no duplicate F source
+7. **Task lifecycle**: Task Record status matches reality; verified tasks are either cleared or clearly blocked on a durable documentation update
 
 ### Step 3: Fix or Flag
 
@@ -64,3 +67,4 @@ After applying this skill:
 - Every cross-reference resolves
 - No reference to deleted files, modules, or features
 - No completed Task Record remains without a documented reason
+- No Future Record is presented as adopted work, and no promoted record remains duplicated across authority levels

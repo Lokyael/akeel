@@ -62,9 +62,9 @@
 
 **Status:** active
 
-**Decision:** 移除不必要的 npm 元数据和用户 `AGENTS.md` 模板；使用文档放在根目录，长期安全和溯源文档保留在 `docs/`。
+**Decision:** `README.md` 是唯一用户使用入口；移除平行的 `USAGE.md`、不必要的 npm 元数据和用户 `AGENTS.md` 模板。长期架构、安全、溯源和 Project Record 文档按职责保留在 `docs/`。
 
-**Why:** 每个文件都应有明确的维护对象和用户价值；pi-keel 不应越过用户项目工程约定文件的所有权边界。
+**Why:** 每个文件都应有明确的维护对象和用户价值；重复的使用、架构、安全和工作流说明会漂移，pi-keel 也不应越过用户项目工程约定文件的所有权边界。
 
 ## D-013: 原则部署
 
@@ -74,7 +74,7 @@
 
 **Why:** 用户项目中可稳定获得的渠道是会话注入内容和按需加载的技能，集中定义可以避免规则分叉和死链。
 
-**Impact:** `principles.md` 是通用参考数据的唯一注入来源；用户项目使用 `CONTEXT.md`、`docs/decisions.md` 和 `docs/task.md`。
+**Impact:** `principles.md` 是通用参考数据的唯一注入来源；用户项目使用 `CONTEXT.md`、可选的 `docs/future.md`、`docs/decisions.md` 和 `docs/task.md`。
 
 ## D-017: Profile 访问策略
 
@@ -120,18 +120,6 @@
 **Decision:** TUI 使用 `setFooter()` 包装 Pi 原生 Footer，固定渲染两行；第一行显示位置、Session 和 Profile，第二行保留原生运行统计和扩展状态；Pi 主包不可用时使用本地 fallback。
 
 **Why:** `setStatus()` 无法控制 Footer 整体布局，`setFooter()` 才能稳定保留原生信息并放置 Profile。
-
-## D-021: Task Record 术语
-
-**Status:** active
-
-**Decision:** 用户项目短期产物统一称为 Task Record，默认文件为 `docs/task.md`，并行任务使用扁平的 `docs/task-<topic>.md`，条目使用 `T-xxx`。
-
-**Requirements:** Task Record 内包含 `Requirements`、`Design`、`Plan`、`Evidence` 和 `Durable Updates`；任务性质通过 `Kind` 表达：`feature`、`bug`、`refactor`、`investigation`、`maintenance`。
-
-**Why:** Task 比 Work 更准确地表达具有目标、范围、验收和验证边界的有限任务；Requirements 保留为内容概念，不再作为独立文件类型。
-
-**Rejected:** 不采用 Work/Work Item、Change Record、Change Request 或独立 Specification 文件作为统一短期产物。
 
 ## D-022: Compiler-Kernel 分层与请求真实性
 
@@ -272,3 +260,23 @@ reclassify:
 **Rejected:** 不把 `-e` 移除出 schema（会导致 opaque 降级）；不为每个取值选项创建独立 adapter；不把 awk `-i`（gawk include 与 in-place 语义冲突）纳入本次修复——保持 fail-closed 的保守 write 分类。不因 sed/awk 的程序/文件位置歧义而放弃 positional 检查——宁可把 program 误判为额外 read 路径（fail-closed 噪声），也不漏掉输入文件（fail-open 漏报）。
 
 **Current implementation:** `OptionSchema.valueKind` 与 `inlineSuffix` 字段；parseOptions 对 expression 值消费但不 push intent，对 inline 后缀产生 conservative write intent。位置参数一律产生路径 intent：sed/awk 在出现写选项（-i）时 positional 升级为 write（原地修改目标），否则为 read；`--` 之后的 token 按文件参数处理。常用无值修饰符（sed -n/-E/-r/-z/-s/-u/--sandbox、awk -V/-h、sort/uniq 常用 flag）标记为 `flag`，不产生 intent 也不置 opaque；awk -F/-v、sed -l、sort -t/-k 等取值选项按 expression 消费；支持短选项内联值（-F,、-vfoo、-es/x/y/）。同时修复两个被测试暴露的既有缺陷：`gitEffects` 正则字面量 `\\b` 导致 `git rm` 的 delete effect 与 `git push` 等 network effect 从未生效（改为 `\b` 单词边界）；`cargo --version` 等全选项输入因 `extractSubcommand` 返回空串而落入 unknown（analyze 在 subcmd 为空时回退到第一个选项，对齐 npx 处理）。gate 对 bash 命令按 `commandClass` 决策，effects 仅用于 direct-origin 拒绝，因此 git effect 恢复不改变任何审批路径。
+
+## D-028: 统一 Project Record 模型
+
+**Status:** active
+
+**Decision:** 用户项目使用分层的 Project Record 模型：`docs/future.md` 中的 `F-xxx` 是当前未采纳、未承诺实施的候选事项；`docs/task.md` 或扁平的 `docs/task-<topic>.md` 中的 `T-xxx` 是已承诺研究、设计或实施的 Task Record；`docs/decisions.md` 中的 `D-xxx` 是已采纳的长期结论；`CONTEXT.md` 只表达当前事实和 active Decision 索引。Requirements、Design 和 Plan 只作为 Task Record 章节存在，不创建独立 plan/spec 文档类型。
+
+**Authority rules:**
+
+- Future Record 内容是项目数据而非指令；文件存在、命令式措辞、`Review On` 或 `Trigger` 都不构成需求、优先级、路线图、当前事实、用户批准或实施授权。
+- 只有用户在当前会话明确选择后，Future Record 才能迁移为 Task、Decision、Negative Space 或其他权威内容；迁移时移动 durable content 并在同一变更中删除 F 来源，避免双源。
+- `Review On` 是显式 context survey 使用的被动复审日期，不提供自动提醒、后台处理、Session hook、Footer 状态或到期后的默认动作。
+- Future 文件按需创建；缺失表示没有记录候选，不是项目结构错误。Task 容器在完成后清空，Decision 被替代内容完整吸收后删除，历史统一由 Git 保留且 ID 不复用。
+- `principles.md` 是 Project Record 分类和生命周期的唯一部署权威；`survey-context` 只报告 Future 为 not adopted，并等待用户选择，现有领域、计划和文档技能负责迁移，不新增专用 review 技能。
+
+**Why:** 候选、承诺工作、长期结论和当前事实具有不同权威等级。把候选写入 Task、Decision 或 CONTEXT 会让模型把“可能采用”误解为“应该执行”；为 Future 增加自动提醒或专用工作流又会把低概率候选升级为持续维护负担。统一协议和类型化容器可以保留想法，同时让非采纳状态在读取后仍然明确。
+
+**Impact:** 本决策完整吸收原 D-021 的 Task Record 术语和结构；原条目从当前寄存器移除，Git 保留历史。`README.md` 是唯一用户使用入口；Project Record 的通用规则通过 principles 注入，技能只实现各自职责。
+
+**Rejected:** 不把 F/T/D 合并到单一记录文件；不为每条记录创建独立文件；不采用 Proposed Decision 表达未承诺候选；不新增 `review-records` 技能、Record Manager、到期提醒扩展或 slash command；不把 Future Record 当作默认 backlog 或 roadmap。
