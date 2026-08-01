@@ -74,7 +74,9 @@ export const buildAdapter: CommandAdapter = {
     if (!config) return makeSemantics("unknown", { reason: `unknown build tool: ${name}`, opaque: true });
 
     const args = [...node.args];
-    const subcmd = extractSubcommand(args, config.valueOpts ?? []);
+    let subcmd = extractSubcommand(args, config.valueOpts ?? []);
+    // 全选项输入（如 cargo --version）：用第一个选项作为子命令候选
+    if (!subcmd && args.length > 0) subcmd = args[0]!.value ?? "";
 
     for (const def of config.rules) {
       if (def.pattern(subcmd)) {

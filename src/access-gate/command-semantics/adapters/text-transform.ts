@@ -13,18 +13,25 @@ interface OptionSchema {
   operation: "read" | "write";
   /** 值的来源: next-token 或 inline（如 -ifile）。 */
   valueSource: "next" | "inline";
+  /**
+   * 值的性质: "file"（值是一个文件路径，产生路径 intent）或
+   * "expression"（值是程序/表达式，如 sed -e、awk -e —— 值被消费但不产生路径 intent）。
+   */
+  valueKind?: "file" | "expression";
+  /** 是否支持 inline 后缀（如 sed -i.bak、--in-place=.bak）。 */
+  inlineSuffix?: boolean;
 }
 
 const SED_OPTS: OptionSchema[] = [
-  { names: ["-i", "--in-place"], takesValue: false, operation: "write", valueSource: "next" },
-  { names: ["-e", "--expression"], takesValue: true, operation: "read", valueSource: "next" },
+  { names: ["-i", "--in-place"], takesValue: false, operation: "write", valueSource: "next", inlineSuffix: true },
+  { names: ["-e", "--expression"], takesValue: true, operation: "read", valueSource: "next", valueKind: "expression" },
   { names: ["-f", "--file"], takesValue: true, operation: "read", valueSource: "next" },
 ];
 
 const AWK_OPTS: OptionSchema[] = [
-  { names: ["-i", "--in-place"], takesValue: false, operation: "write", valueSource: "next" },
+  { names: ["-i", "--in-place"], takesValue: false, operation: "write", valueSource: "next", inlineSuffix: true },
   { names: ["-f", "--file"], takesValue: true, operation: "read", valueSource: "next" },
-  { names: ["-e"], takesValue: true, operation: "read", valueSource: "next" },
+  { names: ["-e"], takesValue: true, operation: "read", valueSource: "next", valueKind: "expression" },
 ];
 
 const SORT_OPTS: OptionSchema[] = [
@@ -68,6 +75,22 @@ function parseOptions(
     // 查找匹配的 schema
     const schema = schemas.find((s) => s.names.includes(val));
     if (!schema) {
+      // inline 后缀形式：sed -i.bak、--in-place=.bak（选项值附在选项上，不是文件路径）
+      const inline = schemas.find((s) => s.inlineSuffix && s.names.some((n) => {
+        if (n.startsWith("--")) return val.startsWith(n + "=");
+        return !val.startsWith("--") && val.startsWith(n) && val.length > n.length;
+      }));
+      if (inline) {
+        intents.push({
+          operation: inline.operation,
+          rawPath: "",
+          source: "option",
+          span: { start: 0, end: 0 },
+          confidence: "conservative",
+        });
+        index++;
+        continue;
+      }
       // 不认识这个选项 → opaque
       opaque = true;
       index++;
@@ -84,6 +107,12 @@ function parseOptions(
         confidence: "conservative",
       });
       index++;
+      continue;
+    }
+
+    if (schema.valueKind === "expression") {
+      // sed -e / awk -e：表达式值被消费但不产生路径 intent
+      index += index + 1 < args.length ? 2 : 1;
       continue;
     }
 

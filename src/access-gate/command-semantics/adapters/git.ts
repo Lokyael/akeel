@@ -67,8 +67,8 @@ function gitPathOpts(args: ShellArg[]): PathIntent[] {
 
 function gitEffects(def: GitDef, subcmd: string): readonly Effect[] {
   const effects = new Set<Effect>(def.cls === "inspect" ? ["read"] : def.cls === "destroy" ? ["execute"] : ["write"]);
-  if (/^rm\\b/.test(subcmd)) effects.add("delete");
-  if (/^(fetch|pull|push|clone|remote)\\b/.test(subcmd)) effects.add("network");
+  if (/^rm\b/.test(subcmd)) effects.add("delete");
+  if (/^(fetch|pull|push|clone|remote)\b/.test(subcmd)) effects.add("network");
   return [...effects];
 }
 

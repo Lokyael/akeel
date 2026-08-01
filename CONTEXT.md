@@ -44,6 +44,7 @@
 - [D-024 命令覆盖层](docs/decisions.md#d-024-命令覆盖层)
 - [D-025 Direct 优先与 Shell 安全子集](docs/decisions.md#d-025-direct-优先与-shell-安全子集)
 - [D-026 本地约束与溯源文档边界](docs/decisions.md#d-026-本地约束与溯源文档边界)
+- [D-027 选项值按性质分类（expression vs file）](docs/decisions.md#d-027-选项值按性质分类expression-vs-file)
 
 ## Negative Space
 
