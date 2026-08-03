@@ -1,6 +1,8 @@
 # Pi Keel Decisions
 
-本文集中记录 pi-keel 的长期架构、工程和安全决策。每条决策只保留当前结论、理由、必要的替代方案和影响；被后续决策完整吸收的条目从当前寄存器删除，历史由 Git 保留。仅在替代内容尚未完成迁移时暂留 `superseded` 状态并指向承接条目。
+本文集中记录 pi-keel 的长期架构、工程和安全决策。每条决策只保留当前结论、理由、必要的替代方案和影响；被后续决策完整吸收（`superseded`）或主动退役（`retired`）的条目从当前寄存器剪除，历史由 Git 保留。瞬态迁移与去向规则见 [D-029](#d-029-decision-退役路径retired与统一生命周期)。
+
+下一编号：`D-030`。删除条目后不复用历史 ID。
 
 ## D-001: Soft 技能匹配
 
@@ -89,7 +91,7 @@
 - `blockedPaths`、威胁模式、unsafe syntax 和 symlink escape 是不可覆盖的 hard deny。
 - `ask` 只提供 `Allow once` 和 `Deny`，不跨调用或 Session 持久化。
 - 每次 Session 从配置的 `defaultProfile` 开始，不继承其他 Session 的临时 Profile。
-- 配置按内置、用户全局顺序合并，全局同名 Profile 替换内置定义；项目仓库不提供 Profile 配置。
+- 配置只分内置与用户全局两层：按内置、用户全局顺序合并，全局同名 Profile 替换内置定义。用户全局配置位于 `~/.pi/agent/pi-keel/profiles.json`（`PI_CODING_AGENT_DIR` 可改变 agent 目录）。
 - 全局配置无效时保留内置 Profiles，并将当前 Session 默认项收紧为 `keel-read`。
 
 ## D-018: Shell IR 与 Access Gate
@@ -170,13 +172,13 @@
 **Why:**
 - Shell adapter 的分类、路径提取和效果推断共享同一趟参数解析——三者是同一个分析的输出，不是可拆分的"数据"和"逻辑"。强行拆分会造成 YAML 和 TS 描述同一命令的双源真理问题。
 - 内置命令分类是权威语义知识；覆盖层用于用户主动补充本机 Shell 命令语义。
-- 仓库内容不应改变 Gate 对命令的理解，因此不加载项目级 command overrides。
+- 命令语义只由内置 adapter 与用户全局 `command-overrides.yaml` 定义，仓库内容不是语义来源。
 - Direct 工具需要精确参数 schema、路径字段和 effect 证明，继续通过源码和测试扩展，不开放 YAML schema。
 
 **格式：**
 
 ```yaml
-# ~/.pi/agent/command-overrides.yaml（可选）
+# ~/.pi/agent/pi-keel/command-overrides.yaml（可选）
 
 # 别名：让未知命令复用已知 adapter 的完整语义分析
 # 路径提取、效果推断和子命令解析全部沿用目标 adapter 的逻辑
@@ -207,7 +209,7 @@ reclassify:
 
 **查找顺序：** `commands 定义 → aliases 别名解析 → 内置 adapter → reclassify 覆盖`。
 
-**加载：** 只读取用户全局 `~/.pi/agent/command-overrides.yaml`（`PI_CODING_AGENT_DIR` 可改变 agent 目录）；项目仓库中的同名文件不参与加载。TypeScript adapter 是内置权威来源。
+**加载：** 只读取用户全局 `~/.pi/agent/pi-keel/command-overrides.yaml`（`PI_CODING_AGENT_DIR` 可改变 agent 目录）。TypeScript adapter 是内置权威来源。
 
 **影响：**
 - 内置 adapter 结构和测试不受影响
@@ -280,3 +282,23 @@ reclassify:
 **Impact:** 本决策完整吸收原 D-021 的 Task Record 术语和结构；原条目从当前寄存器移除，Git 保留历史。`README.md` 是唯一用户使用入口；Project Record 的通用规则通过 principles 注入，技能只实现各自职责。
 
 **Rejected:** 不把 F/T/D 合并到单一记录文件；不为每条记录创建独立文件；不采用 Proposed Decision 表达未承诺候选；不新增 `review-records` 技能、Record Manager、到期提醒扩展或 slash command；不把 Future Record 当作默认 backlog 或 roadmap。
+
+## D-029: Decision 退役路径（retired）与统一生命周期
+
+**Status:** active
+
+**Decision:** Decision Record 的离开方式统一为两种终态路径：`superseded`（被后续决策完整吸收，内容延续）和 `retired`（能力撤销或移交外部，内容终止）。两者都是短暂迁移态，去向就位后统一 `pruned`（从寄存器剪除）。退役的去向只有两类：完全撤销时残余耐用主张迁入 `CONTEXT.md` Negative Space；移交外部时归属边界记录为新的窄边界决策（或并入 CONTEXT）。`docs/traceability.md` 不参与任何迁移路径。
+
+**Rules:**
+
+- 记录离开当前寄存器只有两种原因：内容转移（durable content 迁往其所属权威层级）或内容废止（无耐用内容可迁）。
+- 转移与移除必须在同一变更内完成，避免双源；历史由 Git 保留，ID 不复用。
+- `superseded` 必须指向承接 D-xxx；`retired` 必须指向去向（Negative Space 条目或边界决策）。
+- 退役不得硬标 `superseded`（会产生悬空承接引用）；退役决策不得保留为 active（会传播假事实）。
+- 终态一律原因命名并声明去向：Future 为 `promoted/dismissed`，Task 为 `cleared`，Decision 为 `superseded/retired` → `pruned`。
+
+**Why:** 原生命周期只提供“被后续决策完整吸收后剪除”一条删除路径；能力撤销或移交外部时没有内部承接者，模型字面上不允许删除，导致过时决策滞留。吸收与退役是两种不同的内容走向（延续 vs 终止），分开表达才能避免读者寻找不存在的承接条目。
+
+**Impact:** `principles.md` 的 Record Lifecycle 与迁移协议同步更新；`domain-modeling` 与 `doc-sync` 补充退役检查项。`docs/traceability.md` 不参与任何迁移路径，仅按 D-026 在第三方许可证场景独立记录来源。
+
+**Rejected:** 不把退役硬套 `superseded`；不为 `retired` 增加永久状态枚举或墓碑文件；不建 archive 目录；不把外部移交的所有权边界写入 traceability（所有权边界属于决策，许可证归属才属于 traceability）。

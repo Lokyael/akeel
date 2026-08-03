@@ -13,13 +13,14 @@
 - **Review On**：Future Record 的被动复审日期，只在显式 context survey 中报告；不是期限、提醒承诺或自动激活条件。
 - **Task Record**：具有目标、范围、验收和验证边界的已承诺短期任务，使用 `T-xxx` 标识。
 - **Decision**：需要长期保留的已采纳架构、领域或安全取舍，记录在 [`docs/decisions.md`](docs/decisions.md)。
+- **Durable Content**：在当前工作或会话结束后仍然成立且承载约束的事实、取舍与承诺（如采纳结论、安全不变量、外部归属边界、拒绝理由）；过程产物（实施步骤、测试日志、审查报告）不是耐用内容，不进入权威容器。
 - **Direct-first**：文件检查优先使用 Direct `read`、`grep`、`find`、`ls`；安全可分析的字面 Shell 仍可使用，Gate 不因存在 Direct 等价入口而自动拒绝 Shell。
 
 ## Architecture
 
 - `src/bootstrap/` 在 Session 启动和 compaction 后注入工程原则。
 - `src/access-gate/` 统一处理用户全局 Profile、Shell IR、命令语义、路径策略、Gate、Session 状态和 Footer。
-- `shell-parse/` 输出受限 Shell IR；`command-semantics/` 提取命令类别、路径意图、效果和 cwd 转换，用户全局 `command-overrides.yaml` 只扩展 Shell 命令语义。
+- `shell-parse/` 输出受限 Shell IR；`command-semantics/` 提取命令类别、路径意图、效果和 cwd 转换，用户全局 `pi-keel/command-overrides.yaml` 只扩展 Shell 命令语义。
 - `gate/` 编译器将 Shell IR 和 Direct tool 参数转换为 `CompleteAccessPlan`；compiler outcome 另外区分 unsupported form、security block 和 invalid request。`compiler-entry.ts` 是唯一 plan sealing boundary，同步 Policy Kernel 只消费经过 verifier 验证的 plan 和 Profile，产出 `GateDecision`，renderer 将决策转为 host 兼容结果。
 - Direct tool（`read`、`write`、`edit`、`find`、`grep`、`ls`）和 Shell 命令经过各自的 compiler 后进入同一 Policy Kernel。
 - 用户项目运行时文档入口为 `CONTEXT.md`、可选的 `docs/future.md`、`docs/decisions.md` 和 `docs/task.md`；Future Record 不进入当前事实或 active Decision 索引。
@@ -48,6 +49,7 @@
 - [D-026 本地约束与溯源文档边界](docs/decisions.md#d-026-本地约束与溯源文档边界)
 - [D-027 选项值按性质分类（expression vs file）](docs/decisions.md#d-027-选项值按性质分类expression-vs-file)
 - [D-028 统一 Project Record 模型](docs/decisions.md#d-028-统一-project-record-模型)
+- [D-029 Decision 退役路径（retired）与统一生命周期](docs/decisions.md#d-029-decision-退役路径retired与统一生命周期)
 
 ## Negative Space
 

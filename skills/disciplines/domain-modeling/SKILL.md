@@ -61,6 +61,14 @@ authoritative location and remove the F entry in the same change.
 
 Offer: "Want me to record this in `docs/decisions.md`?" only after the user has adopted a hard, contentious, or future-explorer-relevant conclusion. Append a precise `D-xxx: <decision>` entry with the decision, reasons, rejected alternatives, consequences, and genuine Out of Scope items. Do not record exploratory steps or uncommitted candidates as Decisions, and do not create one file per decision.
 
+### Retire a Decision
+
+When a decision's capability is withdrawn or handed to an external owner, do not
+force it into `superseded` (which requires an absorbing successor). Record the
+retirement in the same change: move residual durable claims to `CONTEXT.md`
+Negative Space or a new boundary decision, then prune the old entry. Git
+retains history and the ID is never reused.
+
 ## Integration
 
 This skill is invoked automatically when running `/skill:grill-docs`. It builds the domain model as decisions emerge from the grilling session.

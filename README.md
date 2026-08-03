@@ -38,11 +38,11 @@ Hard threats, unsafe Shell syntax, symlink escapes, and blocked paths always den
 
 ## Configuration
 
-Pi Keel loads configuration only from the user agent directory (`~/.pi/agent` by default, or `$PI_CODING_AGENT_DIR`). Project repositories cannot override Profiles or Shell command semantics.
+Pi Keel loads configuration only from the user agent directory (`~/.pi/agent` by default, or `$PI_CODING_AGENT_DIR`). Profiles and Shell command semantics are user-global configuration only.
 
 ### Profiles
 
-Define user Profiles in `~/.pi/agent/extensions/access-gate/profiles.json`. Built-ins load first; a user Profile can extend them, and `defaultProfile` selects the Profile used at the start of every Session.
+Define user Profiles in `~/.pi/agent/pi-keel/profiles.json`. Built-ins load first; a user Profile can extend them, and `defaultProfile` selects the Profile used at the start of every Session.
 
 ```json
 {
@@ -63,7 +63,7 @@ Profile decisions are `allow`, `ask`, or `deny`. Path rules independently contro
 
 ### Shell Command Overrides
 
-Define user-only aliases, simple command semantics, and classification adjustments in `~/.pi/agent/command-overrides.yaml`:
+Define user-only aliases, simple command semantics, and classification adjustments in `~/.pi/agent/pi-keel/command-overrides.yaml`:
 
 ```yaml
 aliases:

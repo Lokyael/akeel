@@ -56,7 +56,7 @@ export function loadProfiles(options: ProfileLoadOptions = {}): ResolvedProfiles
 
   const base = structuredClone(builtinRaw) as RawProfiles;
   base.defaultProfile ||= builtin.value.defaultProfile || DEFAULT_PROFILE_NAME;
-  const global = loadLayer(base, join(options.agentDir ?? getAgentDir(), "extensions", "access-gate", "profiles.json"));
+  const global = loadLayer(base, join(options.agentDir ?? getAgentDir(), "pi-keel", "profiles.json"));
   if (global.error) {
     options.onError?.(global.error);
     return { ...builtin.value, defaultProfile: "keel-read" };

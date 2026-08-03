@@ -31,6 +31,7 @@ Also scan `CONTEXT.md`, `docs/future.md`, `docs/decisions.md`, `docs/task.md`, a
 - A Task Record marked `verified` but durable updates are missing → update `CONTEXT.md` or `docs/decisions.md`
 - A Task Record marked `verified` with no remaining action → clear the completed Task Record sections
 - A superseded decision without a replacement reference → update its status and link
+- A retired decision still marked active, or without a documented destination (Negative Space entry or boundary decision) → record the retirement destination or flag the gap
 
 ### Step 2: Verify Each Against Code
 

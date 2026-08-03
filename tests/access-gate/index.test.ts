@@ -85,8 +85,8 @@ async function startSessionWithFooter(): Promise<{ harness: ReturnType<typeof cr
 
 test("reports invalid global profile configuration at session start", async () => {
   const agentDir = mkdtempSync(join(tmpdir(), "pi-access-invalid-agent-"));
-  mkdirSync(join(agentDir, "extensions", "access-gate"), { recursive: true });
-  writeFileSync(join(agentDir, "extensions", "access-gate", "profiles.json"), "{ bad json");
+  mkdirSync(join(agentDir, "pi-keel"), { recursive: true });
+  writeFileSync(join(agentDir, "pi-keel", "profiles.json"), "{ bad json");
   const previous = process.env.PI_CODING_AGENT_DIR;
   process.env.PI_CODING_AGENT_DIR = agentDir;
   const { harness, cleanup } = startSession();
@@ -103,8 +103,8 @@ test("reports invalid global profile configuration at session start", async () =
 
 test("/profile status reports the complete resolved policy", async () => {
   const agentDir = mkdtempSync(join(tmpdir(), "pi-access-status-agent-"));
-  mkdirSync(join(agentDir, "extensions", "access-gate"), { recursive: true });
-  writeFileSync(join(agentDir, "extensions", "access-gate", "profiles.json"), JSON.stringify({
+  mkdirSync(join(agentDir, "pi-keel"), { recursive: true });
+  writeFileSync(join(agentDir, "pi-keel", "profiles.json"), JSON.stringify({
     defaultProfile: "status-test",
     profiles: {
       "status-test": {

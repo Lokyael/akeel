@@ -3,7 +3,7 @@
 // 为 Shell 命令提供用户全局的轻量扩展入口。
 // 内置 adapter 仍是权威来源；此文件只处理用户定义的扩展和覆盖。
 //
-// 配置路径：$PI_CODING_AGENT_DIR/command-overrides.yaml，默认 ~/.pi/agent/command-overrides.yaml。
+// 配置路径：$PI_CODING_AGENT_DIR/pi-keel/command-overrides.yaml，默认 ~/.pi/agent/pi-keel/command-overrides.yaml。
 
 import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
@@ -85,7 +85,7 @@ function getAgentDir(): string {
 }
 
 export function loadOverrides(agentDir = getAgentDir()): CommandOverrides {
-  const globalPath = join(agentDir, "command-overrides.yaml");
+  const globalPath = join(agentDir, "pi-keel", "command-overrides.yaml");
   const cached = _cache.get(globalPath);
   if (cached) return cached;
 

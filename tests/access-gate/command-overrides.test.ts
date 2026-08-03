@@ -23,7 +23,8 @@ function setupProject(overridesContent: string): { root: string; ctx: SemanticCo
   const parent = realpathSync(tmpdir());
   const root = mkdtempSync(join(parent, "pi-keel-overrides-project-"));
   const agentDir = mkdtempSync(join(parent, "pi-keel-overrides-agent-"));
-  writeFileSync(join(agentDir, "command-overrides.yaml"), overridesContent, "utf-8");
+  mkdirSync(join(agentDir, "pi-keel"), { recursive: true });
+  writeFileSync(join(agentDir, "pi-keel", "command-overrides.yaml"), overridesContent, "utf-8");
   const previous = process.env.PI_CODING_AGENT_DIR;
   process.env.PI_CODING_AGENT_DIR = agentDir;
 
@@ -103,12 +104,12 @@ test("aliases: 无 overrides 时不受影响", () => {
   assert.ok(sem.reason.includes("show working tree"));
 });
 
-test("project command overrides are ignored", () => {
+test("only the global pi-keel/command-overrides.yaml is read; no project config exists", () => {
   resetOverrides();
   const { root, ctx, cleanup } = setupProject("");
-  mkdirSync(join(root, ".pi"), { recursive: true });
-  writeFileSync(join(root, ".pi", "command-overrides.yaml"), "aliases:\n  local-git: git\n", "utf-8");
   try {
+    // setupProject 只写了全局 pi-keel/command-overrides.yaml（内容为空）；
+    // 项目目录中没有配置文件，也不存在项目级读取路径。
     const sem = analyzeSemantics(parseCmd("local-git status"), ctx);
     assert.equal(sem.class, "unknown");
   } finally {

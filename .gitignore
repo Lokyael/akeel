@@ -31,6 +31,3 @@ logs/
 # Pi runtime artifacts
 .pi/
 .pi-keel/
-
-# Local development (not pushed)
-AGENTS.md
