@@ -64,7 +64,7 @@
 
 **Status:** active
 
-**Decision:** `README.md` 是唯一用户使用入口；移除平行的 `USAGE.md`、不必要的 npm 元数据和用户 `AGENTS.md` 模板。长期架构、安全、溯源和 Project Record 文档按职责保留在 `docs/`。pi-keel 仓库自身维护用的 `AGENTS.md`（见 D-026）随仓库提交，不属于分发给用户项目的模板。
+**Decision:** `README.md` 是唯一用户使用入口；移除平行的 `USAGE.md`、不必要的 npm 元数据和用户 `AGENTS.md` 模板。长期架构、安全、溯源和 Project Record 文档按职责保留在 `docs/`。
 
 **Why:** 每个文件都应有明确的维护对象和用户价值；重复的使用、架构、安全和工作流说明会漂移，pi-keel 也不应越过用户项目工程约定文件的所有权边界。
 
@@ -239,7 +239,7 @@ reclassify:
 
 **Status:** active
 
-**Decision:** `AGENTS.md` 只定义 pi-keel 自身的维护入口和仓库约定，不复制注入原则、Task 生命周期或当前架构。它随仓库提交（不再列于 `.gitignore`），但不影响用户项目：pi 只从当前工作目录向上加载 AGENTS.md，安装到 `~/.pi/agent/` 的 pi-keel 包目录不在用户项目的向上遍历链上。`docs/traceability.md` 只记录外部来源、采用方式、当前文件映射和许可证义务；当前架构、安全边界和长期取舍分别由 `CONTEXT.md`、`docs/security-boundaries.md` 和本决策寄存器维护。
+**Decision:** `AGENTS.md` 只定义 pi-keel 自身的维护入口和仓库约定，不复制注入原则、Task 生命周期或当前架构。它随仓库提交并只影响仓库内开发会话。`docs/traceability.md` 只记录外部来源、采用方式、当前文件映射和许可证义务；当前架构、安全边界和长期取舍分别由 `CONTEXT.md`、`docs/security-boundaries.md` 和本决策寄存器维护。
 
 **Why:** 同一规则或行为在多个长期文档中重复描述会产生漂移。溯源文件只有在来源、revision、采用范围和许可证证据可核查时才具有合规价值；运行时行为和融合取舍放入其中会把它变成第二份架构与决策文档。
 
@@ -291,7 +291,6 @@ reclassify:
 
 **Rules:**
 
-- 记录离开当前寄存器只有两种原因：内容转移（durable content 迁往其所属权威层级）或内容废止（无耐用内容可迁）。
 - 转移与移除必须在同一变更内完成，避免双源；历史由 Git 保留，ID 不复用。
 - `superseded` 必须指向承接 D-xxx；`retired` 必须指向去向（Negative Space 条目或边界决策）。
 - 退役不得硬标 `superseded`（会产生悬空承接引用）；退役决策不得保留为 active（会传播假事实）。
@@ -299,6 +298,6 @@ reclassify:
 
 **Why:** 原生命周期只提供“被后续决策完整吸收后剪除”一条删除路径；能力撤销或移交外部时没有内部承接者，模型字面上不允许删除，导致过时决策滞留。吸收与退役是两种不同的内容走向（延续 vs 终止），分开表达才能避免读者寻找不存在的承接条目。
 
-**Impact:** `principles.md` 的 Record Lifecycle 与迁移协议同步更新；`domain-modeling` 与 `doc-sync` 补充退役检查项。`docs/traceability.md` 不参与任何迁移路径，仅按 D-026 在第三方许可证场景独立记录来源。
+**Impact:** `principles.md` 的 Record Lifecycle 与迁移协议同步更新；`domain-modeling` 与 `doc-sync` 补充退役检查项。traceability 仅按 D-026 在第三方许可证场景独立记录来源。
 
 **Rejected:** 不把退役硬套 `superseded`；不为 `retired` 增加永久状态枚举或墓碑文件；不建 archive 目录；不把外部移交的所有权边界写入 traceability（所有权边界属于决策，许可证归属才属于 traceability）。
