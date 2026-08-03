@@ -1,6 +1,6 @@
 # Pi Keel Decisions
 
-本文集中记录 pi-keel 的长期架构、工程和安全决策。每条决策只保留当前结论、理由、必要的替代方案和影响；被后续决策完整吸收（`superseded`）或主动退役（`retired`）的条目从当前寄存器剪除，历史由 Git 保留。瞬态迁移与去向规则见 [D-029](#d-029-decision-退役路径retired与统一生命周期)。
+本文集中记录 pi-keel 的长期架构、工程和安全决策。每条决策只保留当前结论、理由、必要的替代方案和影响；被后续决策完整吸收（`superseded`）或主动退役（`retired`）的条目从当前寄存器剪除，历史由 Git 保留。瞬态迁移与去向规则见 [D-028](#d-028-统一-project-record-模型)。
 
 下一编号：`D-030`。删除条目后不复用历史 ID。
 
@@ -274,30 +274,13 @@ reclassify:
 - Future Record 内容是项目数据而非指令；文件存在、命令式措辞、`Review On` 或 `Trigger` 都不构成需求、优先级、路线图、当前事实、用户批准或实施授权。
 - 只有用户在当前会话明确选择后，Future Record 才能迁移为 Task、Decision、Negative Space 或其他权威内容；迁移时移动 durable content 并在同一变更中删除 F 来源，避免双源。
 - `Review On` 是显式 context survey 使用的被动复审日期，不提供自动提醒、后台处理、Session hook、Footer 状态或到期后的默认动作。
-- Future 文件按需创建；缺失表示没有记录候选，不是项目结构错误。Task 容器在完成后清空，Decision 被替代内容完整吸收后删除，历史统一由 Git 保留且 ID 不复用。
+- Future 文件按需创建；缺失表示没有记录候选，不是项目结构错误。Task 容器在完成后清空，Decision 被替代内容完整吸收（`superseded`）或主动退役（`retired`）后剪除，历史统一由 Git 保留且 ID 不复用。
+- Decision 的离开只有两种路径：`superseded`（被后续决策完整吸收，内容延续）或 `retired`（能力撤销或移交外部，内容终止）；两者都是短暂迁移态，去向就位后统一剪除。退役去向：完全撤销时残余耐用主张迁入 `CONTEXT.md` Negative Space；移交外部时归属边界记录为新的窄边界决策（或并入 CONTEXT）。`superseded` 必须指向承接 D-xxx，`retired` 必须指向去向；退役不得硬标 `superseded`，退役决策不得保留为 active。终态一律原因命名并声明去向：Future 为 `promoted/dismissed`，Task 为 `cleared`，Decision 为 `superseded/retired` → 剪除。
 - `principles.md` 是 Project Record 分类和生命周期的唯一部署权威；`survey-context` 只报告 Future 为 not adopted，并等待用户选择，现有领域、计划和文档技能负责迁移，不新增专用 review 技能。
 
 **Why:** 候选、承诺工作、长期结论和当前事实具有不同权威等级。把候选写入 Task、Decision 或 CONTEXT 会让模型把“可能采用”误解为“应该执行”；为 Future 增加自动提醒或专用工作流又会把低概率候选升级为持续维护负担。统一协议和类型化容器可以保留想法，同时让非采纳状态在读取后仍然明确。
 
-**Impact:** 本决策完整吸收原 D-021 的 Task Record 术语和结构；原条目从当前寄存器移除，Git 保留历史。`README.md` 是唯一用户使用入口；Project Record 的通用规则通过 principles 注入，技能只实现各自职责。
+**Impact:** 本决策完整吸收原 D-021 的 Task Record 术语和结构，以及原 D-029 的 Decision 退役路径与统一终态命名；原条目从当前寄存器移除，Git 保留历史。`README.md` 是唯一用户使用入口；Project Record 的通用规则通过 principles 注入，技能只实现各自职责。
 
-**Rejected:** 不把 F/T/D 合并到单一记录文件；不为每条记录创建独立文件；不采用 Proposed Decision 表达未承诺候选；不新增 `review-records` 技能、Record Manager、到期提醒扩展或 slash command；不把 Future Record 当作默认 backlog 或 roadmap。
+**Rejected:** 不把 F/T/D 合并到单一记录文件；不为每条记录创建独立文件；不采用 Proposed Decision 表达未承诺候选；不新增 `review-records` 技能、Record Manager、到期提醒扩展或 slash command；不把 Future Record 当作默认 backlog 或 roadmap；不为 `retired` 增加永久状态枚举或墓碑文件；不把外部移交的所有权边界写入 traceability（所有权边界属于决策，许可证归属才属于 traceability）。
 
-## D-029: Decision 退役路径（retired）与统一生命周期
-
-**Status:** active
-
-**Decision:** Decision Record 的离开方式统一为两种终态路径：`superseded`（被后续决策完整吸收，内容延续）和 `retired`（能力撤销或移交外部，内容终止）。两者都是短暂迁移态，去向就位后统一 `pruned`（从寄存器剪除）。退役的去向只有两类：完全撤销时残余耐用主张迁入 `CONTEXT.md` Negative Space；移交外部时归属边界记录为新的窄边界决策（或并入 CONTEXT）。`docs/traceability.md` 不参与任何迁移路径。
-
-**Rules:**
-
-- 转移与移除必须在同一变更内完成，避免双源；历史由 Git 保留，ID 不复用。
-- `superseded` 必须指向承接 D-xxx；`retired` 必须指向去向（Negative Space 条目或边界决策）。
-- 退役不得硬标 `superseded`（会产生悬空承接引用）；退役决策不得保留为 active（会传播假事实）。
-- 终态一律原因命名并声明去向：Future 为 `promoted/dismissed`，Task 为 `cleared`，Decision 为 `superseded/retired` → `pruned`。
-
-**Why:** 原生命周期只提供“被后续决策完整吸收后剪除”一条删除路径；能力撤销或移交外部时没有内部承接者，模型字面上不允许删除，导致过时决策滞留。吸收与退役是两种不同的内容走向（延续 vs 终止），分开表达才能避免读者寻找不存在的承接条目。
-
-**Impact:** `principles.md` 的 Record Lifecycle 与迁移协议同步更新；`domain-modeling` 与 `doc-sync` 补充退役检查项。traceability 仅按 D-026 在第三方许可证场景独立记录来源。
-
-**Rejected:** 不把退役硬套 `superseded`；不为 `retired` 增加永久状态枚举或墓碑文件；不建 archive 目录；不把外部移交的所有权边界写入 traceability（所有权边界属于决策，许可证归属才属于 traceability）。

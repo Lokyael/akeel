@@ -49,7 +49,6 @@
 - [D-026 本地约束与溯源文档边界](docs/decisions.md#d-026-本地约束与溯源文档边界)
 - [D-027 选项值按性质分类（expression vs file）](docs/decisions.md#d-027-选项值按性质分类expression-vs-file)
 - [D-028 统一 Project Record 模型](docs/decisions.md#d-028-统一-project-record-模型)
-- [D-029 Decision 退役路径（retired）与统一生命周期](docs/decisions.md#d-029-decision-退役路径retired与统一生命周期)
 
 ## Negative Space
 
