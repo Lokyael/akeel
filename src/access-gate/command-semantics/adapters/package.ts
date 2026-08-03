@@ -2,7 +2,7 @@
 
 import type { ShellCommandNode } from "../../shell-parse/types";
 import type { CommandAdapter, CommandSemantics, SemanticContext } from "../types";
-import { makeSemantics } from "./shared";
+import { makeSemantics, extractSubcommand } from "./shared";
 
 interface PkgDef {
   cls: "inspect" | "modify" | "execute" | "unknown";
@@ -14,7 +14,7 @@ interface PkgDef {
 function buildPkgRules(cmd: string): PkgDef[] {
   const installPat = cmd === "yarn" ? /^(?:add|install)\b/ : /^install\b/;
   const removePat = cmd === "yarn" ? /^(?:remove|upgrade)\b/ : /^(?:remove|uninstall)\b/;
-  return [
+  const rules: PkgDef[] = [
     { cls: "inspect", pattern: (s) => /^view\b/.test(s) || /^info\b/.test(s), reason: `${cmd} package info` },
     { cls: "inspect", pattern: (s) => /^outdated\b/.test(s), reason: `${cmd} outdated packages` },
     { cls: "inspect", pattern: (s) => /^(?:search|ls|list)\b/.test(s), reason: `${cmd} search/list` },
@@ -27,9 +27,22 @@ function buildPkgRules(cmd: string): PkgDef[] {
     { cls: "execute", pattern: (s) => /^exec\b/.test(s), reason: `${cmd} exec` },
     { cls: "execute", pattern: (s) => /^test\b/.test(s), reason: `${cmd} test` },
     { cls: "execute", pattern: (s) => /^build\b/.test(s), reason: `${cmd} build` },
-    { cls: "unknown", pattern: () => true, reason: `${cmd} unknown subcommand`, network: true },
   ];
+  // npm/pnpm 有 ci（按 lockfile 精确安装）；yarn 的等价物是 install --frozen-lockfile，没有独立 ci 子命令
+  if (cmd !== "yarn") {
+    rules.push({ cls: "execute", pattern: (s) => /^ci\b/.test(s), reason: `${cmd} ci`, network: true });
+  }
+  rules.push({ cls: "unknown", pattern: () => true, reason: `${cmd} unknown subcommand`, network: true });
+  return rules;
 }
+
+// 取值选项：选项之后的下一个 token 是值而非子命令。不穷举，未覆盖的选项导致 unknown（安全降级）。
+const PKG_VALUE_OPTS = [
+  "--prefix", "--registry", "--cache", "--userconfig", "--globalconfig",
+  "--cafile", "--cert", "--key", "--proxy", "--https-proxy", "--noproxy",
+  "--scope", "--tag", "--workspace", "--dir", "--filter", "--cwd",
+  "-w", "-C", "-F",
+];
 
 // npx always executes (potentially after download).  Flags like --version/--help
 // are inspect; everything else is execute + network.
@@ -53,11 +66,8 @@ export const packageAdapter: CommandAdapter = {
     if (!rules) return makeSemantics("unknown", { reason: `unknown package manager: ${name}`, opaque: true });
 
     const args = [...node.args];
-    let subcmd = args.find((a) => {
-      const v = a.value ?? "";
-      return !v.startsWith("-") && v !== "--";
-    })?.value ?? "";
-    // npx: when no subcommand (all args are flags), use the first flag
+    let subcmd = extractSubcommand(args, PKG_VALUE_OPTS);
+    // npx: 当没有子命令（全为选项）时，用第一个选项作为候选
     if (name === "npx" && !subcmd && args.length > 0) {
       subcmd = args[0]!.value ?? "";
     }

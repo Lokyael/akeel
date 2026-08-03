@@ -1,6 +1,6 @@
 // 文本处理命令 — sed, awk, sort, uniq 的选项语义
 
-import type { ShellCommandNode, ShellArg } from "../../shell-parse/types";
+import type { ShellCommandNode, ShellArg, SourceSpan } from "../../shell-parse/types";
 import type { CommandAdapter, CommandSemantics, PathIntent, SemanticContext } from "../types";
 import { makeSemantics } from "./shared";
 
@@ -11,8 +11,6 @@ interface OptionSchema {
   takesValue: boolean;
   /** 产生的操作。 */
   operation: "read" | "write";
-  /** 值的来源: next-token 或 inline（如 -ifile）。 */
-  valueSource: "next" | "inline";
   /**
    * 值的性质: "file"（值是一个文件路径，产生路径 intent）或
    * "expression"（值是程序/表达式，如 sed -e、awk -e/-F/-v —— 值被消费但不产生路径 intent）。
@@ -25,32 +23,32 @@ interface OptionSchema {
 }
 
 const SED_OPTS: OptionSchema[] = [
-  { names: ["-i", "--in-place"], takesValue: false, operation: "write", valueSource: "next", inlineSuffix: true },
-  { names: ["-e", "--expression"], takesValue: true, operation: "read", valueSource: "next", valueKind: "expression" },
-  { names: ["-f", "--file"], takesValue: true, operation: "read", valueSource: "next" },
-  { names: ["-l", "--line-length"], takesValue: true, operation: "read", valueSource: "next", valueKind: "expression" },
-  { names: ["-n", "--quiet", "--silent"], takesValue: false, operation: "read", valueSource: "next", flag: true },
-  { names: ["-E", "-r", "-z", "-s", "-u", "--sandbox", "--debug"], takesValue: false, operation: "read", valueSource: "next", flag: true },
+  { names: ["-i", "--in-place"], takesValue: false, operation: "write", inlineSuffix: true },
+  { names: ["-e", "--expression"], takesValue: true, operation: "read", valueKind: "expression" },
+  { names: ["-f", "--file"], takesValue: true, operation: "read" },
+  { names: ["-l", "--line-length"], takesValue: true, operation: "read", valueKind: "expression" },
+  { names: ["-n", "--quiet", "--silent"], takesValue: false, operation: "read", flag: true },
+  { names: ["-E", "-r", "-z", "-s", "-u", "--sandbox", "--debug"], takesValue: false, operation: "read", flag: true },
 ];
 
 const AWK_OPTS: OptionSchema[] = [
-  { names: ["-i", "--in-place"], takesValue: false, operation: "write", valueSource: "next", inlineSuffix: true },
-  { names: ["-f", "--file"], takesValue: true, operation: "read", valueSource: "next" },
-  { names: ["-e"], takesValue: true, operation: "read", valueSource: "next", valueKind: "expression" },
-  { names: ["-F", "--field-separator"], takesValue: true, operation: "read", valueSource: "next", valueKind: "expression" },
-  { names: ["-v", "--assign"], takesValue: true, operation: "read", valueSource: "next", valueKind: "expression" },
-  { names: ["-V", "--version", "-h", "--help"], takesValue: false, operation: "read", valueSource: "next", flag: true },
+  { names: ["-i", "--in-place"], takesValue: false, operation: "write", inlineSuffix: true },
+  { names: ["-f", "--file"], takesValue: true, operation: "read" },
+  { names: ["-e"], takesValue: true, operation: "read", valueKind: "expression" },
+  { names: ["-F", "--field-separator"], takesValue: true, operation: "read", valueKind: "expression" },
+  { names: ["-v", "--assign"], takesValue: true, operation: "read", valueKind: "expression" },
+  { names: ["-V", "--version", "-h", "--help"], takesValue: false, operation: "read", flag: true },
 ];
 
 const SORT_OPTS: OptionSchema[] = [
-  { names: ["-o", "--output"], takesValue: true, operation: "write", valueSource: "next" },
-  { names: ["-t", "--field-separator", "-k", "--key"], takesValue: true, operation: "read", valueSource: "next", valueKind: "expression" },
-  { names: ["-n", "-r", "-u", "-f", "-b", "-c", "-m", "-h", "-V", "-s", "--numeric-sort", "--reverse", "--unique", "--ignore-case", "--stable", "--check", "--merge", "--version", "--help"], takesValue: false, operation: "read", valueSource: "next", flag: true },
+  { names: ["-o", "--output"], takesValue: true, operation: "write" },
+  { names: ["-t", "--field-separator", "-k", "--key"], takesValue: true, operation: "read", valueKind: "expression" },
+  { names: ["-n", "-r", "-u", "-f", "-b", "-c", "-m", "-h", "-V", "-s", "--numeric-sort", "--reverse", "--unique", "--ignore-case", "--stable", "--check", "--merge", "--version", "--help"], takesValue: false, operation: "read", flag: true },
 ];
 
 const UNIQ_OPTS: OptionSchema[] = [
-  { names: ["-o", "--output"], takesValue: true, operation: "write", valueSource: "next" },
-  { names: ["-c", "-d", "-u", "-i", "--count", "--repeated", "--unique", "--ignore-case", "--version", "--help"], takesValue: false, operation: "read", valueSource: "next", flag: true },
+  { names: ["-o", "--output"], takesValue: true, operation: "write" },
+  { names: ["-c", "-d", "-u", "-i", "--count", "--repeated", "--unique", "--ignore-case", "--version", "--help"], takesValue: false, operation: "read", flag: true },
 ];
 
 const TEXT_CONFIG: Record<string, {
@@ -65,6 +63,14 @@ const TEXT_CONFIG: Record<string, {
   sort: { class: "inspect", schemas: SORT_OPTS, reason: "sort lines" },
   uniq: { class: "inspect", schemas: UNIQ_OPTS, reason: "unique lines" },
 };
+
+/** 选项派生意图的合成 span：真实 token 位置未知，不参与精确定位。 */
+const SYNTHETIC_SPAN: SourceSpan = { start: 0, end: 0 };
+
+/** 选项派生的路径意图（source: option，conservative 置信度）。 */
+function optionIntent(operation: "read" | "write", rawPath: string): PathIntent {
+  return { operation, rawPath, source: "option", span: SYNTHETIC_SPAN, confidence: "conservative" };
+}
 
 /**
  * 解析选项模式，提取路径 intent。
@@ -108,13 +114,7 @@ function parseOptions(
         return !val.startsWith("--") && val.startsWith(n) && val.length > n.length;
       }));
       if (inline) {
-        intents.push({
-          operation: inline.operation,
-          rawPath: "",
-          source: "option",
-          span: { start: 0, end: 0 },
-          confidence: "conservative",
-        });
+        intents.push(optionIntent(inline.operation, ""));
         index++;
         continue;
       }
@@ -125,13 +125,7 @@ function parseOptions(
       if (short) {
         const inlineVal = val.slice(2);
         if (short.valueKind !== "expression" && inlineVal.length > 0) {
-          intents.push({
-            operation: short.operation,
-            rawPath: inlineVal,
-            source: "option",
-            span: { start: 0, end: 0 },
-            confidence: "conservative",
-          });
+          intents.push(optionIntent(short.operation, inlineVal));
         }
         index++;
         continue;
@@ -145,51 +139,17 @@ function parseOptions(
     if (!schema.takesValue) {
       if (!schema.flag) {
         // 无值选项（如 sed -i）
-        intents.push({
-          operation: schema.operation,
-          rawPath: "",
-          source: "option",
-          span: { start: 0, end: 0 },
-          confidence: "conservative",
-        });
+        intents.push(optionIntent(schema.operation, ""));
       }
       index++;
       continue;
     }
 
-    if (schema.valueKind === "expression") {
-      // sed -e / awk -e：表达式值被消费但不产生路径 intent
-      index += index + 1 < args.length ? 2 : 1;
-      continue;
-    }
-
-    if (schema.valueSource === "inline") {
-      // inline 值（如 -i.bak）
-      const inlineVal = val.slice(schema.names[0]!.length);
-      if (inlineVal.length > 0) {
-        intents.push({
-          operation: schema.operation,
-          rawPath: inlineVal,
-          source: "option",
-          span: { start: 0, end: 0 },
-          confidence: "conservative",
-        });
-      }
-      index++;
-      continue;
-    }
-
-    // next token 值
+    // 取值选项统一消费下一个 token：expression 值（sed -e / awk -e 等）不产生路径 intent，其余视为文件路径
     if (index + 1 < args.length) {
       const nextVal = args[index + 1]!.value;
-      if (nextVal) {
-        intents.push({
-          operation: schema.operation,
-          rawPath: nextVal,
-          source: "option",
-          span: { start: 0, end: 0 },
-          confidence: "conservative",
-        });
+      if (schema.valueKind !== "expression" && nextVal) {
+        intents.push(optionIntent(schema.operation, nextVal));
       }
       index += 2;
     } else {

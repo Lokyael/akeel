@@ -191,6 +191,37 @@ test("tx: sort common flags are not opaque", () => {
   assert.ok(sem.intents.some((i) => i.operation === "read" && i.rawPath === "file.txt"));
 });
 
+test("tx: sort short inline output value produces a write intent", () => {
+  const sem = analyzeCmd("sort -oout.txt in.txt");
+  assert.equal(sem.class, "modify");
+  assert.ok(sem.intents.some((i) => i.operation === "write" && i.rawPath === "out.txt"));
+});
+
+test("tx: awk attached -v value is consumed without a path intent", () => {
+  const sem = analyzeCmd("awk -vx=1 '{ print x }' data.txt");
+  assert.equal(sem.opaque, false);
+  assert.ok(!sem.intents.some((i) => i.rawPath === "x=1"));
+});
+
+test("tx: sed attached -e expression is consumed without a path intent", () => {
+  const sem = analyzeCmd("sed -es/x/y/ file.txt");
+  assert.equal(sem.opaque, false);
+  assert.equal(sem.class, "inspect");
+  assert.ok(sem.intents.some((i) => i.operation === "read" && i.rawPath === "file.txt"));
+});
+
+test("tx: expression option with no value is consumed without opaque", () => {
+  const sem = analyzeCmd("sed -e");
+  assert.equal(sem.opaque, false);
+  assert.equal(sem.intents.length, 0);
+});
+
+test("tx: sed -i without positional files stays a conservative write", () => {
+  const sem = analyzeCmd("sed -i 's/x/y/'");
+  assert.equal(sem.class, "modify");
+  assert.ok(sem.intents.some((i) => i.operation === "write"));
+});
+
 // ─── search: 破坏性变体与取值选项 ───
 
 test("search: find -execdir upgrades to modify", () => {
@@ -297,6 +328,12 @@ test("git: push carries the network effect", () => {
   assert.ok(sem.effects?.includes("network"));
 });
 
+test("git: fetch, pull, clone, remote carry the network effect", () => {
+  for (const cmd of ["git fetch origin", "git pull origin main", "git clone https://github.com/x/y.git", "git remote add origin url"]) {
+    assert.ok(analyzeCmd(cmd).effects?.includes("network"), cmd);
+  }
+});
+
 // ─── build: 未测子命令 ───
 
 const CARGO_INSPECT = ["cargo search serde", "cargo --version"];
@@ -400,6 +437,24 @@ test("pkg: yarn remove and upgrade are execute", () => {
 
 test("pkg: pnpm install is execute with network", () => {
   const sem = analyzeCmd("pnpm install");
+  assert.equal(sem.class, "execute");
+  assert.ok(sem.effects?.includes("network"));
+});
+
+test("pkg: npm ci is execute with network", () => {
+  const sem = analyzeCmd("npm ci");
+  assert.equal(sem.class, "execute");
+  assert.ok(sem.effects?.includes("network"));
+});
+
+test("pkg: npm --prefix ci is execute with network", () => {
+  const sem = analyzeCmd("npm --prefix /tmp/deps ci");
+  assert.equal(sem.class, "execute");
+  assert.ok(sem.effects?.includes("network"));
+});
+
+test("pkg: pnpm ci is execute with network", () => {
+  const sem = analyzeCmd("pnpm ci");
   assert.equal(sem.class, "execute");
   assert.ok(sem.effects?.includes("network"));
 });
