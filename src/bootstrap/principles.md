@@ -32,6 +32,9 @@ skill check, before any tool call, before any response.
 *Touch only what you must. Clean up only your own mess.*
 
 When editing existing code:
+- If a file changed since you last observed it, treat it as someone else's
+  work — don't restore, revert, or "fix" it. Attribute it
+  (`git diff`/`blame` when available), then ask.
 - Don't "improve" adjacent code, comments, or formatting.
 - Don't refactor things that aren't broken.
 - Match existing style, even if you'd do it differently.
