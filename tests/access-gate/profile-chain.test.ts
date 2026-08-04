@@ -1,18 +1,12 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import { resolve, dirname } from "node:path";
-import { fileURLToPath } from "node:url";
 import test from "node:test";
-import { resolveProfiles } from "../../src/access-gate/profile/resolve";
 import type { ResolvedProfiles } from "../../src/access-gate/profile/types";
+import { loadBuiltinProfiles } from "./helpers";
 
-const builtinsPath = resolve(dirname(fileURLToPath(import.meta.url)), "../../src/access-gate/profile/builtins.json");
-const builtins = JSON.parse(readFileSync(builtinsPath, "utf-8"));
-const result = resolveProfiles(builtins);
+const profilesCache = loadBuiltinProfiles();
 
 function profiles(): ResolvedProfiles {
-  assert.equal(result.ok, true, `builtins resolution failed: ${result.ok ? "" : result.error}`);
-  return (result as { ok: true; value: ResolvedProfiles }).value;
+  return profilesCache;
 }
 
 // ── root ──

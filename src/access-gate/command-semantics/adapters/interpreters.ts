@@ -23,6 +23,7 @@ const INTERP_RULES: Record<string, InterpRule[]> = {
   node: buildInterpRules("node"),
   ruby: buildInterpRules("ruby"),
   perl: buildInterpRules("perl"),
+  tsx: buildInterpRules("tsx"),
 };
 
 export const interpreterAdapter: CommandAdapter = {

@@ -706,6 +706,32 @@ test("interp: versioned interpreter names are classified", () => {
   assert.equal(analyzeCmd("nodejs --version").class, "inspect");
 });
 
+test("interp: tsx is managed as a TS interpreter (bare and path forms)", () => {
+  assert.equal(analyzeCmd("tsx --version").class, "inspect");
+  assert.equal(analyzeCmd("tsx -v").class, "inspect");
+  assert.equal(analyzeCmd("tsx --help").class, "inspect");
+  assert.equal(analyzeCmd("tsx script.ts").class, "execute");
+  assert.equal(analyzeCmd("tsx watch src/x.ts").class, "execute");
+  assert.equal(analyzeCmd("tsx -e 'console.log(1)'").class, "execute");
+  assert.equal(analyzeCmd("./node_modules/.bin/tsx run.ts").class, "execute");
+  assert.equal(analyzeCmd("node_modules/.bin/tsx --version").class, "inspect");
+});
+
+test("unknown: path-form executables without adapter classify as execute", () => {
+  const s = analyzeCmd("./node_modules/.bin/some-tool run.ts");
+  assert.equal(s.class, "execute");
+  assert.equal(s.opaque, false);
+  assert.equal(analyzeCmd("/usr/local/bin/mytool --version").class, "execute");
+  assert.equal(analyzeCmd("scripts/deploy.sh -x").class, "execute");
+  assert.equal(analyzeCmd("../bin/helper --help").class, "execute");
+});
+
+test("unknown: bare-name executables without adapter stay unknown", () => {
+  const s = analyzeCmd("mycustomtool --help");
+  assert.equal(s.class, "unknown");
+  assert.equal(s.opaque, false);
+});
+
 test("interp: path form of other adapters resolves by basename", () => {
   const sem = analyzeCmd("/bin/sed 's/x/y/' file.txt");
   assert.equal(sem.class, "inspect");

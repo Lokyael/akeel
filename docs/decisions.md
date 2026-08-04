@@ -308,3 +308,28 @@ reclassify:
 - **合并任何触发场景互斥的 skill**：全量消费约束的必然推论。Revisit when 实测两 skill 触发场景重合。
 - **token 基线测量与提示词行为测试**：无法可靠操作化“理解认知”。Revisit when 出现可观察的遵守度问题。
 
+## D-031: 路径可执行与 tsx 解释器归类
+
+**Status:** active
+
+**Decision:** 无 adapter 的路径形式可执行文件（executable 含 `/`：`./x`、`../x`、绝对路径、`scripts/x.sh`）分类为 `execute`（non-opaque）；`tsx` 作为语言运行时纳入 interpreter adapter（与 node/python 同规则：`--version`/`-v`/`--help` → inspect，其余 → execute）；无路径的裸名未知命令保持 `unknown`（non-opaque）。
+
+**Why:** 同一操作（运行本地二进制）此前因拼写不同落入不同 Profile 决策——`npx tsx` 为 execute（plan deny/build allow），`./node_modules/.bin/tsx` 为 unknown（plan ask）——这是 spelling-based 分类偏差。含 `/` 的裸词在 POSIX 下即文件路径，路径形式“运行二进制”是事实而非假设，归 execute 是正确语义；裸名可能是 alias/函数/PATH 工具，静态分析无法确定语义，`unknown`→ask 是诚实分类与同意层，语义扩充权留给 D-024 用户覆盖层。tsx 是 TS/ESM 运行时，与 node/python/ruby/perl 同属语言运行时封闭范畴，纳入解释器管理不构成“任意工具进内置”的先例。
+
+**Impact:** 变更后矩阵——`npx tsx`、`./node_modules/.bin/tsx`、裸名 `tsx` 全部为 execute：keel-plan deny、keel-code/query/develop ask、keel-build allow；裸名无 adapter 命令保持 unknown（keel-plan ask）。唯一放宽点是 keel-build（路径二进制从 ask 变 allow），与 full-trust 语义一致；keel-plan 对本地脚本从 ask 收紧为 deny，符合其“execute 命令一律拒绝”的声明意图。keel-build 描述保持原样——execute 覆盖路径二进制与该 Profile full-trust 意图一致，不因措辞微调。`analyzeSemantics` 唯一生产调用方是 `shell-compiler.ts`，爆炸半径封闭；不新增 path intent、不触碰任何 hard boundary（blocked path/destroy/dynamic/opaque/threat）、D-024 覆盖层优先级（commands→aliases→adapter→reclassify）不变。
+
+**Rejected:**
+
+- **仅禁 `./node_modules/.bin/*`（按目录）**：误伤 npm scripts 全部本地二进制，且不解决绝对路径与项目脚本；拒绝。
+- **为任意裸名工具新增内置 adapter（eslint/prettier/vitest → execute）**：whack-a-mole，与 D-024（用户覆盖层是语义扩充的唯一入口）冲突；语言运行时封闭范畴（tsx）是特例，不构成先例。
+- **保持 unknown、仅改 guidance**：不消除 deny/ask 拼写分歧；拒绝。
+- **引入新 commandClass**：破坏 D-017/D-022 的封闭类集合与 effect axis；拒绝。
+- **按项目根判定（仅项目内路径归 execute）**：语义层引入 cwd/path 上下文耦合，绝对路径与 `/usr/local/bin` 工具分类不一致；拒绝。
+
+**Out of Scope:**
+
+- Windows `\` 路径（宿主为 Unix 语义，按 POSIX `/` 判定）。
+- 裸名经 PATH 到达的路径：`export PATH=…`（unknown→ask）与裸命令（unknown→ask）是两次审批，不构成静默绕过；裸名工具语义扩充属于用户 `command-overrides.yaml`（D-024）。
+- 路径形式的 alias 匹配：`aliases` 按完整 executable 字符串查键，`aliases: {tsx: node}` 对 `./node_modules/.bin/tsx` 不生效——既有不对称，另立评估。
+- PATH 解析与文件存在性探测：静态分类不做 filesystem 检查。
+

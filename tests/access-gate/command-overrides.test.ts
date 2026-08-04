@@ -448,3 +448,55 @@ test("边界: 无效 YAML 不崩溃，回退到空配置", () => {
     cleanup();
   }
 });
+
+// ─── 路径 fallback 与覆盖层优先级 ───
+
+test("commands: 路径键优先于路径 fallback（用户定义直接生效）", () => {
+  resetOverrides();
+  const { ctx, cleanup } = setupProject(`
+commands:
+  ./deploy.sh:
+    class: inspect
+    effects: [read]
+`);
+  try {
+    const sem = analyzeSemantics(parseCmd("./deploy.sh -x"), ctx);
+    assert.equal(sem.class, "inspect", "user-defined path command must win over execute fallback");
+    assert.ok(sem.reason.includes("user-defined"));
+  } finally {
+    cleanup();
+  }
+});
+
+test("reclassify: 可覆盖路径 fallback 的 execute", () => {
+  resetOverrides();
+  const { ctx, cleanup } = setupProject(`
+reclassify:
+  - command: ./node_modules/.bin/tsx
+    pattern: run\\.ts
+    class: inspect
+`);
+  try {
+    const sem = analyzeSemantics(parseCmd("./node_modules/.bin/tsx run.ts"), ctx);
+    assert.equal(sem.class, "inspect", "reclassify must override the path-form execute fallback");
+    assert.equal(sem.opaque, false);
+    assert.ok(sem.reason.includes("reclassified to inspect"));
+  } finally {
+    cleanup();
+  }
+});
+
+test("aliases: 仍先于 adapter/fallback 生效（裸名映射到已知 adapter）", () => {
+  resetOverrides();
+  const { ctx, cleanup } = setupProject(`
+aliases:
+  myinsp: ls
+`);
+  try {
+    const sem = analyzeSemantics(parseCmd("myinsp /tmp"), ctx);
+    assert.equal(sem.class, "inspect", "alias to known adapter wins over unknown fallback");
+  } finally {
+    cleanup();
+  }
+});
+

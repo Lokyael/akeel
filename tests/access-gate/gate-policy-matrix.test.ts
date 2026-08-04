@@ -6,7 +6,9 @@ import { compileDirectToolCall, compileShellCall } from "../../src/access-gate/g
 import { evaluateRequest } from "../../src/access-gate/gate/evaluate-request";
 import type { CompleteAccessPlan, CompileResult, CompilerContext } from "../../src/access-gate/gate/access-request";
 import type { ResolvedProfile } from "../../src/access-gate/profile/types";
-import { makeContext } from "./helpers";
+import { loadBuiltinProfiles, makeContext } from "./helpers";
+
+const builtinProfiles = loadBuiltinProfiles();
 
 function context(): CompilerContext & { cleanup: () => void } {
   return makeContext("pi-policy-kernel-");
@@ -115,6 +117,42 @@ test("asks for a complete direct edit request through the kernel", () => {
     if (decision.disposition === "ask") {
       assert.equal(decision.code, "approval-required");
     }
+  } finally {
+    env.cleanup();
+  }
+});
+
+// ─── 路径可执行与 tsx 在真实 builtins Profile 下的决策矩阵 ───
+
+test("path-form local binary follows execute policy across builtin profiles", () => {
+  const env = context();
+  try {
+    for (const cmd of ["./node_modules/.bin/tsx run.ts", "tsx run.ts", "npx tsx run.ts"]) {
+      const request = complete(compileShellCall({ ...env, command: cmd }));
+
+      const plan = evaluateRequest(request, builtinProfiles.profiles["keel-plan"]!);
+      assert.equal(plan.disposition, "deny", `${cmd}: keel-plan should deny execute`);
+      if (plan.disposition === "deny") {
+        assert.equal(plan.enforcement, "profile", `${cmd}: keel-plan deny is profile-level`);
+      }
+
+      const develop = evaluateRequest(request, builtinProfiles.profiles["keel-develop"]!);
+      assert.equal(develop.disposition, "ask", `${cmd}: keel-develop should ask`);
+
+      const build = evaluateRequest(request, builtinProfiles.profiles["keel-build"]!);
+      assert.equal(build.disposition, "allow", `${cmd}: keel-build should allow`);
+    }
+  } finally {
+    env.cleanup();
+  }
+});
+
+test("bare unknown command stays ask in plan (unknown policy bucket)", () => {
+  const env = context();
+  try {
+    const request = complete(compileShellCall({ ...env, command: "mycustomtool --help" }));
+    const plan = evaluateRequest(request, builtinProfiles.profiles["keel-plan"]!);
+    assert.equal(plan.disposition, "ask", "bare unknown should stay ask in plan");
   } finally {
     env.cleanup();
   }

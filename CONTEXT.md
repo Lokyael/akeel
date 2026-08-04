@@ -53,6 +53,7 @@
 - [D-027 选项值按性质分类（expression vs file）](docs/decisions.md#d-027-选项值按性质分类expression-vs-file)
 - [D-028 统一 Project Record 模型](docs/decisions.md#d-028-统一-project-record-模型)
 - [D-030 提示词体系边界（Prompt Surface）](docs/decisions.md#d-030-提示词体系边界prompt-surface)
+- [D-031 路径可执行与 tsx 解释器归类](docs/decisions.md#d-031-路径可执行与-tsx-解释器归类)
 
 ## Negative Space
 

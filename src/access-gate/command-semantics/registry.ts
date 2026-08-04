@@ -90,6 +90,11 @@ export function analyzeSemantics(
   const adapter = INDEX.get(key);
 
   if (!adapter) {
+    // 路径形式（含 "/"）本质是运行本地二进制 → execute；裸名保持 unknown（可能为
+    // alias/函数/PATH 工具），由 profile.unknown 决策（D-024 覆盖层仍可精确语义化）。
+    if (resolvedName.includes("/")) {
+      return makeSemantics("execute", { reason: `execute local binary: ${name}` });
+    }
     // 别名目标也不存在时给出更清晰的理由
     const reason = resolvedName !== name
       ? `no adapter for: ${name} (aliased to ${resolvedName})`
