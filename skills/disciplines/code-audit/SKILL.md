@@ -26,6 +26,7 @@ git log --since=90.days --format=format: --name-only | sort | uniq -c | sort -rn
 - [ ] Security: diff scanned — no unaddressed HIGH findings
 
 For a deep security scan instead of this spot-check, run `/skill:security-review`.
+For instruction/prompt content in the diff (principles, SKILL.md, AGENTS.md, doc headers), run `/skill:prompt-audit`.
 
 ### Scope
 - [ ] Changes limited to what was asked — nothing extra refactored
