@@ -316,7 +316,7 @@ reclassify:
 
 **Why:** 同一操作（运行本地二进制）此前因拼写不同落入不同 Profile 决策——`npx tsx` 为 execute（plan deny/build allow），`./node_modules/.bin/tsx` 为 unknown（plan ask）——这是 spelling-based 分类偏差。含 `/` 的裸词在 POSIX 下即文件路径，路径形式“运行二进制”是事实而非假设，归 execute 是正确语义；裸名可能是 alias/函数/PATH 工具，静态分析无法确定语义，`unknown`→ask 是诚实分类与同意层，语义扩充权留给 D-024 用户覆盖层。tsx 是 TS/ESM 运行时，与 node/python/ruby/perl 同属语言运行时封闭范畴，纳入解释器管理不构成“任意工具进内置”的先例。
 
-**Impact:** 变更后矩阵——`npx tsx`、`./node_modules/.bin/tsx`、裸名 `tsx` 全部为 execute：keel-plan deny、keel-code/query/develop ask、keel-build allow；裸名无 adapter 命令保持 unknown（keel-plan ask）。唯一放宽点是 keel-build（路径二进制从 ask 变 allow），与 full-trust 语义一致；keel-plan 对本地脚本从 ask 收紧为 deny，符合其“execute 命令一律拒绝”的声明意图。keel-build 描述保持原样——execute 覆盖路径二进制与该 Profile full-trust 意图一致，不因措辞微调。`analyzeSemantics` 唯一生产调用方是 `shell-compiler.ts`，爆炸半径封闭；不新增 path intent、不触碰任何 hard boundary（blocked path/destroy/dynamic/opaque/threat）、D-024 覆盖层优先级（commands→aliases→adapter→reclassify）不变。
+**Impact:** 变更后矩阵——脚本执行场景（`tsx foo.ts`）下 `npx tsx foo.ts`、`./node_modules/.bin/tsx foo.ts`、裸名 `tsx foo.ts` 全部为 execute：keel-plan deny、keel-code/query/develop ask、keel-build allow；裸名无 adapter 命令保持 unknown（keel-plan ask）。版本探测有意不对称：`npx tsx --version` 为 execute（npx 语义＝下载+运行包，flags 不改变风险），而本地解释器 `./node_modules/.bin/tsx --version`/`tsx --version` 为 inspect（与 node/python 同规则）——门禁建模的是命令本身（npx vs 本地解释器），不是目标包。唯一放宽点是 keel-build（路径二进制从 ask 变 allow），与 full-trust 语义一致；keel-plan 对本地脚本从 ask 收紧为 deny，符合其“execute 命令一律拒绝”的声明意图。keel-build 描述保持原样——execute 覆盖路径二进制与该 Profile full-trust 意图一致，不因措辞微调。`analyzeSemantics` 唯一生产调用方是 `shell-compiler.ts`，爆炸半径封闭；不新增 path intent、不触碰任何 hard boundary（blocked path/destroy/dynamic/opaque/threat）、D-024 覆盖层优先级（commands→aliases→adapter→reclassify）不变。
 
 **Rejected:**
 
