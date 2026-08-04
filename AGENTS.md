@@ -36,3 +36,13 @@ CONTEXT.md              # 当前事实、术语、架构与 Active Decisions 索
 - **分发声明**：只有 `package.json` 的 `pi.extensions` 与 `pi.skills` 声明的路径进入用户项目；其余是仓库自身开发内容。
 - **文档边界**：长期决策写 `docs/decisions.md`，当前事实写 `CONTEXT.md`，安全承诺写 `docs/security-boundaries.md`，第三方来源与许可证写 `docs/traceability.md`；AGENTS.md 不承接这些职责。
 - **技能规则单一来源**：技能只引用 `src/bootstrap/principles.md`，不在技能内重复定义规则（D-013）。
+
+## 提示词内容改动约定
+
+改动 `src/bootstrap/principles.md`、`skills/` 或 access-gate guidance 文本时，按以下原则审计。**语义零损失是唯一目标，行数不是目标**；只为本仓库维护，不进入通用 skill 层。
+
+- **语义零损失**：压缩只删同义重复。限定词（`imperative`/`external`/`only`/`full`）是语义；特指词不泛化（`user approval` ≠ `approval`）；列举不概括（去向/字段列表只在表格完整覆盖时可抽象）；术语不截断（`durable content` ≠ `durable`）。
+- **引用验证**：每个 `per principles.md Quick Reference — X` 锚点真实存在且承载所引语义；被删除内容的语义必须存活于引用目标，锚点与语义同处。
+- **指代清晰**：合并句子后每个代词（`it`/`the file`/`that`）有可见先行词；省略名词短语（如 `in docs/task.md`）仅当同句提供语境。
+- **措辞方向**：适合正向的用正向（`do not X unless Z` → `X only when Z`）；必要反向保留（安全门禁、否定误解纠正、排除边界、绝对禁令、防循环）；同类结构全文件统一，不一处正一处反。
+- **词汇一致**：正向指令与 access-gate 失败路径 guidance 用同一词汇（如 `literal form` / `every argument must be fixed text`），减少模型在两条路径间的认知切换。
