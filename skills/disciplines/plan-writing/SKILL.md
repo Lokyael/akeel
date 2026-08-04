@@ -31,8 +31,6 @@ Every Task Record MUST include:
 
 Status transitions and cleanup: per principles.md Quick Reference — Record Lifecycle.
 
-## Global Constraints
-
 ## Task Right-Sizing
 
 A task is the smallest unit that carries its own test cycle and is worth a reviewer's gate. Each task ends with an independently testable deliverable. Fold setup, configuration, and documentation steps into the task whose deliverable needs them.

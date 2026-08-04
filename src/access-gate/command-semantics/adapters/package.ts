@@ -12,7 +12,8 @@ interface PkgDef {
 }
 
 function buildPkgRules(cmd: string): PkgDef[] {
-  const installPat = cmd === "yarn" ? /^(?:add|install)\b/ : /^install\b/;
+  // npm 用 install；pnpm/yarn 用 add/install（pnpm add 是核心安装命令）
+  const installPat = cmd === "npm" ? /^install\b/ : /^(?:add|install)\b/;
   const removePat = cmd === "yarn" ? /^(?:remove|upgrade)\b/ : /^(?:remove|uninstall)\b/;
   const rules: PkgDef[] = [
     { cls: "inspect", pattern: (s) => /^view\b/.test(s) || /^info\b/.test(s), reason: `${cmd} package info` },
@@ -23,10 +24,15 @@ function buildPkgRules(cmd: string): PkgDef[] {
     { cls: "execute", pattern: (s) => /^update\b/.test(s), reason: `${cmd} update`, network: true },
     { cls: "modify", pattern: (s) => /^init\b/.test(s), reason: `${cmd} init` },
     { cls: "execute", pattern: (s) => /^publish\b/.test(s), reason: `${cmd} publish`, network: true },
-    { cls: "execute", pattern: (s) => /^run\b/.test(s), reason: `${cmd} run script` },
+    { cls: "execute", pattern: (s) => /^(?:run|start|stop|restart)\b/.test(s), reason: `${cmd} run script` },
     { cls: "execute", pattern: (s) => /^exec\b/.test(s), reason: `${cmd} exec` },
     { cls: "execute", pattern: (s) => /^test\b/.test(s), reason: `${cmd} test` },
     { cls: "execute", pattern: (s) => /^build\b/.test(s), reason: `${cmd} build` },
+    { cls: "execute", pattern: (s) => /^(?:prune|pack|link|unlink)\b/.test(s), reason: `${cmd} prune/pack/link` },
+    { cls: "inspect", pattern: (s) => /^config\s+(?:get|list)\b/.test(s), reason: `${cmd} read config` },
+    { cls: "inspect", pattern: (s) => /^(?:audit|whoami|ping)\b/.test(s), reason: `${cmd} audit/whoami/ping`, network: true },
+    { cls: "inspect", pattern: (s) => /^(?:help|root)\b/.test(s), reason: `${cmd} help/root` },
+    { cls: "modify", pattern: (s) => /^(?:config|version|dedupe|cache)\b/.test(s), reason: `${cmd} config/version/dedupe/cache` },
   ];
   // npm/pnpm 有 ci（按 lockfile 精确安装）；yarn 的等价物是 install --frozen-lockfile，没有独立 ci 子命令
   if (cmd !== "yarn") {

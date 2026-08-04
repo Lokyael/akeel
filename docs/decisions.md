@@ -2,7 +2,7 @@
 
 本文集中记录 pi-keel 的长期架构、工程和安全决策。每条决策只保留当前结论、理由、必要的替代方案和影响；被后续决策完整吸收（`superseded`）或主动退役（`retired`）的条目从当前寄存器剪除，历史由 Git 保留。瞬态迁移与去向规则见 [D-028](#d-028-统一-project-record-模型)。
 
-下一编号：`D-030`。删除条目后不复用历史 ID。
+编号取末尾最大 `D-xxx` + 1，不复用历史 ID。
 
 ## D-001: Soft 技能匹配
 
@@ -283,4 +283,28 @@ reclassify:
 **Impact:** 本决策完整吸收原 D-021 的 Task Record 术语和结构，以及原 D-029 的 Decision 退役路径与统一终态命名；原条目从当前寄存器移除，Git 保留历史。`README.md` 是唯一用户使用入口；Project Record 的通用规则通过 principles 注入，技能只实现各自职责。
 
 **Rejected:** 不把 F/T/D 合并到单一记录文件；不为每条记录创建独立文件；不采用 Proposed Decision 表达未承诺候选；不新增 `review-records` 技能、Record Manager、到期提醒扩展或 slash command；不把 Future Record 当作默认 backlog 或 roadmap；不为 `retired` 增加永久状态枚举或墓碑文件；不把外部移交的所有权边界写入 traceability（所有权边界属于决策，许可证归属才属于 traceability）。
+
+## D-030: 提示词体系边界（Prompt Surface）
+
+**Status:** active
+
+**Decision:** 与 LLM 交互的提示词按注入面分层：`principles.md`（恒定注入，承载原则与唯一格式/规则来源）、`skills/`（按需加载，每个 skill 单一职责、调用时全量消费）、access-gate guidance（失败路径，保持原样不精简）。两条约束：① skill 单一职责——一个 skill 只做一件事，不混合；触发场景互斥的 skill 保持独立，不合并；② 格式/规则单一来源——只在 `principles.md` Quick Reference 定义一次，技能只文字引用（如 "per principles.md Quick Reference — Record Lifecycle"），不内嵌副本。
+
+**Why:** 混合职责的 skill 被调用时部分内容永远用不到，浪费 token、稀释注意力并使触发匹配模糊；内嵌格式副本在多个 skill 间漂移（survey-context 与 principles 的 Future Record 措辞已出现分歧）。principles 每次 session 恒定注入，格式放此处零额外注入成本，且模型无需额外 read 动作即可获得权威定义。
+
+**Impact:** 本次重构以两条约束为验收标准：skills 全部瘦身（删内嵌副本）、principles Quick Reference 去重压缩（只删同义重复、不删唯一语义）、不新建承载格式的 skill、不修订 D-013（回到其原设计并执行）。
+
+**Rejected:**
+
+- **合并触发场景互斥的 skill**（draft-spec→brainstorm-design、draft-tickets→plan-writing、grill-docs→grill-plan）：调用时另一部分内容用不到，违反全量消费约束；触发场景分别是“想法需探索/已讨论完直接落记录”“计划需分解/需求→步骤计划”“纯拷问/拷问+文档验证”，互斥且各自全量使用。
+- **新建 `project-records` skill 承载格式**：指针引用依赖模型主动 read，可能被跳过且单次注入可能多于内嵌副本；格式与 principles 恒定注入面天然同层。
+- **Quick Reference 下沉到各对应 skill**：需修订 D-013，且操作手册分散后失去恒定注入的零成本优势。
+- **精简 guidance 文本**：失败路径负 ROI，压缩风险高于收益。
+- **为提示词行为增加测试或 token 基线**：无法可靠衡量“理解认知”，用户明确不做额外验证。
+
+**Out of Scope:**
+
+- **guidance 文本精简**：失败路径、高压力场景，措辞精度要求最高。Revisit when guidance 文本总量显著增长。
+- **合并任何触发场景互斥的 skill**：全量消费约束的必然推论。Revisit when 实测两 skill 触发场景重合。
+- **token 基线测量与提示词行为测试**：无法可靠操作化“理解认知”。Revisit when 出现可观察的遵守度问题。
 

@@ -59,3 +59,19 @@ WeakSet 在进程生命周期内保持，plan 不跨调用缓存或持久化。
 **状态：** implemented。
 
 Guidance 只能从源码内置的静态 `GuidanceId` catalog 映射，不拼接原始 Shell、glob、用户输入或文件路径。blocked path、threat 和 symlink escape 不提供绕过建议。renderer 不调用替代 tool、不生成可执行命令。
+
+## R-15：工具外部配置文件写入
+
+**状态：** by design。
+
+`git config --global`（写 `~/.gitconfig`）、`npm config set`（写 `~/.npmrc`）、`pnpm config` 等命令虽被分类为 modify，但命令语义 adapter 不为其提取配置文件路径 intent：目标由工具根据全局/项目上下文动态决定，无法静态建模。编译器只对 modify 命令做 cwd 保守写检查，因此这类工具的外部配置文件写入不经过 PathPolicy 检查。
+
+消除该边界需要为 config 类命令建模 `--global`/`--local`/`--userconfig` 等目标解析——当前不引入。
+
+## R-16：命令语义的平台/方言假设
+
+**状态：** by design。
+
+内置命令语义面向 GNU coreutils / GNU git / npm 生态的常用选项建模，未声明平台假设。BSD/macOS 工具存在选项歧义：`stat -c`（GNU 格式参数）vs `stat -f`（BSD 格式参数）、`du -d`（GNU max-depth）在 BSD 无对应、`df -t`（GNU 类型参数）vs POSIX flag。选项解析按 GNU 语义处理，BSD 方言的差异选项可能被误判为位置参数或忽略。
+
+消除该边界需要按平台检测方言并切换选项表——当前不引入。

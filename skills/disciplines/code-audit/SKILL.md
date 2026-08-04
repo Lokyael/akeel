@@ -25,6 +25,8 @@ git log --since=90.days --format=format: --name-only | sort | uniq -c | sort -rn
 - [ ] No `[SLOP]` packages without documented approval
 - [ ] Security: diff scanned — no unaddressed HIGH findings
 
+For a deep security scan instead of this spot-check, run `/skill:security-review`.
+
 ### Scope
 - [ ] Changes limited to what was asked — nothing extra refactored
 - [ ] No speculative features
@@ -51,7 +53,10 @@ git log --since=90.days --format=format: --name-only | sort | uniq -c | sort -rn
 - [ ] Open/Closed: extended through interfaces, not by modifying stable code
 - [ ] Dependency Inversion: dependencies injected, not imported globally
 
-### Code Style
+### Code Style (Human + Agent Readability)
+
+These checks serve both human reviewers and the agent's context-window readability — no separate list needed.
+
 - [ ] Functions: 4–20 lines; split if longer — unless splitting would scatter a single cohesive concern
 - [ ] Files: ~300 lines target.  Above 350 is a **smell** — investigate, but don't dogmatically split.  Do NOT split if:
   - the file guards a single concept and splitting would scatter it (§8 Centralize Don't Scatter)
@@ -62,12 +67,7 @@ git log --since=90.days --format=format: --name-only | sort | uniq -c | sort -rn
 - [ ] No duplication — shared logic extracted (DRY)
 - [ ] Early returns over nested ifs; max 2 levels of indentation
 - [ ] Comments explain WHY, not WHAT
-
-### Agent Readability (Akita's Lens)
-- [ ] Functions small enough for context window (4–20 lines)
-- [ ] Names unique enough to grep (< 5 hits)
-- [ ] Types explicit (no `any`, no inferred return types for public APIs)
-- [ ] Code avoids deep nesting (max 2 levels), uses early returns
+- [ ] Types explicit: no `any`, no inferred return types for public APIs
 
 ### Red Flags
 

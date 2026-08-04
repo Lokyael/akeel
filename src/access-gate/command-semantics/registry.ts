@@ -1,5 +1,7 @@
 // command-semantics/registry.ts — 语义注册表
 
+import { basename } from "node:path";
+
 import type { ShellCommandNode } from "../shell-parse/types";
 import type { CommandAdapter, CommandSemantics, SemanticContext } from "./types";
 import { filesystemAdapter } from "./adapters/filesystem";
@@ -45,6 +47,19 @@ for (const adapter of ADAPTERS) {
 }
 
 /**
+ * 将 executable 归一化为索引键：
+ * - 路径形式（.venv/bin/python、/usr/bin/sed）取 basename
+ * - 版本化解释器（python3.11、nodejs、perl5）映射回基础名
+ */
+function indexKey(executable: string): string {
+  const base = basename(executable);
+  if (/^python3\.\d+$/.test(base)) return "python3";
+  if (base === "nodejs") return "node";
+  if (base === "perl5") return "perl";
+  return base;
+}
+
+/**
  * 查找并执行语义分析。
  *
  * 查找顺序：
@@ -70,8 +85,9 @@ export function analyzeSemantics(
   // 2. 别名解析
   const resolvedName = ov.aliases?.[name] ?? name;
 
-  // 3. 内置 adapter 查找
-  const adapter = INDEX.get(resolvedName);
+  // 3. 内置 adapter 查找（executable 按 basename/版本归一）
+  const key = indexKey(resolvedName);
+  const adapter = INDEX.get(key);
 
   if (!adapter) {
     // 别名目标也不存在时给出更清晰的理由
@@ -81,9 +97,9 @@ export function analyzeSemantics(
     return makeSemantics("unknown", { reason, opaque: false });
   }
 
-  // 别名节点：替换 executable 名称让 adapter 按目标命令规则分析
-  const lookupNode = resolvedName !== name
-    ? { ...node, executable: aliasNode(node.executable, resolvedName) }
+  // 别名/归一化节点：替换 executable 名称让 adapter 按目标命令规则分析
+  const lookupNode = (resolvedName !== name || key !== resolvedName)
+    ? { ...node, executable: aliasNode(node.executable, key) }
     : node;
 
   const result = adapter.analyze(lookupNode, context);

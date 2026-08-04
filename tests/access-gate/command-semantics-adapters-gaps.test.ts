@@ -44,6 +44,45 @@ test("fs: truncate produces write intent", () => {
   assert.ok(sem.intents.some((i) => i.operation === "write" && i.rawPath === "log.txt"));
 });
 
+test("fs: ln -s produces read source and write link", () => {
+  const sem = analyzeCmd("ln -s target.txt link.txt");
+  assert.equal(sem.class, "modify");
+  assert.ok(sem.intents.some((i) => i.operation === "read" && i.rawPath === "target.txt"));
+  assert.ok(sem.intents.some((i) => i.operation === "write" && i.rawPath === "link.txt"));
+});
+
+test("fs: rmdir produces delete effect", () => {
+  const sem = analyzeCmd("rmdir empty-dir");
+  assert.equal(sem.class, "modify");
+  assert.ok(sem.effects?.includes("delete"));
+  assert.ok(sem.intents.some((i) => i.operation === "write" && i.rawPath === "empty-dir"));
+});
+
+test("fs: install reads source and writes destination", () => {
+  const sem = analyzeCmd("install -m 755 src.sh /usr/local/bin/");
+  assert.equal(sem.class, "modify");
+  assert.ok(sem.intents.some((i) => i.operation === "read" && i.rawPath === "src.sh"));
+  assert.ok(sem.intents.some((i) => i.operation === "write" && i.rawPath === "/usr/local/bin/"));
+});
+
+test("fs: mktemp is modify without opaque", () => {
+  const sem = analyzeCmd("mktemp -d");
+  assert.equal(sem.class, "modify");
+  assert.equal(sem.opaque, false);
+});
+
+test("fs: shred is destroy", () => {
+  const sem = analyzeCmd("shred -u secret.txt");
+  assert.equal(sem.class, "destroy");
+  assert.ok(sem.intents.some((i) => i.operation === "write" && i.rawPath === "secret.txt"));
+});
+
+test("fs: dd is modify without opaque", () => {
+  const sem = analyzeCmd("dd if=/dev/zero of=out.bin bs=1M count=1");
+  assert.equal(sem.class, "modify");
+  assert.equal(sem.opaque, false);
+});
+
 test("fs: rm -rf filters flags and keeps the path", () => {
   const sem = analyzeCmd("rm -rf build/");
   assert.equal(sem.class, "modify");
@@ -255,6 +294,39 @@ test("read: cat - skips stdin and keeps files", () => {
   assert.equal(sem.intents[0]!.rawPath, "file.txt");
 });
 
+test("read: diff reads both files", () => {
+  const sem = analyzeCmd("diff -u a.txt b.txt");
+  assert.equal(sem.class, "inspect");
+  assert.ok(sem.intents.some((i) => i.operation === "read" && i.rawPath === "a.txt"));
+  assert.ok(sem.intents.some((i) => i.operation === "read" && i.rawPath === "b.txt"));
+});
+
+test("read: less/more/file read intents", () => {
+  for (const cmd of ["less notes.md", "more README.md", "file logo.png"]) {
+    const sem = analyzeCmd(cmd);
+    assert.equal(sem.class, "inspect", cmd);
+    assert.ok(sem.intents.some((i) => i.operation === "read"), cmd);
+  }
+});
+
+test("read: stat format option value is skipped", () => {
+  const sem = analyzeCmd("stat -c %s file.txt");
+  assert.equal(sem.class, "inspect");
+  assert.ok(!sem.intents.some((i) => i.rawPath === "%s"));
+  assert.ok(sem.intents.some((i) => i.rawPath === "file.txt"));
+});
+
+test("read: du depth value is skipped", () => {
+  const sem = analyzeCmd("du -sh dir");
+  assert.equal(sem.class, "inspect");
+  assert.ok(sem.intents.some((i) => i.rawPath === "dir"));
+});
+
+test("read: df is inspect", () => {
+  const sem = analyzeCmd("df -h");
+  assert.equal(sem.class, "inspect");
+});
+
 test("read: head -- treats following tokens as files", () => {
   const sem = analyzeCmd("head -- -n file.txt");
   assert.equal(sem.intents.length, 2);
@@ -323,6 +395,73 @@ test("git: rm carries the delete effect", () => {
   assert.ok(sem.effects?.includes("delete"));
 });
 
+test("git: branch delete variants are destroy", () => {
+  for (const cmd of ["git branch -d feature", "git branch -D feature", "git branch --delete feature"]) {
+    assert.equal(analyzeCmd(cmd).class, "destroy", cmd);
+  }
+});
+
+test("git: branch force create/move is modify", () => {
+  for (const cmd of ["git branch -f feature", "git branch --force feature main"]) {
+    assert.equal(analyzeCmd(cmd).class, "modify", cmd);
+  }
+});
+
+test("git: branch listing variants stay inspect", () => {
+  for (const cmd of ["git branch", "git branch -a", "git branch --merged main", "git branch --list"]) {
+    assert.equal(analyzeCmd(cmd).class, "inspect", cmd);
+  }
+});
+
+test("git: clean dry-run is inspect, real clean is destroy", () => {
+  assert.equal(analyzeCmd("git clean -n").class, "inspect");
+  assert.equal(analyzeCmd("git clean --dry-run").class, "inspect");
+  assert.equal(analyzeCmd("git clean -fd").class, "destroy");
+});
+
+test("git: mv carries write intents", () => {
+  const sem = analyzeCmd("git mv old.ts new.ts");
+  assert.equal(sem.class, "modify");
+  assert.ok(sem.intents.some((i) => i.operation === "write" && i.rawPath === "old.ts"));
+  assert.ok(sem.intents.some((i) => i.operation === "write" && i.rawPath === "new.ts"));
+});
+
+test("git: cherry-pick and revert are modify", () => {
+  for (const cmd of ["git cherry-pick abc123", "git revert abc123"]) {
+    assert.equal(analyzeCmd(cmd).class, "modify", cmd);
+  }
+});
+
+test("git: config is modify without opaque", () => {
+  const sem = analyzeCmd("git config user.name zev");
+  assert.equal(sem.class, "modify");
+  assert.equal(sem.opaque, false);
+});
+
+test("git: apply and gc are modify", () => {
+  for (const cmd of ["git apply patch.diff", "git gc"]) {
+    assert.equal(analyzeCmd(cmd).class, "modify", cmd);
+  }
+});
+
+test("git: submodule carries network effect", () => {
+  const sem = analyzeCmd("git submodule update --init");
+  assert.equal(sem.class, "modify");
+  assert.ok(sem.effects?.includes("network"));
+});
+
+test("git: ls-remote carries network effect", () => {
+  const sem = analyzeCmd("git ls-remote origin");
+  assert.equal(sem.class, "inspect");
+  assert.ok(sem.effects?.includes("network"));
+});
+
+test("git: fsck and archive are inspect", () => {
+  for (const cmd of ["git fsck", "git archive HEAD"]) {
+    assert.equal(analyzeCmd(cmd).class, "inspect", cmd);
+  }
+});
+
 test("git: push carries the network effect", () => {
   const sem = analyzeCmd("git push origin main");
   assert.ok(sem.effects?.includes("network"));
@@ -375,10 +514,49 @@ test("build: go get is execute with network", () => {
   assert.ok(sem.effects?.includes("network"));
 });
 
+test("build: cargo fmt and fix are modify", () => {
+  for (const cmd of ["cargo fmt", "cargo fix"]) {
+    assert.equal(analyzeCmd(cmd).class, "modify", cmd);
+  }
+});
+
+test("build: cargo clippy/doc/bench are execute", () => {
+  for (const cmd of ["cargo clippy", "cargo doc", "cargo bench"]) {
+    assert.equal(analyzeCmd(cmd).class, "execute", cmd);
+  }
+});
+
+test("build: cargo add/remove are modify with network", () => {
+  for (const cmd of ["cargo add serde", "cargo remove serde"]) {
+    const sem = analyzeCmd(cmd);
+    assert.equal(sem.class, "modify", cmd);
+    assert.ok(sem.effects?.includes("network"), cmd);
+  }
+});
+
+test("build: cargo tree and metadata are inspect", () => {
+  for (const cmd of ["cargo tree", "cargo metadata"]) {
+    assert.equal(analyzeCmd(cmd).class, "inspect", cmd);
+  }
+});
+
+test("build: go fmt and clean are modify", () => {
+  for (const cmd of ["go fmt", "go clean"]) {
+    assert.equal(analyzeCmd(cmd).class, "modify", cmd);
+  }
+});
+
 test("build: go mod download is execute with network", () => {
   const sem = analyzeCmd("go mod download");
   assert.equal(sem.class, "execute");
   assert.ok(sem.effects?.includes("network"));
+});
+
+test("build: go vet/generate are execute, go env is inspect", () => {
+  for (const cmd of ["go vet", "go generate"]) {
+    assert.equal(analyzeCmd(cmd).class, "execute", cmd);
+  }
+  assert.equal(analyzeCmd("go env GOPATH").class, "inspect");
 });
 
 test("build: go mod tidy is modify", () => {
@@ -435,10 +613,49 @@ test("pkg: yarn remove and upgrade are execute", () => {
   }
 });
 
-test("pkg: pnpm install is execute with network", () => {
-  const sem = analyzeCmd("pnpm install");
+test("pkg: npm run-script shortcuts are execute", () => {
+  for (const cmd of ["npm start", "npm stop", "npm restart"]) {
+    const sem = analyzeCmd(cmd);
+    assert.equal(sem.class, "execute", cmd);
+    assert.equal(sem.opaque, false, cmd);
+  }
+});
+
+test("pkg: npm prune/pack/link are execute", () => {
+  for (const cmd of ["npm prune", "npm pack", "npm link", "npm unlink"]) {
+    const sem = analyzeCmd(cmd);
+    assert.equal(sem.class, "execute", cmd);
+    assert.equal(sem.opaque, false, cmd);
+  }
+});
+
+test("pkg: pnpm add is execute with network", () => {
+  const sem = analyzeCmd("pnpm add lodash");
   assert.equal(sem.class, "execute");
   assert.ok(sem.effects?.includes("network"));
+});
+
+test("pkg: npm cache/config/version/dedupe are modify or execute", () => {
+  for (const cmd of ["npm cache clean", "npm version patch", "npm dedupe"]) {
+    const sem = analyzeCmd(cmd);
+    assert.equal(sem.opaque, false, cmd);
+    assert.notEqual(sem.class, "unknown", cmd);
+  }
+});
+
+test("pkg: npm config get is inspect, config set is modify", () => {
+  assert.equal(analyzeCmd("npm config get registry").class, "inspect");
+  assert.equal(analyzeCmd("npm config set registry https://mirror").class, "modify");
+});
+
+test("pkg: npm audit/whoami/ping/help/root are inspect with network where relevant", () => {
+  for (const cmd of ["npm audit", "npm whoami", "npm ping", "npm help", "npm root"]) {
+    const sem = analyzeCmd(cmd);
+    assert.equal(sem.class, "inspect", cmd);
+    assert.equal(sem.opaque, false, cmd);
+  }
+  assert.ok(analyzeCmd("npm audit").effects?.includes("network"));
+  assert.ok(analyzeCmd("npm whoami").effects?.includes("network"));
 });
 
 test("pkg: npm ci is execute with network", () => {
@@ -475,6 +692,24 @@ test("pkg: npm unknown subcommand is opaque", () => {
 
 test("interp: python - reads the script from stdin as execute", () => {
   assert.equal(analyzeCmd("python -").class, "execute");
+});
+
+test("interp: venv and system path interpreters are classified", () => {
+  assert.equal(analyzeCmd(".venv/bin/python --version").class, "inspect");
+  assert.equal(analyzeCmd("/usr/bin/python3 --version").class, "inspect");
+  assert.equal(analyzeCmd("./.venv/bin/python -m pytest").class, "execute");
+});
+
+test("interp: versioned interpreter names are classified", () => {
+  assert.equal(analyzeCmd("python3.11 --version").class, "inspect");
+  assert.equal(analyzeCmd("python3.12 -m pip list").class, "execute");
+  assert.equal(analyzeCmd("nodejs --version").class, "inspect");
+});
+
+test("interp: path form of other adapters resolves by basename", () => {
+  const sem = analyzeCmd("/bin/sed 's/x/y/' file.txt");
+  assert.equal(sem.class, "inspect");
+  assert.ok(sem.intents.some((i) => i.operation === "read" && i.rawPath === "file.txt"));
 });
 
 test("interp: node --help is inspect", () => {

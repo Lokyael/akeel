@@ -56,6 +56,26 @@ const FILESYSTEM_CMDS: Record<string, {
     effects: ["read", "write"],
     reason: "copy files",
   },
+  ln: {
+    class: "modify",
+    // ln [-s] <target> <link>
+    paths: (args) => {
+      if (args.length < 2) return [];
+      const last = args[args.length - 1]!;
+      return [
+        ...args.slice(0, -1).map((a) => ({ op: "read" as const, value: a.value ?? "" })),
+        { op: "write" as const, value: last.value ?? "" },
+      ];
+    },
+    effects: ["read", "write"],
+    reason: "create links",
+  },
+  rmdir: {
+    class: "modify",
+    paths: (args) => args.map((a) => ({ op: "write", value: a.value ?? "" })),
+    effects: ["delete"],
+    reason: "remove empty directories",
+  },
   mv: {
     class: "modify",
     // mv <src>... <dst>
@@ -81,6 +101,40 @@ const FILESYSTEM_CMDS: Record<string, {
     paths: (args) => args.map((a) => ({ op: "write", value: a.value ?? "" })),
     effects: ["write"],
     reason: "truncate files",
+  },
+  install: {
+    class: "modify",
+    // install [opts] <src>... <dst> — 同 cp 的 src read + dst write
+    paths: (args) => {
+      if (args.length < 2) return [];
+      const last = args[args.length - 1]!;
+      return [
+        ...args.slice(0, -1).map((a) => ({ op: "read" as const, value: a.value ?? "" })),
+        { op: "write" as const, value: last.value ?? "" },
+      ];
+    },
+    effects: ["read", "write"],
+    reason: "install files",
+  },
+  mktemp: {
+    class: "modify",
+    // 目标路径由工具动态生成，无法静态提取 → 依赖编译器 cwd 保守写 fallback
+    paths: () => [],
+    effects: ["write"],
+    reason: "create temporary files",
+  },
+  dd: {
+    class: "modify",
+    // if=/of= 形式参数难以静态解析 → 依赖编译器 cwd 保守写 fallback
+    paths: () => [],
+    effects: ["read", "write"],
+    reason: "convert/copy data",
+  },
+  shred: {
+    class: "destroy",
+    paths: (args) => args.map((a) => ({ op: "write", value: a.value ?? "" })),
+    effects: ["delete"],
+    reason: "securely delete files",
   },
 };
 

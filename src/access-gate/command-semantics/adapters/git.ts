@@ -19,13 +19,17 @@ const GIT_CMDS: GitDef[] = [
   { cls: "inspect", pattern: (s) => /^diff\b/.test(s), reason: "show changes" },
   { cls: "inspect", pattern: (s) => /^log\b/.test(s), reason: "show commit logs" },
   { cls: "inspect", pattern: (s) => /^rev-list\b/.test(s), reason: "list reachable commits" },
-  { cls: "inspect", pattern: (s) => /^branch\b(?!.*-[dD]\b)/.test(s), reason: "list branches" },
+  { cls: "inspect", pattern: (s) => /^branch\b(?!.*(?:-[dDf]|--delete|--force)\b)/.test(s), reason: "list branches" },
+  { cls: "inspect", pattern: (s) => /^clean\b.*(-n|--dry-run)\b/.test(s), reason: "preview untracked files" },
   { cls: "inspect", pattern: (s) => /^show\b/.test(s), reason: "show objects" },
   { cls: "inspect", pattern: (s) => /^grep\b/.test(s), reason: "search commit contents" },
   { cls: "inspect", pattern: (s) => /^blame\b/.test(s), reason: "show file blame" },
   { cls: "inspect", pattern: (s) => /^stash\s+(list|show)\b/.test(s), reason: "list/show stashes" },
   { cls: "inspect", pattern: (s) => /^ls-files\b/.test(s), reason: "list tracked files" },
   { cls: "inspect", pattern: (s) => /^ls-tree\b/.test(s), reason: "list tree contents" },
+  { cls: "inspect", pattern: (s) => /^ls-remote\b/.test(s), reason: "list remote refs" },
+  { cls: "inspect", pattern: (s) => /^fsck\b/.test(s), reason: "verify repository integrity" },
+  { cls: "inspect", pattern: (s) => /^archive\b/.test(s), reason: "create repository archive" },
   { cls: "inspect", pattern: (s) => /^describe\b/.test(s), reason: "describe commit" },
   { cls: "modify", pattern: (s) => /^add\b/.test(s), paths: (args) => positionalArgs(args).map((a) => ({ op: "read" as const, value: a.value ?? "" })), reason: "stage files" },
   { cls: "modify", pattern: (s) => /^rm\b/.test(s), paths: (args) => positionalArgs(args).map((a) => ({ op: "write" as const, value: a.value ?? "" })), reason: "remove tracked files" },
@@ -43,6 +47,15 @@ const GIT_CMDS: GitDef[] = [
   { cls: "modify", pattern: (s) => /^clone\b/.test(s), reason: "clone repository" },
   { cls: "modify", pattern: (s) => /^init\b/.test(s), reason: "initialize repository" },
   { cls: "modify", pattern: (s) => /^remote\b/.test(s), reason: "manage remotes" },
+  { cls: "modify", pattern: (s) => /^mv\b/.test(s), paths: (args) => positionalArgs(args).map((a) => ({ op: "write" as const, value: a.value ?? "" })), reason: "move/rename tracked files" },
+  { cls: "modify", pattern: (s) => /^(?:cherry-pick|revert)\b/.test(s), reason: "apply commits" },
+  { cls: "modify", pattern: (s) => /^config\b/.test(s), reason: "set repository/user config" },
+  { cls: "modify", pattern: (s) => /^apply\b/.test(s), reason: "apply patch" },
+  { cls: "modify", pattern: (s) => /^gc\b/.test(s), reason: "garbage collect repository" },
+  { cls: "modify", pattern: (s) => /^submodule\b/.test(s), reason: "manage submodules" },
+  { cls: "modify", pattern: (s) => /^branch\s+(?:-f|--force)\b/.test(s), reason: "force create/move branch" },
+  { cls: "destroy", pattern: (s) => /^branch\s+(?:-[dD]|--delete)\b/.test(s), reason: "delete branch" },
+  { cls: "destroy", pattern: (s) => /^clean\b/.test(s), reason: "delete untracked files" },
   { cls: "destroy", pattern: (s) => /^push\s+.*(-f|--force)\b/.test(s), reason: "force push" },
   { cls: "destroy", pattern: (s) => /^reset\s+--hard\b/.test(s), reason: "hard reset" },
   { cls: "destroy", pattern: (s) => /^stash\s+clear\b/.test(s), reason: "clear all stashes" },
@@ -68,7 +81,7 @@ function gitPathOpts(args: ShellArg[]): PathIntent[] {
 function gitEffects(def: GitDef, subcmd: string): readonly Effect[] {
   const effects = new Set<Effect>(def.cls === "inspect" ? ["read"] : def.cls === "destroy" ? ["execute"] : ["write"]);
   if (/^rm\b/.test(subcmd)) effects.add("delete");
-  if (/^(fetch|pull|push|clone|remote)\b/.test(subcmd)) effects.add("network");
+  if (/^(fetch|pull|push|clone|remote|ls-remote|submodule)\b/.test(subcmd)) effects.add("network");
   return [...effects];
 }
 

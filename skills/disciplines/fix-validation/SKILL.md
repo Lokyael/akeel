@@ -6,6 +6,7 @@ description: 'Use after fixing a bug or implementing a feature, before code-revi
 # Validate Fix
 
 > **HARD GATE** — No fix is "done" until proven with fresh evidence.
+> Follows the evidence-first iron law (per `/skill:evidence-first`): no completion claims without fresh verification evidence.
 
 ## Process
 

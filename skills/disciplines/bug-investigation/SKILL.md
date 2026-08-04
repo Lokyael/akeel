@@ -47,6 +47,8 @@ you tried — do not guess.
 - State of data before/after failure
 - Working examples for comparison
 
+For multi-component systems, also log what enters and exits each boundary (per `/skill:systematic-debugging` Phase 1).
+
 ### 5. Generate Hypotheses
 
 Before recording, generate 3–5 ranked hypotheses about the likely area of

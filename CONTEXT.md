@@ -15,6 +15,9 @@
 - **Decision**：需要长期保留的已采纳架构、领域或安全取舍，记录在 [`docs/decisions.md`](docs/decisions.md)。
 - **Durable Content**：在当前工作或会话结束后仍然成立且承载约束的事实、取舍与承诺（如采纳结论、安全不变量、外部归属边界、拒绝理由）；过程产物（实施步骤、测试日志、审查报告）不是耐用内容，不进入权威容器。
 - **Direct-first**：文件检查优先使用 Direct `read`、`grep`、`find`、`ls`；安全可分析的字面 Shell 仍可使用，Gate 不因存在 Direct 等价入口而自动拒绝 Shell。
+- **Prompt Surface**：与 LLM 交互的提示词面，按注入方式分层——`principles.md`（恒定注入）、`skills/`（按需加载）、access-gate guidance（失败路径）。
+- **Skill Single Responsibility**：每个 skill 单一职责、调用时内容全量被使用；触发场景互斥的 skill 保持独立，不合并（D-030）。
+- **Single Source of Format**：格式/规则只在 `principles.md` Quick Reference 定义一次，技能只文字引用不内嵌副本（D-030）。
 
 ## Architecture
 
@@ -49,6 +52,7 @@
 - [D-026 本地约束与溯源文档边界](docs/decisions.md#d-026-本地约束与溯源文档边界)
 - [D-027 选项值按性质分类（expression vs file）](docs/decisions.md#d-027-选项值按性质分类expression-vs-file)
 - [D-028 统一 Project Record 模型](docs/decisions.md#d-028-统一-project-record-模型)
+- [D-030 提示词体系边界（Prompt Surface）](docs/decisions.md#d-030-提示词体系边界prompt-surface)
 
 ## Negative Space
 

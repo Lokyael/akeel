@@ -30,6 +30,34 @@ const READ_CONFIG: Record<string, ReadConfig> = {
     valueOptions: ["-b", "--bytes", "-c", "--characters", "-d", "--delimiter", "-f", "--fields"],
     attachedOptions: ["-b", "--bytes=", "-c", "--characters=", "-d", "--delimiter=", "-f", "--fields="],
   },
+  diff: {
+    valueOptions: [],
+    attachedOptions: [],
+  },
+  less: {
+    valueOptions: [],
+    attachedOptions: [],
+  },
+  more: {
+    valueOptions: [],
+    attachedOptions: [],
+  },
+  file: {
+    valueOptions: [],
+    attachedOptions: [],
+  },
+  stat: {
+    valueOptions: ["-c", "--format"],
+    attachedOptions: ["-c", "--format="],
+  },
+  du: {
+    valueOptions: ["-d", "--max-depth", "-t", "--threshold", "--exclude"],
+    attachedOptions: ["-d", "--max-depth=", "-t", "--threshold=", "--exclude="],
+  },
+  df: {
+    valueOptions: ["-t", "--type"],
+    attachedOptions: ["-t=", "--type="],
+  },
 };
 
 function isAttachedValue(value: string, options: readonly string[]): boolean {

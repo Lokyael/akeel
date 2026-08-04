@@ -10,7 +10,7 @@ If you are still in a restrictive profile (e.g. `plan`), tell the user: "Switch 
 
 ## Process
 
-**Lifecycle:** When starting, update the Task Record in `docs/task.md` or `docs/task-<topic>.md` from `draft` to `in-progress`. After fresh verification and durable documentation updates, set it to `verified` and clear the completed Task Record sections. The file remains as a container for future tasks. Per principles.md Quick Reference — Record Lifecycle. If no Task Record is found, ask: "Where is the Task Record, or what task should be recorded?"
+**Lifecycle:** When starting, update the Task Record in `docs/task.md` or `docs/task-<topic>.md` from `draft` to `in-progress`. After fresh verification and durable documentation updates, set it to `verified` and clear the completed sections; the file remains a container for future tasks (per principles.md Quick Reference — Record Lifecycle). If no Task Record is found, ask: "Where is the Task Record, or what task should be recorded?"
 
 Use `/skill:test-driven-development` where possible, at pre-agreed seams (confirm seams with the user before writing tests).
 

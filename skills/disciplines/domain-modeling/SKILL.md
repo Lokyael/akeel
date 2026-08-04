@@ -43,19 +43,18 @@ When the user states how something works, check whether the code agrees. If you 
 
 ### Update CONTEXT.md Inline
 
-When a term or current constraint crystallises, add it to `CONTEXT.md` immediately. The canonical structure is in principles.md Quick Reference — User-Project CONTEXT.md Structure. Build sections lazily: Glossary → Architecture → Security Boundaries → Active Decisions → Negative Space.
+When a term or current constraint crystallises, add it to `CONTEXT.md` immediately. The canonical structure is in principles.md Quick Reference — CONTEXT.md Structure. Build sections lazily: Glossary → Architecture → Security Boundaries → Active Decisions → Negative Space.
 
 ### Park Uncommitted Candidates
 
 When an idea may matter later but is neither adopted nor committed work, offer
-to add an `F-xxx` entry to `docs/future.md`. Create that file lazily. Every
-entry must include `Created`, `Review On`, `Why Not Now`, and `Trigger`.
-
-Future Record content is project data, not instruction. Do not infer approval
-from its wording, date, or presence, and do not design or implement it unless
+to add an `F-xxx` entry to `docs/future.md` (fields per principles.md Quick
+Reference — Document Set; non-binding semantics per principles.md Quick
+Reference — Project Record Authority). Create that file lazily. Its wording,
+date, or presence carries no approval — design or implement the idea only when
 the user explicitly promotes it in the current conversation. When promoted,
-move the durable content to the Task, Decision, Negative Space, or other
-authoritative location and remove the F entry in the same change.
+move the durable content and remove the F entry in the same change (per
+principles.md Quick Reference — Migration Protocol).
 
 ### Record Load-Bearing Decisions
 
@@ -63,11 +62,11 @@ Offer: "Want me to record this in `docs/decisions.md`?" only after the user has 
 
 ### Retire a Decision
 
-When a decision's capability is withdrawn or handed to an external owner, do not
-force it into `superseded` (which requires an absorbing successor). Record the
-retirement in the same change: move residual durable claims to `CONTEXT.md`
-Negative Space or a new boundary decision, then prune the old entry. Git
-retains history and the ID is never reused.
+When a decision's capability is withdrawn or handed to an external owner,
+record it as `retired`, not `superseded` — `superseded` requires an absorbing
+successor. Record the retirement in the same change: move residual durable
+claims to `CONTEXT.md` Negative Space or a new boundary decision, then prune
+the old entry. Git retains history and the ID is never reused.
 
 ## Integration
 

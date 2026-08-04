@@ -41,8 +41,6 @@ Skip any step = lying, not verifying.
 - Using "should", "probably", "seems to"
 - Expressing satisfaction before verification: "Great!", "Perfect!", "Done!"
 - About to commit/push without verification
-- Relying on partial verification
-- Thinking "just this once"
 - ANY wording implying success without having run verification
 
 ## Key Patterns
