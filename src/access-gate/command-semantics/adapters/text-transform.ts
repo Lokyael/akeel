@@ -119,6 +119,31 @@ function parseOptions(
       continue;
     }
 
+    // 长选项 =VALUE 形式（--expression=...、--output=...、--in-place=.bak）
+    if (!afterDoubleDash && val.startsWith("--")) {
+      const eq = val.indexOf("=");
+      if (eq > 0) {
+        const name = val.slice(0, eq);
+        const attachedVal = val.slice(eq + 1);
+        const schema = schemas.find((s) => s.names.includes(name));
+        if (schema) {
+          if (schema.isPattern) sawPattern = true;
+          if (schema.takesValue) {
+            if (schema.valueKind !== "expression" && attachedVal) {
+              intents.push(optionIntent(schema.operation, attachedVal));
+            }
+          } else if (!schema.flag && schema.operation === "write") {
+            sawWrite = true;
+          }
+          index++;
+          continue;
+        }
+        opaque = true;
+        index++;
+        continue;
+      }
+    }
+
     // 查找匹配的 schema
     const schema = schemas.find((s) => s.names.includes(val));
     if (!schema) {
