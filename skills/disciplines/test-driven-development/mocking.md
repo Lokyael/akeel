@@ -25,7 +25,7 @@ const service = new UserService(mockValidator);
 
 Every time you change `EmailValidator`, you change the mock. The test no longer tells you behavior works — it tells you the mock was set up correctly.
 
-**The mock earns no assertions.** Asserting it directly (call counts, setup) passes when configured and fails when absent. Assert the real component's behavior; if the mock is what you are checking, unmock it or delete the assertion.
+**The mock earns no assertions.** Asserting it directly (call counts, setup) tracks the mock's state, not the component's behavior. Assert the real component's behavior; if the mock is what you are checking, unmock it or delete the assertion.
 
 **Good (use the real thing):**
 ```typescript

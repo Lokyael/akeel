@@ -37,9 +37,9 @@ Ask: "What's the public interface, and which seams should we test?"
 
 - **Implementation-coupled** — mocks internal collaborators, tests private methods, or verifies through a side channel. The tell: the test breaks when you refactor but behavior hasn't changed.
 - **Tautological** — the assertion recomputes the expected value the way the code does (`expect(add(a,b)).toBe(a+b)`), so it passes by construction. Expected values must come from an independent source of truth.
-- **Horizontal slicing** — writing all tests first, then all implementation. Work in **vertical slices** instead — one test → one implementation → repeat.
 - **String-presence** — asserts a script, skill, or config contains an exact line instead of running it. It passes because the source is the source and fails on rewording, not breakage.
 - **Change detector** — only intentional decisions (a constant's value, exact message wording, private structure) can fail it. It fires on redesign and sleeps through bugs.
+- **Horizontal slicing** — writing all tests first, then all implementation. Work in **vertical slices** instead — one test → one implementation → repeat.
 
 ## Rules of the Red-Green-Refactor Loop
 
