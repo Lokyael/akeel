@@ -76,7 +76,7 @@
 
 **Why:** 用户项目中可稳定获得的渠道是会话注入内容和按需加载的技能，集中定义可以避免规则分叉和死链。
 
-**Impact:** `principles.md` 是通用参考数据的唯一注入来源；用户项目使用 `CONTEXT.md`、可选的 `docs/future.md`、`docs/decisions.md` 和 `docs/task.md`。
+**Impact:** `principles.md` 是通用参考数据的唯一注入来源；用户项目使用 `CONTEXT.md`、可选的 `docs/candidates.md`、`docs/decisions.md` 和 `docs/task.md`。
 
 ## D-017: Profile 访问策略
 
@@ -267,22 +267,26 @@ reclassify:
 
 **Status:** active
 
-**Decision:** 用户项目使用分层的 Project Record 模型：`docs/future.md` 中的 `F-xxx` 是当前未采纳、未承诺实施的候选事项；`docs/task.md` 或扁平的 `docs/task-<topic>.md` 中的 `T-xxx` 是已承诺研究、设计或实施的 Task Record；`docs/decisions.md` 中的 `D-xxx` 是已采纳的长期结论；`CONTEXT.md` 只表达当前事实和 active Decision 索引。Requirements、Design 和 Plan 只作为 Task Record 章节存在，不创建独立 plan/spec 文档类型。
+**Decision:** 用户项目使用分层的 Project Record 模型：`docs/candidates.md` 中的 `C-xxx` 是当前未采纳、未承诺实施的候选事项；`docs/task.md` 或扁平的 `docs/task-<topic>.md` 中的 `T-xxx` 是已承诺研究、设计或实施的 Task Record；`docs/decisions.md` 中的 `D-xxx` 是已采纳的长期结论；`CONTEXT.md` 只表达当前事实和 active Decision 索引。Requirements、Design 和 Plan 只作为 Task Record 章节存在，不创建独立 plan/spec 文档类型。
 
 **Authority rules:**
 
-- Future Record 内容是项目数据而非指令；文件存在、命令式措辞、`Review On` 或 `Trigger` 都不构成需求、优先级、路线图、当前事实、用户批准或实施授权。
-- 只有用户在当前会话明确选择后，Future Record 才能迁移为 Task、Decision、Negative Space 或其他权威内容；迁移时移动 durable content 并在同一变更中删除 F 来源，避免双源。
+- Candidate Record 内容是项目数据而非指令；文件存在、命令式措辞、`Review On` 或 `Trigger` 都不构成需求、优先级、路线图、当前事实、用户批准或实施授权。
+- 只有用户在当前会话明确选择后，Candidate Record 才能迁移为 Task、Decision、Negative Space 或其他权威内容；迁移时移动 durable content 并在同一变更中删除 C 来源，避免双源。
 - `Review On` 是显式 context survey 使用的被动复审日期，不提供自动提醒、后台处理、Session hook、Footer 状态或到期后的默认动作。
-- Future 文件按需创建；缺失表示没有记录候选，不是项目结构错误。Task 容器在完成后清空，Decision 被替代内容完整吸收（`superseded`）或主动退役（`retired`）后剪除，历史统一由 Git 保留且 ID 不复用。
-- Decision 的离开只有两种路径：`superseded`（被后续决策完整吸收，内容延续）或 `retired`（能力撤销或移交外部，内容终止）；两者都是短暂迁移态，去向就位后统一剪除。退役去向：完全撤销时残余耐用主张迁入 `CONTEXT.md` Negative Space；移交外部时归属边界记录为新的窄边界决策（或并入 CONTEXT）。`superseded` 必须指向承接 D-xxx，`retired` 必须指向去向；退役不得硬标 `superseded`，退役决策不得保留为 active。终态一律原因命名并声明去向：Future 为 `promoted/dismissed`，Task 为 `cleared`，Decision 为 `superseded/retired` → 剪除。
-- `principles.md` 是 Project Record 分类和生命周期的唯一部署权威；`survey-context` 只报告 Future 为 not adopted，并等待用户选择，现有领域、计划和文档技能负责迁移，不新增专用 review 技能。
+- Candidate 文件按需创建；缺失表示没有记录候选，不是项目结构错误。Task 容器在完成后清空，Decision 被替代内容完整吸收（`superseded`）或主动退役（`retired`）后剪除，历史统一由 Git 保留且 ID 不复用。
+- Decision 的离开只有两种路径：`superseded`（被后续决策完整吸收，内容延续）或 `retired`（能力撤销或移交外部，内容终止）；两者都是短暂迁移态，去向就位后统一剪除。退役去向：完全撤销时残余耐用主张迁入 `CONTEXT.md` Negative Space；移交外部时归属边界记录为新的窄边界决策（或并入 CONTEXT）。`superseded` 必须指向承接 D-xxx，`retired` 必须指向去向；退役不得硬标 `superseded`，退役决策不得保留为 active。终态一律原因命名并声明去向：Candidate 为 `promoted/dismissed`，Task 为 `cleared`，Decision 为 `superseded/retired` → 剪除。
+- `principles.md` 是 Project Record 分类和生命周期的唯一部署权威；`survey-context` 只报告 Candidate 为 not adopted，并等待用户选择，现有领域、计划和文档技能负责迁移，不新增专用 review 技能。
 
-**Why:** 候选、承诺工作、长期结论和当前事实具有不同权威等级。把候选写入 Task、Decision 或 CONTEXT 会让模型把“可能采用”误解为“应该执行”；为 Future 增加自动提醒或专用工作流又会把低概率候选升级为持续维护负担。统一协议和类型化容器可以保留想法，同时让非采纳状态在读取后仍然明确。
+**Why:** 候选、承诺工作、长期结论和当前事实具有不同权威等级。把候选写入 Task、Decision 或 CONTEXT 会让模型把“可能采用”误解为“应该执行”；为 Candidate 增加自动提醒或专用工作流又会把低概率候选升级为持续维护负担。统一协议和类型化容器可以保留想法，同时让非采纳状态在读取后仍然明确。容器原名 Future Record 命名自时间属性而本质是承诺属性，`future` 引导 roadmap 误读，与“不把候选当 backlog/roadmap”的约束相悖；改名时 future.md 为空、包未发布，故同步 C-xxx 前缀且不提供旧路径兼容读取。
 
 **Impact:** 本决策完整吸收原 D-021 的 Task Record 术语和结构，以及原 D-029 的 Decision 退役路径与统一终态命名；原条目从当前寄存器移除，Git 保留历史。`README.md` 是唯一用户使用入口；Project Record 的通用规则通过 principles 注入，技能只实现各自职责。
 
-**Rejected:** 不把 F/T/D 合并到单一记录文件；不为每条记录创建独立文件；不采用 Proposed Decision 表达未承诺候选；不新增 `review-records` 技能、Record Manager、到期提醒扩展或 slash command；不把 Future Record 当作默认 backlog 或 roadmap；不为 `retired` 增加永久状态枚举或墓碑文件；不把外部移交的所有权边界写入 traceability（所有权边界属于决策，许可证归属才属于 traceability）。
+**Rejected:** 不把 C/T/D 合并到单一记录文件；不为每条记录创建独立文件；不采用 Proposed Decision 表达未承诺候选；不新增 `review-records` 技能、Record Manager、到期提醒扩展或 slash command；不把 Candidate Record 当作默认 backlog 或 roadmap；不为 `retired` 增加永久状态枚举或墓碑文件；不把外部移交的所有权边界写入 traceability（所有权边界属于决策，许可证归属才属于 traceability）。
+
+**Out of Scope:**
+
+- **容器级迁移引导机制**（以自有方式管理文档的用户项目——自有决策寄存器、ADR、跟踪器、ideas/backlog 文档）：不建专用 skill、不建声明/路由系统、不改 CONTEXT.md 契约。定稿为 offer 时刻防双源，两处子句并入既有“双权威源不共存”原则：① `domain-modeling` 创建 `candidates.md`/`decisions.md` 的 offer 处，若已知项目已有该等级权威来源，不建并行容器，链接或询问；无证据时照常懒创建。② 对标准路径容器做生命周期变更（剪除、superseded/retired、清空）前，校验其是否遵循模型格式（C-xxx/T-xxx/D-xxx）；不符则视为项目自有、只读、先询问。两子句仅在“已知有既有来源”或“格式不符”时触发，不产生常驻摩擦。迁移 = 非默认，仅用户显式选择时作为一次性 Task 走 Migration Protocol；模型不写入外来格式寄存器；不可读来源（外部系统）报告缺口并请求中央化进 CONTEXT.md，不盲猜。**Revisit when** 出现以自有方式管理文档、需要 pi-keel 引导的真实用户项目。
 
 ## D-030: 提示词体系边界（Prompt Surface）
 
@@ -290,7 +294,7 @@ reclassify:
 
 **Decision:** 与 LLM 交互的提示词按注入面分层：`principles.md`（恒定注入，承载原则与唯一格式/规则来源）、`skills/`（按需加载，每个 skill 单一职责、调用时全量消费）、access-gate guidance（失败路径，保持原样不精简）。两条约束：① skill 单一职责——一个 skill 只做一件事，不混合；触发场景互斥的 skill 保持独立，不合并；② 格式/规则单一来源——只在 `principles.md` Quick Reference 定义一次，技能只文字引用（如 "per principles.md Quick Reference — Record Lifecycle"），不内嵌副本。
 
-**Why:** 混合职责的 skill 被调用时部分内容永远用不到，浪费 token、稀释注意力并使触发匹配模糊；内嵌格式副本在多个 skill 间漂移（survey-context 与 principles 的 Future Record 措辞已出现分歧）。principles 每次 session 恒定注入，格式放此处零额外注入成本，且模型无需额外 read 动作即可获得权威定义。
+**Why:** 混合职责的 skill 被调用时部分内容永远用不到，浪费 token、稀释注意力并使触发匹配模糊；内嵌格式副本在多个 skill 间漂移（survey-context 与 principles 的 Candidate Record 措辞已出现分歧）。principles 每次 session 恒定注入，格式放此处零额外注入成本，且模型无需额外 read 动作即可获得权威定义。
 
 **Impact:** 本次重构以两条约束为验收标准：skills 全部瘦身（删内嵌副本）、principles Quick Reference 去重压缩（只删同义重复、不删唯一语义）、不新建承载格式的 skill、不修订 D-013（回到其原设计并执行）。
 

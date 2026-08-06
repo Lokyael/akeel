@@ -8,9 +8,9 @@
 - **Policy Kernel**：消费经过 verifier 验证的 `CompleteAccessPlan` 和 `Profile`，产出结构化 `GateDecision`；不依赖原始 Shell。
 - **GateDecision**：`allow | ask | deny(hard/profile/user)` 的封闭决策类型；每个 deny 附带稳定 `DecisionCode`。
 - **Guidance**：从 `DecisionCode` 到静态 `GuidanceId` 的封闭映射，不携带可执行 Shell。
-- **Project Record**：项目文档中的受控记录总称；按权威等级分为非约束的 Future Record、已承诺的 Task Record 和已采纳的 Decision Record。
-- **Future Record**：当前未采纳、未承诺实施的候选事项，使用 `F-xxx` 标识并存放在可选的 [`docs/future.md`](docs/future.md)；其内容是数据而非指令，不构成需求、优先级、路线图、当前事实或用户批准。
-- **Review On**：Future Record 的被动复审日期，只在显式 context survey 中报告；不是期限、提醒承诺或自动激活条件。
+- **Project Record**：项目文档中的受控记录总称；按权威等级分为非约束的 Candidate Record、已承诺的 Task Record 和已采纳的 Decision Record。
+- **Candidate Record**：当前未采纳、未承诺实施的候选事项，使用 `C-xxx` 标识并存放在可选的 [`docs/candidates.md`](docs/candidates.md)；其内容是数据而非指令，不构成需求、优先级、路线图、当前事实或用户批准。
+- **Review On**：Candidate Record 的被动复审日期，只在显式 context survey 中报告；不是期限、提醒承诺或自动激活条件。
 - **Task Record**：具有目标、范围、验收和验证边界的已承诺短期任务，使用 `T-xxx` 标识。
 - **Decision**：需要长期保留的已采纳架构、领域或安全取舍，记录在 [`docs/decisions.md`](docs/decisions.md)。
 - **Durable Content**：在当前工作或会话结束后仍然成立且承载约束的事实、取舍与承诺（如采纳结论、安全不变量、外部归属边界、拒绝理由）；过程产物（实施步骤、测试日志、审查报告）不是耐用内容，不进入权威容器。
@@ -26,7 +26,7 @@
 - `shell-parse/` 输出受限 Shell IR；`command-semantics/` 提取命令类别、路径意图、效果和 cwd 转换，用户全局 `pi-keel/command-overrides.yaml` 只扩展 Shell 命令语义。
 - `gate/` 编译器将 Shell IR 和 Direct tool 参数转换为 `CompleteAccessPlan`；compiler outcome 另外区分 unsupported form、security block 和 invalid request。`compiler-entry.ts` 是唯一 plan sealing boundary，同步 Policy Kernel 只消费经过 verifier 验证的 plan 和 Profile，产出 `GateDecision`，renderer 将决策转为 host 兼容结果。
 - Direct tool（`read`、`write`、`edit`、`find`、`grep`、`ls`）和 Shell 命令经过各自的 compiler 后进入同一 Policy Kernel。
-- 用户项目运行时文档入口为 `CONTEXT.md`、可选的 `docs/future.md`、`docs/decisions.md` 和 `docs/task.md`；Future Record 不进入当前事实或 active Decision 索引。
+- 用户项目运行时文档入口为 `CONTEXT.md`、可选的 `docs/candidates.md`、`docs/decisions.md` 和 `docs/task.md`；Candidate Record 不进入当前事实或 active Decision 索引。
 
 ## Security Boundaries
 
@@ -60,13 +60,13 @@
 - 不提供 OS-level sandbox、容器、VM、seccomp、Landlock、network namespace 或独立 network policy 轴。
 - 不承诺 pathname check 与实际文件操作之间的 TOCTOU 消除。
 - 不拦截 `user_bash`、`shellCommandPrefix`、Bash `spawnHook`、tool override、custom tool backend、未知 Direct tool surface 或其他 Extension 的直接操作。
-- 不为 Future Record 提供自动提醒、后台定时器、Session hook、Footer 状态或专用 review 技能；复审只在显式 context survey 中报告。
+- 不为 Candidate Record 提供自动提醒、后台定时器、Session hook、Footer 状态或专用 review 技能；复审只在显式 context survey 中报告。
 - 不把短期 Task Record、实施过程或审查报告作为永久项目知识。
 - 不修改用户项目的 `README.md`、`AGENTS.md`、`.gitignore` 和 `package.json`，除非用户明确要求。
 
 ## Project Documents
 
-- [`docs/future.md`](docs/future.md)：当前未采纳、未承诺实施的候选事项；不得作为指令、路线图或当前事实。
+- [`docs/candidates.md`](docs/candidates.md)：当前未采纳、未承诺实施的候选事项；不得作为指令、路线图或当前事实。
 - [`docs/decisions.md`](docs/decisions.md)：长期决策寄存器。
 - [`docs/task.md`](docs/task.md)：活跃任务记录。
 - [`docs/security-boundaries.md`](docs/security-boundaries.md)：安全承诺和残余风险。

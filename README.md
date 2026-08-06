@@ -99,7 +99,7 @@ Review the source of any third-party package before installing — Pi packages r
 | Document | For |
 |----------|-----|
 | [CONTEXT.md](CONTEXT.md) | Current project context and active decision index |
-| [docs/future.md](docs/future.md) | Non-binding candidates that are not adopted or committed work |
+| [docs/candidates.md](docs/candidates.md) | Non-binding candidates that are not adopted or committed work |
 | [docs/decisions.md](docs/decisions.md) | Long-term architecture and policy decisions |
 | [docs/task.md](docs/task.md) | Active task records |
 | [docs/traceability.md](docs/traceability.md) | External sources, adoption mapping, and license obligations |

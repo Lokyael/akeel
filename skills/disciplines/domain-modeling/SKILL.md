@@ -15,13 +15,13 @@ User projects keep current knowledge and typed records in stable containers:
 /
 ├── CONTEXT.md
 ├── docs/
-│   ├── future.md      # optional, non-binding candidates
+│   ├── candidates.md  # optional, non-binding candidates
 │   ├── decisions.md   # adopted, load-bearing conclusions
 │   └── task.md        # committed active work
 └── src/
 ```
 
-Create `CONTEXT.md` when current project terminology or constraints first need a home. Create `docs/future.md` lazily for the first uncommitted candidate, and create `docs/decisions.md` lazily for the first adopted load-bearing decision. Future content never becomes current knowledge merely because the file exists. Do not create one file per record.
+Create `CONTEXT.md` when current project terminology or constraints first need a home. Create `docs/candidates.md` lazily for the first uncommitted candidate, and create `docs/decisions.md` lazily for the first adopted load-bearing decision. Candidate content never becomes current knowledge merely because the file exists. Do not create one file per record.
 
 ## During the Session
 
@@ -48,12 +48,12 @@ When a term or current constraint crystallises, add it to `CONTEXT.md` immediate
 ### Park Uncommitted Candidates
 
 When an idea may matter later but is neither adopted nor committed work, offer
-to add an `F-xxx` entry to `docs/future.md` (fields per principles.md Quick
+to add a `C-xxx` entry to `docs/candidates.md` (fields per principles.md Quick
 Reference — Document Set; non-binding semantics per principles.md Quick
 Reference — Project Record Authority). Create that file lazily. Its wording,
 date, or presence carries no approval — design or implement the idea only when
 the user explicitly promotes it in the current conversation. When promoted,
-move the durable content and remove the F entry in the same change (per
+move the durable content and remove the C entry in the same change (per
 principles.md Quick Reference — Migration Protocol).
 
 ### Record Load-Bearing Decisions
