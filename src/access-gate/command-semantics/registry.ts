@@ -40,10 +40,11 @@ const ADAPTERS: CommandAdapter[] = [
   dateAdapter,
 ];
 
-// 按命令名索引
+// 按命令名索引；同名命令跨 adapter 重复注册是结构错误——fail-fast 防止静默覆盖
 const INDEX = new Map<string, CommandAdapter>();
 for (const adapter of ADAPTERS) {
   for (const name of adapter.names) {
+    if (INDEX.has(name)) throw new Error(`duplicate command registration: ${name}`);
     INDEX.set(name, adapter);
   }
 }
