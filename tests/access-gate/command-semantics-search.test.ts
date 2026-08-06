@@ -11,6 +11,7 @@ defineAdapterTests("search", [
   { cmd: "find . -name '*.log' -exec rm {} \\;", name: "find -exec upgrades to modify", cls: "modify", intents: [{ operation: "search", rawPath: "." }] },
   { cmd: "find . -name '*.js' -execdir rm {} +", name: "find -execdir upgrades to modify", cls: "modify", intents: [{ operation: "search", rawPath: "." }] },
   { cmd: "find . -ok rm {} \\;", name: "find -ok upgrades to modify", cls: "modify", intents: [{ operation: "search", rawPath: "." }] },
+  { cmd: "find . -exec rm {} ';' extra-root", name: "find quoted ; terminates exec and keeps the following root", cls: "modify", intents: [{ operation: "search", rawPath: "." }, { operation: "search", rawPath: "extra-root" }] },
   { cmd: "find . -maxdepth 2 -name '*.ts'", name: "find -maxdepth skips the value", cls: "inspect", intents: [{ operation: "search", rawPath: "." }] },
   { cmd: "tree -L 2 .", name: "tree -L skips the level value", cls: "inspect", intents: [{ operation: "search", rawPath: "." }] },
   { cmd: "grep -r pattern src/", name: "grep -r searches directory", cls: "inspect", intents: [{ operation: "search", rawPath: "src/" }] },

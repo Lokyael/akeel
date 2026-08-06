@@ -112,12 +112,13 @@ export const searchAdapter: CommandAdapter = {
         continue;
       }
       if (parseOptions && val.startsWith("-")) {
-        // find -exec/-execdir/-ok：整体消费 exec 命令直到 +（含）或命令末尾，参数不落成根
+        // find -exec/-execdir/-ok：整体消费 exec 命令直到终止符（+ 或引号 ;）或命令末尾，参数不落成根。
+        // 注意：\; 在 lexer 中转义集不含 ";"，会生成 "\" token + 命令分隔符（解析器已拆开），无需在此处理。
         if (val === "-exec" || val === "-execdir" || val === "-ok") {
           i++; // 命令名
           while (i + 1 < args.length) {
             const nextVal = args[i + 1]!.value ?? "";
-            if (nextVal === "+") { i++; break; }
+            if (nextVal === "+" || nextVal === ";") { i++; break; }
             i++;
           }
           continue;
