@@ -23,7 +23,7 @@ mockValidator.validate.mockReturnValue(true);
 const service = new UserService(mockValidator);
 ```
 
-Every time you change `EmailValidator`, you change the mock. The test no longer tells you behavior works — it tells you the mock was set up correctly.
+Every time you change `EmailValidator`, you change the mock. The test no longer tells you behavior works — it tells you the mock was set up correctly. The mock earns no assertions: asserting the mock itself — its call count, its setup — passes when configured and fails when absent, saying nothing about the component. Assert the real component's behavior; if the mock is what you are checking, unmock it or delete the assertion.
 
 **Good (use the real thing):**
 ```typescript
@@ -37,6 +37,10 @@ expect(result.ok).toBe(true);
 const fakeDb = new InMemoryDatabase();
 const service = new UserService(fakeDb);
 ```
+
+## Mirror Real Data Completely
+
+Mock responses mirror the complete structure as it exists in reality — all documented fields, not just the ones the test reads. Partial mocks fail silently when downstream code reads an omitted field: the test passes while integration breaks.
 
 ## Mocking External APIs
 

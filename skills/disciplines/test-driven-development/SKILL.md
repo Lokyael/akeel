@@ -21,6 +21,8 @@ Write code before the test? Delete it. Start over. No "keeping it as reference."
 
 Tests verify behavior through public interfaces, not implementation details. Code can change entirely; tests shouldn't. A good test reads like a specification — "user can checkout with valid cart" tells you exactly what capability exists — and survives refactors because it doesn't care about internal structure.
 
+A good test is also **falsifiable**: it fails when the behavior it guards breaks. Name the production change that would make it fail (see [tests.md](tests.md) — Falsifiability).
+
 See [tests.md](tests.md) for examples and [mocking.md](mocking.md) for mocking guidelines.
 
 ## Seams — Where Tests Go
@@ -36,6 +38,8 @@ Ask: "What's the public interface, and which seams should we test?"
 - **Implementation-coupled** — mocks internal collaborators, tests private methods, or verifies through a side channel. The tell: the test breaks when you refactor but behavior hasn't changed.
 - **Tautological** — the assertion recomputes the expected value the way the code does (`expect(add(a,b)).toBe(a+b)`), so it passes by construction. Expected values must come from an independent source of truth.
 - **Horizontal slicing** — writing all tests first, then all implementation. Work in **vertical slices** instead — one test → one implementation → repeat.
+- **String-presence** — asserts a script, skill, or config contains an exact line instead of running it. It passes because the source is the source and fails on rewording, not breakage.
+- **Change detector** — only intentional decisions (a constant's value, exact message wording, private structure) can fail it. It fires on redesign and sleeps through bugs.
 
 ## Rules of the Red-Green-Refactor Loop
 
@@ -47,6 +51,7 @@ Write one minimal test showing what should happen.
 - One behavior per test
 - Clear name describing behavior
 - Real code (no mocks unless unavoidable — see [mocking.md](mocking.md))
+- Names the break it catches — the production change that would fail it (see [tests.md](tests.md))
 
 ### Verify RED — Watch It Fail
 
@@ -82,6 +87,8 @@ Confirm: test passes, other tests still pass, output pristine.
 
 After green only: remove duplication, improve names, extract helpers. Keep tests green. Don't add behavior.
 
+**Finish:** mentally mutate the production code — every realistic mutation must fail at least one test (mutation check, see [tests.md](tests.md)).
+
 ### Repeat
 
 Next failing test for next behavior. One slice at a time.
@@ -91,7 +98,7 @@ Next failing test for next behavior. One slice at a time.
 | Excuse | Reality |
 |--------|---------|
 | "Too simple to test" | Simple code breaks. Test takes 30 seconds. |
-| "I'll test after" | Tests passing immediately prove nothing. |
+| "I'll test after" | Passing immediately proves nothing — might test the wrong thing, implementation, or miss edge cases. |
 | "Already manually tested" | Ad-hoc ≠ systematic. No record, can't re-run. |
 | "TDD will slow me down" | TDD is faster than debugging. |
 | "Need to explore first" | Fine. Throw away exploration, start with TDD. |

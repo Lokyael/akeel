@@ -53,3 +53,23 @@
 - 发布前如确认当前文件仍包含第三方 substantial portions，应在分发物中保留对应上游版权和完整许可证文本；本表中的来源链接不能替代许可证义务。
 - 新增外部来源时，同时记录来源 URL、固定 revision、采用方式、受影响文件、SPDX license 和所需 notice。
 - 架构、Profile、命令分类、安全边界和 Task 生命周期的变化不更新本文，除非它们改变了第三方来源映射或许可证义务。
+
+## 上游状态核查（2026-08-06）
+
+周期性上游状态确认，不改变既有映射与许可证义务；HEAD 快照供未来同步时作参考点，不替代“每次同步记录 commit 或 release”的要求。
+
+| 来源 | 核查时状态 | 核查时 HEAD |
+|------|-----------|-------------|
+| multica-ai/andrej-karpathy-skills | 活跃（最后推送 2026-04-20）；仍只有 README 声明 MIT，仓库根目录无独立 LICENSE 文件 | `2c606141` |
+| obra/superpowers | 活跃；仓库根目录存在 MIT LICENSE | `44c9b2d6` |
+| mattpocock/skills | 活跃；存在 MIT LICENSE | `8b36d4fb` |
+| danielvm-git/bigpowers | 活跃；存在 MIT LICENSE | `036ab125` |
+| gotgenes/pi-permission-system | 已归档（内容冻结）；存在 MIT LICENSE | `f1d2f619` |
+| kenryu42/cc-safety-net | 活跃；存在 MIT LICENSE | `9fa3c5bd` |
+| chandra447/pi-hermes-memory | 活跃；存在 MIT LICENSE | `11a75337` |
+| landstrip/pi-landstrip | 已归档（内容冻结）；存在 MIT LICENSE | `61220413` |
+| eemeli/yaml | 最新 release 仍为 v2.9.0（2026-05-11 发布），与固定版本一致，无需更新 | — |
+
+结论：本次核查未发现任何来源删除、改许可或引入新的第三方 substantial portions。`pi-permission-system` 与 `pi-landstrip` 已归档，其内容已冻结，后续同步引用以核查时 HEAD 为参考；andrej-karpathy-skills 的许可证证据缺口依旧存在，重新同步其文本前必须补齐可归档证据。
+
+**同步记录（2026-08-06）**：从 obra/superpowers v6.2.0 吸收 `writing-good-tests.md` 的可证伪性纪律至 `skills/disciplines/test-driven-development/`：SKILL.md 织入 falsifiability 定义与反模式（String-presence、Change detector）并扩展 rationalization 行；tests.md 新增 Falsifiability 节、删除 Why Order Matters 段落（列举语义迁至表格行）；mocking.md 并入 mock-earns-no-assertions 并新增 Mirror Real Data Completely。上游 commit 链：`e74961c1`（testing-anti-patterns → writing-good-tests 重构）→ `9d8630d5`（吸收可证伪性）→ `e8a9748a`（关闭 change-detector 漏洞）→ `517a9c64`（压缩）→ `caa1826c`（两原则重写，HEAD）。
