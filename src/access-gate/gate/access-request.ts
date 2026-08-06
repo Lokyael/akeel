@@ -88,7 +88,7 @@ export function evidenceKind(code: DecisionCode): GateEvidence["kind"] {
   return "command";
 }
 
-export function cwdCandidates(state: { cwd: string; candidates?: readonly CwdCandidate[] }): readonly CwdCandidate[] {
+function cwdCandidates(state: { cwd: string; candidates?: readonly CwdCandidate[] }): readonly CwdCandidate[] {
   return state.candidates ?? [{ cwd: state.cwd, certainty: "exact", branch: "current" }];
 }
 
@@ -172,8 +172,10 @@ export function validateEffects(effects: readonly Effect[], span: SourceSpan): C
 }
 
 // ── internal helpers ──
+// uniqueCandidates 由 createPlanDraft（编译器侧）与 access-plan-verifier（验证侧）共用，
+// 保证 plan.cwdCandidates 的去重键与校验键始终一致（单一来源）。
 
-function uniqueCandidates(values: readonly CwdCandidate[]): readonly CwdCandidate[] {
+export function uniqueCandidates(values: readonly CwdCandidate[]): readonly CwdCandidate[] {
   const seen = new Set<string>();
   return values.filter((candidate) => {
     const key = `${candidate.branch}\0${candidate.cwd}\0${candidate.certainty}`;

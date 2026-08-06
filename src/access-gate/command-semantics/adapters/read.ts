@@ -1,4 +1,4 @@
-// Read-only file commands — cat, head, tail, wc, cut
+// Read-only file commands — cat, head, tail, wc, cut, diff, less, more, file, stat, du, df
 
 import type { ShellCommandNode, ShellArg } from "../../shell-parse/types";
 import type { CommandAdapter, CommandSemantics, PathIntent, SemanticContext } from "../types";

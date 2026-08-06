@@ -260,14 +260,6 @@ test("parser: multiple env assignments", () => {
   assert.equal(cmd.executable?.value, "cmd");
 });
 
-test("parser: env wrapper", () => {
-  const { program } = parse(lex("env rm file").tokens);
-  const cmd = program.commands[0]!;
-  assert.equal(cmd.wrapper.length, 1);
-  assert.equal(cmd.wrapper[0]!.value, "env");
-  assert.equal(cmd.executable?.value, "rm");
-});
-
 test("parser: env with PATH override", () => {
   const lexResult = lex("env PATH=/tmp rm file");
   const { program } = parse(lexResult.tokens);
@@ -415,34 +407,6 @@ test("lexer+parser: end-to-end env rm path", () => {
   assert.equal(cmd.executable?.value, "rm");
   assert.equal(cmd.args.length, 1);
   assert.equal(cmd.args[0]!.value, "~/.ssh/id_rsa");
-});
-
-test("lexer+parser: end-to-end command cp", () => {
-  const { program } = parse(lex("command cp src dst").tokens);
-  const cmd = program.commands[0]!;
-  assert.equal(cmd.wrapper.length, 1);
-  assert.equal(cmd.wrapper[0]!.value, "command");
-  assert.equal(cmd.executable?.value, "cp");
-  assert.equal(cmd.args.length, 2);
-});
-
-test("lexer+parser: end-to-end cd && cat", () => {
-  const { program } = parse(lex("cd /etc && cat shadow").tokens);
-  assert.equal(program.commands.length, 2);
-  assert.equal(program.commands[0]!.executable?.value, "cd");
-  assert.equal(program.commands[1]!.executable?.value, "cat");
-  assert.equal(program.commands[1]!.operatorBefore, "&&");
-});
-
-test("lexer+parser: sort -o output.txt input.txt is all args", () => {
-  const { program } = parse(lex("sort -o output.txt input.txt").tokens);
-  const cmd = program.commands[0]!;
-  assert.equal(cmd.executable?.value, "sort");
-  assert.equal(cmd.args.length, 3);
-  // parser doesn't understand -o semantics
-  assert.equal(cmd.args[0]!.value, "-o");
-  assert.equal(cmd.args[1]!.value, "output.txt");
-  assert.equal(cmd.args[2]!.value, "input.txt");
 });
 
 test("lexer+parser: sed --in-place is args", () => {

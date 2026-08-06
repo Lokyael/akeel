@@ -147,11 +147,10 @@ function parseOptions(
     // 查找匹配的 schema
     const schema = schemas.find((s) => s.names.includes(val));
     if (!schema) {
-      // inline 后缀形式：sed -i.bak、--in-place=.bak（选项值附在选项上，不是文件路径）
-      const inline = schemas.find((s) => s.inlineSuffix && s.names.some((n) => {
-        if (n.startsWith("--")) return val.startsWith(n + "=");
-        return !val.startsWith("--") && val.startsWith(n) && val.length > n.length;
-      }));
+      // inline 后缀形式：-i.bak（短选项值附在选项上，不是文件路径；长形式 --in-place= 已由上方 =VALUE 分支处理）
+      const inline = schemas.find((s) => s.inlineSuffix && s.names.some((n) =>
+        !val.startsWith("--") && val.startsWith(n) && val.length > n.length,
+      ));
       if (inline) {
         if (inline.operation === "write") sawWrite = true;
         index++;

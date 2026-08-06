@@ -15,7 +15,7 @@ import {
   REQUEST_BRAND,
   TOOL_SURFACES,
 } from "./access-request-types";
-import { isRecord } from "./access-request";
+import { isRecord, uniqueCandidates } from "./access-request";
 
 export function validateCompleteAccessPlan(
   value: unknown,
@@ -147,12 +147,3 @@ function isValidOperation(value: unknown): value is AccessOperation {
   return false;
 }
 
-function uniqueCandidates(values: readonly CwdCandidate[]): readonly CwdCandidate[] {
-  const seen = new Set<string>();
-  return values.filter((candidate) => {
-    const key = `${candidate.branch}\0${candidate.cwd}\0${candidate.certainty}`;
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
-}
