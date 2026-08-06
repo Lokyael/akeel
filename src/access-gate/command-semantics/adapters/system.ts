@@ -7,11 +7,11 @@ import type { CommandAdapter, CommandSemantics, PathIntent, SemanticContext } fr
 import { makeSemantics } from "./shared";
 
 /** 取值选项：值被消费，不产生路径 intent（-d/--date 的值是时间字符串）。 */
-const VALUE_OPTS = new Set(["-d"]);
-/** 文件取值选项：值产生 read intent（-r/-f）。 */
-const FILE_VALUE_OPTS = new Set(["-r", "-f"]);
+const VALUE_OPTS = new Set(["-d", "--date"]);
+/** 文件取值选项：值产生 read intent（-r/--reference、-f/--file）。 */
+const FILE_VALUE_OPTS = new Set(["-r", "--reference", "-f", "--file"]);
 /** 修改类选项：检测到则 class 升级为 modify。 */
-const SET_OPTS = new Set(["-s"]);
+const SET_OPTS = new Set(["-s", "--set"]);
 /** 无值标志。 */
 const FLAG_OPTS = new Set(["-u", "-R", "-I", "--utc", "--universal", "--rfc-822", "--iso-8601", "--version", "--help"]);
 
