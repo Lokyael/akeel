@@ -10,5 +10,5 @@ defineAdapterTests("registry", [
   { cmd: "/usr/local/bin/mytool --version", name: "absolute path-form executable classifies as execute", cls: "execute" },
   { cmd: "scripts/deploy.sh -x", name: "relative path-form script classifies as execute", cls: "execute" },
   { cmd: "../bin/helper --help", name: "parent path-form helper classifies as execute", cls: "execute" },
-  { cmd: "/bin/sed 's/x/y/' file.txt", name: "path form of other adapters resolves by basename", cls: "inspect", intents: [{ operation: "read", rawPath: "s/x/y/" }, { operation: "read", rawPath: "file.txt" }] },
+  { cmd: "/bin/sed 's/x/y/' file.txt", name: "path form of other adapters resolves by basename", cls: "inspect", intents: [{ operation: "read", rawPath: "file.txt" }] },
 ]);

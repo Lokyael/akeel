@@ -9,6 +9,10 @@ const FILESYSTEM_CMDS: Record<string, {
   paths: (args: ShellArg[]) => { op: "read" | "write"; value: string }[];
   effects: readonly Effect[];
   reason: string;
+  /** 取值选项：值被消费，不是路径（如 truncate -s SIZE、install -m MODE）。 */
+  valueOptions?: readonly string[];
+  /** 长选项附加值前缀（--size= 形式）。 */
+  attachedOptions?: readonly string[];
 }> = {
   rm: {
     class: "modify",
@@ -101,6 +105,8 @@ const FILESYSTEM_CMDS: Record<string, {
     paths: (args) => args.map((a) => ({ op: "write", value: a.value ?? "" })),
     effects: ["write"],
     reason: "truncate files",
+    valueOptions: ["-s", "--size"],
+    attachedOptions: ["--size="],
   },
   install: {
     class: "modify",
@@ -115,6 +121,8 @@ const FILESYSTEM_CMDS: Record<string, {
     },
     effects: ["read", "write"],
     reason: "install files",
+    valueOptions: ["-m", "--mode", "-o", "--owner", "-g", "--group", "-t", "--target-directory"],
+    attachedOptions: ["--mode=", "--owner=", "--group=", "--target-directory="],
   },
   mktemp: {
     class: "modify",
@@ -145,8 +153,21 @@ export const filesystemAdapter: CommandAdapter = {
     const def = FILESYSTEM_CMDS[name];
     if (!def) return makeSemantics("unknown", { reason: `unknown filesystem command: ${name}`, opaque: true });
 
-    // 跳过命令行选项（以 - 开头）
-    const positionalArgs = [...node.args].filter((a) => a.value && !a.value.startsWith("-"));
+    // 提取位置参数：跳过选项与选项值（-s SIZE、--size= 等），-- 后全部按位置参数
+    const positionalArgs = (() => {
+      const result: ShellArg[] = [];
+      for (let i = 0; i < node.args.length; i++) {
+        const val = node.args[i]!.value ?? "";
+        if (val === "--") { result.push(...node.args.slice(i + 1)); break; }
+        if (def.valueOptions?.includes(val)) { i++; continue; }
+        if (val.startsWith("-")) {
+          if (def.attachedOptions?.some((prefix) => val.startsWith(prefix))) continue;
+          continue;
+        }
+        result.push(node.args[i]!);
+      }
+      return result;
+    })();
 
     const rawPaths = def.paths(positionalArgs);
     const intents: PathIntent[] = rawPaths

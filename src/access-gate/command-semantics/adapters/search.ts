@@ -112,6 +112,16 @@ export const searchAdapter: CommandAdapter = {
         continue;
       }
       if (parseOptions && val.startsWith("-")) {
+        // find -exec/-execdir/-ok：整体消费 exec 命令直到 +（含）或命令末尾，参数不落成根
+        if (val === "-exec" || val === "-execdir" || val === "-ok") {
+          i++; // 命令名
+          while (i + 1 < args.length) {
+            const nextVal = args[i + 1]!.value ?? "";
+            if (nextVal === "+") { i++; break; }
+            i++;
+          }
+          continue;
+        }
         const takesNext = valueOpts.includes(val);
         const hasAttachedValue = attachedValueOpts.some((prefix) => val.startsWith(prefix) && val.length > prefix.length);
         if (takesNext && i + 1 < args.length) {

@@ -20,12 +20,14 @@ interface OptionSchema {
   inlineSuffix?: boolean;
   /** 无值行为修饰符（如 sed -n、-E）：不产生文件 intent，也不置 opaque。 */
   flag?: boolean;
+  /** 是否提供程序/模式（-e/-f）：存在时位置参数全部是文件，首个位置参数不再按程序跳过。 */
+  isPattern?: boolean;
 }
 
 const SED_OPTS: OptionSchema[] = [
   { names: ["-i", "--in-place"], takesValue: false, operation: "write", inlineSuffix: true },
-  { names: ["-e", "--expression"], takesValue: true, operation: "read", valueKind: "expression" },
-  { names: ["-f", "--file"], takesValue: true, operation: "read" },
+  { names: ["-e", "--expression"], takesValue: true, operation: "read", valueKind: "expression", isPattern: true },
+  { names: ["-f", "--file"], takesValue: true, operation: "read", isPattern: true },
   { names: ["-l", "--line-length"], takesValue: true, operation: "read", valueKind: "expression" },
   { names: ["-n", "--quiet", "--silent"], takesValue: false, operation: "read", flag: true },
   { names: ["-E", "-r", "-z", "-s", "-u", "--sandbox", "--debug"], takesValue: false, operation: "read", flag: true },
@@ -33,8 +35,8 @@ const SED_OPTS: OptionSchema[] = [
 
 const AWK_OPTS: OptionSchema[] = [
   { names: ["-i", "--in-place"], takesValue: false, operation: "write", inlineSuffix: true },
-  { names: ["-f", "--file"], takesValue: true, operation: "read" },
-  { names: ["-e"], takesValue: true, operation: "read", valueKind: "expression" },
+  { names: ["-f", "--file"], takesValue: true, operation: "read", isPattern: true },
+  { names: ["-e"], takesValue: true, operation: "read", valueKind: "expression", isPattern: true },
   { names: ["-F", "--field-separator"], takesValue: true, operation: "read", valueKind: "expression" },
   { names: ["-v", "--assign"], takesValue: true, operation: "read", valueKind: "expression" },
   { names: ["-V", "--version", "-h", "--help"], takesValue: false, operation: "read", flag: true },
@@ -57,9 +59,11 @@ const TEXT_CONFIG: Record<string, {
   reason: string;
   /** sed/awk 在出现写选项（-i）时，位置参数是原地修改目标而非只读输入。 */
   inPlace?: boolean;
+  /** 首个位置参数是程序（sed/awk 经典形式），未出现 -e/-f 时跳过。 */
+  programFirst?: boolean;
 }> = {
-  sed: { class: "inspect", schemas: SED_OPTS, reason: "stream editor", inPlace: true },
-  awk: { class: "inspect", schemas: AWK_OPTS, reason: "pattern scanning", inPlace: true },
+  sed: { class: "inspect", schemas: SED_OPTS, reason: "stream editor", inPlace: true, programFirst: true },
+  awk: { class: "inspect", schemas: AWK_OPTS, reason: "pattern scanning", inPlace: true, programFirst: true },
   sort: { class: "inspect", schemas: SORT_OPTS, reason: "sort lines" },
   uniq: { class: "inspect", schemas: UNIQ_OPTS, reason: "unique lines" },
 };
@@ -81,9 +85,13 @@ function parseOptions(
   schemas: OptionSchema[],
   index: number,
   inPlace: boolean,
-): { intents: PathIntent[]; opaque: boolean } {
+  programFirst: boolean,
+): { intents: PathIntent[]; opaque: boolean; sawWrite: boolean } {
   const intents: PathIntent[] = [];
   let opaque = false;
+  let sawWrite = false;
+  let sawPattern = false;
+  let programPending = programFirst;
   let afterDoubleDash = false;
 
   while (index < args.length) {
@@ -92,8 +100,14 @@ function parseOptions(
 
     if (!afterDoubleDash && val === "--") { afterDoubleDash = true; index++; continue; } // 之后的 token 全部按位置参数处理
     if (afterDoubleDash || !val.startsWith("-")) {
-      // 位置参数：输入文件（in-place 模式下出现写选项时是原地修改目标）
-      const sawWrite = intents.some((i) => i.operation === "write");
+      // 位置参数：sed/awk 经典形式的首个位置参数是程序（无 -e/-f 时），跳过
+      if (programPending && !sawPattern) {
+        programPending = false;
+        index++;
+        continue;
+      }
+      programPending = false;
+      // 其余位置参数：输入文件（in-place 模式下出现写选项时是原地修改目标）
       intents.push({
         operation: inPlace && sawWrite ? "write" : "read",
         rawPath: val,
@@ -114,7 +128,7 @@ function parseOptions(
         return !val.startsWith("--") && val.startsWith(n) && val.length > n.length;
       }));
       if (inline) {
-        intents.push(optionIntent(inline.operation, ""));
+        if (inline.operation === "write") sawWrite = true;
         index++;
         continue;
       }
@@ -123,6 +137,7 @@ function parseOptions(
         n.length === 2 && n.startsWith("-") && val.startsWith(n) && val.length > 2,
       ));
       if (short) {
+        if (short.isPattern) sawPattern = true;
         const inlineVal = val.slice(2);
         if (short.valueKind !== "expression" && inlineVal.length > 0) {
           intents.push(optionIntent(short.operation, inlineVal));
@@ -136,10 +151,12 @@ function parseOptions(
       continue;
     }
 
+    if (schema.isPattern) sawPattern = true;
+
     if (!schema.takesValue) {
       if (!schema.flag) {
-        // 无值选项（如 sed -i）
-        intents.push(optionIntent(schema.operation, ""));
+        // 无值写选项（如 sed -i）：仅标记 in-place 写意图，不产生空路径 intent
+        if (schema.operation === "write") sawWrite = true;
       }
       index++;
       continue;
@@ -157,7 +174,7 @@ function parseOptions(
     }
   }
 
-  return { intents, opaque };
+  return { intents, opaque, sawWrite };
 }
 
 export const textTransformAdapter: CommandAdapter = {
@@ -168,10 +185,10 @@ export const textTransformAdapter: CommandAdapter = {
     if (!config) return makeSemantics("unknown", { reason: `unknown text command: ${name}`, opaque: true });
 
     // 解析选项
-    const { intents: optionIntents, opaque } = parseOptions([...node.args], config.schemas, 0, config.inPlace === true);
+    const { intents: optionIntents, opaque, sawWrite } = parseOptions([...node.args], config.schemas, 0, config.inPlace === true, config.programFirst === true);
 
-    // 如果产生了写 intent，升级为 modify
-    const hasWrite = optionIntents.some((i) => i.operation === "write");
+    // 如果产生了写意图（-o/--output 或 in-place -i），升级为 modify
+    const hasWrite = sawWrite || optionIntents.some((i) => i.operation === "write");
     const cls: "inspect" | "modify" | "unknown" = hasWrite ? "modify" : config.class;
 
     return makeSemantics(cls, {
