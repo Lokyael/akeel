@@ -72,6 +72,6 @@ Guidance 只能从源码内置的静态 `GuidanceId` catalog 映射，不拼接�
 
 **状态：** by design。
 
-内置命令语义面向 GNU coreutils / GNU git / npm 生态的常用选项建模，未声明平台假设。BSD/macOS 工具存在选项歧义：`stat -c`（GNU 格式参数）vs `stat -f`（BSD 格式参数）、`du -d`（GNU max-depth）在 BSD 无对应、`df -t`（GNU 类型参数）vs POSIX flag。选项解析按 GNU 语义处理，BSD 方言的差异选项可能被误判为位置参数或忽略。
+内置命令语义面向 GNU coreutils / GNU git / npm 生态的常用选项建模，平台边界为**仅支持 POSIX**：Windows、macOS 不在支持范围，不建模其路径语义与选项方言。BSD/macOS 工具存在选项歧义：`stat -c`（GNU 格式参数）vs `stat -f`（BSD 格式参数）、`du -d`（GNU max-depth）在 BSD 无对应、`df -t`（GNU 类型参数）vs POSIX flag。选项解析按 GNU 语义处理，BSD 方言的差异选项可能被误判为位置参数或忽略。
 
 消除该边界需要按平台检测方言并切换选项表——当前不引入。

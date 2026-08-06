@@ -58,6 +58,7 @@
 ## Negative Space
 
 - 不提供 OS-level sandbox、容器、VM、seccomp、Landlock、network namespace 或独立 network policy 轴。
+- 仅支持 POSIX 平台；不提供 Windows / macOS 支持，不建模其路径语义与选项方言。
 - 不承诺 pathname check 与实际文件操作之间的 TOCTOU 消除。
 - 不拦截 `user_bash`、`shellCommandPrefix`、Bash `spawnHook`、tool override、custom tool backend、未知 Direct tool surface 或其他 Extension 的直接操作。
 - 不为 Candidate Record 提供自动提醒、后台定时器、Session hook、Footer 状态或专用 review 技能；复审只在显式 context survey 中报告。
