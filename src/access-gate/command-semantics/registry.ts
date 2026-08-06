@@ -41,13 +41,21 @@ const ADAPTERS: CommandAdapter[] = [
 ];
 
 // 按命令名索引；同名命令跨 adapter 重复注册是结构错误——fail-fast 防止静默覆盖
-const INDEX = new Map<string, CommandAdapter>();
-for (const adapter of ADAPTERS) {
-  for (const name of adapter.names) {
-    if (INDEX.has(name)) throw new Error(`duplicate command registration: ${name}`);
-    INDEX.set(name, adapter);
+function buildCommandIndex(adapters: readonly CommandAdapter[]): ReadonlyMap<string, CommandAdapter> {
+  const index = new Map<string, CommandAdapter>();
+  for (const adapter of adapters) {
+    for (const name of adapter.names) {
+      if (index.has(name)) throw new Error(`duplicate command registration: ${name}`);
+      index.set(name, adapter);
+    }
   }
+  return index;
 }
+
+const INDEX = buildCommandIndex(ADAPTERS);
+
+// 导出供测试验证 fail-fast 守卫（结构性不变量的直接断言）
+export { buildCommandIndex };
 
 /**
  * 将 executable 归一化为索引键：
