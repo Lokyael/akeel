@@ -56,9 +56,9 @@ expect(buildSearchQuery({ tag: 'urgent' })).toBe(expected);
 expect(buildSearchQuery({ tag: 'urgent' })).toBe('tag:"urgent"');
 ```
 
-**No change detectors.** A test only intentional decisions can fail — a constant's value, exact message wording, private structure — fires on redesign and sleeps through bugs. Test the behavior that depends on the decision: not `expect(MAX_RETRIES).toBe(5)`, but "a failing call is retried 5 times and the 6th attempt never happens."
+**No change detectors.** Test the behavior that depends on a decision, never the decision itself: not `expect(MAX_RETRIES).toBe(5)`, but "a failing call is retried 5 times and the 6th attempt never happens."
 
-**Behavior, not text.** Asserting a script, skill, or config contains an exact line proves only that the source is the source. Run scripts against controlled inputs and assert outputs, side effects, or exit codes. Agent-facing documents are tested by the consuming agent's behavior; prose for humans earns no test.
+**Behavior, not text.** Run scripts against controlled inputs and assert outputs, side effects, or exit codes; test agent-facing documents by the consuming agent's behavior — prose for humans earns no test.
 
 **The mutation check.** Before finishing, mentally mutate the production code; each realistic mutation — wrong constant or argument, wrong branch, missing side effect, empty/default return, missing validation for zero, empty, nil, unauthorized, or malformed input — must fail at least one test. A mutation nothing catches marks the behavior as unprotected — or the test as tautological.
 

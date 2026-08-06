@@ -21,7 +21,7 @@ Write code before the test? Delete it. Start over. No "keeping it as reference."
 
 Tests verify behavior through public interfaces, not implementation details. Code can change entirely; tests shouldn't. A good test reads like a specification — "user can checkout with valid cart" tells you exactly what capability exists — and survives refactors because it doesn't care about internal structure.
 
-A good test is also **falsifiable**: it fails when the behavior it guards breaks. Name the production change that would make it fail (see [tests.md](tests.md) — Falsifiability).
+A good test is also **falsifiable**: it fails for the right reason — when the behavior it guards breaks (see [tests.md](tests.md) — Falsifiability).
 
 See [tests.md](tests.md) for examples and [mocking.md](mocking.md) for mocking guidelines.
 
