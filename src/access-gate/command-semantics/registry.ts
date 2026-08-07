@@ -90,13 +90,19 @@ function indexKey(executable: string): string {
  *   该被覆盖，basename 冲突由此结构性消除。
  * 返回命中的键；未命中返回 null。
  */
+
+/** 剥离前导 "./"——./ 是 cwd 相对拼写，无管理意义（D-034），精确键与前缀键对称归一化。 */
+function stripDotSlash(s: string): string {
+  return s.startsWith("./") ? s.slice(2) : s;
+}
+
 function scopeKey(table: Record<string, unknown> | undefined, name: string): string | null {
   if (!table) return null;
-  const normalized = name.startsWith("./") ? name.slice(2) : name;
+  const normalized = stripDotSlash(name);
   // 精确键：键与名均做 ./ 归一化后相等即命中（两侧对称，D-034）
   for (const key of Object.keys(table)) {
     if (key.endsWith("/")) continue;
-    if (key === name || (key.startsWith("./") ? key.slice(2) : key) === normalized) return key;
+    if (key === name || stripDotSlash(key) === normalized) return key;
   }
   // 路径前缀键（以 / 结尾）：最长前缀优先，键与名均 ./ 归一化
   if (normalized.includes("/")) {
@@ -104,7 +110,7 @@ function scopeKey(table: Record<string, unknown> | undefined, name: string): str
     let bestLen = -1;
     for (const key of Object.keys(table)) {
       if (!key.endsWith("/")) continue;
-      const normKey = key.startsWith("./") ? key.slice(2) : key;
+      const normKey = stripDotSlash(key);
       if (normalized.startsWith(normKey) && normKey.length > bestLen) {
         bestKey = key;
         bestLen = normKey.length;
