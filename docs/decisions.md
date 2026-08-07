@@ -339,7 +339,7 @@ reclassify:
 
 - Windows `\` 路径（宿主为 Unix 语义，按 POSIX `/` 判定）。
 - 裸名经 PATH 到达的路径：`export PATH=…`（unknown→ask）与裸命令（unknown→ask）是两次审批，不构成静默绕过；裸名工具语义扩充属于用户 `command-overrides.yaml`（D-024）。
-- 路径形式的 alias 匹配：已解决——`aliases` 在路径形式精确键未命中时按 basename 回退（D-033），`aliases: {mytool: cat}` 对 `./bin/mytool` 同样生效。
+- 路径形式的 alias 匹配：已解决——覆盖层键为显式作用域（精确键 + 路径前缀键，D-034），路径形式需精确/前缀键声明语义（裸名键不隐式覆盖路径形式，basename 冲突结构性消除）。
 - PATH 解析与文件存在性探测：静态分类不做 filesystem 检查。
 
 ## D-032: ask 渲染展示 unknown 命令的 literal form（知情同意）

@@ -16,7 +16,7 @@ import { makeSemantics } from "./adapters/shared";
 // ─── 类型 ───
 
 /** 单个命令的声明式定义（用于 YAML 中的 commands 段）。 */
-export interface CommandDef {
+interface CommandDef {
   class: CommandClass;
   effects?: Effect[];
   /** 子命令覆盖。key 是第一个非选项参数值。 */
@@ -24,14 +24,14 @@ export interface CommandDef {
 }
 
 /** 分类微调规则。pattern 是正则表达式，匹配命令的子命令部分。 */
-export interface ReclassifyEntry {
+interface ReclassifyEntry {
   command: string;
   pattern: string;
   class: CommandClass;
 }
 
 /** command-overrides.yaml 的完整结构。 */
-export interface CommandOverrides {
+interface CommandOverrides {
   aliases?: Record<string, string>;
   commands?: Record<string, CommandDef>;
   reclassify?: ReclassifyEntry[];
