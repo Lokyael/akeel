@@ -182,12 +182,15 @@
 
 # 别名：让未知命令复用已知 adapter 的完整语义分析
 # 路径提取、效果推断和子命令解析全部沿用目标 adapter 的逻辑；
-# 路径形式（executable 含 /）在精确键未命中时按 basename 回退查键（D-033）
+# 键为显式作用域：裸名（仅裸调用）/ 完整路径字符串 / 路径前缀（以 / 结尾，
+# 覆盖该前缀下所有路径形式，两侧归一化去 ./；精确键优先，最长前缀优先）（D-034）
 aliases:
   fd: find
   bat: cat
   exa: ls
   just: make
+  "bin/": cat       # 目录作用域：./bin/ 下所有工具
+  "./vendor/tool": git  # 精确路径：该具体二进制
 
 # 新命令定义：为没有对应 adapter 的命令提供声明式分类
 # 适合只需分类、不需要路径提取的简单命令
@@ -371,9 +374,37 @@ reclassify:
 - xargs 的 stdin 目标静态提取：运行期数据，静态不可知（D-031 同款边界）。
 - 其他 unknown 命令的语义扩充：属 D-024 用户 `command-overrides.yaml`。
 
+## D-034: 覆盖层显式作用域键（取代 D-033 隐式 basename 回退）
+
+**Status:** active（D-033 的 basename 回退被本决策取代）
+
+**Decision:** 覆盖层（`aliases` 与 `commands`）的键改为**显式作用域匹配**：精确键优先（裸名或完整路径字符串），路径形式按最长路径前缀键匹配（键以 `/` 结尾，两侧归一化去 `./`）；**移除隐式 basename 回退**。解析顺序不变（commands→aliases→adapter→reclassify）。
+
+**Why:**
+- D-033 的隐式 basename 回退把"工具身份"与"调用拼写"混为一谈：一个裸名键同时覆盖 `./bin/mytool` 与 `./vendor/mytool`——gate 不做 filesystem 解析（D-031），同名不同工具无法区分，冲突结构性存在。
+- 显式作用域把歧义交给用户声明（D-024 权威）：每个键声明明确覆盖范围（裸名 / 精确路径 / 路径前缀），gate 不再猜测哪个路径形式该被覆盖——basename 冲突从设计上消除。
+- 路径前缀键把"误伤"变成"能力"：`"bin/": cat` 明确声明目录内全部工具语义；`"./vendor/mytool": git` 精确指向具体二进制。
+- D-033 的拼写一致性目标以显式方式保留：想两种拼写都覆盖，写 `mytool: cat` + `"bin/": cat`——声明取代猜测。
+
+**Impact:**
+- `aliases: {mytool: cat}` 不再覆盖 `./bin/mytool`（路径形式默认 execute，D-031）；覆盖需 `"bin/": cat` 或精确路径键。
+- 匹配规则：精确键 > 最长前缀键；`./` 归一化（`"bin/"` 命中 `./bin/mytool`）；前缀键不误伤其他目录同名工具。
+- `commands` 同样支持前缀键（消除 D-033 Out of Scope 记录的同类不对称）。
+- 爆炸半径：registry.ts（`scopeKey` 4 处调用点：commands/aliases 各一）；不碰 plan/verifier/policy。
+- 测试：command-overrides 7 个新/改用例（前缀命中、精确优先、最长前缀、裸名不隐式覆盖、跨目录不误伤、目标不存在、commands 前缀键）。
+
+**Rejected:**
+- **保留 basename 回退作为前缀键后的兜底**：冲突只在用户不用新消歧时"休眠"而非消除；显式作用域是更诚实的分类（D-024：语义由用户声明定义）。
+- **realpath/filesystem 消歧**：D-031 明确静态分类不做 filesystem 检查；引入解析会破坏无副作用语义。
+
+**Out of Scope:**
+- 前缀键的绝对/相对拼写敏感（`"/abs/bin/"` 与 `"bin/"` 是不同作用域）：`./` 已归一化，其余拼写差异由用户声明承担。
+- Windows `\` 路径（POSIX 语义）。
+- 目录内多个前缀键重叠：最长前缀优先，已测试。
+
 ## D-033: 路径形式 alias basename 回退
 
-**Status:** active
+**Status:** superseded（被 D-034 显式作用域键取代）。
 
 **Decision:** `registry.ts` 别名解析：路径形式（executable 含 `/`）在精确键未命中时按 basename 回退查 alias，与裸名语义一致。解析顺序不变（commands→aliases→adapter→reclassify）；alias 优先于内置 adapter（与裸名一致）。
 

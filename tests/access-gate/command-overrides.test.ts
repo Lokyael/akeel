@@ -96,11 +96,11 @@ aliases:
   }
 });
 
-test("aliases: 路径形式按 basename 回退（./bin/mytool → cat 语义）", () => {
+test("aliases: 路径前缀键覆盖目录内路径形式（bin/: cat → ./bin/mytool）", () => {
   resetOverrides();
   const { ctx: _ctx, cleanup } = setupProject(`
 aliases:
-  mytool: cat
+  "bin/": cat
 `);
   try {
     const sem = analyzeSemantics(parseCmd("./bin/mytool file.txt"), _ctx);
@@ -112,12 +112,12 @@ aliases:
   }
 });
 
-test("aliases: 路径形式精确键优先于 basename 回退", () => {
+test("aliases: 路径形式精确键优先于前缀键", () => {
   resetOverrides();
   const { ctx: _ctx, cleanup } = setupProject(`
 aliases:
   "./bin/foo": git
-  foo: cat
+  "bin/": cat
 `);
   try {
     const sem = analyzeSemantics(parseCmd("./bin/foo status"), _ctx);
@@ -128,13 +128,30 @@ aliases:
   }
 });
 
-test("aliases: 路径形式无 basename alias → execute（D-031 不变）", () => {
+test("aliases: 最长路径前缀键优先", () => {
   resetOverrides();
   const { ctx: _ctx, cleanup } = setupProject(`
 aliases:
-  othertool: cat
+  "bin/": cat
+  "bin/tools/": git
 `);
   try {
+    const sem = analyzeSemantics(parseCmd("./bin/tools/mytool status"), _ctx);
+    assert.equal(sem.class, "inspect");
+    assert.ok(sem.reason.includes("show working tree"), `最长前缀应优先: ${sem.reason}`);
+  } finally {
+    cleanup();
+  }
+});
+
+test("aliases: 裸名键不再隐式覆盖路径形式（basename 冲突消除）", () => {
+  resetOverrides();
+  const { ctx: _ctx, cleanup } = setupProject(`
+aliases:
+  mytool: cat
+`);
+  try {
+    // 裸名键只作用于裸调用；路径形式默认 execute（D-031），不被隐式 basename 覆盖
     const sem = analyzeSemantics(parseCmd("./bin/mytool run.ts"), _ctx);
     assert.equal(sem.class, "execute");
   } finally {
@@ -142,11 +159,25 @@ aliases:
   }
 });
 
-test("aliases: 路径形式 alias 目标不存在 → unknown（与裸名一致）", () => {
+test("aliases: 前缀键不误伤其他目录同名工具", () => {
   resetOverrides();
   const { ctx: _ctx, cleanup } = setupProject(`
 aliases:
-  nosuchtool: nosuchadapter
+  "bin/": cat
+`);
+  try {
+    const sem = analyzeSemantics(parseCmd("./vendor/mytool run.ts"), _ctx);
+    assert.equal(sem.class, "execute");
+  } finally {
+    cleanup();
+  }
+});
+
+test("aliases: 路径前缀键目标不存在 → unknown", () => {
+  resetOverrides();
+  const { ctx: _ctx, cleanup } = setupProject(`
+aliases:
+  "bin/": nosuchadapter
 `);
   try {
     const sem = analyzeSemantics(parseCmd("./bin/nosuchtool arg"), _ctx);
@@ -190,6 +221,24 @@ commands:
 `);
   try {
     const sem = analyzeSemantics(parseCmd("my-linter src/"), ctx);
+    assert.equal(sem.class, "inspect");
+    assert.ok(sem.reason.includes("user-defined"));
+    assert.deepStrictEqual(sem.effects, ["read"]);
+  } finally {
+    cleanup();
+  }
+});
+
+test("commands: 路径前缀键覆盖目录内命令定义（D-034 作用域）", () => {
+  resetOverrides();
+  const { ctx, cleanup } = setupProject(`
+commands:
+  "bin/":
+    class: inspect
+    effects: [read]
+`);
+  try {
+    const sem = analyzeSemantics(parseCmd("./bin/tool src/"), ctx);
     assert.equal(sem.class, "inspect");
     assert.ok(sem.reason.includes("user-defined"));
     assert.deepStrictEqual(sem.effects, ["read"]);

@@ -81,6 +81,35 @@ function indexKey(executable: string): string {
  *
  * 找不到 adapter 时返回 unknown，opaque=false。
  */
+
+/**
+ * 显式作用域键查找（D-034）：
+ * - 精确键优先（裸名或完整路径字符串）；
+ * - 路径形式按最长路径前缀键匹配（键以 "/" 结尾，两侧归一化去 "./"）；
+ * - 不做隐式 basename 匹配——工具身份由用户声明定义，gate 不猜测哪个路径形式
+ *   该被覆盖，basename 冲突由此结构性消除。
+ * 返回命中的键；未命中返回 null。
+ */
+function scopeKey(table: Record<string, unknown> | undefined, name: string): string | null {
+  if (!table) return null;
+  if (table[name] !== undefined) return name;
+  if (name.includes("/")) {
+    const normalized = name.startsWith("./") ? name.slice(2) : name;
+    let bestKey: string | null = null;
+    let bestLen = -1;
+    for (const key of Object.keys(table)) {
+      if (!key.endsWith("/")) continue;
+      const normKey = key.startsWith("./") ? key.slice(2) : key;
+      if (normalized.startsWith(normKey) && normKey.length > bestLen) {
+        bestKey = key;
+        bestLen = normKey.length;
+      }
+    }
+    if (bestKey) return bestKey;
+  }
+  return null;
+}
+
 export function analyzeSemantics(
   node: ShellCommandNode,
   context: SemanticContext,
@@ -88,16 +117,15 @@ export function analyzeSemantics(
   const name = node.executable?.value?.toLowerCase() ?? "";
   const ov = loadOverrides();
 
-  // 1. 用户定义的完整命令 — 直接返回，不走 adapter
-  if (ov.commands?.[name]) {
-    return applyCommandDef(ov.commands[name]!, node.args, name);
+  // 1. 用户定义的完整命令（精确 + 路径前缀作用域，D-034）
+  const commandKey = scopeKey(ov.commands, name);
+  if (commandKey) {
+    return applyCommandDef(ov.commands![commandKey]!, node.args, name);
   }
 
-  // 2. 别名解析
-  // 路径形式（含 "/"）在精确键未命中时按 basename 回退：用户对同一工具的一次声明
-  // （aliases: {mytool: cat}）应对裸名与路径形式同样生效，消除拼写分裂（D-033）。
-  const resolvedName = ov.aliases?.[name]
-    ?? (name.includes("/") ? ov.aliases?.[basename(name)] ?? name : name);
+  // 2. 别名解析（精确 + 路径前缀作用域）
+  const aliasKey = scopeKey(ov.aliases, name);
+  const resolvedName = aliasKey ? ov.aliases![aliasKey]! : name;
 
   // 3. 内置 adapter 查找（executable 按 basename/版本归一）
   const key = indexKey(resolvedName);
