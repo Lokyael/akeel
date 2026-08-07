@@ -336,6 +336,25 @@ reclassify:
   }
 });
 
+test("reclassify: 路径形式按 basename 对齐 adapter 身份（./bin/git → 应用规则）", () => {
+  resetOverrides();
+  const { ctx, cleanup } = setupProject(`
+reclassify:
+  - command: git
+    pattern: "status"
+    class: modify
+`);
+  try {
+    // adapter 已按 basename 识别命令身份（./bin/git → git adapter），
+    // reclassify 应对齐该身份，否则用户声明在路径形式下静默失效
+    const sem = analyzeSemantics(parseCmd("./bin/git status"), ctx);
+    assert.equal(sem.class, "modify");
+    assert.ok(sem.reason.includes("reclassified"));
+  } finally {
+    cleanup();
+  }
+});
+
 test("reclassify: 不匹配时保留原分类", () => {
   resetOverrides();
   const { ctx, cleanup } = setupProject(`

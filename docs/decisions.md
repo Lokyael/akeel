@@ -390,6 +390,7 @@ reclassify:
 - `aliases: {mytool: cat}` 不再覆盖 `./bin/mytool`（路径形式默认 execute，D-031）；覆盖需 `"bin/": cat` 或精确路径键。
 - 匹配规则：精确键 > 最长前缀键；`./` 归一化（`"bin/"` 命中 `./bin/mytool`）；前缀键不误伤其他目录同名工具。
 - `commands` 同样支持前缀键（消除 D-033 Out of Scope 记录的同类不对称）。
+- `reclassify` 按 basename 对齐 adapter 身份：adapter 已按 basename 识别命令（`./bin/git` → git adapter），reclassify 匹配规则命令名时同样回退 basename——用户声明的分类微调在路径形式下不再静默失效（如 `./bin/git status` + `{command: git, pattern: "status", class: modify}` 生效）。
 - 爆炸半径：registry.ts（`scopeKey` 4 处调用点：commands/aliases 各一）；不碰 plan/verifier/policy。
 - 测试：command-overrides 7 个新/改用例（前缀命中、精确优先、最长前缀、裸名不隐式覆盖、跨目录不误伤、目标不存在、commands 前缀键）。
 
