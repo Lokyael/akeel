@@ -428,8 +428,8 @@ reclassify:
 - **basename 回退仅无 adapter 时**：裸名 alias 优先于内置 adapter（步骤顺序），路径形式若 adapter 优先则两种拼写行为分裂——引入新拼写偏差。
 
 **Out of Scope:**
-- `commands`（完整命令定义）仍精确键：同类不对称，另立评估。
+- ~~`commands`（完整命令定义）仍精确键~~：已解决——D-034 使 `commands` 与 `aliases` 同样支持精确 + 路径前缀键（见 D-034 Impact）。
 - Windows `\` 路径（宿主为 Unix 语义）。
-- basename 冲突（两路径同名工具共享 alias）：与裸名模型一致（PATH 决定），属用户声明范畴。
+- basename 冲突（两路径同名工具共享 alias）：与裸名模型一致（PATH 决定），属用户声明范畴；D-034 显式作用域键已结构性消除。
 - 执行记录（`BashExecutionMessage.command`）的脱敏：执行由 pi 负责，gate 渲染层控制不到（R-11 边界）。
 
