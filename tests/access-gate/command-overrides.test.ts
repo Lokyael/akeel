@@ -96,14 +96,15 @@ aliases:
   }
 });
 
-test("aliases: 路径前缀键覆盖目录内路径形式（bin/: cat → ./bin/mytool）", () => {
+test("aliases: 路径前缀键覆盖目录内路径形式（含 ./ 归一化）", () => {
   resetOverrides();
   const { ctx: _ctx, cleanup } = setupProject(`
 aliases:
   "bin/": cat
 `);
   try {
-    const sem = analyzeSemantics(parseCmd("./bin/mytool file.txt"), _ctx);
+    // 键 "bin/" 经 ./ 归一化命中 "./bin/tool"（./ 无管理意义，不要求用户写 "./bin/" 键）
+    const sem = analyzeSemantics(parseCmd("./bin/tool file.txt"), _ctx);
     assert.equal(sem.class, "inspect");
     assert.ok(sem.intents.some((i) => i.operation === "read"), "应有 read intent");
     assert.equal(sem.intents[0]!.rawPath, "file.txt");
@@ -116,13 +117,14 @@ test("aliases: 路径形式精确键优先于前缀键", () => {
   resetOverrides();
   const { ctx: _ctx, cleanup } = setupProject(`
 aliases:
-  "./bin/foo": git
+  "./bin/eslint": node
   "bin/": cat
 `);
   try {
-    const sem = analyzeSemantics(parseCmd("./bin/foo status"), _ctx);
+    // 精确键（npm 本地 eslint → node）优先于前缀键（bin/ → cat）
+    const sem = analyzeSemantics(parseCmd("./bin/eslint --version"), _ctx);
     assert.equal(sem.class, "inspect");
-    assert.ok(sem.reason.includes("show working tree"), `精确键应优先: ${sem.reason}`);
+    assert.ok(sem.reason.includes("version/help"), `精确键应优先（node 语义）: ${sem.reason}`);
   } finally {
     cleanup();
   }
@@ -133,12 +135,13 @@ test("aliases: 最长路径前缀键优先", () => {
   const { ctx: _ctx, cleanup } = setupProject(`
 aliases:
   "bin/": cat
-  "bin/tools/": git
+  "./bin/scripts/": node
 `);
   try {
-    const sem = analyzeSemantics(parseCmd("./bin/tools/mytool status"), _ctx);
+    // 项目 bin/scripts/ 目录用 node 语义，bin/ 其他工具用 cat 语义
+    const sem = analyzeSemantics(parseCmd("./bin/scripts/deploy --version"), _ctx);
     assert.equal(sem.class, "inspect");
-    assert.ok(sem.reason.includes("show working tree"), `最长前缀应优先: ${sem.reason}`);
+    assert.ok(sem.reason.includes("version/help"), `最长前缀应优先（node 语义）: ${sem.reason}`);
   } finally {
     cleanup();
   }
