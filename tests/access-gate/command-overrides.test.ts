@@ -390,7 +390,7 @@ reclassify:
   }
 });
 
-test("reclassify: 路径形式按 basename 对齐 adapter 身份（./bin/git → 应用规则）", () => {
+test("reclassify: 路径形式按 basename 对齐 adapter 身份（/usr/local/bin/git → 应用规则）", () => {
   resetOverrides();
   const { ctx, cleanup } = setupProject(`
 reclassify:
@@ -399,9 +399,9 @@ reclassify:
     class: modify
 `);
   try {
-    // adapter 已按 basename 识别命令身份（./bin/git → git adapter），
+    // adapter 已按 basename 识别命令身份（/usr/local/bin/git → git adapter），
     // reclassify 应对齐该身份，否则用户声明在路径形式下静默失效
-    const sem = analyzeSemantics(parseCmd("./bin/git status"), ctx);
+    const sem = analyzeSemantics(parseCmd("/usr/local/bin/git status"), ctx);
     assert.equal(sem.class, "modify");
     assert.ok(sem.reason.includes("reclassified"));
   } finally {
