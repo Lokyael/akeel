@@ -2,6 +2,7 @@ import { denyResponseKindFor, guidanceFor, guidanceText } from "./guidance-catal
 import { ANALYSIS_LIMITS, type CompileResult } from "./access-request";
 import type { GateDecision, Guidance } from "./decision-types";
 import type { GateResult } from "./types";
+import type { SourceSpan } from "../shell-parse/types";
 
 const MAX_RENDERED_REASON = 2_048;
 const MAX_EVIDENCE_ITEMS = 32;
@@ -9,25 +10,6 @@ const MAX_EVIDENCE_ITEMS = 32;
 const SHELL_FORM_DENY_BASE = "This Shell form cannot be approved as written.";
 const SECURITY_BOUNDARY_DENY =
   "This operation is blocked by a non-overridable security boundary. Do not retry or bypass it.";
-const SENSITIVE_PREFIXES = [
-  "~/", "~\\", "/home/", "/root/",
-  "/etc/passwd", "/etc/shadow",
-  ".ssh", ".git", "id_rsa", "id_ed25519", "authorized_keys", "known_hosts",
-  ".env", ".npmrc", ".pypirc", ".netrc",
-  "token", "secret", "password", "credentials",
-];
-
-function redactSubject(subject: string): string {
-  const lower = subject.toLowerCase();
-  for (const prefix of SENSITIVE_PREFIXES) {
-    const idx = lower.indexOf(prefix);
-    if (idx === -1) continue;
-    const before = idx === 0 || lower[idx-1] === "/" || lower[idx-1] === "\\";
-    const after = idx + prefix.length >= lower.length || lower[idx+prefix.length] === "/" || lower[idx+prefix.length] === "\\";
-    if (before && after) return subject.slice(0, 32).replace(/[^\/\s]{3,}/g, "***");
-  }
-  return subject.slice(0, ANALYSIS_LIMITS.maxEvidenceSubjectLength);
-}
 
 function renderGuidance(guidance: readonly Guidance[]): string {
   return guidance.map((item) => guidanceText(item.id)).join("; ");
@@ -35,7 +17,7 @@ function renderGuidance(guidance: readonly Guidance[]): string {
 
 export function renderCompilationFailure(result: Extract<CompileResult, { kind: "reject" }>): GateResult {
   const head = result.evidence[0];
-  const subject = head ? redactSubject(head.subject) : "request denied";
+  const subject = head ? head.subject.slice(0, ANALYSIS_LIMITS.maxEvidenceSubjectLength) : "request denied";
   const guidance = result.category === "unsupported-form" ? guidanceFor(result.code) : [];
   let reason: string;
 
@@ -54,18 +36,46 @@ export function renderCompilationFailure(result: Extract<CompileResult, { kind: 
   return { kind: "block", reason: reason.slice(0, MAX_RENDERED_REASON), code: result.code };
 }
 
-export function renderDecision(decision: GateDecision): GateResult {
+/**
+ * 从原始命令文本中按 span 切片出命令的字面形式（literal form）。
+ *
+ * ask 渲染用它让审批人看到正在批准的完整命令（而不是只有可执行名）——
+ * unknown 命令没有可提取的路径/效果语义，字面文本是门禁对其唯一诚实可知的信息。
+ * 展示完整命令、不做脱敏：命令由模型提出，原文已作为 toolCall 参数存在于会话与
+ * 模型上下文中，审批框（人类）展示它不构成新的暴露；而模型侧（block reason）
+ * 不重复命令——模型已持有自己的 toolCall 参数。仅做长度截断保持审批框可读；
+ * span 缺失/越界/为空时返回 null（不附加）。
+ */
+function literalForm(rawCommand: string | undefined, span: SourceSpan): string | null {
+  if (!rawCommand) return null;
+  const { start, end } = span;
+  if (!Number.isInteger(start) || !Number.isInteger(end)) return null;
+  if (start < 0 || end > rawCommand.length || start >= end) return null;
+  const sliced = rawCommand.slice(start, end);
+  if (sliced.length <= ANALYSIS_LIMITS.maxEvidenceSubjectLength) return sliced;
+  // 超长命令显式标注截断，不静默丢信息（知情同意完整性）。
+  return sliced.slice(0, ANALYSIS_LIMITS.maxEvidenceSubjectLength) + "… (truncated)";
+}
+
+export function renderDecision(decision: GateDecision, rawCommand?: string): GateResult {
   if (decision.disposition === "allow") return { kind: "allow" };
 
   if (decision.disposition === "ask") {
-    const items = decision.evidence.slice(0, MAX_EVIDENCE_ITEMS).map((e) => e.subject.slice(0, ANALYSIS_LIMITS.maxEvidenceSubjectLength));
+    const items = decision.evidence.slice(0, MAX_EVIDENCE_ITEMS).map((e) => {
+      const subject = e.subject.slice(0, ANALYSIS_LIMITS.maxEvidenceSubjectLength);
+      if (e.kind !== "command" || !e.span) return subject;
+      const literal = literalForm(rawCommand, e.span);
+      // ask 侧 command subject 已是类别-only（evaluate-request 按面构造），
+      // 渲染器纯追加 literal form，不做格式手术。
+      return literal ? `${subject} — literal form: ${literal}` : subject;
+    });
     const reason = items.length < decision.evidence.length
       ? items.join("; ") + " and " + (decision.evidence.length - items.length) + " additional items"
       : items.join("; ");
     return { kind: "block", reason: reason.slice(0, MAX_RENDERED_REASON), code: decision.code };
   }
 
-  const subject = decision.evidence[0] ? redactSubject(decision.evidence[0].subject) : "request denied";
+  const subject = decision.evidence[0] ? decision.evidence[0].subject.slice(0, ANALYSIS_LIMITS.maxEvidenceSubjectLength) : "request denied";
   const guidance = decision.guidance ?? guidanceFor(decision.code);
   let reason: string;
 

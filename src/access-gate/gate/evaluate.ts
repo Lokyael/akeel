@@ -1,4 +1,4 @@
-import { compileToolCall } from "./compiler-entry";
+import { bashCommandFromArgs, compileToolCall } from "./compiler-entry";
 import { evaluateRequest } from "./evaluate-request";
 import { renderCompilationFailure, renderDecision } from "./render-decision";
 import type { GateDecision } from "./decision-types";
@@ -27,13 +27,14 @@ export async function evaluateToolCall(input: ToolCallInput, runtime: GateRuntim
     stagingDir: input.stagingDir,
   });
   if (compiled.kind === "reject") return renderCompilationFailure(compiled);
-  return adaptDecision(evaluateRequest(compiled.plan, input.profile), runtime);
+  const rawCommand = bashCommandFromArgs(input.surface, input.args);
+  return adaptDecision(evaluateRequest(compiled.plan, input.profile), runtime, rawCommand);
 }
 
-async function adaptDecision(decision: GateDecision, runtime: GateRuntime): Promise<GateResult> {
+async function adaptDecision(decision: GateDecision, runtime: GateRuntime, rawCommand?: string): Promise<GateResult> {
   if (decision.disposition === "allow") return { kind: "allow" };
   if (decision.disposition === "ask") {
-    const rendered = renderDecision(decision);
+    const rendered = renderDecision(decision, rawCommand);
     return askOnce(runtime, "Access profile approval", rendered.kind === "block" ? rendered.reason : "approval required");
   }
   return renderDecision(decision);

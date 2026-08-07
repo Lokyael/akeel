@@ -39,13 +39,24 @@ export function compileDirectToolCall(input: DirectToolCompilerInput): CompileRe
 
 export function compileToolCall(input: ToolCompilerInput): CompileResult {
   if (input.surface === "bash") {
-    const args = isRecord(input.args) ? input.args : {};
     return compileShellCall({
       ...input,
-      command: typeof args.command === "string" ? args.command : "",
+      command: bashCommandFromArgs(input.surface, input.args) ?? "",
     });
   }
   return compileDirectToolCall(input);
+}
+
+/**
+ * 从 tool 参数中提取 bash 命令字符串。
+ * 非 bash surface、参数非 record、或 command 非 string 时返回 undefined。
+ * 单一来源：compileToolCall（编译侧，缺省空串）与 evaluate（渲染侧，需要原始文本或 undefined）
+ * 共享同一窄化逻辑，避免两处重复。
+ */
+export function bashCommandFromArgs(surface: string, args: unknown): string | undefined {
+  if (surface !== "bash") return undefined;
+  const record = isRecord(args) ? args : {};
+  return typeof record.command === "string" ? record.command : undefined;
 }
 
 export function isCompleteAccessPlan(value: unknown): value is CompleteAccessPlan {

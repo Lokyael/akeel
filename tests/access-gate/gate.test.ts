@@ -130,11 +130,63 @@ test("asks for an unknown network command", async () => {
   assert.equal(prompts.length, 1);
 });
 
+test("ask prompt shows the literal form of an unknown command", async () => {
+  const { runtime, prompts } = makeRuntime(["Allow once"]);
+  const result = await evaluateTool("bash", { command: "sh -c 'rm -rf /'" }, runtime);
+  assert.deepEqual(result, { kind: "allow" });
+  assert.equal(prompts.length, 1);
+  assert.ok(prompts[0]!.includes("unknown command"));
+  assert.ok(prompts[0]!.includes("literal form: sh -c 'rm -rf /'"));
+  assert.equal(prompts[0]!.includes("unknown command: sh"), false, "literal 已含可执行名，不重复");
+});
+
+test("ask prompt shows the literal form of an xargs bulk edit", async () => {
+  const { runtime, prompts } = makeRuntime(["Allow once"]);
+  const command = "xargs sed -i 's/agent_feedback/handler_feedback/g'";
+  const result = await evaluateTool("bash", { command }, runtime);
+  assert.deepEqual(result, { kind: "allow" });
+  assert.equal(prompts.length, 1);
+  assert.ok(prompts[0]!.includes(`literal form: ${command}`));
+});
+
+test("ask prompt shows the literal form of a modeled modify command", async () => {
+  const { runtime, prompts } = makeRuntime(["Allow once"]);
+  const command = "sed -i 's/x/y/' src/main.ts";
+  const result = await evaluateTool("bash", { command }, runtime);
+  assert.deepEqual(result, { kind: "allow" });
+  assert.ok(prompts[0]!.includes(`literal form: ${command}`));
+});
+
 test("hard destroy commands are denied without asking", async () => {
   const { runtime, prompts } = makeRuntime(["Allow once"]);
   const result = await evaluateTool("bash", { command: "rm -rf /" }, runtime);
   assert.equal(result.kind, "block");
   assert.equal(prompts.length, 0);
+});
+
+test("dynamic shell deny keeps diagnostic words readable", async () => {
+  // 固定诊断串 "dynamic shell token" 中的 token 是术语；类别化设计下无掩码，
+  // 固定诊断词原样展示。
+  const result = await evaluateBash("echo $(whoami)");
+  assert.equal(result.kind, "block");
+  assert.ok(result.reason.includes("dynamic shell"));
+});
+
+test("path deny reason names the operation without repeating the path", async () => {
+  // 模型侧 deny 只携带操作类型分类，不重复具体路径（模型已持有命令）。
+  const result = await evaluateBash("cp ~/.ssh/id_rsa project/leak");
+  assert.equal(result.kind, "block");
+  assert.ok(result.reason.includes("read path denied"));
+  assert.equal(result.reason.includes("id_rsa"), false);
+  assert.equal(result.reason.includes("~/.ssh"), false);
+});
+
+test("direct write ask keeps the full path for consent", async () => {
+  // Direct 工具无 literal form，ask 侧 path 证据必须保留完整路径供人类同意。
+  const { runtime, prompts } = makeRuntime(["Allow once"]);
+  await evaluateTool("write", { path: "src/main.ts", content: "code" }, runtime);
+  assert.equal(prompts.length, 1);
+  assert.ok(prompts[0]!.includes("write path: src/main.ts"));
 });
 
 test("denies modify commands that target protected paths", async () => {

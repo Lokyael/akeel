@@ -337,3 +337,37 @@ reclassify:
 - 路径形式的 alias 匹配：`aliases` 按完整 executable 字符串查键，`aliases: {tsx: node}` 对 `./node_modules/.bin/tsx` 不生效——既有不对称，另立评估。
 - PATH 解析与文件存在性探测：静态分类不做 filesystem 检查。
 
+## D-032: ask 渲染展示 unknown 命令的 literal form（知情同意）
+
+**Status:** active
+
+**Decision:** `evaluate.ts` 把原始命令文本顺着 `adaptDecision` 传给 renderer；`renderDecision` 的 ask 分支对 `kind === "command"` 的证据按证据 span 从原文切片，追加 `— literal form: <完整命令>`（仅长度截断，**不脱敏**）。模型侧（block reason / 编译失败）**不重复命令、不携带用户派生值**：path 证据在 deny 侧只渲染为操作类型分类（`read path denied`、`write path denied`），原始路径只存在于 ask 侧（人类同意面）与命令的 literal form——**类别化设计取代掩码脱敏，`redactSubject` 全套移除**。语义层不变：xargs、`sh -c` 等运行期构造命令的命令族保持 `unknown`→ask，不做任何建模。
+
+**Why:**
+- unknown 命令没有可提取的路径/效果语义，人类批准是唯一针对该命令本身的防线；审批框只显示 `unknown command: xargs` 时，人类无从判断要批准什么——同意层变成橡皮图章，防线实际失效。
+- 字面文本是门禁对该命令唯一诚实可知的完整信息：原文已在输入中，span 是 lexer/parser 算出的真实字符偏移（verifier 校验过 span 与命令操作的对应），渲染只是展示事实而非推断。语义建模（给 xargs 加 adapter/wrapper）把运行期 stdin 数据驱动的命令构造猜成静态 class，是伪精确，违反 D-024/D-025 的诚实分类原则。
+- 覆盖是结构性的：修复只依赖 "command 证据 + span" 这对每条命令都存在的产物，不依赖任何适配器知识；所有 unknown（以及 profile 下 ask 的 modeled）命令经同一漏斗出口自动受益，不枚举命令、不新增适配器。
+- **审批展示不脱敏**：命令由模型提出，原文已作为 `AssistantMessage` 的 toolCall 参数存在于模型上下文与 session JSONL 中——审批框（TUI 覆盖层，不落 session）脱敏保护不了任何尚未暴露的信息，反而削弱人类否决时所需的完整信息。
+- **类别化取代掩码**：掩码是"嵌入原始值再打码"的补丁。根治：模型侧 deny 证据 subject 不嵌入用户派生值——path 证据只渲染操作类型分类（`write path denied`），命令证据只含可执行名，编译失败 subject 为固定诊断/威胁 id。模型已持有自己提出的命令（toolCall 参数），路径与区域都是它可自行推导的冗余信息，gate 不重复（与"不追加重复信息"同根）；ask 侧保留完整 path 证据——Direct 工具无 literal form，路径是人类同意的唯一信息。
+
+**Impact:**
+- 审批提示从 `unknown command: xargs` 变为 `unknown command — literal form: xargs sed -i 's/…'`——literal form 已包含完整命令（可执行名是首 token），subject 只保留命令类别，不追加重复信息；`sh -c 'rm -rf /'` 显示完整负载，人类批准从盲批变为知情且可完整否决。
+- block/deny 渲染不出现命令重复、不携带原始路径：deny 侧 path 证据为 `read path denied`/`write path denied`，`dynamic shell token` 等固定诊断词原样展示（无掩码误伤）。
+- 删除 `redactSubject`/`SENSITIVE_PREFIXES`/边界启发式全套；无前缀表维护、无脱敏误伤。
+- 新增/更新测试：`guidance.test.ts` 5 个单元用例（literal form 展示、完整展示不脱敏、截断显式标注、无原文时保持原样、span 越界跳过）+ `gate.test.ts` 6 个集成用例（unknown/`xargs`/modeled modify 审批提示、dynamic 诊断词原样、deny 不含原始路径、Direct ask 保留完整路径）。
+- ask 侧 command subject 按面构造（evaluate-request 决策时只含类别，如 `unknown command`），渲染器纯追加 literal form——不做 subject 格式手术（消除跨模块格式耦合）；deny 侧 subject 含可执行名（模型分类需要）。
+- 不改 plan 形状、`access-plan-verifier`、profile/path policy。
+
+**Rejected:**
+- **给 xargs 建模（adapter / wrapper 白名单 / reclassify）**：xargs 与 `sh -c`、`bash -c` 同属运行期构造命令族，静态 class/路径是猜测；单独建模造成双标（`xargs rm -rf /` 硬拒而 `sh -c 'rm -rf /'` 盲批说不通），且 keel-build 会自动放行错误的 class。
+- **把 raw command 存入 `CompleteAccessPlan`**：plan 形状变更需同步 verifier 与 coverage proof，收益与渲染层传参相同。
+- **审批展示脱敏**：命令原文已通过 toolCall 参数存在于会话与模型上下文，审批框（不落 session）脱敏是无效剧场——不减少任何暴露，却让人类否决时看不到完整命令（如嵌入的 token 值）；拒绝。
+- **block reason 附加 literal form**：模型已持有自己的 toolCall 参数，重复命令浪费上下文并双倍持久化，且无新增信息；拒绝。
+- **掩码脱敏（redactSubject 前缀表）**：掩码是"嵌入原始值再打码"的补丁——需要前缀表维护与边界启发式，且会误伤固定诊断词（`dynamic shell token` → `*** *** ***`）。类别化设计让 deny 侧根本不产生用户派生值，掩码从设计上消失；拒绝。
+
+**Out of Scope:**
+- 逐命令拆分审批：批准粒度仍是 tool-call 级（D-032 只让审批看到全文，不改变批准范围）。
+- xargs 的 stdin 目标静态提取：运行期数据，静态不可知（D-031 同款边界）。
+- 其他 unknown 命令的语义扩充：属 D-024 用户 `command-overrides.yaml`。
+- 执行记录（`BashExecutionMessage.command`）的脱敏：执行由 pi 负责，gate 渲染层控制不到（R-11 边界）。
+

@@ -97,39 +97,85 @@ test("hard security deny explains that the boundary cannot be bypassed", () => {
   assert.equal(result.reason.includes("Direct"), false);
 });
 
-test("renderer does not embed raw evidence paths when security-sensitive", () => {
-  const deny: GateDecision = {
-    disposition: "deny",
-    code: "blocked-path",
-    enforcement: "hard",
-    evidence: [{ kind: "path", subject: "~/.ssh/id_rsa @ /home/user" }],
-    guidance: guidanceFor("blocked-path"),
-  };
-  const result = renderDecision(deny);
-  assert.equal(result.kind, "block");
-  assert.equal(result.reason.includes("~/.ssh"), false);
-});
-
-test("ask renderer preserves full evidence and does not allow guidance bypass", () => {
-  const ask: GateDecision = {
+function askDecision(evidenceItems: GateEvidence[]): GateDecision {
+  return {
     disposition: "ask",
     code: "approval-required",
-    evidence: [
-      { kind: "path", subject: "write path: src/main.ts @ /project" },
-      { kind: "path", subject: "write path: docs/task.md @ /project" },
-    ],
+    evidence: evidenceItems,
     approval: {
       code: "approval-required",
       scope: "tool-call",
-      evidence,
+      evidence: evidenceItems,
       options: ["Allow once", "Deny"],
     },
   };
+}
+
+test("ask renderer preserves full evidence and does not allow guidance bypass", () => {
+  const ask: GateDecision = askDecision([
+    { kind: "path", subject: "write path: src/main.ts @ /project" },
+    { kind: "path", subject: "write path: docs/task.md @ /project" },
+  ]);
   const result = renderDecision(ask);
   assert.equal(result.kind, "block");
   assert.equal(result.code, "approval-required");
   assert.ok(result.reason.includes("src/main.ts"));
   assert.ok(result.reason.includes("docs/task.md"));
+});
+
+test("ask renderer shows the literal form of command evidence when raw command is available", () => {
+  const command = "sh -c 'rm -rf /'";
+  const ask: GateDecision = askDecision([
+    { kind: "command", subject: "unknown command", span: { start: 0, end: command.length } },
+  ]);
+  const result = renderDecision(ask, command);
+  assert.equal(result.kind, "block");
+  assert.ok(result.reason.includes("unknown command"), "类别保留");
+  assert.ok(result.reason.includes(`literal form: ${command}`));
+  assert.equal(result.reason.includes("unknown command: sh"), false, "ask 侧 subject 类别-only，可执行名由 literal 提供");
+});
+
+test("ask renderer shows the full command in the literal form without redaction", () => {
+  // 命令由模型提出，原文已作为 toolCall 参数存在于会话与模型上下文；
+  // 审批框（人类）展示完整命令供知情同意，不做脱敏；subject 为类别-only。
+  const command = "sh -c 'cat ~/.env'";
+  const ask: GateDecision = askDecision([
+    { kind: "command", subject: "unknown command", span: { start: 0, end: command.length } },
+  ]);
+  const result = renderDecision(ask, command);
+  assert.equal(result.kind, "block");
+  assert.ok(result.reason.includes(`literal form: ${command}`));
+});
+
+test("ask literal form marks truncation instead of silently cutting", () => {
+  const command = "echo " + "x".repeat(5_000);
+  const ask: GateDecision = askDecision([
+    { kind: "command", subject: "unknown command", span: { start: 0, end: command.length } },
+  ]);
+  const result = renderDecision(ask, command);
+  assert.equal(result.kind, "block");
+  assert.ok(result.reason.includes("(truncated)"), "截断显式标注，不静默丢信息");
+  assert.equal(result.reason.includes("x".repeat(5_000)), false);
+});
+
+test("ask renderer without raw command keeps evidence-only output", () => {
+  const ask: GateDecision = askDecision([
+    { kind: "command", subject: "unknown command" },
+  ]);
+  const result = renderDecision(ask);
+  assert.equal(result.kind, "block");
+  assert.ok(result.reason.includes("unknown command"));
+  assert.equal(result.reason.includes("literal form:"), false);
+});
+
+test("ask renderer skips literal form for out-of-range spans", () => {
+  const ask: GateDecision = askDecision([
+    { kind: "command", subject: "unknown command", span: { start: 0, end: 999 } },
+  ]);
+  const result = renderDecision(ask, "xargs sed -i 's/a/b/g'");
+  assert.equal(result.kind, "block");
+  assert.ok(result.reason.includes("unknown command"));
+  assert.equal(result.reason.includes("literal form:"), false);
 });
 
 test("renderer bounds evidence subject count and total reason length", () => {

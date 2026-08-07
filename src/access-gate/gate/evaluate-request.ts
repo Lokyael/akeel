@@ -46,11 +46,12 @@ export function evaluateRequest(
     // operation is handled by the path loop below.
     if (operation.origin === "direct" || operation.executable === "cd") continue;
     const decision = profile.shellPolicy[operation.commandClass];
-    const evidence = [commandEvidence(operation)];
     if (decision === "deny" && !profileDenial) {
-      profileDenial = profileDeny("shell-policy-denied", evidence[0]!.subject);
+      profileDenial = profileDeny("shell-policy-denied", commandEvidence(operation).subject);
     } else if (decision === "ask") {
-      asks.push(...evidence);
+      // ask 侧 subject 只含命令类别（"unknown command"），可执行名与参数由 literal form 提供，
+      // 渲染器纯追加不做格式手术（D-032：不追加重复信息）。
+      asks.push(commandEvidence(operation, true));
     }
   }
 
@@ -62,8 +63,11 @@ export function evaluateRequest(
       const evidence = [pathEvidence(operation, candidate.cwd)];
       if (decision.decision === "deny") {
         const code = pathDecisionCode(decision);
-        if (decision.hard) return hardDeny(code === "path-denied" ? "path-unclassifiable" : code, evidence[0]!.subject, evidence[0]!.span);
-        if (code === "path-denied" && !profileDenial) profileDenial = profileDeny(code, evidence[0]!.subject);
+        // 模型侧 deny 只携带操作类型分类，不含原始路径——模型已持有命令（toolCall 参数），
+        // 不重复具体路径信息（D-032）。ask 侧（pathEvidence）保留完整路径供人类同意。
+        const denySubject = `${operation.operation} path denied`;
+        if (decision.hard) return hardDeny(code === "path-denied" ? "path-unclassifiable" : code, denySubject, evidence[0]!.span);
+        if (code === "path-denied" && !profileDenial) profileDenial = profileDeny(code, denySubject);
       } else if (decision.decision === "ask") {
         asks.push(...evidence);
       }
@@ -87,8 +91,16 @@ function pathDecisionCode(decision: Pick<PathDecision, "hard" | "reason">): Hard
 
 // ── evidence helpers ──
 
-function commandEvidence(operation: CommandAccessOperation): GateEvidence {
-  return { kind: "command", subject: `${operation.commandClass} command: ${operation.executable ?? "?"}`, span: operation.span };
+function commandEvidence(operation: CommandAccessOperation, forAsk = false): GateEvidence {
+  return {
+    kind: "command",
+    // ask 侧只含类别（literal form 提供完整命令与可执行名），渲染器纯追加；
+    // deny 侧含可执行名（模型需要它做分类）。
+    subject: forAsk
+      ? `${operation.commandClass} command`
+      : `${operation.commandClass} command: ${operation.executable ?? "?"}`,
+    span: operation.span,
+  };
 }
 
 function pathEvidence(operation: PathAccessOperation, cwd: string): GateEvidence {
