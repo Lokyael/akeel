@@ -94,7 +94,10 @@ export function analyzeSemantics(
   }
 
   // 2. 别名解析
-  const resolvedName = ov.aliases?.[name] ?? name;
+  // 路径形式（含 "/"）在精确键未命中时按 basename 回退：用户对同一工具的一次声明
+  // （aliases: {mytool: cat}）应对裸名与路径形式同样生效，消除拼写分裂（D-033）。
+  const resolvedName = ov.aliases?.[name]
+    ?? (name.includes("/") ? ov.aliases?.[basename(name)] ?? name : name);
 
   // 3. 内置 adapter 查找（executable 按 basename/版本归一）
   const key = indexKey(resolvedName);

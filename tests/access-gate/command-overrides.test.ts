@@ -96,6 +96,67 @@ aliases:
   }
 });
 
+test("aliases: 路径形式按 basename 回退（./bin/mytool → cat 语义）", () => {
+  resetOverrides();
+  const { ctx: _ctx, cleanup } = setupProject(`
+aliases:
+  mytool: cat
+`);
+  try {
+    const sem = analyzeSemantics(parseCmd("./bin/mytool file.txt"), _ctx);
+    assert.equal(sem.class, "inspect");
+    assert.ok(sem.intents.some((i) => i.operation === "read"), "应有 read intent");
+    assert.equal(sem.intents[0]!.rawPath, "file.txt");
+  } finally {
+    cleanup();
+  }
+});
+
+test("aliases: 路径形式精确键优先于 basename 回退", () => {
+  resetOverrides();
+  const { ctx: _ctx, cleanup } = setupProject(`
+aliases:
+  "./bin/foo": git
+  foo: cat
+`);
+  try {
+    const sem = analyzeSemantics(parseCmd("./bin/foo status"), _ctx);
+    assert.equal(sem.class, "inspect");
+    assert.ok(sem.reason.includes("show working tree"), `精确键应优先: ${sem.reason}`);
+  } finally {
+    cleanup();
+  }
+});
+
+test("aliases: 路径形式无 basename alias → execute（D-031 不变）", () => {
+  resetOverrides();
+  const { ctx: _ctx, cleanup } = setupProject(`
+aliases:
+  othertool: cat
+`);
+  try {
+    const sem = analyzeSemantics(parseCmd("./bin/mytool run.ts"), _ctx);
+    assert.equal(sem.class, "execute");
+  } finally {
+    cleanup();
+  }
+});
+
+test("aliases: 路径形式 alias 目标不存在 → unknown（与裸名一致）", () => {
+  resetOverrides();
+  const { ctx: _ctx, cleanup } = setupProject(`
+aliases:
+  nosuchtool: nosuchadapter
+`);
+  try {
+    const sem = analyzeSemantics(parseCmd("./bin/nosuchtool arg"), _ctx);
+    assert.equal(sem.class, "unknown");
+    assert.ok(sem.reason.includes("nosuchadapter"), `reason 应提到别名目标: ${sem.reason}`);
+  } finally {
+    cleanup();
+  }
+});
+
 test("aliases: 无 overrides 时不受影响", () => {
   resetOverrides();
   // DEFAULT_CTX 指向不存在的目录 → loadOverrides 找不到文件，回退到空配置

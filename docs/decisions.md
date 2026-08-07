@@ -181,7 +181,8 @@
 # ~/.pi/agent/pi-keel/command-overrides.yaml（可选）
 
 # 别名：让未知命令复用已知 adapter 的完整语义分析
-# 路径提取、效果推断和子命令解析全部沿用目标 adapter 的逻辑
+# 路径提取、效果推断和子命令解析全部沿用目标 adapter 的逻辑；
+# 路径形式（executable 含 /）在精确键未命中时按 basename 回退查键（D-033）
 aliases:
   fd: find
   bat: cat
@@ -334,7 +335,7 @@ reclassify:
 
 - Windows `\` 路径（宿主为 Unix 语义，按 POSIX `/` 判定）。
 - 裸名经 PATH 到达的路径：`export PATH=…`（unknown→ask）与裸命令（unknown→ask）是两次审批，不构成静默绕过；裸名工具语义扩充属于用户 `command-overrides.yaml`（D-024）。
-- 路径形式的 alias 匹配：`aliases` 按完整 executable 字符串查键，`aliases: {tsx: node}` 对 `./node_modules/.bin/tsx` 不生效——既有不对称，另立评估。
+- 路径形式的 alias 匹配：已解决——`aliases` 在路径形式精确键未命中时按 basename 回退（D-033），`aliases: {mytool: cat}` 对 `./bin/mytool` 同样生效。
 - PATH 解析与文件存在性探测：静态分类不做 filesystem 检查。
 
 ## D-032: ask 渲染展示 unknown 命令的 literal form（知情同意）
@@ -369,5 +370,31 @@ reclassify:
 - 逐命令拆分审批：批准粒度仍是 tool-call 级（D-032 只让审批看到全文，不改变批准范围）。
 - xargs 的 stdin 目标静态提取：运行期数据，静态不可知（D-031 同款边界）。
 - 其他 unknown 命令的语义扩充：属 D-024 用户 `command-overrides.yaml`。
+
+## D-033: 路径形式 alias basename 回退
+
+**Status:** active
+
+**Decision:** `registry.ts` 别名解析：路径形式（executable 含 `/`）在精确键未命中时按 basename 回退查 alias，与裸名语义一致。解析顺序不变（commands→aliases→adapter→reclassify）；alias 优先于内置 adapter（与裸名一致）。
+
+**Why:**
+- 消除 spelling-based 拼写分裂：用户对同一工具的一次声明（`aliases: {mytool: cat}`）应对裸名与路径形式同样生效——路径形式此前被 D-031 的 execute 回退覆盖，声明被拼写打败。
+- 信任锚不变：alias 是用户显式声明（D-024 权威），裸名时已作用于 PATH 解析到的工具；basename 回退只是把同一信任延伸到显式路径，不新增信任边界。
+- 与 D-031 初衷一致（消除拼写偏差）；alias 优先于内置 adapter 与裸名解析完全一致（步骤顺序不变）。
+
+**Impact:**
+- `./bin/mytool` + `aliases: {mytool: cat}` → cat 语义（inspect），此前为 execute；`mytool` 与 `./bin/mytool` 两种拼写行为一致。
+- 精确键仍优先（`aliases: {"./bin/foo": git}` 命中）；无 alias 路径形式仍 execute（D-031 不变）；alias 目标不存在 → unknown（与裸名一致）。
+- 爆炸半径：`analyzeSemantics` 唯一生产调用方是 `shell-compiler.ts`；不碰 plan/verifier/policy；实现 3 行。
+- 测试：`command-overrides.test.ts` 4 个新用例（basename 命中、精确键优先、无 alias execute、目标不存在 unknown）。
+
+**Rejected:**
+- **维持现状（全路径键变通）**：用户一次声明被拼写分裂，与 D-031 初衷冲突。
+- **basename 回退仅无 adapter 时**：裸名 alias 优先于内置 adapter（步骤顺序），路径形式若 adapter 优先则两种拼写行为分裂——引入新拼写偏差。
+
+**Out of Scope:**
+- `commands`（完整命令定义）仍精确键：同类不对称，另立评估。
+- Windows `\` 路径（宿主为 Unix 语义）。
+- basename 冲突（两路径同名工具共享 alias）：与裸名模型一致（PATH 决定），属用户声明范畴。
 - 执行记录（`BashExecutionMessage.command`）的脱敏：执行由 pi 负责，gate 渲染层控制不到（R-11 边界）。
 
