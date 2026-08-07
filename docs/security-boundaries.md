@@ -40,9 +40,9 @@ access-gate 只拦截并理解受管的 Pi `tool_call` surface。`user_bash`（`
 
 用户批准 ask tool call 后，该 tool call 内部的实际文件操作仍由操作系统权限决定。access-gate 只做前置策略检查，不控制执行后的行为。
 
-## R-11：审批详情敏感信息
+## R-11：审批详情信息边界
 
-**状态：** partial。
+**状态：** implemented。
 
 deny/编译失败的 reason 不携带用户派生值：path 证据在 deny 侧只渲染为操作类型分类（`read path denied`、`write path denied`），原始路径只存在于 ask 侧（人类同意面）与命令的 literal form；command 证据只含可执行名，编译失败 subject 为固定诊断/威胁 id。subject 被截断到 1,024 字符，reason 总长度 ≤ 2,048。模型侧（block reason）不重复命令文本、不重复具体路径——模型已持有自己提出的命令（toolCall 参数），不需要 gate 重复。ask 决策保留完整 evidence 供人类否决：path 证据含完整路径（Direct 工具无 literal form，路径是唯一同意信息），command 证据追加完整 literal form（不脱敏）。renderer 不做完整 security log scrubbing；执行记录（`BashExecutionMessage.command`）由 pi 负责，不在此承诺内。
 
