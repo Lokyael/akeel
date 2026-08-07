@@ -379,7 +379,7 @@ reclassify:
 
 **Status:** active（D-033 的 basename 回退被本决策取代）
 
-**Decision:** 覆盖层（`aliases` 与 `commands`）的键改为**显式作用域匹配**：精确键优先（裸名或完整路径字符串），路径形式按最长路径前缀键匹配（键以 `/` 结尾，两侧归一化去 `./`）；**移除隐式 basename 回退**。解析顺序不变（commands→aliases→adapter→reclassify）。
+**Decision:** 覆盖层（`aliases` 与 `commands`）的键改为**显式作用域匹配**：精确键优先（裸名或完整路径字符串，`./` 归一化对精确键与前缀键对称生效），路径形式按最长路径前缀键匹配（键以 `/` 结尾）；**移除隐式 basename 回退**。别名目标可为用户定义的 `commands` 条目（链式：别名 → 命令定义）。解析顺序：commands→aliases→commands(别名目标)→adapter→reclassify。
 
 **Why:**
 - D-033 的隐式 basename 回退把"工具身份"与"调用拼写"混为一谈：一个裸名键同时覆盖 `./bin/mytool` 与 `./vendor/mytool`——gate 不做 filesystem 解析（D-031），同名不同工具无法区分，冲突结构性存在。
@@ -391,6 +391,8 @@ reclassify:
 - `aliases: {mytool: cat}` 不再覆盖 `./bin/mytool`（路径形式默认 execute，D-031）；覆盖需 `"bin/": cat` 或精确路径键。
 - 匹配规则：精确键 > 最长前缀键；`./` 归一化（`"bin/"` 命中 `./bin/mytool`）；前缀键不误伤其他目录同名工具。
 - `commands` 同样支持前缀键（消除 D-033 Out of Scope 记录的同类不对称）。
+- `./` 归一化对称：精确键与前缀键同样归一化前导 `./`——`"bin/eslint"` 命中 `./bin/eslint`，`"./bin/eslint"` 命中 `bin/eslint`（`./` 无管理意义，拼写差异不产生作用域分裂）。
+- 别名目标可为 `commands` 定义（`aliases: {mytool: my-linter}` 复用 my-linter 的 class/effects/subcommands，reason 用原始调用名）；alias 单步解析，不链式套 alias。
 - `reclassify` 按 basename 对齐 adapter 身份：adapter 已按 basename 识别命令（`./bin/git` → git adapter），reclassify 匹配规则命令名时同样回退 basename——用户声明的分类微调在路径形式下不再静默失效（如 `./bin/git status` + `{command: git, pattern: "status", class: modify}` 生效）。
 - 爆炸半径：registry.ts（`scopeKey` 4 处调用点：commands/aliases 各一）；不碰 plan/verifier/policy。
 - 测试：command-overrides 7 个新/改用例（前缀命中、精确优先、最长前缀、裸名不隐式覆盖、跨目录不误伤、目标不存在、commands 前缀键）。

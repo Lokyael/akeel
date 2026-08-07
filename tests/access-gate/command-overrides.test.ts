@@ -191,6 +191,57 @@ aliases:
   }
 });
 
+test("aliases: ./ 归一化对精确键同样生效（bin/eslint 命中 ./bin/eslint）", () => {
+  resetOverrides();
+  const { ctx: _ctx, cleanup } = setupProject(`
+aliases:
+  "bin/eslint": node
+`);
+  try {
+    // 与前缀键一致：精确键也归一化前导 ./，两侧对称
+    const sem = analyzeSemantics(parseCmd("./bin/eslint --version"), _ctx);
+    assert.equal(sem.class, "inspect");
+    assert.ok(sem.reason.includes("version/help"), `应命中精确键（node 语义）: ${sem.reason}`);
+  } finally {
+    cleanup();
+  }
+});
+
+test("aliases: ./ 精确键与无 ./ 键等价（./bin/eslint 命中 bin/eslint）", () => {
+  resetOverrides();
+  const { ctx: _ctx, cleanup } = setupProject(`
+aliases:
+  "./bin/eslint": node
+`);
+  try {
+    const sem = analyzeSemantics(parseCmd("bin/eslint --version"), _ctx);
+    assert.equal(sem.class, "inspect");
+    assert.ok(sem.reason.includes("version/help"), `应命中精确键（node 语义）: ${sem.reason}`);
+  } finally {
+    cleanup();
+  }
+});
+
+test("aliases: 别名目标为 commands 定义时链式解析", () => {
+  resetOverrides();
+  const { ctx: _ctx, cleanup } = setupProject(`
+aliases:
+  mytool: my-linter
+commands:
+  my-linter:
+    class: inspect
+    effects: [read]
+`);
+  try {
+    const sem = analyzeSemantics(parseCmd("mytool src/"), _ctx);
+    assert.equal(sem.class, "inspect");
+    assert.ok(sem.reason.includes("user-defined"), `应复用命令定义: ${sem.reason}`);
+    assert.deepStrictEqual(sem.effects, ["read"]);
+  } finally {
+    cleanup();
+  }
+});
+
 test("aliases: 无 overrides 时不受影响", () => {
   resetOverrides();
   // DEFAULT_CTX 指向不存在的目录 → loadOverrides 找不到文件，回退到空配置

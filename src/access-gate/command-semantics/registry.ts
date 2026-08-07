@@ -84,17 +84,22 @@ function indexKey(executable: string): string {
 
 /**
  * 显式作用域键查找（D-034）：
- * - 精确键优先（裸名或完整路径字符串）；
- * - 路径形式按最长路径前缀键匹配（键以 "/" 结尾，两侧归一化去 "./"）；
+ * - 精确键优先（裸名或完整路径字符串），前导 "./" 归一化对精确键与前缀键对称生效；
+ * - 路径形式按最长路径前缀键匹配（键以 "/" 结尾）；
  * - 不做隐式 basename 匹配——工具身份由用户声明定义，gate 不猜测哪个路径形式
  *   该被覆盖，basename 冲突由此结构性消除。
  * 返回命中的键；未命中返回 null。
  */
 function scopeKey(table: Record<string, unknown> | undefined, name: string): string | null {
   if (!table) return null;
-  if (table[name] !== undefined) return name;
-  if (name.includes("/")) {
-    const normalized = name.startsWith("./") ? name.slice(2) : name;
+  const normalized = name.startsWith("./") ? name.slice(2) : name;
+  // 精确键：键与名均做 ./ 归一化后相等即命中（两侧对称，D-034）
+  for (const key of Object.keys(table)) {
+    if (key.endsWith("/")) continue;
+    if (key === name || (key.startsWith("./") ? key.slice(2) : key) === normalized) return key;
+  }
+  // 路径前缀键（以 / 结尾）：最长前缀优先，键与名均 ./ 归一化
+  if (normalized.includes("/")) {
     let bestKey: string | null = null;
     let bestLen = -1;
     for (const key of Object.keys(table)) {
@@ -126,6 +131,14 @@ export function analyzeSemantics(
   // 2. 别名解析（精确 + 路径前缀作用域）
   const aliasKey = scopeKey(ov.aliases, name);
   const resolvedName = aliasKey ? ov.aliases![aliasKey]! : name;
+
+  // 2.5 别名目标可能是用户定义的 commands 条目（链式解析：别名 → 命令定义）
+  if (resolvedName !== name) {
+    const targetCommandKey = scopeKey(ov.commands, resolvedName);
+    if (targetCommandKey) {
+      return applyCommandDef(ov.commands![targetCommandKey]!, node.args, name);
+    }
+  }
 
   // 3. 内置 adapter 查找（executable 按 basename/版本归一）
   const key = indexKey(resolvedName);
