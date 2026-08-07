@@ -21,7 +21,7 @@ export type DecisionCode =
   | "unknown-effect"
   | "resource-limit";
 
-export type Enforcement = "hard" | "profile" | "user";
+type Enforcement = "hard" | "profile" | "user";
 
 export type HardDenyCode = Exclude<DecisionCode, "path-denied" | "shell-policy-denied" | "approval-required" | "user-denied">;
 export type ProfileDenyCode = "path-denied" | "shell-policy-denied";
@@ -44,7 +44,7 @@ export interface Guidance {
   readonly safety: "recheck";
 }
 
-export interface ApprovalRequest {
+interface ApprovalRequest {
   readonly code: "approval-required";
   readonly scope: "tool-call";
   readonly evidence: readonly GateEvidence[];

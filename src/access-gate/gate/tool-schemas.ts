@@ -5,7 +5,7 @@ import type { PathOperationKind } from "./access-request";
 // parameter validation.  Adding a new tool or parameter only requires a schema
 // entry here; the compiler validates against these schemas automatically.
 
-export interface FieldSchema {
+interface FieldSchema {
   readonly type: "string" | "integer" | "array";
   readonly required: boolean;
   readonly min?: number;

@@ -142,9 +142,9 @@
 
 **Status:** active
 
-**Decision:** 拒绝结果的 guidance 只能引用源码内置的静态 `GuidanceId` catalog，不能拼接可执行 Shell、原始 glob 或用户输入。`renderDecision()` 处理 Policy Kernel 的 `GateDecision`，`renderCompilationFailure()` 处理 typed compiler outcome；两者都执行 evidence redact 和长度预算。
+**Decision:** 拒绝结果的 guidance 只能引用源码内置的静态 `GuidanceId` catalog，不能拼接可执行 Shell、原始 glob 或用户输入。`renderDecision()` 处理 Policy Kernel 的 `GateDecision`，`renderCompilationFailure()` 处理 typed compiler outcome；两者都执行长度预算（subject ≤ 1,024，reason ≤ 2,048），且 deny 侧 subject 不携带用户派生值（见 D-032 类别化设计）。
 
-**Why:** guidance 不能成为间接 code injection 通道；blocked path/threat 不提供绕过建议；evidence 脱敏防止拒绝原因泄露敏感路径。guidance 文本必须给出可验证判据（如 literal 定义的动态字符集合），且不得建议 LLM 无法自行完成的动作：切换 Profile 只能由用户进行，profile 类 deny 不触发审批弹窗，因此指引改为请求用户更新或批准。
+**Why:** guidance 不能成为间接 code injection 通道；blocked path/threat 不提供绕过建议；deny 侧 subject 只含分类信息（操作类型、可执行名、威胁 id），不携带用户派生值——模型已持有自己提出的命令，gate 不重复具体路径（D-032 类别化取代掩码脱敏）。guidance 文本必须给出可验证判据（如 literal 定义的动态字符集合），且不得建议 LLM 无法自行完成的动作：切换 Profile 只能由用户进行，profile 类 deny 不触发审批弹窗，因此指引改为请求用户更新或批准。
 
 **Guidance mapping:**
 
@@ -160,7 +160,7 @@
 | `invalid-tool-input` | `check-tool-input` |
 | 其他 deny code | 无（避免诱导绕过）|
 
-**Redaction rules:** renderer 仅对 deny 决策执行 sensitive prefix 脱敏（`~/.ssh`、`/home/`、`.env` 等），ask 决策保留完整 evidence 供用户审批判断。
+**Deny subject 规则：** deny 侧 subject 不携带用户派生值：path 证据只渲染操作类型分类（`read path denied`、`write path denied`），command 证据只含可执行名，编译失败 subject 为固定诊断/威胁 id；ask 决策保留完整 evidence 供人类否决（path 含完整路径，Direct 工具无 literal form；command 证据追加完整 literal form）。
 
 ## D-024: 命令覆盖层
 

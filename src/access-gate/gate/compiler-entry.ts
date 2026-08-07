@@ -21,7 +21,7 @@ import type {
   CompleteAccessPlan,
 } from "./access-request-types";
 
-export type ToolCompilerInput = CompilerContext & {
+type ToolCompilerInput = CompilerContext & {
   readonly surface: string;
   readonly args: unknown;
 };
