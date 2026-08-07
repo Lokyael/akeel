@@ -106,7 +106,7 @@ test("aliases: 无 overrides 时不受影响", () => {
 
 test("only the global pi-keel/command-overrides.yaml is read; no project config exists", () => {
   resetOverrides();
-  const { root, ctx, cleanup } = setupProject("");
+  const { ctx, cleanup } = setupProject("");
   try {
     // setupProject 只写了全局 pi-keel/command-overrides.yaml（内容为空）；
     // 项目目录中没有配置文件，也不存在项目级读取路径。

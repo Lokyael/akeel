@@ -125,12 +125,12 @@ test("lexer: quoted wildcards are not dynamic", () => {
 });
 
 test("lexer: unterminated single quote", () => {
-  const { tokens, unsafeSyntax } = lex("echo 'hello");
+  const { unsafeSyntax } = lex("echo 'hello");
   assert.equal(unsafeSyntax, "unterminated quote");
 });
 
 test("lexer: unterminated double quote", () => {
-  const { tokens, unsafeSyntax } = lex('echo "hello');
+  const { unsafeSyntax } = lex('echo "hello');
   assert.equal(unsafeSyntax, "unterminated quote");
 });
 

@@ -5,7 +5,7 @@
 
 import assert from "node:assert/strict";
 import test from "node:test";
-import { makeContext } from "./helpers";
+import { deepFreeze, makeContext } from "./helpers";
 import { compileShellCall, ANALYSIS_LIMITS } from "../../src/access-gate/gate";
 import type { AccessOperation } from "../../src/access-gate/gate";
 import { validateCompleteAccessPlan } from "../../src/access-gate/gate/access-plan-verifier";
@@ -23,15 +23,6 @@ function cloneCandidate(candidate: { cwd: string; certainty: string; branch: str
 
 function cloneOperation<T extends { span: { start: number; end: number } }>(operation: T): T {
   return { ...operation, span: { ...operation.span } };
-}
-
-function deepFreeze<T>(value: T): T {
-  if (value && typeof value === "object" && !Object.isFrozen(value)) {
-    for (const child of Object.values(value as Record<string, unknown>)) deepFreeze(child);
-    for (const symbol of Object.getOwnPropertySymbols(value)) deepFreeze((value as Record<PropertyKey, unknown>)[symbol]);
-    Object.freeze(value);
-  }
-  return value;
 }
 
 /** 深拷贝 base plan，交给 mutator 篡改，深度冻结后返回。 */

@@ -1,10 +1,10 @@
-import { mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
 import assert from "node:assert/strict";
-import type { CompilerContext } from "../../src/access-gate/gate/access-request";
+import type { CompilerContext, CompleteAccessPlan, CompileResult } from "../../src/access-gate/gate/access-request";
 import { resolveProfiles } from "../../src/access-gate/profile/resolve";
 import type { ResolvedProfiles } from "../../src/access-gate/profile/types";
 import { lex } from "../../src/access-gate/shell-parse/lexer";
@@ -137,4 +137,22 @@ export function defineSemanticTests(suite: {
 /** 按 adapter 命令族的便捷注册（prefix = "${adapter}: "，默认分析入口）。 */
 export function defineAdapterTests(adapter: string, cases: readonly SemCase[]): void {
   defineSemanticTests({ prefix: `${adapter}: `, cases });
+}
+
+// ─── 编译器结果与深度冻结共享工具 ───
+
+/** 断言编译器返回 complete 并返回 plan（reject 时直接失败）。 */
+export function complete(result: CompileResult): CompleteAccessPlan {
+  assert.equal(result.kind, "complete");
+  return result.plan;
+}
+
+/** 深度冻结对象图（含 Symbol 属性），返回原值。 */
+export function deepFreeze<T>(value: T): T {
+  if (value && typeof value === "object" && !Object.isFrozen(value)) {
+    for (const child of Object.values(value as Record<string, unknown>)) deepFreeze(child);
+    for (const symbol of Object.getOwnPropertySymbols(value)) deepFreeze((value as Record<PropertyKey, unknown>)[symbol]);
+    Object.freeze(value);
+  }
+  return value;
 }

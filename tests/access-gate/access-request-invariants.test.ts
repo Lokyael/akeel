@@ -2,10 +2,10 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { compileShellCall, compileDirectToolCall } from "../../src/access-gate/gate";
 import { evaluateRequest } from "../../src/access-gate/gate/evaluate-request";
-import type { CompileResult, CompilerContext } from "../../src/access-gate/gate/access-request";
+import type { CompilerContext } from "../../src/access-gate/gate/access-request";
 import type { GateDecision } from "../../src/access-gate/gate/decision-types";
 import type { ResolvedProfile } from "../../src/access-gate/profile/types";
-import { makeContext } from "./helpers";
+import { complete, makeContext } from "./helpers";
 
 function context(): CompilerContext & { cleanup: () => void } {
   return makeContext("pi-invariants-");
@@ -17,11 +17,6 @@ function profile(): ResolvedProfile {
     shellPolicy: { inspect: "allow", modify: "deny", execute: "deny", destroy: "deny", unknown: "deny" },
     pathPolicy: { default: { read: "allow", list: "allow", search: "allow", write: "deny" }, rules: [] },
   };
-}
-
-function complete(result: CompileResult) {
-  assert.equal(result.kind, "complete");
-  return result.plan;
 }
 
 function disposition(decision: GateDecision): string {

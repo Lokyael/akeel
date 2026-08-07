@@ -4,9 +4,9 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { compileDirectToolCall, compileShellCall } from "../../src/access-gate/gate";
 import { evaluateRequest } from "../../src/access-gate/gate/evaluate-request";
-import type { CompleteAccessPlan, CompileResult, CompilerContext } from "../../src/access-gate/gate/access-request";
+import type { CompilerContext } from "../../src/access-gate/gate/access-request";
 import type { ResolvedProfile } from "../../src/access-gate/profile/types";
-import { loadBuiltinProfiles, makeContext } from "./helpers";
+import { complete, loadBuiltinProfiles, makeContext } from "./helpers";
 
 const builtinProfiles = loadBuiltinProfiles();
 
@@ -25,11 +25,6 @@ function profile(overrides?: Partial<ResolvedProfile>): ResolvedProfile {
     },
     ...overrides,
   };
-}
-
-function complete(result: CompileResult): CompleteAccessPlan {
-  assert.equal(result.kind, "complete");
-  return result.plan;
 }
 
 test("allows a complete direct read request through the kernel synchronously", () => {
