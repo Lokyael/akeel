@@ -1,4 +1,4 @@
-import type { RawProfile, RawProfiles, ValidationResult } from "./types";
+import type { RawProfiles, ValidationResult } from "./types";
 
 const DECISIONS = new Set(["allow", "ask", "deny"]);
 const OPERATIONS = new Set(["read", "list", "search", "write"]);

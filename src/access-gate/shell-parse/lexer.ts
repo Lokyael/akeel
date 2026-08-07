@@ -3,11 +3,11 @@
 // 输出：LexToken[] 扁平 token 流，带 source span
 // 不依赖 command rules 或 Profile
 
-export const LEXER_LIMITS = {
+const LEXER_LIMITS = {
   maxTokens: 4_096,
 } as const;
 
-export type LexTokenKind = "word" | "operator" | "redirect" | "heredoc-body";
+type LexTokenKind = "word" | "operator" | "redirect" | "heredoc-body";
 
 export interface LexToken {
   kind: LexTokenKind;

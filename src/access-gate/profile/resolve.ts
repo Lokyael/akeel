@@ -1,6 +1,6 @@
 import { emptyPathPolicy, emptyShellPolicy, mergePathDefaults, mergePathRules, mergeShellPolicy } from "./merge";
 import { validateProfiles } from "./validate";
-import type { PathRule, RawProfile, RawProfiles, ResolvedProfile, ResolvedProfiles, ShellPolicy, ValidationResult } from "./types";
+import type { PathRule, RawProfiles, ResolvedProfile, ResolvedProfiles, ShellPolicy, ValidationResult } from "./types";
 
 const PATH_OPERATIONS = ["read", "list", "search", "write"] as const;
 

@@ -8,7 +8,6 @@ import type {
   CompilationReject,
   CompilerDecisionCode,
   CompilerDraftResult,
-  CompileResult,
   InvalidCompilationCode,
   PathAccessOperation,
   PlanCoverage,

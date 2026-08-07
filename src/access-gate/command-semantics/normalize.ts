@@ -1,7 +1,7 @@
 // command-semantics/normalize.ts — Wrapper 规范化
 // 递归解包已知 wrapper，支持嵌套和深层链
 
-import type { ShellCommandNode, ShellArg } from "../shell-parse/types";
+import type { ShellCommandNode } from "../shell-parse/types";
 import type { NormalizedCommand } from "./types";
 
 const MAX_UNWRAP_DEPTH = 5;

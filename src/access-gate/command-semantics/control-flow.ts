@@ -5,7 +5,7 @@
 import { isAbsolute, resolve } from "node:path";
 import { homedir } from "node:os";
 import { statSync } from "node:fs";
-import type { ShellProgram, ShellCommandNode, ShellOperator } from "../shell-parse/types";
+import type { ShellProgram, ShellCommandNode } from "../shell-parse/types";
 import type { CwdCandidate, CwdState, CommandSemantics } from "./types";
 
 // ─── 初始状态 ───

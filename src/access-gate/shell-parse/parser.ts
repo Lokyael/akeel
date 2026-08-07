@@ -236,7 +236,6 @@ function parseCommandGroup(tokens: LexToken[]): Omit<ShellCommandNode, "operator
           continue;
         }
         // 某些 wrapper 有固定 positional 参数（如 timeout <duration>）
-        const wrapperName = wrapper.length > 0 ? wrapper[wrapper.length - 1]!.value : "";
         if (wrapperSkipRemaining > 0) {
           // 把 skippable 参数加入 args，不计为 executable
           args.push(arg);

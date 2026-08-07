@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { evaluateToolCall } from "./gate";
 import { loadProfiles } from "./profile/load";
 import type { ResolvedProfiles } from "./profile/types";
@@ -103,7 +103,7 @@ export default function accessGate(pi: ExtensionAPI): void {
     stagingDir = mkdtempSync(join(tmpdir(), "pi-access-"));
   });
 
-  pi.on("session_shutdown", async (_event, ctx) => {
+  pi.on("session_shutdown", async (_event, _ctx) => {
     clearProfileStatus(footer);
     footer = undefined;
     if (stagingDir) rmSync(stagingDir, { recursive: true, force: true });
