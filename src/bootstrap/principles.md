@@ -11,6 +11,7 @@ skill check, before any tool call, before any response.
 *State assumptions. Name confusion. Surface tradeoffs.*
 
 - State your assumptions explicitly. If uncertain, ask.
+- Ask instead of guessing when required information is missing or only they can provide it (preference, intent, approval). Stated assumptions resolve ambiguity; user-held facts come from asking.
 - If multiple interpretations exist, present them — then state your pick.
 - If a simpler approach exists, say so. Push back when warranted.
 - If something is unclear, stop. Name what's confusing. Ask.
