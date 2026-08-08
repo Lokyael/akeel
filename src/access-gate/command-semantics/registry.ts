@@ -16,7 +16,7 @@ import { interpreterAdapter } from "./adapters/interpreters";
 import { shellBuiltinsAdapter } from "./adapters/shell-builtins";
 import { pythonToolsAdapter } from "./adapters/python-tools";
 import { dateAdapter } from "./adapters/system";
-import { makeSemantics } from "./adapters/shared";
+import { makeSemantics, canonicalExecutableName } from "./adapters/shared";
 import {
   loadOverrides,
   applyCommandDef,
@@ -63,11 +63,7 @@ export { buildCommandIndex };
  * - 版本化解释器（python3.11、nodejs、perl5）映射回基础名
  */
 function indexKey(executable: string): string {
-  const base = basename(executable);
-  if (/^python3\.\d+$/.test(base)) return "python3";
-  if (base === "nodejs") return "node";
-  if (base === "perl5") return "perl";
-  return base;
+  return canonicalExecutableName(basename(executable));
 }
 
 /**

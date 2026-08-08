@@ -1,6 +1,7 @@
 import { scanThreats } from "../security/threat-scan";
 import { reject, type CompilationReject } from "./access-request";
 import type { ShellCommandNode, ShellProgram } from "../shell-parse/types";
+import { canonicalExecutableName } from "../command-semantics/adapters/shared";
 
 // ── hard command rules（结构级） ──
 // 无条件拦截形态，不因 Profile 或用户批准放行（F1）：
@@ -36,10 +37,8 @@ function interpreterName(raw: string | null | undefined): string | null {
   const normalized = shellWord(raw);
   if (!normalized) return null;
   const base = normalized.includes("/") ? normalized.slice(normalized.lastIndexOf("/") + 1) : normalized;
-  if (base === "nodejs") return "node";
-  if (/^python3\.\d+$/.test(base)) return "python3";
-  if (base === "perl5") return "perl";
-  return INTERPRETER_NAMES.has(base) ? base : null;
+  const canonical = canonicalExecutableName(base);
+  return INTERPRETER_NAMES.has(canonical) ? canonical : null;
 }
 
 function commandName(node: ShellCommandNode): string | null {
@@ -101,10 +100,8 @@ function pipeToInterpreter(program: ShellProgram): string | null {
     if (commands[i + 1]!.operatorBefore !== "|") continue;
     // 管道进入后，后续任意解释器节点都拦截（含 tee 落地 + sh 执行的间接形态；
     // 中间节点不稀释形态检查——原 \|.*(?:sh|...) 语义）
-    for (let j = i + 1; j < commands.length; j++) {
-      if (executesInterpreter(commands[j]!)) {
-        return commandName(current) === "wget" ? "wget-pipe-interpreter" : "curl-pipe-interpreter";
-      }
+    if (commands.slice(i + 1).some(executesInterpreter)) {
+      return commandName(current) === "wget" ? "wget-pipe-interpreter" : "curl-pipe-interpreter";
     }
   }
   return null;

@@ -160,6 +160,18 @@ export function matchFlagCluster(
   return found;
 }
 
+/**
+ * 可执行名规范化：版本化/别名解释器映射回基础名（nodejs→node、perl5→perl、
+ * python3.11→python3）。registry 的 adapter 索引键与 preflight 的硬规则解释器
+ * 判定共用同一映射（S1 单一来源，防两处漂移）。
+ */
+export function canonicalExecutableName(base: string): string {
+  if (/^python3\.\d+$/.test(base)) return "python3";
+  if (base === "nodejs") return "node";
+  if (base === "perl5") return "perl";
+  return base;
+}
+
 // ─── 配置命令共享解析引擎（git config / npm config，T-037 系列） ───
 
 /**
