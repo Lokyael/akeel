@@ -74,7 +74,7 @@ export function extractSubcommand(args: readonly ShellArg[], valueOptions: Itera
 }
 
 /** 位置参数提取结果：positional + 被消费的取值选项（供目标目录/参考文件等语义判定）。 */
-export interface ExtractedArgs {
+interface ExtractedArgs {
   positional: readonly ShellArg[];
   /** 被消费的取值选项（-t VALUE、--reference=VALUE 等），选项名归一化（去 = 后缀）。 */
   consumed: ReadonlyArray<{ option: string; value: string }>;
@@ -134,7 +134,7 @@ export function extractPositionalArgs(
 }
 
 /** 组合短选项匹配所需的最小选项 schema 形状（text-transform 的 OptionSchema 满足此形状）。 */
-export interface FlagSchemaLike {
+interface FlagSchemaLike {
   names: readonly string[];
   takesValue: boolean;
   operation: "read" | "write";
