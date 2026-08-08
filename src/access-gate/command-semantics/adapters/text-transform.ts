@@ -58,7 +58,7 @@ const TR_OPTS: OptionSchema[] = [
   { names: ["-c", "--complement", "-d", "--delete", "-s", "--squeeze-repeats", "-t", "--truncate-set1", "--help", "--version"], takesValue: false, operation: "read", flag: true },
 ];
 
-const TEXT_CONFIG: Record<string, {
+interface TextConfigEntry {
   class: "inspect" | "modify" | "unknown";
   schemas: OptionSchema[];
   reason: string;
@@ -68,7 +68,12 @@ const TEXT_CONFIG: Record<string, {
   programFirst?: boolean;
   /** 位置参数是字符集等非文件值（tr SET1/SET2）：消费但不产生路径 intent（D-027 值性质）。 */
   positionalsNotFiles?: boolean;
-}> = {
+}
+
+/** parseOptions 消费的配置子集（窄契约）：只声明位置参数处理相关字段，不接受未用字段。 */
+type PositionalConfig = Pick<TextConfigEntry, "schemas" | "inPlace" | "programFirst" | "positionalsNotFiles">;
+
+const TEXT_CONFIG: Record<string, TextConfigEntry> = {
   sed: { class: "inspect", schemas: SED_OPTS, reason: "stream editor", inPlace: true, programFirst: true },
   awk: { class: "inspect", schemas: AWK_OPTS, reason: "pattern scanning", inPlace: true, programFirst: true },
   sort: { class: "inspect", schemas: SORT_OPTS, reason: "sort lines" },
@@ -82,12 +87,10 @@ const TEXT_CONFIG: Record<string, {
  */
 function parseOptions(
   args: ShellArg[],
-  schemas: OptionSchema[],
+  config: PositionalConfig,
   index: number,
-  inPlace: boolean,
-  programFirst: boolean,
-  positionalsNotFiles: boolean,
 ): { intents: PathIntent[]; opaque: boolean; sawWrite: boolean } {
+  const { schemas, inPlace = false, programFirst = false, positionalsNotFiles = false } = config;
   const intents: PathIntent[] = [];
   let opaque = false;
   let sawWrite = false;
@@ -223,7 +226,7 @@ export const textTransformAdapter: CommandAdapter = {
     if (!config) return makeSemantics("unknown", { reason: `unknown text command: ${name}`, opaque: true });
 
     // 解析选项
-    const { intents: optionIntents, opaque, sawWrite } = parseOptions([...node.args], config.schemas, 0, config.inPlace === true, config.programFirst === true, config.positionalsNotFiles === true);
+    const { intents: optionIntents, opaque, sawWrite } = parseOptions([...node.args], config, 0);
 
     // 如果产生了写意图（-o/--output 或 in-place -i），升级为 modify
     const hasWrite = sawWrite || optionIntents.some((i) => i.operation === "write");
