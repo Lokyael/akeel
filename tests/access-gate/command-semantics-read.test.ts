@@ -19,4 +19,16 @@ defineAdapterTests("read", [
   { cmd: "stat -c %s file.txt", name: "stat format option value is skipped", cls: "inspect", intents: [{ operation: "read", rawPath: "file.txt" }] },
   { cmd: "du -sh dir", name: "du depth value is skipped", cls: "inspect", intents: [{ operation: "read", rawPath: "dir" }] },
   { cmd: "df -h", name: "df is inspect", cls: "inspect" },
+  // od —— POSIX 只读检查工具（T-040）
+  { cmd: "od -c file.bin", name: "od reads the file", cls: "inspect", intents: [{ operation: "read", rawPath: "file.bin" }] },
+  { cmd: "od -j 16 file.bin", name: "od skips separated skip-bytes value", cls: "inspect", intents: [{ operation: "read", rawPath: "file.bin" }] },
+  { cmd: "od -A d file.bin", name: "od skips separated address-radix value", cls: "inspect", intents: [{ operation: "read", rawPath: "file.bin" }] },
+  { cmd: "od -j16 file.bin", name: "od skips attached skip-bytes value", cls: "inspect", intents: [{ operation: "read", rawPath: "file.bin" }] },
+  { cmd: "od -N 64 file.bin", name: "od skips read-bytes value", cls: "inspect", intents: [{ operation: "read", rawPath: "file.bin" }] },
+  { cmd: "od -t x1 file.bin", name: "od skips format type value", cls: "inspect", intents: [{ operation: "read", rawPath: "file.bin" }] },
+  { cmd: "od -An -tx1 file.bin", name: "od skips attached radix and format values", cls: "inspect", intents: [{ operation: "read", rawPath: "file.bin" }] },
+  { cmd: "od --skip-bytes=16 file.bin", name: "od skips long attached skip-bytes value", cls: "inspect", intents: [{ operation: "read", rawPath: "file.bin" }] },
+  { cmd: "od -w file.bin", name: "od optional-arg width flag does not swallow the file", cls: "inspect", intents: [{ operation: "read", rawPath: "file.bin" }] },
+  { cmd: "od -c a.bin b.bin", name: "od checks multiple files", cls: "inspect", intents: [{ operation: "read", rawPath: "a.bin" }, { operation: "read", rawPath: "b.bin" }] },
+  { cmd: "od -c -", name: "od - skips stdin and has no path intent", cls: "inspect", intents: [] },
 ]);

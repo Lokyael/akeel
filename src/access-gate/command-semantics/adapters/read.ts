@@ -1,4 +1,4 @@
-// Read-only file commands — cat, head, tail, wc, cut, diff, less, more, file, stat, du, df
+// Read-only file commands — cat, head, tail, wc, cut, diff, less, more, file, stat, du, df, od
 
 import type { ShellCommandNode, ShellArg } from "../../shell-parse/types";
 import type { CommandAdapter, CommandSemantics, PathIntent, SemanticContext } from "../types";
@@ -57,6 +57,12 @@ const READ_CONFIG: Record<string, ReadConfig> = {
   df: {
     valueOptions: ["-t", "--type"],
     attachedOptions: ["-t=", "--type="],
+  },
+  // od —— POSIX 只读检查（T-040）：-A/-j/-N/-t 为必选值选项；GNU 可选值选项
+  // (-w/-S/-s) 不建模：不建模=按 flag 跳过，位置参数仍正确提取，避免分离值误吞文件路径。
+  od: {
+    valueOptions: ["-A", "-j", "-N", "-t"],
+    attachedOptions: ["-A", "-j", "-N", "-t", "--address-radix=", "--skip-bytes=", "--read-bytes=", "--format=", "--width=", "--strings="],
   },
 };
 

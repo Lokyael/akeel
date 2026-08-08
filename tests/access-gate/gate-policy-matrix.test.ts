@@ -152,3 +152,14 @@ test("bare unknown command stays ask in plan (unknown policy bucket)", () => {
     env.cleanup();
   }
 });
+
+test("od read command compiles and is allowed under keel-plan (T-040)", () => {
+  const env = context();
+  try {
+    const request = complete(compileShellCall({ ...env, command: "od -c file.bin" }));
+    const decision = evaluateRequest(request, builtinProfiles.profiles["keel-plan"]!);
+    assert.deepEqual(decision, { disposition: "allow" }, "od should compile to inspect and be allowed under keel-plan");
+  } finally {
+    env.cleanup();
+  }
+});
