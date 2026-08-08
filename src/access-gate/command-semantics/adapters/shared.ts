@@ -11,6 +11,15 @@ export interface MakeSemanticsOpts {
   opaque?: boolean;
 }
 
+/** 选项派生的路径 intent（source: option，span 合成）；confidence 默认 conservative。 */
+export function optionIntent(
+  operation: "read" | "write",
+  rawPath: string,
+  confidence: "exact" | "conservative" = "conservative",
+): PathIntent {
+  return { operation, rawPath, source: "option", span: { start: 0, end: 0 }, confidence };
+}
+
 function defaultEffects(cls: CommandClass): readonly Effect[] {
   if (cls === "inspect") return ["read"];
   if (cls === "modify") return ["write"];

@@ -38,6 +38,7 @@ defineAdapterTests("pkg", [
   { cmd: "npm config set registry https://mirror", name: "npm config set writes ~/.npmrc", cls: "modify", opaque: false, intents: [{ operation: "write", rawPath: "~/.npmrc", confidence: "exact" }] },
   // ── T-037: config 目标层级解析 ──
   { cmd: "npm config set --userconfig=conf.ini registry x", name: "npm config set --userconfig writes exact path", cls: "modify", intents: [{ operation: "write", rawPath: "conf.ini", confidence: "exact" }] },
+  { cmd: "npm config set --userconfig= registry x", name: "npm config set --userconfig empty value is opaque", cls: "modify", opaque: true },
   { cmd: "npm config set registry x --globalconfig=etc.ini", name: "npm config set trailing --globalconfig writes exact path", cls: "modify", intents: [{ operation: "write", rawPath: "etc.ini", confidence: "exact" }] },
   { cmd: "npm config set -g registry x", name: "npm config set -g writes ~/.npmrc", cls: "modify", intents: [{ operation: "write", rawPath: "~/.npmrc", confidence: "exact" }] },
   { cmd: "npm config delete registry", name: "npm config delete writes ~/.npmrc", cls: "modify", intents: [{ operation: "write", rawPath: "~/.npmrc", confidence: "exact" }] },

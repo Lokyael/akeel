@@ -2,7 +2,7 @@
 
 import type { ShellArg, ShellCommandNode } from "../../shell-parse/types";
 import type { CommandAdapter, CommandSemantics, PathIntent, SemanticContext } from "../types";
-import { makeSemantics, extractSubcommand } from "./shared";
+import { makeSemantics, extractSubcommand, optionIntent } from "./shared";
 
 interface PkgDef {
   cls: "inspect" | "modify" | "execute" | "unknown";
@@ -95,8 +95,18 @@ function analyzePkgConfig(rest: readonly ShellArg[]): { cls: "modify"; intents: 
 
   for (let i = 0; i < rest.length; i++) {
     const val = rest[i]!.value ?? "";
-    if (val.startsWith("--userconfig=")) { target = { rawPath: val.slice("--userconfig=".length), confidence: "exact" }; continue; }
-    if (val.startsWith("--globalconfig=")) { target = { rawPath: val.slice("--globalconfig=".length), confidence: "exact" }; continue; }
+    if (val.startsWith("--userconfig=")) {
+      const configPath = val.slice("--userconfig=".length);
+      if (!configPath) { sawUnknown = true; continue; }  // 空目标不猜，避免空路径 intent
+      target = { rawPath: configPath, confidence: "exact" };
+      continue;
+    }
+    if (val.startsWith("--globalconfig=")) {
+      const configPath = val.slice("--globalconfig=".length);
+      if (!configPath) { sawUnknown = true; continue; }
+      target = { rawPath: configPath, confidence: "exact" };
+      continue;
+    }
     if ((val === "--userconfig" || val === "--globalconfig") && i + 1 < rest.length) {
       target = { rawPath: rest[i + 1]!.value ?? "", confidence: "exact" };
       i++;
@@ -111,9 +121,7 @@ function analyzePkgConfig(rest: readonly ShellArg[]): { cls: "modify"; intents: 
     const t = target ?? PKG_CONFIG_DEFAULT_TARGET;
     return {
       cls: "modify",
-      intents: sawUnknown
-        ? []
-        : [{ operation: "write", rawPath: t.rawPath, source: "option", span: { start: 0, end: 0 }, confidence: t.confidence }],
+      intents: sawUnknown ? [] : [optionIntent("write", t.rawPath, t.confidence)],
       opaque: sawUnknown,
     };
   }
