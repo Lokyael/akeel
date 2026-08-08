@@ -160,8 +160,6 @@
 | `invalid-tool-input` | `check-tool-input` |
 | 其他 deny code | 无（避免诱导绕过）|
 
-**Deny subject 规则：** deny 侧 subject 不携带用户派生值：path 证据只渲染操作类型分类（`read path denied`、`write path denied`），command 证据只含可执行名，编译失败 subject 为固定诊断/威胁 id；ask 决策保留完整 evidence 供人类否决（path 含完整路径，Direct 工具无 literal form；command 证据追加完整 literal form）。
-
 ## D-024: 命令覆盖层
 
 **Status:** active
@@ -234,7 +232,7 @@ reclassify:
 
 **Why:** Direct 工具提供结构化参数和更窄的访问面，适合作为模型默认选择；Shell 仍承载 pipeline、命令特有选项和组合语义。按命令名禁用会把工具选择问题错误地变成能力禁止，并破坏合法的组合操作。
 
-**Deny feedback:** dynamic、unsafe、opaque 和 unsupported 语法的拒绝必须说明“当前 Shell 形式不能批准”，并指向 Direct 工具或更简单的字面命令。threat、blocked path、symlink escape、destroy 和 hard command rule 等不可覆盖边界必须说明不可绕过，不能提供替代执行建议。两类 guidance 都只能使用静态 catalog 文本。compiler outcome 使用封闭 category，并直接进入 host renderer；不通过 DecisionCode 反推失败类型。
+**Deny feedback:** dynamic、unsafe、opaque 和 unsupported 语法的拒绝必须说明“当前 Shell 形式不能批准”，并指向 Direct 工具或更简单的字面命令。threat、blocked path、symlink escape、destroy 和 hard command rule 等不可覆盖边界必须说明不可绕过，不能提供替代执行建议。两类 guidance 都只能使用静态 catalog 文本（D-023）。
 
 **Rejected:** 不采用“Direct 存在即禁用 Shell”等价命令；不把 Direct 工具作为 Shell gate 的绕过路径；不在本决策中实现 Shell glob 的安全展开。
 
@@ -266,7 +264,7 @@ reclassify:
 
 **Rejected:** 不把 `-e` 移除出 schema（会导致 opaque 降级）；不为每个取值选项创建独立 adapter；不把 awk `-i`（gawk include 与 in-place 语义冲突）纳入本次修复——保持 fail-closed 的保守 write 分类。不因 sed/awk 的程序/文件位置歧义而放弃 positional 检查——宁可把 program 误判为额外 read 路径（fail-closed 噪声），也不漏掉输入文件（fail-open 漏报）。
 
-**Current implementation:** `OptionSchema.valueKind` 与 `inlineSuffix` 字段；parseOptions 对 expression 值消费但不 push intent，对 inline 后缀产生 conservative write intent。位置参数一律产生路径 intent：sed/awk 在出现写选项（-i）时 positional 升级为 write（原地修改目标），否则为 read；`--` 之后的 token 按文件参数处理。常用无值修饰符（sed -n/-E/-r/-z/-s/-u/--sandbox、awk -V/-h、sort/uniq 常用 flag）标记为 `flag`，不产生 intent 也不置 opaque；awk -F/-v、sed -l、sort -t/-k 等取值选项按 expression 消费；支持短选项内联值（-F,、-vfoo、-es/x/y/）。同时修复两个被测试暴露的既有缺陷：`gitEffects` 正则字面量 `\\b` 导致 `git rm` 的 delete effect 与 `git push` 等 network effect 从未生效（改为 `\b` 单词边界）；`cargo --version` 等全选项输入因 `extractSubcommand` 返回空串而落入 unknown（analyze 在 subcmd 为空时回退到第一个选项，对齐 npx 处理）。gate 对 bash 命令按 `commandClass` 决策，effects 仅用于 direct-origin 拒绝，因此 git effect 恢复不改变任何审批路径。
+**Current implementation:** `OptionSchema.valueKind` 与 `inlineSuffix` 字段；parseOptions 对 expression 值消费但不 push intent，对 inline 后缀产生 conservative write intent。位置参数一律产生路径 intent：sed/awk 在出现写选项（-i）时 positional 升级为 write（原地修改目标），否则为 read；`--` 之后的 token 按文件参数处理。常用无值修饰符（sed -n/-E/-r/-z/-s/-u/--sandbox、awk -V/-h、sort/uniq 常用 flag）标记为 `flag`，不产生 intent 也不置 opaque；awk -F/-v、sed -l、sort -t/-k 等取值选项按 expression 消费；支持短选项内联值（-F,、-vfoo、-es/x/y/）。当前行为：`git rm` 的 delete effect 与 `git push` 等 network effect 生效；`cargo --version` 等全选项输入按 npx 同规则处理（subcmd 为空时回退到第一个选项）。gate 对 bash 命令按 `commandClass` 决策，effects 仅用于 direct-origin 拒绝，git effect 恢复不改变任何审批路径。
 
 ## D-028: 统一 Project Record 模型
 
@@ -305,17 +303,14 @@ reclassify:
 
 **Rejected:**
 
-- **合并触发场景互斥的 skill**（draft-spec→brainstorm-design、draft-tickets→plan-writing、grill-docs→grill-plan）：调用时另一部分内容用不到，违反全量消费约束；触发场景分别是“想法需探索/已讨论完直接落记录”“计划需分解/需求→步骤计划”“纯拷问/拷问+文档验证”，互斥且各自全量使用。
 - **新建 `project-records` skill 承载格式**：指针引用依赖模型主动 read，可能被跳过且单次注入可能多于内嵌副本；格式与 principles 恒定注入面天然同层。
 - **Quick Reference 下沉到各对应 skill**：需修订 D-013，且操作手册分散后失去恒定注入的零成本优势。
-- **精简 guidance 文本**：失败路径负 ROI，压缩风险高于收益。
-- **为提示词行为增加测试或 token 基线**：无法可靠衡量“理解认知”，用户明确不做额外验证。
 
 **Out of Scope:**
 
-- **guidance 文本精简**：失败路径、高压力场景，措辞精度要求最高。Revisit when guidance 文本总量显著增长。
-- **合并任何触发场景互斥的 skill**：全量消费约束的必然推论。Revisit when 实测两 skill 触发场景重合。
-- **token 基线测量与提示词行为测试**：无法可靠操作化“理解认知”。Revisit when 出现可观察的遵守度问题。
+- **guidance 文本精简**：失败路径、高压力场景，措辞精度要求最高，压缩风险高于收益。Revisit when guidance 文本总量显著增长。
+- **合并任何触发场景互斥的 skill**（draft-spec→brainstorm-design、draft-tickets→plan-writing、grill-docs→grill-plan）：全量消费约束的必然推论；配对触发场景互斥（想法需探索/已讨论完直接落记录、计划需分解/需求→步骤计划、纯拷问/拷问+文档验证），各自全量使用。Revisit when 实测两 skill 触发场景重合。
+- **token 基线测量与提示词行为测试**：无法可靠操作化“理解认知”，用户明确不做额外验证。Revisit when 出现可观察的遵守度问题。**已评估并 dismiss（C-003，2026-08-08）**：遵守度问题实际出现一次——D-036 中 8 个 workflows skill 的 description 与 `disable-model-invocation` 矛盾（承诺的模型自动响应永不发生）。评估结论：该事故属结构矛盾而非 token 消耗，可操作化的测量是结构层行为测试（validate-skills 新增 `Use /skill:<name>` 强制校验与负向自检，锁 D-036 防回归）；token 基线/“理解认知”级测量维持拒绝，已观察到的遵守度问题由结构校验覆盖，不产生新的测量需求。
 
 ## D-031: 路径可执行与 tsx 解释器归类
 
@@ -359,7 +354,6 @@ reclassify:
 - 审批提示从 `unknown command: xargs` 变为 `unknown command — literal form: xargs sed -i 's/…'`——literal form 已包含完整命令（可执行名是首 token），subject 只保留命令类别，不追加重复信息；`sh -c 'rm -rf /'` 显示完整负载，人类批准从盲批变为知情且可完整否决。
 - block/deny 渲染不出现命令重复、不携带原始路径：deny 侧 path 证据为 `read path denied`/`write path denied`，`dynamic shell token` 等固定诊断词原样展示（无掩码误伤）。
 - 删除 `redactSubject`/`SENSITIVE_PREFIXES`/边界启发式全套；无前缀表维护、无脱敏误伤。
-- 新增/更新测试：`guidance.test.ts` 5 个单元用例（literal form 展示、完整展示不脱敏、截断显式标注、无原文时保持原样、span 越界跳过）+ `gate.test.ts` 6 个集成用例（unknown/`xargs`/modeled modify 审批提示、dynamic 诊断词原样、deny 不含原始路径、Direct ask 保留完整路径）。
 - ask 侧 command subject 按面构造（evaluate-request 决策时只含类别，如 `unknown command`），渲染器纯追加 literal form——不做 subject 格式手术（消除跨模块格式耦合）；deny 侧 subject 含可执行名（模型分类需要）。
 - 不改 plan 形状、`access-plan-verifier`、profile/path policy。
 
@@ -395,7 +389,6 @@ reclassify:
 - 别名目标可为 `commands` 定义（`aliases: {mytool: my-linter}` 复用 my-linter 的 class/effects/subcommands，reason 用原始调用名）；alias 单步解析，不链式套 alias。
 - `reclassify` 按 basename 对齐 adapter 身份：adapter 已按 basename 识别命令（`/usr/local/bin/git` → git adapter），reclassify 匹配规则命令名时同样回退 basename——用户声明的分类微调在路径形式下不再静默失效（如 `/usr/local/bin/git status` + `{command: git, pattern: "status", class: modify}` 生效）。
 - 爆炸半径：registry.ts（`scopeKey` 3 处调用点：commands、aliases、别名目标的 commands 链式各一）；不碰 plan/verifier/policy。
-- 测试：command-overrides 12 个新/改用例（前缀命中、精确优先、最长前缀、裸名不隐式覆盖、跨目录不误伤、目标不存在、commands 前缀键、`./` 归一化精确键双向×2、别名→commands 链式、reclassify basename 对齐、alias 不链式负向）。
 
 **Rejected:**
 - **保留 basename 回退作为前缀键后的兜底**：冲突只在用户不用新消歧时"休眠"而非消除；显式作用域是更诚实的分类（D-024：语义由用户声明定义）。
@@ -413,7 +406,7 @@ reclassify:
 
 **Decision:** 平台支持边界从“仅支持 POSIX”收窄为**仅保证支持 Linux，以 Arch Linux 为基准工具链**：命令选项解析固定按 Arch Linux 的 GNU 工具链语义处理（GNU coreutils / GNU git / npm 生态常用选项），不提供按平台或发行版检测方言并切换选项表的机制。Windows、macOS、BSD 均不在支持范围，不建模其路径语义与选项方言；其他 Linux 发行版的工具链版本差异（如旧版 coreutils 缺失部分选项）不在保证范围——选项表以 Arch Linux（滚动发布、工具链最新）为准。BSD 工具与 GNU 的选项歧义（`stat -f` 为格式参数、`du -d` 在 BSD 无对应、`df -t` 在 BSD 为 flag）造成的解析差异不承诺消除，BSD 平台上的命令语义不在承诺范围。
 
-**Why:** 候选 C-007（BSD 选项方言检测）评估确认：触发条件（用户项目实际运行于 BSD 工具链）无现实样本；方言检测的方案要么在跨宿主场景（ssh/容器）错配，要么引入选项表双维护与双解析误报噪声，收益不抵成本。用户明确决定不引入方言检测，并把支持承诺锚定为 Arch Linux 基准——开发与验证环境即 Arch，选项表以该环境的 GNU 工具链为准，其他发行版工具链差异由环境承担。GNU 语义成为唯一且无条件的解析基线，消除“POSIX 范围内 BSD 行为未定义”的悬空承诺。
+**Why:** 候选 C-007（BSD 选项方言检测）评估确认：触发条件（用户项目实际运行于 BSD 工具链）无现实样本，方言检测收益不抵成本（错配/双维护/误报，详见 Rejected）。用户明确决定不引入方言检测，并把支持承诺锚定为 Arch Linux 基准——开发与验证环境即 Arch，选项表以该环境的 GNU 工具链为准，其他发行版工具链差异由环境承担。GNU 语义成为唯一且无条件的解析基线，消除“POSIX 范围内 BSD 行为未定义”的悬空承诺。
 
 **Impact:** R-16 平台边界表述同步；CONTEXT.md Negative Space 同步（仅保证 Arch Linux，Windows/macOS/BSD 显式列出，其他发行版不在保证范围）；C-007 dismissed（durable content 迁入本决策、R-16 与 Negative Space，同一变更删除候选来源）。代码零改动——选项解析本就固定 GNU 语义，无平台/发行版检测代码。D-031/D-034 中“POSIX 语义”指路径分隔符语义（`/`），与平台支持范围正交，表述不变。
 
@@ -436,7 +429,7 @@ reclassify:
 
 **Why:** 8 个流程型 skill 的 description 原为模型指令式措辞（“You MUST use this...”、“Use when the user says...”），但 `disable-model-invocation` 使模型永远看不到 description——触发承诺与实际触发机制矛盾，承诺的自动响应永不发生。修复：description 统一改写为用户侧调用指引（`Use /skill:<name> when...`），语义保留、仅改写触发面。rollback-session 保持手动调用而非模型响应：“undo/rollback” 语义有歧义（可能是会话导航 `/tree`、小修改或大规模撤销），且恢复涉及 `git reset --hard`/`checkout --`/`clean` 等破坏性操作，用户显式发起才具备明确撤销意图；触发词 “go back” 删除（与 `/tree` 会话导航语义重叠）。
 
-**Impact:** 8 个 workflows skill 的 description 改写为调用指引式；handoff-session 保留禁用并重构（见 Out of Scope）；README “User workflows” 概览与 D-005 三目录不变；触发场景互斥的 skill 保持独立（D-030）；校验脚本新增防回归检查。
+**Impact:** handoff-session 保留禁用并重构（见 Out of Scope）；README “User workflows” 概览与 D-005 三目录不变；触发场景互斥的 skill 保持独立（D-030）；校验脚本新增防回归检查。
 
 **Rejected:**
 
