@@ -65,7 +65,9 @@ function loadFile(path: string): CommandOverrides | null {
     const parsed = parseYaml(raw);
     if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
     return parsed as CommandOverrides;
-  } catch {
+  } catch (error) {
+    // 与 profiles 加载（响亮报错）一致：解析失败必须可见，不能静默回退默认语义
+    console.error(`command-overrides: failed to parse ${path}: ${error instanceof Error ? error.message : String(error)}`);
     return null;
   }
 }

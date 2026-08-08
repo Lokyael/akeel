@@ -59,7 +59,11 @@ export function loadProfiles(options: ProfileLoadOptions = {}): ResolvedProfiles
   const global = loadLayer(base, join(options.agentDir ?? getAgentDir(), "pi-keel", "profiles.json"));
   if (global.error) {
     options.onError?.(global.error);
-    return { ...builtin.value, defaultProfile: "keel-read" };
+    // 全局配置损坏 → 回退到内置集中最受限的 profile（keel-read），不依赖硬编码名字存在
+    const fallback = Object.keys(builtin.value.profiles).includes("keel-read")
+      ? "keel-read"
+      : builtin.value.defaultProfile;
+    return { ...builtin.value, defaultProfile: fallback };
   }
 
   const resolved = resolveProfiles(global.raw);

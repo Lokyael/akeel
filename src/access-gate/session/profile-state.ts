@@ -26,11 +26,17 @@ export function createProfileState(profiles: ResolvedProfiles): ProfileState {
 }
 
 export function findProjectRoot(cwd: string): string {
-  let current = realpathSync(cwd);
+  // cwd 可能在会话中被删除（session_start 竞态）——回退到字面 cwd，不让启动崩溃
+  let current: string;
+  try {
+    current = realpathSync(cwd);
+  } catch {
+    return cwd;
+  }
   while (true) {
     if (existsSync(join(current, ".git"))) return current;
     const parent = dirname(current);
-    if (parent === current) return realpathSync(cwd);
+    if (parent === current) return current;
     current = parent;
   }
 }

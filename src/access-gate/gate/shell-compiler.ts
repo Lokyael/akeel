@@ -41,8 +41,8 @@ function redirectionOperation(
 }
 
 export function compileShellDraft(input: ShellCompilerInput): CompilerDraftResult {
-  const command = input.command.trim();
-  if (!command) return reject("unsafe-syntax", "bash command is missing");
+  const command = input.command;
+  if (!command.trim()) return reject("unsafe-syntax", "bash command is missing");
   const inputLimit = validateInputLength(command, "shell command");
   if (inputLimit) return inputLimit;
 
@@ -53,8 +53,9 @@ export function compileShellDraft(input: ShellCompilerInput): CompilerDraftResul
   if (parsed.program.commands.length > ANALYSIS_LIMITS.maxCommands) return reject("resource-limit", "command count exceeds the analysis budget");
   if (parsed.program.unsafeSyntax) return reject("unsafe-syntax", parsed.program.unsafeSyntax);
 
-  // preflight 在 dynamic 检查之前运行，以便硬规则和威胁扫描提供更具体的错误信息
-  const preflight = runPreflight(command);
+  // preflight 在 dynamic 检查之前运行，以便硬规则和威胁扫描提供更具体的错误信息；
+  // 结构级检查基于 parse 后的 program（引号拆分规范化、注释/字符串不误报）
+  const preflight = runPreflight(parsed.program);
   if (preflight) return preflight;
 
   if (parsed.program.dynamic) return reject("dynamic-shell", "dynamic shell token");
