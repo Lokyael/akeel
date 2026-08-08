@@ -21,8 +21,6 @@ export type DecisionCode =
   | "unknown-effect"
   | "resource-limit";
 
-type Enforcement = "hard" | "profile" | "user";
-
 export type HardDenyCode = Exclude<DecisionCode, "path-denied" | "shell-policy-denied" | "approval-required" | "user-denied">;
 export type ProfileDenyCode = "path-denied" | "shell-policy-denied";
 
