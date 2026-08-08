@@ -22,7 +22,12 @@ const FILESYSTEM_CMDS: Record<string, {
   },
   touch: {
     class: "modify",
-    paths: (args) => args.map((a) => ({ op: "write", value: a.value ?? "" })),
+    // touch [-t STAMP] [-r REF] <file>... — 时间戳/日期被消费；-r/--reference 的参考文件是 read 源
+    paths: (args, consumed) => {
+      const ref = consumed.find((c) => c.option === "-r" || c.option === "--reference")?.value;
+      const writes = args.map((a) => ({ op: "write" as const, value: a.value ?? "" }));
+      return ref ? [{ op: "read" as const, value: ref }, ...writes] : writes;
+    },
     effects: ["write"],
     reason: "create/update files",
     valueOptions: ["-t", "-d", "--date", "-r", "--reference"],
@@ -38,10 +43,12 @@ const FILESYSTEM_CMDS: Record<string, {
   },
   chmod: {
     class: "modify",
-    // chmod <mode> <file>... — skip first positional arg (mode)；--reference= 出现时无 mode 位置参数
+    // chmod <mode> <file>... — skip first positional arg (mode)；--reference= 出现时无 mode 位置参数，参考文件是 read 源
     paths: (args, consumed) => {
       const hasReference = consumed.some((c) => c.option === "--reference");
-      return args.slice(hasReference ? 0 : 1).map((a) => ({ op: "write" as const, value: a.value ?? "" }));
+      const ref = consumed.find((c) => c.option === "--reference")?.value;
+      const files = args.slice(hasReference ? 0 : 1).map((a) => ({ op: "write" as const, value: a.value ?? "" }));
+      return ref ? [{ op: "read" as const, value: ref }, ...files] : files;
     },
     effects: ["permissionChange"],
     reason: "change file permissions",
@@ -49,10 +56,12 @@ const FILESYSTEM_CMDS: Record<string, {
   },
   chown: {
     class: "modify",
-    // chown <owner> <file>... — skip first positional arg (owner)；--reference= 出现时无 owner 位置参数
+    // chown <owner> <file>... — skip first positional arg (owner)；--reference= 出现时无 owner 位置参数，参考文件是 read 源
     paths: (args, consumed) => {
       const hasReference = consumed.some((c) => c.option === "--reference");
-      return args.slice(hasReference ? 0 : 1).map((a) => ({ op: "write" as const, value: a.value ?? "" }));
+      const ref = consumed.find((c) => c.option === "--reference")?.value;
+      const files = args.slice(hasReference ? 0 : 1).map((a) => ({ op: "write" as const, value: a.value ?? "" }));
+      return ref ? [{ op: "read" as const, value: ref }, ...files] : files;
     },
     effects: ["permissionChange"],
     reason: "change file ownership",

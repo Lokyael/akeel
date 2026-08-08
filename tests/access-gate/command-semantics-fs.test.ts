@@ -41,9 +41,9 @@ defineAdapterTests("fs", [
   { cmd: "mv -t /tmp a.txt b.txt", name: "mv -t writes target directory", cls: "modify", intents: [{ operation: "write", rawPath: "a.txt" }, { operation: "write", rawPath: "b.txt" }, { operation: "write", rawPath: "/tmp" }] },
   { cmd: "ln -t /tmp target.txt", name: "ln -t writes target directory", cls: "modify", intents: [{ operation: "read", rawPath: "target.txt" }, { operation: "write", rawPath: "/tmp" }] },
   { cmd: "touch -t 202401011200 file.txt", name: "touch -t consumes timestamp", cls: "modify", intents: [{ operation: "write", rawPath: "file.txt" }] },
-  { cmd: "touch -r ref.txt file.txt", name: "touch -r consumes reference", cls: "modify", intents: [{ operation: "write", rawPath: "file.txt" }] },
+  { cmd: "touch -r ref.txt file.txt", name: "touch -r consumes reference and reads it", cls: "modify", intents: [{ operation: "read", rawPath: "ref.txt" }, { operation: "write", rawPath: "file.txt" }] },
   { cmd: "mkdir -m 755 src", name: "mkdir -m consumes mode", cls: "modify", intents: [{ operation: "write", rawPath: "src" }] },
-  { cmd: "chmod --reference=ref.txt file.txt", name: "chmod --reference keeps file arg", cls: "modify", intents: [{ operation: "write", rawPath: "file.txt" }] },
-  { cmd: "chown --reference=ref.txt file.txt", name: "chown --reference keeps file arg", cls: "modify", intents: [{ operation: "write", rawPath: "file.txt" }] },
+  { cmd: "chmod --reference=ref.txt file.txt", name: "chmod --reference keeps file arg and reads reference", cls: "modify", intents: [{ operation: "read", rawPath: "ref.txt" }, { operation: "write", rawPath: "file.txt" }] },
+  { cmd: "chown --reference=ref.txt file.txt", name: "chown --reference keeps file arg and reads reference", cls: "modify", intents: [{ operation: "read", rawPath: "ref.txt" }, { operation: "write", rawPath: "file.txt" }] },
   { cmd: "shred -n 3 file.txt", name: "shred -n consumes iterations", cls: "destroy", intents: [{ operation: "write", rawPath: "file.txt" }] },
 ]);
