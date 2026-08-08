@@ -1,4 +1,4 @@
-// 文本处理命令 — sed, awk, sort, uniq 的选项语义
+// 文本处理命令 — sed, awk, sort, uniq, tr 的选项语义
 
 import type { ShellCommandNode, ShellArg } from "../../shell-parse/types";
 import type { CommandAdapter, CommandSemantics, PathIntent, SemanticContext } from "../types";
@@ -53,6 +53,11 @@ const UNIQ_OPTS: OptionSchema[] = [
   { names: ["-c", "-d", "-u", "-i", "--count", "--repeated", "--unique", "--ignore-case", "--version", "--help"], takesValue: false, operation: "read", flag: true },
 ];
 
+// tr 无文件参数（GNU/POSIX 均只读 stdin）；选项全为 flag，positionals（SET1/SET2）是字符集非文件路径。
+const TR_OPTS: OptionSchema[] = [
+  { names: ["-c", "--complement", "-d", "--delete", "-s", "--squeeze-repeats", "-t", "--truncate-set1", "--help", "--version"], takesValue: false, operation: "read", flag: true },
+];
+
 const TEXT_CONFIG: Record<string, {
   class: "inspect" | "modify" | "unknown";
   schemas: OptionSchema[];
@@ -61,11 +66,14 @@ const TEXT_CONFIG: Record<string, {
   inPlace?: boolean;
   /** 首个位置参数是程序（sed/awk 经典形式），未出现 -e/-f 时跳过。 */
   programFirst?: boolean;
+  /** 位置参数是字符集等非文件值（tr SET1/SET2）：消费但不产生路径 intent（D-027 值性质）。 */
+  positionalsNotFiles?: boolean;
 }> = {
   sed: { class: "inspect", schemas: SED_OPTS, reason: "stream editor", inPlace: true, programFirst: true },
   awk: { class: "inspect", schemas: AWK_OPTS, reason: "pattern scanning", inPlace: true, programFirst: true },
   sort: { class: "inspect", schemas: SORT_OPTS, reason: "sort lines" },
   uniq: { class: "inspect", schemas: UNIQ_OPTS, reason: "unique lines" },
+  tr: { class: "inspect", schemas: TR_OPTS, reason: "translate characters", positionalsNotFiles: true },
 };
 
 /**
@@ -78,6 +86,7 @@ function parseOptions(
   index: number,
   inPlace: boolean,
   programFirst: boolean,
+  positionalsNotFiles: boolean,
 ): { intents: PathIntent[]; opaque: boolean; sawWrite: boolean } {
   const intents: PathIntent[] = [];
   let opaque = false;
@@ -99,14 +108,16 @@ function parseOptions(
         continue;
       }
       programPending = false;
-      // 其余位置参数：输入文件（in-place 模式下出现写选项时是原地修改目标）
-      intents.push({
-        operation: inPlace && sawWrite ? "write" : "read",
-        rawPath: val,
-        source: "argument",
-        span: token.span,
-        confidence: "exact",
-      });
+      // 其余位置参数：输入文件（in-place 模式下出现写选项时是原地修改目标）；tr 等 positionalsNotFiles 命令的字符集非文件，消费不产生 intent
+      if (!positionalsNotFiles) {
+        intents.push({
+          operation: inPlace && sawWrite ? "write" : "read",
+          rawPath: val,
+          source: "argument",
+          span: token.span,
+          confidence: "exact",
+        });
+      }
       index++;
       continue;
     }
@@ -212,7 +223,7 @@ export const textTransformAdapter: CommandAdapter = {
     if (!config) return makeSemantics("unknown", { reason: `unknown text command: ${name}`, opaque: true });
 
     // 解析选项
-    const { intents: optionIntents, opaque, sawWrite } = parseOptions([...node.args], config.schemas, 0, config.inPlace === true, config.programFirst === true);
+    const { intents: optionIntents, opaque, sawWrite } = parseOptions([...node.args], config.schemas, 0, config.inPlace === true, config.programFirst === true, config.positionalsNotFiles === true);
 
     // 如果产生了写意图（-o/--output 或 in-place -i），升级为 modify
     const hasWrite = sawWrite || optionIntents.some((i) => i.operation === "write");

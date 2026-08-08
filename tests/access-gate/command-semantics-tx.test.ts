@@ -46,4 +46,10 @@ defineAdapterTests("tx", [
   { cmd: "sed -es/x/y/ file.txt", name: "sed attached -e expression is consumed without a path intent", cls: "inspect", opaque: false, intents: [{ operation: "read", rawPath: "file.txt" }] },
   { cmd: "sed -e", name: "expression option with no value is consumed without opaque", cls: "inspect", opaque: false, intents: [] },
   { cmd: "sed -i 's/x/y/'", name: "sed -i without positional files relies on the compiler conservative write", cls: "modify", intents: [] },
+  // tr —— POSIX 字符转换（T-042）：positionals（SET1/SET2）是字符集非文件路径
+  { cmd: "tr '\\n' ' '", name: "tr character sets are not file paths", cls: "inspect", intents: [] },
+  { cmd: "tr -d '\\n'", name: "tr -d flag is not opaque", cls: "inspect", opaque: false, intents: [] },
+  { cmd: "tr -ds ' ' '\\n'", name: "tr flag cluster is not opaque", cls: "inspect", opaque: false, intents: [] },
+  { cmd: "tr --delete '\\n'", name: "tr long flag is not opaque", cls: "inspect", opaque: false, intents: [] },
+  { cmd: "tr a-z A-Z", name: "tr ranges are sets, not files", cls: "inspect", intents: [] },
 ]);
