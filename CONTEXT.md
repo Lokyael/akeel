@@ -55,8 +55,7 @@
 - [D-030 提示词体系边界（Prompt Surface）](docs/decisions.md#d-030-提示词体系边界prompt-surface)
 - [D-031 路径可执行与 tsx 解释器归类](docs/decisions.md#d-031-路径可执行与-tsx-解释器归类)
 - [D-032 ask 渲染展示 unknown 命令的 literal form（知情同意）](docs/decisions.md#d-032-ask-渲染展示-unknown-命令的-literal-form知情同意)
-- [D-033 路径形式 alias basename 回退](docs/decisions.md#d-033-路径形式-alias-basename-回退)（superseded）
-- [D-034 覆盖层显式作用域键](docs/decisions.md#d-034-覆盖层显式作用域键)
+- [D-034 覆盖层显式作用域键](docs/decisions.md#d-034-覆盖层显式作用域键取代隐式-basename-回退)
 
 ## Negative Space
 

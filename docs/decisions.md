@@ -375,22 +375,22 @@ reclassify:
 - xargs 的 stdin 目标静态提取：运行期数据，静态不可知（D-031 同款边界）。
 - 其他 unknown 命令的语义扩充：属 D-024 用户 `command-overrides.yaml`。
 
-## D-034: 覆盖层显式作用域键（取代 D-033 隐式 basename 回退）
+## D-034: 覆盖层显式作用域键（取代隐式 basename 回退）
 
-**Status:** active（D-033 的 basename 回退被本决策取代）
+**Status:** active（取代隐式 basename 回退）
 
 **Decision:** 覆盖层（`aliases` 与 `commands`）的键改为**显式作用域匹配**：精确键优先（裸名或完整路径字符串，`./` 归一化对精确键与前缀键对称生效），路径形式按最长路径前缀键匹配（键以 `/` 结尾）；**移除隐式 basename 回退**。别名目标可为用户定义的 `commands` 条目（链式：别名 → 命令定义）。解析顺序：commands→aliases→commands(别名目标)→adapter→reclassify。
 
 **Why:**
-- D-033 的隐式 basename 回退把"工具身份"与"调用拼写"混为一谈：一个裸名键同时覆盖 `./bin/mytool` 与 `./vendor/mytool`——gate 不做 filesystem 解析（D-031），同名不同工具无法区分，冲突结构性存在。
+- 隐式 basename 回退（路径形式在精确键未命中时按工具 basename 查键，让一次声明覆盖两种拼写）把"工具身份"与"调用拼写"混为一谈：一个裸名键同时覆盖 `./bin/mytool` 与 `./vendor/mytool`——gate 不做 filesystem 解析（D-031），同名不同工具无法区分，冲突结构性存在。
 - 显式作用域把歧义交给用户声明（D-024 权威）：每个键声明明确覆盖范围（裸名 / 精确路径 / 路径前缀），gate 不再猜测哪个路径形式该被覆盖——basename 冲突从设计上消除。
 - 路径前缀键把"误伤"变成"能力"：`"bin/": cat` 明确声明目录内全部工具语义；`"./vendor/mytool": git` 精确指向具体二进制。
-- D-033 的拼写一致性目标以显式方式保留：想两种拼写都覆盖，写 `mytool: cat` + `"bin/": cat`——声明取代猜测。
+- 拼写一致性目标以显式方式保留：想两种拼写都覆盖，写 `mytool: cat` + `"bin/": cat`——声明取代猜测。
 
 **Impact:**
 - `aliases: {mytool: cat}` 不再覆盖 `./bin/mytool`（路径形式默认 execute，D-031）；覆盖需 `"bin/": cat` 或精确路径键。
 - 匹配规则：精确键 > 最长前缀键；`./` 归一化（`"bin/"` 命中 `./bin/mytool`）；前缀键不误伤其他目录同名工具。
-- `commands` 同样支持前缀键（消除 D-033 Out of Scope 记录的同类不对称）。
+- `commands` 同样支持前缀键（此前 commands 只支持精确键，与 aliases 的路径形式匹配不对称；现两者统一为显式作用域）。
 - `./` 归一化对称：精确键与前缀键同样归一化前导 `./`——`"bin/eslint"` 命中 `./bin/eslint`，`"./bin/eslint"` 命中 `bin/eslint`（`./` 无管理意义，拼写差异不产生作用域分裂）。
 - 别名目标可为 `commands` 定义（`aliases: {mytool: my-linter}` 复用 my-linter 的 class/effects/subcommands，reason 用原始调用名）；alias 单步解析，不链式套 alias。
 - `reclassify` 按 basename 对齐 adapter 身份：adapter 已按 basename 识别命令（`/usr/local/bin/git` → git adapter），reclassify 匹配规则命令名时同样回退 basename——用户声明的分类微调在路径形式下不再静默失效（如 `/usr/local/bin/git status` + `{command: git, pattern: "status", class: modify}` 生效）。
@@ -406,31 +406,4 @@ reclassify:
 - 前缀键的绝对/相对拼写敏感（`"/abs/bin/"` 与 `"bin/"` 是不同作用域）：`./` 已归一化，其余拼写差异由用户声明承担。
 - Windows `\` 路径（POSIX 语义）。
 - 目录内多个前缀键重叠：最长前缀优先，已测试。
-
-## D-033: 路径形式 alias basename 回退
-
-**Status:** superseded（被 D-034 显式作用域键取代）。
-
-**Decision:** `registry.ts` 别名解析：路径形式（executable 含 `/`）在精确键未命中时按 basename 回退查 alias，与裸名语义一致。解析顺序不变（commands→aliases→adapter→reclassify）；alias 优先于内置 adapter（与裸名一致）。
-
-**Why:**
-- 消除 spelling-based 拼写分裂：用户对同一工具的一次声明（`aliases: {mytool: cat}`）应对裸名与路径形式同样生效——路径形式此前被 D-031 的 execute 回退覆盖，声明被拼写打败。
-- 信任锚不变：alias 是用户显式声明（D-024 权威），裸名时已作用于 PATH 解析到的工具；basename 回退只是把同一信任延伸到显式路径，不新增信任边界。
-- 与 D-031 初衷一致（消除拼写偏差）；alias 优先于内置 adapter 与裸名解析完全一致（步骤顺序不变）。
-
-**Impact:**
-- `./bin/mytool` + `aliases: {mytool: cat}` → cat 语义（inspect），此前为 execute；`mytool` 与 `./bin/mytool` 两种拼写行为一致。
-- 精确键仍优先（`aliases: {"./bin/foo": git}` 命中）；无 alias 路径形式仍 execute（D-031 不变）；alias 目标不存在 → unknown（与裸名一致）。
-- 爆炸半径：`analyzeSemantics` 唯一生产调用方是 `shell-compiler.ts`；不碰 plan/verifier/policy；实现 3 行。
-- 测试：`command-overrides.test.ts` 4 个新用例（basename 命中、精确键优先、无 alias execute、目标不存在 unknown）。
-
-**Rejected:**
-- **维持现状（全路径键变通）**：用户一次声明被拼写分裂，与 D-031 初衷冲突。
-- **basename 回退仅无 adapter 时**：裸名 alias 优先于内置 adapter（步骤顺序），路径形式若 adapter 优先则两种拼写行为分裂——引入新拼写偏差。
-
-**Out of Scope:**
-- ~~`commands`（完整命令定义）仍精确键~~：已解决——D-034 使 `commands` 与 `aliases` 同样支持精确 + 路径前缀键（见 D-034 Impact）。
-- Windows `\` 路径（宿主为 Unix 语义）。
-- basename 冲突（两路径同名工具共享 alias）：与裸名模型一致（PATH 决定），属用户声明范畴；D-034 显式作用域键已结构性消除。
-- 执行记录（`BashExecutionMessage.command`）的脱敏：执行由 pi 负责，gate 渲染层控制不到（R-11 边界）。
 

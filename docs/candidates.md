@@ -4,4 +4,51 @@
 >
 > 编号取末尾最大 `C-xxx` + 1，不复用历史 ID。
 
-当前没有 Candidate Record。
+## C-001: guidance 文本精简（提示词体系观察）
+
+- **来源:** [D-030](decisions.md#d-030-提示词体系边界prompt-surface) Revisit when ①
+- **Trigger:** guidance 文本总量显著增长
+- **Review On:** 2026-09-07（条件触发，随显式 context survey 复审）
+- **内容:** 失败路径与高压力场景的 guidance 措辞精度要求最高；总量增长时评估精简。不构成维护承诺。
+
+## C-002: 合并触发场景互斥的 skill
+
+- **来源:** [D-030](decisions.md#d-030-提示词体系边界prompt-surface) Revisit when ②
+- **Trigger:** 实测两个 skill 触发场景重合
+- **Review On:** 2026-09-07（条件触发，随显式 context survey 复审）
+- **内容:** 全量消费约束（D-030）的必然推论；场景重合时评估合并。不构成维护承诺。
+
+## C-003: token 基线测量与提示词行为测试
+
+- **来源:** [D-030](decisions.md#d-030-提示词体系边界prompt-surface) Revisit when ③
+- **Trigger:** 出现可观察的遵守度问题
+- **Review On:** 2026-09-07（条件触发，随显式 context survey 复审）
+- **内容:** "理解认知"无法可靠操作化；出现遵守度问题时评估测量方案。不构成维护承诺。
+
+## C-004: 容器级迁移引导机制
+
+- **来源:** [D-028](decisions.md#d-028-统一-project-record-模型) Out of Scope（Revisit when）
+- **Trigger:** 出现以自有方式管理文档（自有决策寄存器、ADR、跟踪器、ideas/backlog）的真实用户项目
+- **Review On:** 2026-09-07（条件触发，随显式 context survey 复审）
+- **内容:** 不建专用 skill、声明/路由系统，不改 CONTEXT.md 契约；offer 时刻防双源两子句已就位；迁移 = 非默认，仅用户显式选择时作为一次性 Task 走 Migration Protocol。不构成维护承诺。
+
+## C-005: config 类命令目标解析（R-11 残余）
+
+- **来源:** [security-boundaries.md](security-boundaries.md) R-11
+- **Trigger:** config 类命令（`--global`/`--local`/`--userconfig` 等）误分类造成实际审批摩擦
+- **Review On:** 2026-09-07（条件触发，随显式 context survey 复审）
+- **内容:** 为 config 类命令建模目标解析可缩小 R-11 审批详情信息边界；当前不引入。不构成实施承诺。
+
+## C-006: TOCTOU 原子机制
+
+- **来源:** [security-boundaries.md](security-boundaries.md)（pathname check 边界）
+- **Trigger:** 出现可接受的 fd-based 或 OS-level 原子机制引入窗口
+- **Review On:** 2026-09-07（条件触发，随显式 context survey 复审）
+- **内容:** 消除 pathname check 与实际文件操作之间的 TOCTOU 残余需实际操作方使用 fd-based 或 OS-level 原子机制；当前不引入。不构成实施承诺。
+
+## C-007: BSD 选项方言检测
+
+- **来源:** [security-boundaries.md](security-boundaries.md)（平台边界）
+- **Trigger:** 用户项目实际运行于 BSD 工具链
+- **Review On:** 2026-09-07（条件触发，随显式 context survey 复审）
+- **内容:** GNU/BSD 选项歧义（`stat -c`/`-f`、`du -d`、`df -t` 等）按平台检测方言切换选项表可消除；当前不引入。平台边界仍为 POSIX（Windows/macOS 在 Negative Space）。不构成实施承诺。
