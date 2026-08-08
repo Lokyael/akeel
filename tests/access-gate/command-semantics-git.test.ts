@@ -55,6 +55,7 @@ defineAdapterTests("git", [
   { cmd: "git config --global user.name zev", name: "config --global writes ~/.gitconfig", cls: "modify", intents: [{ operation: "write", rawPath: "~/.gitconfig", confidence: "exact" }] },
   { cmd: "git config --system core.filemode false", name: "config --system writes /etc/gitconfig", cls: "modify", intents: [{ operation: "write", rawPath: "/etc/gitconfig", confidence: "exact" }] },
   { cmd: "git config --file=conf.ini key v", name: "config --file= writes exact path", cls: "modify", intents: [{ operation: "write", rawPath: "conf.ini", confidence: "exact" }] },
+  { cmd: "git config --file conf.ini key v", name: "config --file separated value writes exact path", cls: "modify", intents: [{ operation: "write", rawPath: "conf.ini", confidence: "exact" }] },
   { cmd: "git config -f conf.ini key v", name: "config -f writes exact path", cls: "modify", intents: [{ operation: "write", rawPath: "conf.ini", confidence: "exact" }] },
   { cmd: "git config --file= key v", name: "config --file= empty value is opaque", cls: "modify", opaque: true },
   { cmd: "git config --local key v", name: "config --local writes .git/config conservative", cls: "modify", intents: [{ operation: "write", rawPath: ".git/config", confidence: "conservative" }] },

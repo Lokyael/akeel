@@ -97,7 +97,7 @@ const GIT_CONFIG_TABLE: ConfigOptionTable = {
   readConsume: new Set(["--type", "-t", "--default"]),
   readEquals: ["--value"],
   ignoreFlags: new Set(),
-  consumeTargets: new Set(["-f"]),
+  consumeTargets: new Set(["-f", "--file"]),
   equalsTargets: ["--file"],
   staticTargets: {
     "--global": { rawPath: "~/.gitconfig", confidence: "exact" },
