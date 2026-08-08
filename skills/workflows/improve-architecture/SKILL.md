@@ -1,6 +1,6 @@
 ---
 name: improve-architecture
-description: Scan a codebase for deepening opportunities, present them as a visual HTML report, then grill through the chosen one. Use when the codebase feels like a ball of mud or the user wants to improve architecture.
+description: Use /skill:improve-architecture when the codebase feels like a ball of mud or the user wants to improve architecture. Scan a codebase for deepening opportunities, present them as a visual HTML report, then grill through the chosen one.
 disable-model-invocation: true
 ---
 

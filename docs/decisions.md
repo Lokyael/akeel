@@ -428,3 +428,22 @@ reclassify:
 - Windows `\` 路径与 macOS 路径/选项方言：已在 Negative Space，不因 stat/du/df 同为 BSD 方言而把 macOS 纳入支持。
 - 跨宿主场景（ssh、容器）的命令语义方言：静态分类不做执行环境探测（同 D-031 无 filesystem 检查边界）。
 
+## D-036: Workflows 触发模型（手动调用与即时介入）
+
+**Status:** active
+
+**Decision:** workflows 层按“是否需要即时介入”划分触发模型：**用户显式 `/skill` 触发**（`disable-model-invocation: true`，description 以 `Use /skill:<name>` 开头）——brainstorm-design、draft-spec、draft-tickets、grill-docs、implement-work、improve-architecture、rollback-session、handoff-session；**模型可响应触发词**（无禁用）——survey-context（任务启动）、grill-plan（grill 触发词）。validate-skills.ts 强制校验：workflows 层带 `disable-model-invocation` 的 skill，description 必须以 `Use /skill:<name>` 开头，防触发承诺失效回归。
+
+**Why:** 8 个流程型 skill 的 description 原为模型指令式措辞（“You MUST use this...”、“Use when the user says...”），但 `disable-model-invocation` 使模型永远看不到 description——触发承诺与实际触发机制矛盾，承诺的自动响应永不发生。修复：description 统一改写为用户侧调用指引（`Use /skill:<name> when...`），语义保留、仅改写触发面。rollback-session 保持手动调用而非模型响应：“undo/rollback” 语义有歧义（可能是会话导航 `/tree`、小修改或大规模撤销），且恢复涉及 `git reset --hard`/`checkout --`/`clean` 等破坏性操作，用户显式发起才具备明确撤销意图；触发词 “go back” 删除（与 `/tree` 会话导航语义重叠）。
+
+**Impact:** 8 个 workflows skill 的 description 改写为调用指引式；handoff-session 保留禁用并重构（见 Out of Scope）；README “User workflows” 概览与 D-005 三目录不变；触发场景互斥的 skill 保持独立（D-030）；校验脚本新增防回归检查。
+
+**Rejected:**
+
+- **移除 rollback-session 的 `disable-model-invocation` 让模型响应 “undo” 触发词**：用户说 “undo” 可能是会话导航或小修改，模型自动进入恢复指导会误判与打断；破坏性操作需要用户显式发起。拒绝。
+- **为 workflows 触发模型新增专用配置面或路由系统**：`/skill:` 是 pi 宿主既有机制，自建即重复。拒绝。
+
+**Out of Scope:**
+
+- **handoff-session 定位**（跨环境交接）：handoff 文档的唯一不可替代价值是“无本会话历史访问权的接收方”（非 pi 工具、跨机器/环境）获得状态摘要；同 pi 环境交接由 `/resume`/`/tree`（pi 持久 session 文件全量恢复）与 `survey-context`（从 CONTEXT/task/decisions 重建上下文）覆盖，摘要不增加保真度。原实现写 `$TMPDIR` 是缺陷：Linux `/tmp` 重启即清理、跨机器不可达——在唯一需要它的场景（跨环境）恰恰无法送达。重构：默认在会话中输出文档内容由用户交付（用户掌控持久性），用户显式指定路径时才写入；未沉淀决策不写入 handoff，先经 domain-modeling 入 `docs/decisions.md` 再引用路径（防双源，D-028）。**Revisit when** 出现需频繁跨工具交接的真实用户场景。
+

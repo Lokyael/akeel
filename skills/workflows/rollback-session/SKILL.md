@@ -1,6 +1,6 @@
 ---
 name: rollback-session
-description: Guide the user through recovering from unwanted changes using version control and session tree branching. Use when the user says "undo", "rollback", "revert", "go back", or when the agent has made changes the user wants to discard.
+description: Use /skill:rollback-session when the user wants to undo, rollback, or revert changes, or discard changes the agent made. Guide the user through recovering from unwanted changes using version control and session tree branching.
 disable-model-invocation: true
 ---
 

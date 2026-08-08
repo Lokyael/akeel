@@ -1,6 +1,6 @@
 ---
 name: brainstorm-design
-description: Turn ideas into fully formed designs through collaborative dialogue before any creative work. You MUST use this before building features, creating components, adding functionality, or modifying behavior. Explores user intent, requirements, and design before implementation.
+description: Use /skill:brainstorm-design before building features, creating components, adding functionality, or modifying behavior. Turn ideas into fully formed designs through collaborative dialogue before any creative work. Explores user intent, requirements, and design before implementation.
 disable-model-invocation: true
 ---
 

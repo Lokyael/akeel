@@ -57,6 +57,7 @@
 - [D-032 ask 渲染展示 unknown 命令的 literal form（知情同意）](docs/decisions.md#d-032-ask-渲染展示-unknown-命令的-literal-form知情同意)
 - [D-034 覆盖层显式作用域键](docs/decisions.md#d-034-覆盖层显式作用域键取代隐式-basename-回退)
 - [D-035 平台边界收窄为仅 Linux](docs/decisions.md#d-035-平台边界收窄为仅-linuxdismiss-c-007)
+- [D-036 Workflows 触发模型（手动调用与即时介入）](docs/decisions.md#d-036-workflows-触发模型手动调用与即时介入)
 
 ## Negative Space
 

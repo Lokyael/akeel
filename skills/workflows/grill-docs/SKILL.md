@@ -1,6 +1,6 @@
 ---
 name: grill-docs
-description: Doc-grounded grilling session that updates the project context and decision register as decisions crystallize. Use when the plan relies on external libraries or APIs, and every challenge must cite real documentation. For documentation-free grilling, use grill-plan.
+description: Use /skill:grill-docs when the plan relies on external libraries or APIs, and every challenge must cite real documentation. Doc-grounded grilling session that updates the project context and decision register as decisions crystallize. For documentation-free grilling, use grill-plan.
 disable-model-invocation: true
 ---
 

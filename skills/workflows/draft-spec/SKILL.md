@@ -1,6 +1,6 @@
 ---
 name: draft-spec
-description: Turn the current conversation into a structured Task Record — synthesize what has already been discussed without re-interviewing. Use when requirements need to be captured before implementation.
+description: Use /skill:draft-spec when requirements need to be captured before implementation. Turn the current conversation into a structured Task Record — synthesize what has already been discussed without re-interviewing.
 disable-model-invocation: true
 ---
 

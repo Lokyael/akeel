@@ -1,6 +1,6 @@
 ---
 name: draft-tickets
-description: Break the current Task Record into tracer-bullet task sections, each declaring its blocking edges. Use after draft-spec or when a plan is ready for decomposition.
+description: Use /skill:draft-tickets after draft-spec or when a plan is ready for decomposition. Break the current Task Record into tracer-bullet task sections, each declaring its blocking edges.
 disable-model-invocation: true
 ---
 

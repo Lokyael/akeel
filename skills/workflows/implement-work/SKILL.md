@@ -1,6 +1,6 @@
 ---
 name: implement-work
-description: Implement an approved Task Record from `docs/task.md` or `docs/task-<topic>.md`, orchestrating test-driven-development, code-audit, code-review, and documentation synchronization. Use when ready to build.
+description: Use /skill:implement-work when ready to build. Implement an approved Task Record from `docs/task.md` or `docs/task-<topic>.md`, orchestrating test-driven-development, code-audit, code-review, and documentation synchronization.
 disable-model-invocation: true
 ---
 

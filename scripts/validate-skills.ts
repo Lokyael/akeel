@@ -31,6 +31,8 @@ interface SkillMeta {
   name: string;
   /** Parsed frontmatter description */
   description: string;
+  /** Parsed frontmatter disable-model-invocation */
+  disableModelInvocation: boolean;
   /** Complete SKILL.md content */
   content: string;
   /** SKILL.md line count */
@@ -92,12 +94,14 @@ function collectSkills(): SkillMeta[] {
       const fm = parseFrontmatter(content);
       const name = fm.values["name"];
       const description = fm.values["description"];
+      const disableModelInvocation = fm.values["disable-model-invocation"] === true;
       skills.push({
         dirName: entry,
         layer,
         frontmatterError: fm.error,
         name: typeof name === "string" ? name : "",
         description: typeof description === "string" ? description : "",
+        disableModelInvocation,
         content,
         lineCount: content.split(/\r?\n/).length,
       });
@@ -145,7 +149,18 @@ function checkDescriptionConvention(skill: SkillMeta): CheckResult {
   }
 
   // Foundations: should be descriptive, no strict format enforcement
-  // Workflows: should describe trigger condition
+
+  // Workflows with disable-model-invocation: manual-only skills — description MUST be an
+  // explicit invocation guide, not a model-facing trigger promise that can never fire.
+  if (
+    skill.layer === "workflows" &&
+    skill.disableModelInvocation &&
+    !skill.description.startsWith(`Use /skill:${skill.name}`)
+  ) {
+    errors.push(
+      `description MUST start with "Use /skill:${skill.name}" (disable-model-invocation skills are user-invoked only; model-facing trigger wording would never fire). Got: "${skill.description.slice(0, 60)}..."`
+    );
+  }
 
   // Description length
   if (skill.description.length > 1024) {
