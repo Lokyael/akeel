@@ -2,7 +2,7 @@
 
 import type { ShellCommandNode, ShellArg } from "../../shell-parse/types";
 import type { CommandAdapter, CommandSemantics, PathIntent, SemanticContext } from "../types";
-import { makeSemantics, optionIntent } from "./shared";
+import { makeSemantics, matchFlagCluster, optionIntent } from "./shared";
 
 interface OptionSchema {
   /** 选项名（短和长）。 */
@@ -162,14 +162,10 @@ function parseOptions(
         continue;
       }
       // 组合纯 flag 短选项：-rn、-cd、-nE（POSIX 组合短选项，逐字符均为无值 flag 时消费）。
-      // 簇内任一带值选项（如 sed -ne、sort -oFILE）不满足，落回后续分支——附着值语义由上面两分支负责，保守不扩展。
-      const clusterChars = val.length > 2 ? val.slice(1).split("") : [];
-      const clusterOk = clusterChars.length > 0 && clusterChars.every((ch) =>
-        schemas.some((s) => !s.takesValue && s.names.includes(`-${ch}`)),
-      );
-      if (clusterOk) {
-        for (const ch of clusterChars) {
-          const s = schemas.find((o) => !o.takesValue && o.names.includes(`-${ch}`))!;
+      // 簇内含带值选项（如 sed -ne、sort -oFILE）返回 null，落回后续分支——附着值语义由上面两分支负责，保守不扩展。
+      const cluster = matchFlagCluster(val, schemas);
+      if (cluster) {
+        for (const s of cluster) {
           if (s.isPattern) sawPattern = true;
           if (s.operation === "write") sawWrite = true;
         }

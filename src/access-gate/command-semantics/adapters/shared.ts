@@ -108,11 +108,56 @@ export function extractPositionalArgs(
         consumed.push({ option: attached.endsWith("=") ? attached.slice(0, -1) : attached, value: val.slice(attached.length) });
         continue;
       }
+      // POSIX 组合簇 + 尾随带值短选项：-rt d（-t 分离值）、-rref.txt（-r 附着值）、-pm 755
+      // 从前往后扫描单字符短选项，首个命中 valueOptions 的即带值选项；其前字符视为 flag 簇（不验证），
+      // 值 = token 内剩余（附着）或下一 token（分离）；无下一 token（缺值，POSIX 错误输入）时静默不消费。
+      // 未命中则整体跳过（纯 flag 簇/未知，现状）。
+      if (!val.startsWith("--")) {
+        for (let k = 1; k < val.length; k++) {
+          const opt = `-${val[k]}`;
+          if (valueOptions.includes(opt)) {
+            if (k < val.length - 1) {
+              consumed.push({ option: opt, value: val.slice(k + 1) });
+            } else if (i + 1 < args.length) {
+              consumed.push({ option: opt, value: args[i + 1]!.value ?? "" });
+              i++;
+            }
+            break;
+          }
+        }
+      }
       continue;
     }
     positional.push(args[i]!);
   }
   return { positional, consumed };
+}
+
+/** 组合短选项匹配所需的最小选项 schema 形状（text-transform 的 OptionSchema 满足此形状）。 */
+export interface FlagSchemaLike {
+  names: readonly string[];
+  takesValue: boolean;
+  operation: "read" | "write";
+  isPattern?: boolean;
+}
+
+/**
+ * POSIX 组合短选项匹配：token 形如 -rn（单 "-"、非 "--"、长度 > 2），
+ * 逐字符均为无值 flag 才消费。返回命中的 schema 列表（按字符序）；
+ * 簇内含带值选项或未知字符返回 null——调用方保持原处置（如 text-transform 的 opaque）。
+ */
+export function matchFlagCluster(
+  token: string,
+  schemas: readonly FlagSchemaLike[],
+): FlagSchemaLike[] | null {
+  if (!token.startsWith("-") || token.startsWith("--") || token.length <= 2) return null;
+  const found: FlagSchemaLike[] = [];
+  for (const ch of token.slice(1).split("")) {
+    const schema = schemas.find((s) => !s.takesValue && s.names.includes(`-${ch}`));
+    if (!schema) return null;
+    found.push(schema);
+  }
+  return found;
 }
 
 // ─── 配置命令共享解析引擎（git config / npm config，T-037 系列） ───
