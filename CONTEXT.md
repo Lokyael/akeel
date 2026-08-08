@@ -66,7 +66,7 @@
 - 不拦截 `user_bash`、`shellCommandPrefix`、Bash `spawnHook`、tool override、custom tool backend、未知 Direct tool surface 或其他 Extension 的直接操作。
 - 不为 Candidate Record 提供自动提醒、后台定时器、Session hook、Footer 状态或专用 review 技能；复审只在显式 context survey 中报告。
 - 不把短期 Task Record、实施过程或审查报告作为永久项目知识。
-- 不自动识别用户项目的自有文档体系（自有决策寄存器、ADR、跟踪器、ideas/backlog），不提供容器级迁移引导；非标准体系由用户在 `AGENTS.md` 或会话中显式声明。
+- 不自动识别、不写入用户项目的自有文档体系，不提供容器级迁移引导；非标准体系由用户在 `AGENTS.md` 或会话中显式声明。
 - 不修改用户项目的 `README.md`、`AGENTS.md`、`.gitignore` 和 `package.json`，除非用户明确要求。
 
 ## Project Documents
