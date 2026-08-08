@@ -20,6 +20,12 @@ export function optionIntent(
   return { operation, rawPath, source: "option", span: { start: 0, end: 0 }, confidence };
 }
 
+/** 配置目标：配置文件路径 + 置信度（exact = 静态确定，conservative = 环境依赖）。 */
+export interface ConfigTarget {
+  rawPath: string;
+  confidence: "exact" | "conservative";
+}
+
 function defaultEffects(cls: CommandClass): readonly Effect[] {
   if (cls === "inspect") return ["read"];
   if (cls === "modify") return ["write"];

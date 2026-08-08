@@ -2,7 +2,7 @@
 
 import type { ShellArg, ShellCommandNode } from "../../shell-parse/types";
 import type { CommandAdapter, CommandSemantics, PathIntent, SemanticContext } from "../types";
-import { makeSemantics, extractSubcommand, optionIntent } from "./shared";
+import { makeSemantics, extractSubcommand, optionIntent, type ConfigTarget } from "./shared";
 
 interface PkgDef {
   cls: "inspect" | "modify" | "execute" | "unknown";
@@ -90,7 +90,7 @@ function findConfigIndex(args: readonly ShellArg[]): number {
  */
 function analyzePkgConfig(rest: readonly ShellArg[]): { cls: "modify"; intents: PathIntent[]; opaque: boolean } | null {
   let op = "";
-  let target: { rawPath: string; confidence: "exact" } | null = null;
+  let target: ConfigTarget | null = null;
   let sawUnknown = false;
 
   for (let i = 0; i < rest.length; i++) {

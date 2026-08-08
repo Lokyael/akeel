@@ -2,7 +2,7 @@
 
 import type { ShellCommandNode, ShellArg } from "../../shell-parse/types";
 import type { CommandAdapter, CommandSemantics, Effect, PathIntent, SemanticContext } from "../types";
-import { makeSemantics, optionIntent } from "./shared";
+import { makeSemantics, optionIntent, type ConfigTarget } from "./shared";
 
 /** Git 子命令分类。 */
 type GitClass = "inspect" | "modify" | "destroy";
@@ -86,12 +86,6 @@ function gitEffects(def: GitDef, subcmd: string): readonly Effect[] {
 
 // ─── git config 子命令：读写分类 + 配置层级目标解析（T-037） ───
 
-/** git config 目标层级 → 配置文件路径（confidence 区分确定/环境依赖目标）。 */
-interface ConfigTarget {
-  rawPath: string;
-  confidence: "exact" | "conservative";
-}
-
 const CONFIG_DEFAULT_TARGET: ConfigTarget = { rawPath: ".git/config", confidence: "conservative" };
 
 /** 读特征选项（改变输出格式/过滤，不改变文件访问；含消费值的 --type/-t/--default）。 */
@@ -99,6 +93,7 @@ const CONFIG_READ_FLAGS = new Set([
   "--list", "-l", "-z", "--null", "--get", "--get-all", "--get-regexp", "--get-color", "--get-colorbool",
   "--show-origin", "--show-scope", "--name-only", "--bool", "--int", "--bool-or-int", "--path",
   "--expiry-date", "--no-type", "--fixed-value", "--includes", "--no-includes",
+  "--no-global", "--no-system", "--no-local", "--no-worktree",
 ]);
 
 /** 写特征选项。 */

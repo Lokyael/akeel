@@ -66,6 +66,8 @@ Guidance 只能从源码内置的静态 `GuidanceId` catalog 映射，不拼接�
 
 `git config`/`npm config`/`pnpm config` 的写操作已建模配置层级目标（T-037）：`--global`→`~/.gitconfig`、`--system`→`/etc/gitconfig`、`--file=`/`-f`/`--userconfig`/`--globalconfig`→精确路径，产出 write intent 进入 PathPolicy；无层级/`--local` 的目标 `$cwd/.git/config` 落在 blocked paths（`project/.git/**`），写入被硬拒。外部配置文件写入不再绕过 PathPolicy。
 
+读型 config（`git config <key>`/`--list`/`--get` 等）不产生路径 intent，与 git status/log 等 inspect 命令同规则：`.git/**` blocked paths 只拦截直接文件访问（Direct 工具、重定向），不拦截 git 命令自身的 .git 内部读取（输出经命令过滤）；读型靠 shellPolicy inspect 决策。
+
 未建模的配置写手（yarn config、pip config、uv、cargo 等）仍按 modify + cwd 保守写检查处理，其外部配置文件写入不经过 PathPolicy 检查——语义扩充属用户 `command-overrides.yaml`（D-024），不内置。
 
 ## R-16：命令语义的平台假设

@@ -61,6 +61,7 @@ defineAdapterTests("git", [
   { cmd: "git config --unset user.name", name: "config --unset is modify write", cls: "modify", intents: [{ operation: "write", rawPath: ".git/config", confidence: "conservative" }] },
   { cmd: "git config --list", name: "config --list is inspect without path intent", cls: "inspect", intents: [] },
   { cmd: "git config --global user.name", name: "config --global read is inspect without path intent", cls: "inspect", intents: [] },
+  { cmd: "git config --no-global user.name", name: "config --no-global read exclusion is inspect without opaque", cls: "inspect", opaque: false, intents: [] },
   { cmd: "git config --bogus key v", name: "config unknown option is opaque", cls: "modify", opaque: true },
   { cmd: ["git apply patch.diff", "git gc"], name: "apply and gc are modify", cls: "modify" },
   { cmd: "git submodule update --init", name: "submodule carries network effect", cls: "modify", effects: ["network"] },
