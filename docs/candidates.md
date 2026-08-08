@@ -32,10 +32,3 @@
 - **Review On:** 2026-09-07（条件触发，随显式 context survey 复审）
 - **内容:** 不建专用 skill、声明/路由系统，不改 CONTEXT.md 契约；offer 时刻防双源两子句已就位；迁移 = 非默认，仅用户显式选择时作为一次性 Task 走 Migration Protocol。不构成维护承诺。
 
-## C-005: config 类命令目标解析（R-11 残余）
-
-- **来源:** [security-boundaries.md](security-boundaries.md) R-11
-- **Trigger:** config 类命令（`--global`/`--local`/`--userconfig` 等）误分类造成实际审批摩擦
-- **Review On:** 2026-09-07（条件触发，随显式 context survey 复审）
-- **内容:** 为 config 类命令建模目标解析可缩小 R-11 审批详情信息边界；当前不引入。不构成实施承诺。
-
