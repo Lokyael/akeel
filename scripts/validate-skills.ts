@@ -219,9 +219,33 @@ function checkExternalUrls(skill: SkillMeta): CheckResult {
   return { pass: true, warnings, errors: [] };
 }
 
+// ─── Self-check: the manual-invocation rule must actually reject violations ───
+
+function selfCheckManualInvocationRule(): void {
+  const violating: SkillMeta = {
+    dirName: "sample",
+    layer: "workflows",
+    frontmatterError: undefined,
+    name: "sample",
+    description: "Compact the conversation when the user asks for a handoff.",
+    disableModelInvocation: true,
+    content: "",
+    lineCount: 1,
+  };
+  const result = checkDescriptionConvention(violating);
+  const ruleFired = result.errors.some((e) => e.includes("Use /skill:sample"));
+  if (!ruleFired) {
+    console.error(
+      "❌ Self-check FAILED: manual-invocation rule did not reject a violating description. Fix the rule or the self-check."
+    );
+    process.exit(1);
+  }
+}
+
 // ─── Main ───
 
 function main() {
+  selfCheckManualInvocationRule();
   const skills = collectSkills();
   console.log(`Validating ${skills.length} skills...\n`);
 
