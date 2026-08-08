@@ -2,7 +2,7 @@
 
 import type { ShellCommandNode, ShellArg } from "../../shell-parse/types";
 import type { CommandAdapter, CommandSemantics, Effect, PathIntent, SemanticContext } from "../types";
-import { makeSemantics, optionIntent, type ConfigTarget } from "./shared";
+import { makeSemantics, optionIntent, parseConfigOptions, type ConfigOptionTable, type ConfigTarget } from "./shared";
 
 /** Git 子命令分类。 */
 type GitClass = "inspect" | "modify" | "destroy";
@@ -86,80 +86,51 @@ function gitEffects(def: GitDef, subcmd: string): readonly Effect[] {
 
 // ─── git config 子命令：读写分类 + 配置层级目标解析（T-037） ───
 
-const CONFIG_DEFAULT_TARGET: ConfigTarget = { rawPath: ".git/config", confidence: "conservative" };
-
-/** 读特征选项（改变输出格式/过滤，不改变文件访问；含消费值的 --type/-t/--default）。 */
-const CONFIG_READ_FLAGS = new Set([
-  "--list", "-l", "-z", "--null", "--get", "--get-all", "--get-regexp", "--get-color", "--get-colorbool",
-  "--show-origin", "--show-scope", "--name-only", "--bool", "--int", "--bool-or-int", "--path",
-  "--expiry-date", "--no-type", "--fixed-value", "--includes", "--no-includes",
-  "--no-global", "--no-system", "--no-local", "--no-worktree",
-]);
-
-/** 写特征选项。 */
-const CONFIG_WRITE_FLAGS = new Set(["--add", "--unset", "--unset-all", "--remove-section", "--rename-section", "--edit", "-e"]);
-
-/** 消费下一个 token 作为值的读选项（值非路径：--type bool、--default "fallback"）。 */
-const CONFIG_CONSUME_READ = new Set(["--type", "-t", "--default"]);
+const GIT_CONFIG_TABLE: ConfigOptionTable = {
+  readFlags: new Set([
+    "--list", "-l", "-z", "--null", "--get", "--get-all", "--get-regexp", "--get-urlmatch",
+    "--get-color", "--get-colorbool", "--show-origin", "--show-scope", "--name-only", "--show-secrets",
+    "--bool", "--int", "--bool-or-int", "--path", "--expiry-date", "--no-type", "--fixed-value",
+    "--includes", "--no-includes", "--no-global", "--no-system", "--no-local", "--no-worktree",
+  ]),
+  writeFlags: new Set(["--add", "--unset", "--unset-all", "--remove-section", "--rename-section", "--edit", "-e"]),
+  readConsume: new Set(["--type", "-t", "--default"]),
+  readEquals: ["--value"],
+  ignoreFlags: new Set(),
+  consumeTargets: new Set(["-f"]),
+  equalsTargets: ["--file"],
+  staticTargets: {
+    "--global": { rawPath: "~/.gitconfig", confidence: "exact" },
+    "--system": { rawPath: "/etc/gitconfig", confidence: "exact" },
+    "--local": { rawPath: ".git/config", confidence: "conservative" },
+  },
+  defaultTarget: { rawPath: ".git/config", confidence: "conservative" },
+};
 
 /**
- * 解析 git config 参数，产出读写分类与配置目标（T-037）。
- * - 写特征（写 flag 或 key+value 双 positional）→ modify + write intent
- * - 读特征（读 flag 或单 key）→ inspect + read intent
- * - 无法判定（如孤立层级选项）→ 保守 modify（fail-closed，D-025）
- * - 未知层级/未知选项 → opaque（目标不确定不猜，不产生 intent）
+ * git config 读写判定：显式写标志 > 显式读标志 > positional 推断（key+value 写 / 单 key 读）> 保守 modify。
+ * 显式读标志优先于 positional 推断：--get-urlmatch/--get-colorbool 等读命令可携带 2+ 位置参数。
  */
 function analyzeGitConfig(configArgs: readonly ShellArg[]): { cls: "inspect" | "modify"; intents: PathIntent[]; opaque: boolean } {
-  let target: ConfigTarget | null = null;
-  let sawUnknown = false;
-  let sawRead = false;
-  let sawWrite = false;
-  const positional: string[] = [];
+  const r = parseConfigOptions(configArgs, GIT_CONFIG_TABLE);
+  const t = r.target ?? GIT_CONFIG_TABLE.defaultTarget;
 
-  for (let i = 0; i < configArgs.length; i++) {
-    const val = configArgs[i]!.value ?? "";
-    if (val === "--") {
-      for (let j = i + 1; j < configArgs.length; j++) positional.push(configArgs[j]!.value ?? "");
-      break;
-    }
-    if (!val.startsWith("-")) { positional.push(val); continue; }
-
-    if (CONFIG_READ_FLAGS.has(val)) { sawRead = true; continue; }
-    if (CONFIG_WRITE_FLAGS.has(val)) { sawWrite = true; continue; }
-    if (val === "--global") { target = { rawPath: "~/.gitconfig", confidence: "exact" }; continue; }
-    if (val === "--system") { target = { rawPath: "/etc/gitconfig", confidence: "exact" }; continue; }
-    if (val === "--local") { target = CONFIG_DEFAULT_TARGET; continue; }
-    if (val.startsWith("--file=")) {
-      const filePath = val.slice("--file=".length);
-      if (!filePath) { sawUnknown = true; continue; }  // 空目标不猜，避免空路径 intent
-      target = { rawPath: filePath, confidence: "exact" };
-      continue;
-    }
-    if (val.startsWith("--value=")) { sawRead = true; continue; }
-    if (CONFIG_CONSUME_READ.has(val) && i + 1 < configArgs.length) { sawRead = true; i++; continue; }
-    if (val === "-f" && i + 1 < configArgs.length) {
-      target = { rawPath: configArgs[i + 1]!.value ?? "", confidence: "exact" };
-      i++;
-      continue;
-    }
-    // 未知层级/未知选项（含 --worktree）：目标不确定 → opaque，不猜
-    sawUnknown = true;
+  if (r.sawWrite) {
+    return { cls: "modify", intents: r.sawUnknown ? [] : [optionIntent("write", t.rawPath, t.confidence)], opaque: r.sawUnknown };
   }
-
-  const isWrite = sawWrite || positional.length >= 2;
-  const isRead = sawRead || positional.length === 1;
-  const t = target ?? CONFIG_DEFAULT_TARGET;
-
-  if (isWrite) {
-    return { cls: "modify", intents: sawUnknown ? [] : [optionIntent("write", t.rawPath, t.confidence)], opaque: sawUnknown };
-  }
-  if (isRead) {
+  if (r.sawRead) {
     // 读型 config 不产生路径 intent：与 git status/log 等 inspect 命令一致（.git/config 在 blocked
     // paths，产生 intent 会硬拒读型 config，制造新摩擦）；靠 shellPolicy inspect 决策放行
-    return { cls: "inspect", intents: [], opaque: sawUnknown };
+    return { cls: "inspect", intents: [], opaque: r.sawUnknown };
   }
-  // 无法判定 → 保守 modify；有显式目标才给 intent
-  return { cls: "modify", intents: target && !sawUnknown ? [optionIntent("write", target.rawPath, target.confidence)] : [], opaque: sawUnknown };
+  if (r.positional.length >= 2) {
+    return { cls: "modify", intents: r.sawUnknown ? [] : [optionIntent("write", t.rawPath, t.confidence)], opaque: r.sawUnknown };
+  }
+  if (r.positional.length === 1) {
+    return { cls: "inspect", intents: [], opaque: r.sawUnknown };
+  }
+  // 无法判定（如孤立层级选项）→ 保守 modify；有显式目标才给 intent
+  return { cls: "modify", intents: r.target && !r.sawUnknown ? [optionIntent("write", r.target.rawPath, r.target.confidence)] : [], opaque: r.sawUnknown };
 }
 
 function positionalArgs(args: ShellArg[]): ShellArg[] {
