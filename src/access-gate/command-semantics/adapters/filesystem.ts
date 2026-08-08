@@ -4,6 +4,20 @@ import type { ShellCommandNode, ShellArg } from "../../shell-parse/types";
 import type { CommandAdapter, CommandSemantics, Effect, PathIntent, SemanticContext } from "../types";
 import { makeSemantics, extractPositionalArgs } from "./shared";
 
+// cp/mv/ln 共享路径语义：位置参数是源（cp/ln read、mv write），目标目录来自 -t/--target-directory 值或末尾位置参数
+function copyLikePaths(args: readonly ShellArg[], consumed: ReadonlyArray<{ option: string; value: string }>, srcOp: "read" | "write"): { op: "read" | "write"; value: string }[] {
+  const targetDir = consumed.find((c) => c.option === "-t" || c.option === "--target-directory")?.value;
+  if (targetDir) {
+    return [...args.map((a) => ({ op: srcOp, value: a.value ?? "" })), { op: "write", value: targetDir }];
+  }
+  if (args.length < 2) return [];
+  const last = args[args.length - 1]!;
+  return [
+    ...args.slice(0, -1).map((a) => ({ op: srcOp, value: a.value ?? "" })),
+    { op: "write", value: last.value ?? "" },
+  ];
+}
+
 const FILESYSTEM_CMDS: Record<string, {
   class: "inspect" | "modify" | "destroy";
   paths: (args: readonly ShellArg[], consumed: ReadonlyArray<{ option: string; value: string }>) => { op: "read" | "write"; value: string }[];
@@ -70,18 +84,7 @@ const FILESYSTEM_CMDS: Record<string, {
   cp: {
     class: "modify",
     // cp <src>... <dst>；-t/--target-directory 时目标目录来自选项值，位置参数全是 src
-    paths: (args, consumed) => {
-      const targetDir = consumed.find((c) => c.option === "-t" || c.option === "--target-directory")?.value;
-      if (targetDir) {
-        return [...args.map((a) => ({ op: "read" as const, value: a.value ?? "" })), { op: "write" as const, value: targetDir }];
-      }
-      if (args.length < 2) return [];
-      const last = args[args.length - 1]!;
-      return [
-        ...args.slice(0, -1).map((a) => ({ op: "read" as const, value: a.value ?? "" })),
-        { op: "write" as const, value: last.value ?? "" },
-      ];
-    },
+    paths: (args, consumed) => copyLikePaths(args, consumed, "read"),
     effects: ["read", "write"],
     reason: "copy files",
     valueOptions: ["-t", "--target-directory"],
@@ -90,18 +93,7 @@ const FILESYSTEM_CMDS: Record<string, {
   ln: {
     class: "modify",
     // ln [-s] <target> <link>；-t/--target-directory 时位置参数全是 target，链接目录来自选项值
-    paths: (args, consumed) => {
-      const targetDir = consumed.find((c) => c.option === "-t" || c.option === "--target-directory")?.value;
-      if (targetDir) {
-        return [...args.map((a) => ({ op: "read" as const, value: a.value ?? "" })), { op: "write" as const, value: targetDir }];
-      }
-      if (args.length < 2) return [];
-      const last = args[args.length - 1]!;
-      return [
-        ...args.slice(0, -1).map((a) => ({ op: "read" as const, value: a.value ?? "" })),
-        { op: "write" as const, value: last.value ?? "" },
-      ];
-    },
+    paths: (args, consumed) => copyLikePaths(args, consumed, "read"),
     effects: ["read", "write"],
     reason: "create links",
     valueOptions: ["-t", "--target-directory"],
@@ -116,18 +108,7 @@ const FILESYSTEM_CMDS: Record<string, {
   mv: {
     class: "modify",
     // mv <src>... <dst>；-t/--target-directory 时目标目录来自选项值，位置参数全是 src
-    paths: (args, consumed) => {
-      const targetDir = consumed.find((c) => c.option === "-t" || c.option === "--target-directory")?.value;
-      if (targetDir) {
-        return [...args.map((a) => ({ op: "write" as const, value: a.value ?? "" })), { op: "write" as const, value: targetDir }];
-      }
-      if (args.length < 2) return [];
-      const last = args[args.length - 1]!;
-      return [
-        ...args.slice(0, -1).map((a) => ({ op: "write" as const, value: a.value ?? "" })),
-        { op: "write" as const, value: last.value ?? "" },
-      ];
-    },
+    paths: (args, consumed) => copyLikePaths(args, consumed, "write"),
     effects: ["write", "delete"],
     reason: "move/rename files",
     valueOptions: ["-t", "--target-directory"],

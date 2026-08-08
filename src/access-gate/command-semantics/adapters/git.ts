@@ -114,9 +114,10 @@ const GIT_CONFIG_TABLE: ConfigOptionTable = {
 function analyzeGitConfig(configArgs: readonly ShellArg[]): { cls: "inspect" | "modify"; intents: PathIntent[]; opaque: boolean } {
   const r = parseConfigOptions(configArgs, GIT_CONFIG_TABLE);
   const t = r.target ?? GIT_CONFIG_TABLE.defaultTarget;
+  const writeIntents = (target: ConfigTarget) => (r.sawUnknown ? [] : [optionIntent("write", target.rawPath, target.confidence)]);
 
   if (r.sawWrite) {
-    return { cls: "modify", intents: r.sawUnknown ? [] : [optionIntent("write", t.rawPath, t.confidence)], opaque: r.sawUnknown };
+    return { cls: "modify", intents: writeIntents(t), opaque: r.sawUnknown };
   }
   if (r.sawRead) {
     // 读型 config 不产生路径 intent：与 git status/log 等 inspect 命令一致（.git/config 在 blocked
@@ -124,13 +125,13 @@ function analyzeGitConfig(configArgs: readonly ShellArg[]): { cls: "inspect" | "
     return { cls: "inspect", intents: [], opaque: r.sawUnknown };
   }
   if (r.positional.length >= 2) {
-    return { cls: "modify", intents: r.sawUnknown ? [] : [optionIntent("write", t.rawPath, t.confidence)], opaque: r.sawUnknown };
+    return { cls: "modify", intents: writeIntents(t), opaque: r.sawUnknown };
   }
   if (r.positional.length === 1) {
     return { cls: "inspect", intents: [], opaque: r.sawUnknown };
   }
   // 无法判定（如孤立层级选项）→ 保守 modify；有显式目标才给 intent
-  return { cls: "modify", intents: r.target && !r.sawUnknown ? [optionIntent("write", r.target.rawPath, r.target.confidence)] : [], opaque: r.sawUnknown };
+  return { cls: "modify", intents: r.target ? writeIntents(r.target) : [], opaque: r.sawUnknown };
 }
 
 function positionalArgs(args: ShellArg[]): ShellArg[] {
