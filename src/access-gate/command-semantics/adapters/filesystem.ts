@@ -2,11 +2,11 @@
 
 import type { ShellCommandNode, ShellArg } from "../../shell-parse/types";
 import type { CommandAdapter, CommandSemantics, Effect, PathIntent, SemanticContext } from "../types";
-import { makeSemantics } from "./shared";
+import { makeSemantics, extractPositionalArgs } from "./shared";
 
 const FILESYSTEM_CMDS: Record<string, {
   class: "inspect" | "modify" | "destroy";
-  paths: (args: ShellArg[]) => { op: "read" | "write"; value: string }[];
+  paths: (args: readonly ShellArg[], consumed: ReadonlyArray<{ option: string; value: string }>) => { op: "read" | "write"; value: string }[];
   effects: readonly Effect[];
   reason: string;
   /** 取值选项：值被消费，不是路径（如 truncate -s SIZE、install -m MODE）。 */
@@ -25,31 +25,47 @@ const FILESYSTEM_CMDS: Record<string, {
     paths: (args) => args.map((a) => ({ op: "write", value: a.value ?? "" })),
     effects: ["write"],
     reason: "create/update files",
+    valueOptions: ["-t", "-d", "--date", "-r", "--reference"],
+    attachedOptions: ["--date=", "--reference="],
   },
   mkdir: {
     class: "modify",
     paths: (args) => args.map((a) => ({ op: "write", value: a.value ?? "" })),
     effects: ["write"],
     reason: "create directories",
+    valueOptions: ["-m", "--mode"],
+    attachedOptions: ["--mode="],
   },
   chmod: {
     class: "modify",
-    // chmod <mode> <file>... — skip first positional arg (mode)
-    paths: (args) => args.slice(1).map((a) => ({ op: "write", value: a.value ?? "" })),
+    // chmod <mode> <file>... — skip first positional arg (mode)；--reference= 出现时无 mode 位置参数
+    paths: (args, consumed) => {
+      const hasReference = consumed.some((c) => c.option === "--reference");
+      return args.slice(hasReference ? 0 : 1).map((a) => ({ op: "write" as const, value: a.value ?? "" }));
+    },
     effects: ["permissionChange"],
     reason: "change file permissions",
+    attachedOptions: ["--reference="],
   },
   chown: {
     class: "modify",
-    // chown <owner> <file>... — skip first positional arg (owner)
-    paths: (args) => args.slice(1).map((a) => ({ op: "write", value: a.value ?? "" })),
+    // chown <owner> <file>... — skip first positional arg (owner)；--reference= 出现时无 owner 位置参数
+    paths: (args, consumed) => {
+      const hasReference = consumed.some((c) => c.option === "--reference");
+      return args.slice(hasReference ? 0 : 1).map((a) => ({ op: "write" as const, value: a.value ?? "" }));
+    },
     effects: ["permissionChange"],
     reason: "change file ownership",
+    attachedOptions: ["--reference="],
   },
   cp: {
     class: "modify",
-    // cp <src>... <dst>
-    paths: (args) => {
+    // cp <src>... <dst>；-t/--target-directory 时目标目录来自选项值，位置参数全是 src
+    paths: (args, consumed) => {
+      const targetDir = consumed.find((c) => c.option === "-t" || c.option === "--target-directory")?.value;
+      if (targetDir) {
+        return [...args.map((a) => ({ op: "read" as const, value: a.value ?? "" })), { op: "write" as const, value: targetDir }];
+      }
       if (args.length < 2) return [];
       const last = args[args.length - 1]!;
       return [
@@ -59,11 +75,17 @@ const FILESYSTEM_CMDS: Record<string, {
     },
     effects: ["read", "write"],
     reason: "copy files",
+    valueOptions: ["-t", "--target-directory"],
+    attachedOptions: ["--target-directory="],
   },
   ln: {
     class: "modify",
-    // ln [-s] <target> <link>
-    paths: (args) => {
+    // ln [-s] <target> <link>；-t/--target-directory 时位置参数全是 target，链接目录来自选项值
+    paths: (args, consumed) => {
+      const targetDir = consumed.find((c) => c.option === "-t" || c.option === "--target-directory")?.value;
+      if (targetDir) {
+        return [...args.map((a) => ({ op: "read" as const, value: a.value ?? "" })), { op: "write" as const, value: targetDir }];
+      }
       if (args.length < 2) return [];
       const last = args[args.length - 1]!;
       return [
@@ -73,6 +95,8 @@ const FILESYSTEM_CMDS: Record<string, {
     },
     effects: ["read", "write"],
     reason: "create links",
+    valueOptions: ["-t", "--target-directory"],
+    attachedOptions: ["--target-directory="],
   },
   rmdir: {
     class: "modify",
@@ -82,8 +106,12 @@ const FILESYSTEM_CMDS: Record<string, {
   },
   mv: {
     class: "modify",
-    // mv <src>... <dst>
-    paths: (args) => {
+    // mv <src>... <dst>；-t/--target-directory 时目标目录来自选项值，位置参数全是 src
+    paths: (args, consumed) => {
+      const targetDir = consumed.find((c) => c.option === "-t" || c.option === "--target-directory")?.value;
+      if (targetDir) {
+        return [...args.map((a) => ({ op: "write" as const, value: a.value ?? "" })), { op: "write" as const, value: targetDir }];
+      }
       if (args.length < 2) return [];
       const last = args[args.length - 1]!;
       return [
@@ -93,6 +121,8 @@ const FILESYSTEM_CMDS: Record<string, {
     },
     effects: ["write", "delete"],
     reason: "move/rename files",
+    valueOptions: ["-t", "--target-directory"],
+    attachedOptions: ["--target-directory="],
   },
   tee: {
     class: "modify",
@@ -143,6 +173,8 @@ const FILESYSTEM_CMDS: Record<string, {
     paths: (args) => args.map((a) => ({ op: "write", value: a.value ?? "" })),
     effects: ["delete"],
     reason: "securely delete files",
+    valueOptions: ["-n", "--iterations"],
+    attachedOptions: ["--iterations="],
   },
 };
 
@@ -153,23 +185,10 @@ export const filesystemAdapter: CommandAdapter = {
     const def = FILESYSTEM_CMDS[name];
     if (!def) return makeSemantics("unknown", { reason: `unknown filesystem command: ${name}`, opaque: true });
 
-    // 提取位置参数：跳过选项与选项值（-s SIZE、--size= 等），-- 后全部按位置参数
-    const positionalArgs = (() => {
-      const result: ShellArg[] = [];
-      for (let i = 0; i < node.args.length; i++) {
-        const val = node.args[i]!.value ?? "";
-        if (val === "--") { result.push(...node.args.slice(i + 1)); break; }
-        if (def.valueOptions?.includes(val)) { i++; continue; }
-        if (val.startsWith("-")) {
-          if (def.attachedOptions?.some((prefix) => val.startsWith(prefix))) continue;
-          continue;
-        }
-        result.push(node.args[i]!);
-      }
-      return result;
-    })();
+    // 提取位置参数与消费的选项值：跳过选项与选项值（-s SIZE、--size= 等），-- 后全部按位置参数
+    const { positional, consumed } = extractPositionalArgs(node.args, def.valueOptions ?? [], def.attachedOptions ?? []);
 
-    const rawPaths = def.paths(positionalArgs);
+    const rawPaths = def.paths(positional, consumed);
     const intents: PathIntent[] = rawPaths
       .filter((p) => p.value.length > 0)
       .map((p) => ({

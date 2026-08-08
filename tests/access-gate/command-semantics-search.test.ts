@@ -28,4 +28,6 @@ defineAdapterTests("search", [
   { cmd: "ls src/ tests/", name: "ls multiple paths produce list intents", cls: "inspect", intents: [{ operation: "list", rawPath: "src/" }, { operation: "list", rawPath: "tests/" }] },
   { cmd: "ls -la /home", name: "ls flags like -la are skipped, path still recognized", cls: "inspect", intents: [{ operation: "list", rawPath: "/home" }] },
   { cmd: "ls -l -- -f", name: "ls -- after options treats everything as path", cls: "inspect", intents: [{ operation: "list", rawPath: "-f" }] },
+  { cmd: "ls -w 80 /etc", name: "ls -w consumes width value", cls: "inspect", intents: [{ operation: "list", rawPath: "/etc" }] },
+  { cmd: "ls --width=80 /etc", name: "ls --width= consumes attached value", cls: "inspect", intents: [{ operation: "list", rawPath: "/etc" }] },
 ]);

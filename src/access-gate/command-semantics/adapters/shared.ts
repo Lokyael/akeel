@@ -73,6 +73,48 @@ export function extractSubcommand(args: readonly ShellArg[], valueOptions: Itera
   return parts.join(" ");
 }
 
+/** 位置参数提取结果：positional + 被消费的取值选项（供目标目录/参考文件等语义判定）。 */
+export interface ExtractedArgs {
+  positional: readonly ShellArg[];
+  /** 被消费的取值选项（-t VALUE、--reference=VALUE 等），选项名归一化（去 = 后缀）。 */
+  consumed: ReadonlyArray<{ option: string; value: string }>;
+}
+
+/**
+ * 提取位置参数：跳过选项与选项值（valueOptions 消费下一个、attachedOptions 前缀内联），
+ * `--` 之后全部按位置参数。被消费的选项值记录在 consumed（供路径语义判定，如 -t 目标目录）。
+ */
+export function extractPositionalArgs(
+  args: readonly ShellArg[],
+  valueOptions: readonly string[],
+  attachedOptions: readonly string[],
+): ExtractedArgs {
+  const positional: ShellArg[] = [];
+  const consumed: Array<{ option: string; value: string }> = [];
+  for (let i = 0; i < args.length; i++) {
+    const val = args[i]!.value ?? "";
+    if (val === "--") {
+      positional.push(...args.slice(i + 1));
+      break;
+    }
+    if (val.startsWith("-")) {
+      if (valueOptions.includes(val) && i + 1 < args.length) {
+        consumed.push({ option: val, value: args[i + 1]!.value ?? "" });
+        i++;
+        continue;
+      }
+      const attached = attachedOptions.find((prefix) => prefix && val.startsWith(prefix) && val.length > prefix.length);
+      if (attached) {
+        consumed.push({ option: attached.endsWith("=") ? attached.slice(0, -1) : attached, value: val.slice(attached.length) });
+        continue;
+      }
+      continue;
+    }
+    positional.push(args[i]!);
+  }
+  return { positional, consumed };
+}
+
 // ─── 配置命令共享解析引擎（git config / npm config，T-037 系列） ───
 
 /**

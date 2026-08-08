@@ -2,7 +2,7 @@
 
 import type { ShellCommandNode, ShellArg } from "../../shell-parse/types";
 import type { CommandAdapter, CommandSemantics, PathIntent, SemanticContext } from "../types";
-import { makeSemantics } from "./shared";
+import { makeSemantics, extractPositionalArgs } from "./shared";
 
 interface ReadConfig {
   valueOptions: readonly string[];
@@ -60,31 +60,10 @@ const READ_CONFIG: Record<string, ReadConfig> = {
   },
 };
 
-function isAttachedValue(value: string, options: readonly string[]): boolean {
-  return options.some((option) => value.startsWith(option) && value.length > option.length);
-}
-
 function fileArgs(args: readonly ShellArg[], config: ReadConfig): ShellArg[] {
-  const files: ShellArg[] = [];
-  let parseOptions = true;
-
-  for (let i = 0; i < args.length; i++) {
-    const arg = args[i]!;
-    const value = arg.value ?? "";
-
-    if (parseOptions && value === "--") {
-      parseOptions = false;
-      continue;
-    }
-    if (parseOptions && value.startsWith("-")) {
-      if (config.valueOptions.includes(value)) i++;
-      else if (!isAttachedValue(value, config.attachedOptions)) continue;
-      continue;
-    }
-    if (value !== "-") files.push(arg);
-  }
-
-  return files;
+  const { positional } = extractPositionalArgs(args, config.valueOptions, config.attachedOptions);
+  // "-" 是 stdin，不算文件
+  return positional.filter((arg) => (arg.value ?? "") !== "-");
 }
 
 function readIntents(args: readonly ShellArg[], config: ReadConfig): PathIntent[] {

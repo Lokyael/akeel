@@ -72,6 +72,8 @@ const SEARCH_CONFIG: Record<string, SearchConfig> = {
     defaultRoot: ".",
     rootAtArgIndex: 0,
     operation: "list",
+    valueOpts: ["-w", "--width"],
+    attachedValueOpts: ["--width="],
     reason: "list directory",
   },
 };
