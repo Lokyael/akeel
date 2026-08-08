@@ -56,11 +56,12 @@
 - [D-031 路径可执行与 tsx 解释器归类](docs/decisions.md#d-031-路径可执行与-tsx-解释器归类)
 - [D-032 ask 渲染展示 unknown 命令的 literal form（知情同意）](docs/decisions.md#d-032-ask-渲染展示-unknown-命令的-literal-form知情同意)
 - [D-034 覆盖层显式作用域键](docs/decisions.md#d-034-覆盖层显式作用域键取代隐式-basename-回退)
+- [D-035 平台边界收窄为仅 Linux](docs/decisions.md#d-035-平台边界收窄为仅-linuxdismiss-c-007)
 
 ## Negative Space
 
 - 不提供 OS-level sandbox、容器、VM、seccomp、Landlock、network namespace 或独立 network policy 轴。
-- 仅支持 POSIX 平台；不提供 Windows / macOS 支持，不建模其路径语义与选项方言。
+- 仅保证支持 Linux 平台（以 Arch Linux 的 GNU 工具链为基准）；不提供 Windows / macOS / BSD 支持，不建模其路径语义与选项方言；其他 Linux 发行版的工具链差异不在保证范围。
 - 不承诺 pathname check 与实际文件操作之间的 TOCTOU 消除。
 - 不拦截 `user_bash`、`shellCommandPrefix`、Bash `spawnHook`、tool override、custom tool backend、未知 Direct tool surface 或其他 Extension 的直接操作。
 - 不为 Candidate Record 提供自动提醒、后台定时器、Session hook、Footer 状态或专用 review 技能；复审只在显式 context survey 中报告。

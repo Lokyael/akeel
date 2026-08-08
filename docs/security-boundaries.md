@@ -10,11 +10,11 @@
 
 ## R-08：Node-only TOCTOU
 
-**状态：** deferred。
+**状态：** by design。
 
 路径检查与实际文件操作之间存在时间窗口。其他进程可以在 `realpath`/access check 通过后替换文件、symlink 或父目录，使后续 pathname-based read/write/edit 操作作用于不同目标。
 
-消除该边界需要由实际操作方使用 fd-based 或 OS-level 原子机制；当前不引入此类机制，也不将 Node-only path checks 描述为已消除 TOCTOU 风险。
+消除该边界需要由**实际操作方**——pi 宿主，而非 pi-keel——使用 fd-based 或 OS-level 原子机制。access gate 是纯决策层，不执行文件操作（R-10），与执行方之间没有 fd 传递通道，gate 打开的 fd 无法被宿主使用；因此该消除结构性超出 pi-keel 能力范围，引入窗口只能是 pi 宿主提供 fd/原子机制接口（外部事件，本仓库只观察不触发）。当前不引入此类机制，也不将 Node-only path checks 描述为已消除 TOCTOU 风险。
 
 ## R-12：受限 Shell 语法范围
 
@@ -68,10 +68,8 @@ Guidance 只能从源码内置的静态 `GuidanceId` catalog 映射，不拼接�
 
 消除该边界需要为 config 类命令建模 `--global`/`--local`/`--userconfig` 等目标解析——当前不引入。
 
-## R-16：命令语义的平台/方言假设
+## R-16：命令语义的平台假设
 
 **状态：** by design。
 
-内置命令语义面向 GNU coreutils / GNU git / npm 生态的常用选项建模，平台边界为**仅支持 POSIX**：Windows、macOS 不在支持范围，不建模其路径语义与选项方言。BSD/macOS 工具存在选项歧义：`stat -c`（GNU 格式参数）vs `stat -f`（BSD 格式参数）、`du -d`（GNU max-depth）在 BSD 无对应、`df -t`（GNU 类型参数）vs POSIX flag。选项解析按 GNU 语义处理，BSD 方言的差异选项可能被误判为位置参数或忽略。
-
-消除该边界需要按平台检测方言并切换选项表——当前不引入。
+内置命令语义面向 GNU coreutils / GNU git / npm 生态的常用选项建模，平台边界为**仅保证支持 Linux（以 Arch Linux 为基准工具链）**：Windows、macOS、BSD 不在支持范围，不建模其路径语义与选项方言；其他 Linux 发行版的工具链版本差异不在保证范围。选项解析固定按 GNU 语义处理（选项表以 Arch 工具链为准），不提供按平台或发行版检测方言并切换选项表的机制（D-035）。BSD 工具与 GNU 的选项歧义（`stat -f` 为格式参数、`du -d` 在 BSD 无对应、`df -t` 在 BSD 为 flag）在 GNU 语义下可能被误判为位置参数或忽略——BSD 平台上的行为不在承诺范围，不构成残余风险。

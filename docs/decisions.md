@@ -407,3 +407,24 @@ reclassify:
 - Windows `\` 路径（POSIX 语义）。
 - 目录内多个前缀键重叠：最长前缀优先，已测试。
 
+## D-035: 平台边界收窄为仅 Linux（dismiss C-007）
+
+**Status:** active
+
+**Decision:** 平台支持边界从“仅支持 POSIX”收窄为**仅保证支持 Linux，以 Arch Linux 为基准工具链**：命令选项解析固定按 Arch Linux 的 GNU 工具链语义处理（GNU coreutils / GNU git / npm 生态常用选项），不提供按平台或发行版检测方言并切换选项表的机制。Windows、macOS、BSD 均不在支持范围，不建模其路径语义与选项方言；其他 Linux 发行版的工具链版本差异（如旧版 coreutils 缺失部分选项）不在保证范围——选项表以 Arch Linux（滚动发布、工具链最新）为准。BSD 工具与 GNU 的选项歧义（`stat -f` 为格式参数、`du -d` 在 BSD 无对应、`df -t` 在 BSD 为 flag）造成的解析差异不承诺消除，BSD 平台上的命令语义不在承诺范围。
+
+**Why:** 候选 C-007（BSD 选项方言检测）评估确认：触发条件（用户项目实际运行于 BSD 工具链）无现实样本；方言检测的方案要么在跨宿主场景（ssh/容器）错配，要么引入选项表双维护与双解析误报噪声，收益不抵成本。用户明确决定不引入方言检测，并把支持承诺锚定为 Arch Linux 基准——开发与验证环境即 Arch，选项表以该环境的 GNU 工具链为准，其他发行版工具链差异由环境承担。GNU 语义成为唯一且无条件的解析基线，消除“POSIX 范围内 BSD 行为未定义”的悬空承诺。
+
+**Impact:** R-16 平台边界表述同步；CONTEXT.md Negative Space 同步（仅保证 Arch Linux，Windows/macOS/BSD 显式列出，其他发行版不在保证范围）；C-007 dismissed（durable content 迁入本决策、R-16 与 Negative Space，同一变更删除候选来源）。代码零改动——选项解析本就固定 GNU 语义，无平台/发行版检测代码。D-031/D-034 中“POSIX 语义”指路径分隔符语义（`/`），与平台支持范围正交，表述不变。
+
+**Rejected:**
+
+- **按宿主平台检测方言切换选项表（`process.platform`）**：gate 分析宿主 ≠ 命令执行宿主（ssh/容器内 BSD 工具链会错配）；每张选项表需 GNU/BSD 双维护。拒绝。
+- **保守双解析取并集（方言无关）**：两方言下都产生额外误报（如 BSD 下 `stat -c %s f` 带出 `%s` 路径意图）；对仅支持 Linux 的承诺无意义。拒绝。
+- **宿主检测 + 用户配置覆盖**：为无现实样本的触发场景引入配置面与文档负担。拒绝。
+
+**Out of Scope:**
+
+- Windows `\` 路径与 macOS 路径/选项方言：已在 Negative Space，不因 stat/du/df 同为 BSD 方言而把 macOS 纳入支持。
+- 跨宿主场景（ssh、容器）的命令语义方言：静态分类不做执行环境探测（同 D-031 无 filesystem 检查边界）。
+

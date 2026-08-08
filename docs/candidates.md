@@ -39,16 +39,3 @@
 - **Review On:** 2026-09-07（条件触发，随显式 context survey 复审）
 - **内容:** 为 config 类命令建模目标解析可缩小 R-11 审批详情信息边界；当前不引入。不构成实施承诺。
 
-## C-006: TOCTOU 原子机制
-
-- **来源:** [security-boundaries.md](security-boundaries.md)（pathname check 边界）
-- **Trigger:** 出现可接受的 fd-based 或 OS-level 原子机制引入窗口
-- **Review On:** 2026-09-07（条件触发，随显式 context survey 复审）
-- **内容:** 消除 pathname check 与实际文件操作之间的 TOCTOU 残余需实际操作方使用 fd-based 或 OS-level 原子机制；当前不引入。不构成实施承诺。
-
-## C-007: BSD 选项方言检测
-
-- **来源:** [security-boundaries.md](security-boundaries.md)（平台边界）
-- **Trigger:** 用户项目实际运行于 BSD 工具链
-- **Review On:** 2026-09-07（条件触发，随显式 context survey 复审）
-- **内容:** GNU/BSD 选项歧义（`stat -c`/`-f`、`du -d`、`df -t` 等）按平台检测方言切换选项表可消除；当前不引入。平台边界仍为 POSIX（Windows/macOS 在 Negative Space）。不构成实施承诺。
