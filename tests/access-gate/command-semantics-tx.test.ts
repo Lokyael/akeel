@@ -52,4 +52,5 @@ defineAdapterTests("tx", [
   { cmd: "tr -ds ' ' '\\n'", name: "tr flag cluster is not opaque", cls: "inspect", opaque: false, intents: [] },
   { cmd: "tr --delete '\\n'", name: "tr long flag is not opaque", cls: "inspect", opaque: false, intents: [] },
   { cmd: "tr a-z A-Z", name: "tr ranges are sets, not files", cls: "inspect", intents: [] },
+  { cmd: "tr -- '\\n' ' '", name: "tr positionals after -- are still sets, not files", cls: "inspect", opaque: false, intents: [] },
 ]);
