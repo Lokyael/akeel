@@ -58,27 +58,28 @@ const TR_OPTS: OptionSchema[] = [
   { names: ["-c", "--complement", "-d", "--delete", "-s", "--squeeze-repeats", "-t", "--truncate-set1", "--help", "--version"], takesValue: false, operation: "read", flag: true },
 ];
 
+/** 位置参数性质（D-027 值性质分类）：file=均为输入文件；program-first=首参是程序、其余是文件；set=均为非文件值（tr 字符集）。 */
+type PositionalNature = "file" | "program-first" | "set";
+
 interface TextConfigEntry {
   class: "inspect" | "modify" | "unknown";
   schemas: OptionSchema[];
   reason: string;
   /** sed/awk 在出现写选项（-i）时，位置参数是原地修改目标而非只读输入。 */
   inPlace?: boolean;
-  /** 首个位置参数是程序（sed/awk 经典形式），未出现 -e/-f 时跳过。 */
-  programFirst?: boolean;
-  /** 位置参数是字符集等非文件值（tr SET1/SET2）：消费但不产生路径 intent（D-027 值性质）。 */
-  positionalsNotFiles?: boolean;
+  /** 位置参数性质（默认 file）。 */
+  positional?: PositionalNature;
 }
 
 /** parseOptions 消费的配置子集（窄契约）：只声明位置参数处理相关字段，不接受未用字段。 */
-type PositionalConfig = Pick<TextConfigEntry, "schemas" | "inPlace" | "programFirst" | "positionalsNotFiles">;
+type PositionalConfig = Pick<TextConfigEntry, "schemas" | "inPlace" | "positional">;
 
 const TEXT_CONFIG: Record<string, TextConfigEntry> = {
-  sed: { class: "inspect", schemas: SED_OPTS, reason: "stream editor", inPlace: true, programFirst: true },
-  awk: { class: "inspect", schemas: AWK_OPTS, reason: "pattern scanning", inPlace: true, programFirst: true },
+  sed: { class: "inspect", schemas: SED_OPTS, reason: "stream editor", inPlace: true, positional: "program-first" },
+  awk: { class: "inspect", schemas: AWK_OPTS, reason: "pattern scanning", inPlace: true, positional: "program-first" },
   sort: { class: "inspect", schemas: SORT_OPTS, reason: "sort lines" },
   uniq: { class: "inspect", schemas: UNIQ_OPTS, reason: "unique lines" },
-  tr: { class: "inspect", schemas: TR_OPTS, reason: "translate characters", positionalsNotFiles: true },
+  tr: { class: "inspect", schemas: TR_OPTS, reason: "translate characters", positional: "set" },
 };
 
 /**
@@ -90,12 +91,12 @@ function parseOptions(
   config: PositionalConfig,
   index: number,
 ): { intents: PathIntent[]; opaque: boolean; sawWrite: boolean } {
-  const { schemas, inPlace = false, programFirst = false, positionalsNotFiles = false } = config;
+  const { schemas, inPlace = false, positional = "file" } = config;
   const intents: PathIntent[] = [];
   let opaque = false;
   let sawWrite = false;
   let sawPattern = false;
-  let programPending = programFirst;
+  let programPending = positional === "program-first";
   let afterDoubleDash = false;
 
   while (index < args.length) {
@@ -104,15 +105,15 @@ function parseOptions(
 
     if (!afterDoubleDash && val === "--") { afterDoubleDash = true; index++; continue; } // 之后的 token 全部按位置参数处理
     if (afterDoubleDash || !val.startsWith("-")) {
-      // 位置参数：sed/awk 经典形式的首个位置参数是程序（无 -e/-f 时），跳过
+      // 位置参数：program-first 性质（sed/awk 经典形式）的首个位置参数是程序（无 -e/-f 时），跳过
       if (programPending && !sawPattern) {
         programPending = false;
         index++;
         continue;
       }
       programPending = false;
-      // 其余位置参数：输入文件（in-place 模式下出现写选项时是原地修改目标）；tr 等 positionalsNotFiles 命令的字符集非文件，消费不产生 intent
-      if (!positionalsNotFiles) {
+      // 其余位置参数：输入文件（in-place 模式下出现写选项时是原地修改目标）；set 性质（tr 字符集）非文件，消费不产生 intent
+      if (positional !== "set") {
         intents.push({
           operation: inPlace && sawWrite ? "write" : "read",
           rawPath: val,
