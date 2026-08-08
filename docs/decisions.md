@@ -287,11 +287,11 @@ reclassify:
 
 **Impact:** 本决策完整吸收原 D-021 的 Task Record 术语和结构，以及原 D-029 的 Decision 退役路径与统一终态命名；原条目从当前寄存器移除，Git 保留历史。`README.md` 是唯一用户使用入口；Project Record 的通用规则通过 principles 注入，技能只实现各自职责。
 
-**Rejected:** 不把 C/T/D 合并到单一记录文件；不为每条记录创建独立文件；不采用 Proposed Decision 表达未承诺候选；不新增 `review-records` 技能、Record Manager、到期提醒扩展或 slash command；不把 Candidate Record 当作默认 backlog 或 roadmap；不为 `retired` 增加永久状态枚举或墓碑文件；不把外部移交的所有权边界写入 traceability（所有权边界属于决策，许可证归属才属于 traceability）。
+**Rejected:** 不把 C/T/D 合并到单一记录文件；不为每条记录创建独立文件；不采用 Proposed Decision 表达未承诺候选；不新增 `review-records` 技能、Record Manager、到期提醒扩展或 slash command；不把 Candidate Record 当作默认 backlog 或 roadmap；不为 `retired` 增加永久状态枚举或墓碑文件；不把外部移交的所有权边界写入 traceability（所有权边界属于决策，许可证归属才属于 traceability）；不提供容器级迁移引导——兼容自有格式需要模型自动识别项目文档体系并跨格式校验（C-xxx/T-xxx/D-xxx），产生猜测与格式权威混用；“项目是否已有权威来源”的识别负担属于用户（AGENTS.md / 显式会话指示），标准容器本由 pi-keel 管理、非标准容器本不该被模型触碰，中间态校验无立足点。
 
 **Out of Scope:**
 
-- **容器级迁移引导机制**（以自有方式管理文档的用户项目——自有决策寄存器、ADR、跟踪器、ideas/backlog 文档）：不建专用 skill、不建声明/路由系统、不改 CONTEXT.md 契约。定稿为 offer 时刻防双源，两处子句并入既有“双权威源不共存”原则：① `domain-modeling` 创建 `candidates.md`/`decisions.md` 的 offer 处，若已知项目已有该等级权威来源，不建并行容器，链接或询问；无证据时照常懒创建。② 对标准路径容器做生命周期变更（剪除、superseded/retired、清空）前，校验其是否遵循模型格式（C-xxx/T-xxx/D-xxx）；不符则视为项目自有、只读、先询问。两子句仅在“已知有既有来源”或“格式不符”时触发，不产生常驻摩擦。迁移 = 非默认，仅用户显式选择时作为一次性 Task 走 Migration Protocol；模型不写入外来格式寄存器；不可读来源（外部系统）报告缺口并请求中央化进 CONTEXT.md，不盲猜。**Revisit when** 出现以自有方式管理文档、需要 pi-keel 引导的真实用户项目。
+- **容器级迁移引导机制**（以自有方式管理文档的用户项目——自有决策寄存器、ADR、跟踪器、ideas/backlog 文档）：不建专用 skill、不建声明/路由系统、不改 CONTEXT.md 契约、不自动识别项目文档体系。二元边界：标准路径容器由 pi-keel 管理；非标准文档体系由用户通过 `AGENTS.md` 或显式会话指示声明，pi-keel 不识别、不写入、不迁移。模型不写入外来格式寄存器；不可读来源（外部系统）报告缺口并请求中央化进 CONTEXT.md，不盲猜。
 
 ## D-030: 提示词体系边界（Prompt Surface）
 

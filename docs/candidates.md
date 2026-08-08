@@ -25,10 +25,3 @@
 - **Review On:** 2026-09-07（条件触发，随显式 context survey 复审）
 - **内容:** "理解认知"无法可靠操作化；出现遵守度问题时评估测量方案。不构成维护承诺。
 
-## C-004: 容器级迁移引导机制
-
-- **来源:** [D-028](decisions.md#d-028-统一-project-record-模型) Out of Scope（Revisit when）
-- **Trigger:** 出现以自有方式管理文档（自有决策寄存器、ADR、跟踪器、ideas/backlog）的真实用户项目
-- **Review On:** 2026-09-07（条件触发，随显式 context survey 复审）
-- **内容:** 不建专用 skill、声明/路由系统，不改 CONTEXT.md 契约；offer 时刻防双源两子句已就位；迁移 = 非默认，仅用户显式选择时作为一次性 Task 走 Migration Protocol。不构成维护承诺。
-
