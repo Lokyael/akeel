@@ -232,13 +232,22 @@ function selfCheckManualInvocationRule(): void {
     content: "",
     lineCount: 1,
   };
-  const result = checkDescriptionConvention(violating);
-  const ruleFired = result.errors.some((e) => e.includes("Use /skill:sample"));
-  if (!ruleFired) {
-    console.error(
-      "❌ Self-check FAILED: manual-invocation rule did not reject a violating description. Fix the rule or the self-check."
-    );
-    process.exit(1);
+  // Boundary sample: the phrase is present mid-string but NOT a prefix. The rule must
+  // reject it too — otherwise a regression from startsWith to includes would silently
+  // pass (real files satisfy both, so positive validation cannot catch the relaxation).
+  const midString: SkillMeta = {
+    ...violating,
+    description: "When the user asks for a handoff, Use /skill:sample to compact the conversation.",
+  };
+  for (const sample of [violating, midString]) {
+    const result = checkDescriptionConvention(sample);
+    const ruleFired = result.errors.some((e) => e.includes("Use /skill:sample"));
+    if (!ruleFired) {
+      console.error(
+        "❌ Self-check FAILED: manual-invocation rule did not reject a violating description. Fix the rule or the self-check."
+      );
+      process.exit(1);
+    }
   }
 }
 
