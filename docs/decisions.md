@@ -308,7 +308,7 @@ reclassify:
 
 **Out of Scope:**
 
-- **guidance 文本精简**：失败路径、高压力场景，措辞精度要求最高，压缩风险高于收益。Revisit when guidance 文本总量显著增长。
+- **guidance 文本精简**：失败路径、高压力场景，措辞精度要求最高，压缩风险高于收益。Revisit when guidance 文本总量显著增长。**已评估并 dismiss（C-001，2026-08-08）**：评估结论——进一步压缩无法满足语义零损失，且与总量无关：a9b4448 已把 guidance 从不可执行的含糊短句（`Use a simple literal command or a Direct tool.`）改为可执行判据（动态 token 定义、引号规则、重定向白名单），短句形态因不可执行已被否决；Direct 工具枚举（read/grep/find/ls 等）是模型无法从自身 tool schema 推导的 gate 支持子集，删除即语义损失；其余限定子句（单引号规则、schema 修正、Profile 不可自改、安全边界不可绕过）均为判据或安全祈使。增长哨兵的前提（总量增长→压缩可行）被否定，随 dismiss 撤销，不再设 Revisit。
 - **合并任何触发场景互斥的 skill**（draft-spec→brainstorm-design、draft-tickets→plan-writing、grill-docs→grill-plan）：全量消费约束的必然推论；配对触发场景互斥（想法需探索/已讨论完直接落记录、计划需分解/需求→步骤计划、纯拷问/拷问+文档验证），各自全量使用。Revisit when 实测两 skill 触发场景重合。
 - **token 基线测量与提示词行为测试**：无法可靠操作化“理解认知”，用户明确不做额外验证。Revisit when 出现可观察的遵守度问题。**已评估并 dismiss（C-003，2026-08-08）**：遵守度问题实际出现一次——D-036 中 8 个 workflows skill 的 description 与 `disable-model-invocation` 矛盾（承诺的模型自动响应永不发生）。评估结论：该事故属结构矛盾而非 token 消耗，可操作化的测量是结构层行为测试（validate-skills 新增 `Use /skill:<name>` 强制校验与负向自检，锁 D-036 防回归）；token 基线/“理解认知”级测量维持拒绝，已观察到的遵守度问题由结构校验覆盖，不产生新的测量需求。
 
