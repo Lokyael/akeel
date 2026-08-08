@@ -242,6 +242,24 @@ commands:
   }
 });
 
+test("aliases: 别名目标为别名时不链式解析（单步契约，D-034）", () => {
+  resetOverrides();
+  const { ctx: _ctx, cleanup } = setupProject(`
+aliases:
+  a: b
+  b: cat
+`);
+  try {
+    // 单步契约：a → b 后把 b 当作最终目标查 adapter（无 b adapter → unknown），
+    // 不递归 b → cat——链式让语义需沿解析图追多跳才能确定，D-034 明确拒绝
+    const sem = analyzeSemantics(parseCmd("a --version"), _ctx);
+    assert.equal(sem.class, "unknown");
+    assert.ok(sem.reason.includes("aliased to b"), `reason 应说明单步目标: ${sem.reason}`);
+  } finally {
+    cleanup();
+  }
+});
+
 test("aliases: 无 overrides 时不受影响", () => {
   resetOverrides();
   // DEFAULT_CTX 指向不存在的目录 → loadOverrides 找不到文件，回退到空配置

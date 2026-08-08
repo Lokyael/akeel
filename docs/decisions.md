@@ -394,12 +394,13 @@ reclassify:
 - `./` 归一化对称：精确键与前缀键同样归一化前导 `./`——`"bin/eslint"` 命中 `./bin/eslint`，`"./bin/eslint"` 命中 `bin/eslint`（`./` 无管理意义，拼写差异不产生作用域分裂）。
 - 别名目标可为 `commands` 定义（`aliases: {mytool: my-linter}` 复用 my-linter 的 class/effects/subcommands，reason 用原始调用名）；alias 单步解析，不链式套 alias。
 - `reclassify` 按 basename 对齐 adapter 身份：adapter 已按 basename 识别命令（`/usr/local/bin/git` → git adapter），reclassify 匹配规则命令名时同样回退 basename——用户声明的分类微调在路径形式下不再静默失效（如 `/usr/local/bin/git status` + `{command: git, pattern: "status", class: modify}` 生效）。
-- 爆炸半径：registry.ts（`scopeKey` 4 处调用点：commands/aliases 各一）；不碰 plan/verifier/policy。
-- 测试：command-overrides 7 个新/改用例（前缀命中、精确优先、最长前缀、裸名不隐式覆盖、跨目录不误伤、目标不存在、commands 前缀键）。
+- 爆炸半径：registry.ts（`scopeKey` 3 处调用点：commands、aliases、别名目标的 commands 链式各一）；不碰 plan/verifier/policy。
+- 测试：command-overrides 12 个新/改用例（前缀命中、精确优先、最长前缀、裸名不隐式覆盖、跨目录不误伤、目标不存在、commands 前缀键、`./` 归一化精确键双向×2、别名→commands 链式、reclassify basename 对齐、alias 不链式负向）。
 
 **Rejected:**
 - **保留 basename 回退作为前缀键后的兜底**：冲突只在用户不用新消歧时"休眠"而非消除；显式作用域是更诚实的分类（D-024：语义由用户声明定义）。
 - **realpath/filesystem 消歧**：D-031 明确静态分类不做 filesystem 检查；引入解析会破坏无副作用语义。
+- **alias→alias 链式解析**：单步是显式作用域哲学的延伸——链式让 `a` 的语义需沿解析图追多跳才能确定，与"声明取代猜测"冲突；目标为 alias 键无表达力增量（`lg: lazygit` 一次声明即可），却引入环检测、逐跳作用域重放与 reason 渲染复杂度；commands 链式已覆盖"复用语义定义"的需求（commands 目标携带 class/effects/subcommands，alias 目标只是名字）。
 
 **Out of Scope:**
 - 前缀键的绝对/相对拼写敏感（`"/abs/bin/"` 与 `"bin/"` 是不同作用域）：`./` 已归一化，其余拼写差异由用户声明承担。

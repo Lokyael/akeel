@@ -82,6 +82,11 @@ function indexKey(executable: string): string {
  * 找不到 adapter 时返回 unknown，opaque=false。
  */
 
+/** 剥离前导 "./"——./ 是 cwd 相对拼写，无管理意义（D-034），精确键与前缀键对称归一化。 */
+function stripDotSlash(s: string): string {
+  return s.startsWith("./") ? s.slice(2) : s;
+}
+
 /**
  * 显式作用域键查找（D-034）：
  * - 精确键优先（裸名或完整路径字符串），前导 "./" 归一化对精确键与前缀键对称生效；
@@ -90,19 +95,13 @@ function indexKey(executable: string): string {
  *   该被覆盖，basename 冲突由此结构性消除。
  * 返回命中的键；未命中返回 null。
  */
-
-/** 剥离前导 "./"——./ 是 cwd 相对拼写，无管理意义（D-034），精确键与前缀键对称归一化。 */
-function stripDotSlash(s: string): string {
-  return s.startsWith("./") ? s.slice(2) : s;
-}
-
 function scopeKey(table: Record<string, unknown> | undefined, name: string): string | null {
   if (!table) return null;
   const normalized = stripDotSlash(name);
   // 精确键：键与名均做 ./ 归一化后相等即命中（两侧对称，D-034）
   for (const key of Object.keys(table)) {
     if (key.endsWith("/")) continue;
-    if (key === name || stripDotSlash(key) === normalized) return key;
+    if (stripDotSlash(key) === normalized) return key;
   }
   // 路径前缀键（以 / 结尾）：最长前缀优先，键与名均 ./ 归一化
   if (normalized.includes("/")) {
@@ -131,18 +130,18 @@ export function analyzeSemantics(
   // 1. 用户定义的完整命令（精确 + 路径前缀作用域，D-034）
   const commandKey = scopeKey(ov.commands, name);
   if (commandKey) {
-    return applyCommandDef(ov.commands![commandKey]!, node.args, name);
+    return applyCommandDef(ov.commands![commandKey], node.args, name);
   }
 
   // 2. 别名解析（精确 + 路径前缀作用域）
   const aliasKey = scopeKey(ov.aliases, name);
-  const resolvedName = aliasKey ? ov.aliases![aliasKey]! : name;
+  const resolvedName = aliasKey ? ov.aliases![aliasKey] : name;
 
   // 2.5 别名目标可能是用户定义的 commands 条目（链式解析：别名 → 命令定义）
   if (resolvedName !== name) {
     const targetCommandKey = scopeKey(ov.commands, resolvedName);
     if (targetCommandKey) {
-      return applyCommandDef(ov.commands![targetCommandKey]!, node.args, name);
+      return applyCommandDef(ov.commands![targetCommandKey], node.args, name);
     }
   }
 
