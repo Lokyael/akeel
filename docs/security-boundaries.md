@@ -62,11 +62,11 @@ Guidance 只能从源码内置的静态 `GuidanceId` catalog 映射，不拼接�
 
 ## R-15：工具外部配置文件写入
 
-**状态：** by design。
+**状态：** 部分实现。
 
-`git config --global`（写 `~/.gitconfig`）、`npm config set`（写 `~/.npmrc`）、`pnpm config` 等命令虽被分类为 modify，但命令语义 adapter 不为其提取配置文件路径 intent：目标由工具根据全局/项目上下文动态决定，无法静态建模。编译器只对 modify 命令做 cwd 保守写检查，因此这类工具的外部配置文件写入不经过 PathPolicy 检查。
+`git config`/`npm config`/`pnpm config` 的写操作已建模配置层级目标（T-037）：`--global`→`~/.gitconfig`、`--system`→`/etc/gitconfig`、`--file=`/`-f`/`--userconfig`/`--globalconfig`→精确路径，产出 write intent 进入 PathPolicy；无层级/`--local` 的目标 `$cwd/.git/config` 落在 blocked paths（`project/.git/**`），写入被硬拒。外部配置文件写入不再绕过 PathPolicy。
 
-消除该边界需要为 config 类命令建模 `--global`/`--local`/`--userconfig` 等目标解析——当前不引入。
+未建模的配置写手（yarn config、pip config、uv、cargo 等）仍按 modify + cwd 保守写检查处理，其外部配置文件写入不经过 PathPolicy 检查——语义扩充属用户 `command-overrides.yaml`（D-024），不内置。
 
 ## R-16：命令语义的平台假设
 

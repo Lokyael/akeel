@@ -49,7 +49,6 @@ const GIT_CMDS: GitDef[] = [
   { cls: "modify", pattern: (s) => /^remote\b/.test(s), reason: "manage remotes" },
   { cls: "modify", pattern: (s) => /^mv\b/.test(s), paths: (args) => positionalArgs(args).map((a) => ({ op: "write" as const, value: a.value ?? "" })), reason: "move/rename tracked files" },
   { cls: "modify", pattern: (s) => /^(?:cherry-pick|revert)\b/.test(s), reason: "apply commits" },
-  { cls: "modify", pattern: (s) => /^config\b/.test(s), reason: "set repository/user config" },
   { cls: "modify", pattern: (s) => /^apply\b/.test(s), reason: "apply patch" },
   { cls: "modify", pattern: (s) => /^gc\b/.test(s), reason: "garbage collect repository" },
   { cls: "modify", pattern: (s) => /^submodule\b/.test(s), reason: "manage submodules" },
@@ -83,6 +82,88 @@ function gitEffects(def: GitDef, subcmd: string): readonly Effect[] {
   if (/^rm\b/.test(subcmd)) effects.add("delete");
   if (/^(fetch|pull|push|clone|remote|ls-remote|submodule)\b/.test(subcmd)) effects.add("network");
   return [...effects];
+}
+
+// ─── git config 子命令：读写分类 + 配置层级目标解析（T-037） ───
+
+/** git config 目标层级 → 配置文件路径（confidence 区分确定/环境依赖目标）。 */
+interface ConfigTarget {
+  rawPath: string;
+  confidence: "exact" | "conservative";
+}
+
+const CONFIG_DEFAULT_TARGET: ConfigTarget = { rawPath: ".git/config", confidence: "conservative" };
+
+/** 读特征选项（改变输出格式/过滤，不改变文件访问；含消费值的 --type/-t/--default）。 */
+const CONFIG_READ_FLAGS = new Set([
+  "--list", "-l", "-z", "--null", "--get", "--get-all", "--get-regexp", "--get-color", "--get-colorbool",
+  "--show-origin", "--show-scope", "--name-only", "--bool", "--int", "--bool-or-int", "--path",
+  "--expiry-date", "--no-type", "--fixed-value", "--includes", "--no-includes",
+]);
+
+/** 写特征选项。 */
+const CONFIG_WRITE_FLAGS = new Set(["--add", "--unset", "--unset-all", "--remove-section", "--rename-section", "--edit", "-e"]);
+
+/** 消费下一个 token 作为值的读选项（值非路径：--type bool、--default "fallback"）。 */
+const CONFIG_CONSUME_READ = new Set(["--type", "-t", "--default"]);
+
+function configIntent(operation: "read" | "write", target: ConfigTarget): PathIntent {
+  return { operation, rawPath: target.rawPath, source: "option", span: { start: 0, end: 0 }, confidence: target.confidence };
+}
+
+/**
+ * 解析 git config 参数，产出读写分类与配置目标（T-037）。
+ * - 写特征（写 flag 或 key+value 双 positional）→ modify + write intent
+ * - 读特征（读 flag 或单 key）→ inspect + read intent
+ * - 无法判定（如孤立层级选项）→ 保守 modify（fail-closed，D-025）
+ * - 未知层级/未知选项 → opaque（目标不确定不猜，不产生 intent）
+ */
+function analyzeGitConfig(configArgs: readonly ShellArg[]): { cls: "inspect" | "modify"; intents: PathIntent[]; opaque: boolean } {
+  let target: ConfigTarget | null = null;
+  let sawUnknown = false;
+  let sawRead = false;
+  let sawWrite = false;
+  const positional: string[] = [];
+
+  for (let i = 0; i < configArgs.length; i++) {
+    const val = configArgs[i]!.value ?? "";
+    if (val === "--") {
+      for (let j = i + 1; j < configArgs.length; j++) positional.push(configArgs[j]!.value ?? "");
+      break;
+    }
+    if (!val.startsWith("-")) { positional.push(val); continue; }
+
+    if (CONFIG_READ_FLAGS.has(val)) { sawRead = true; continue; }
+    if (CONFIG_WRITE_FLAGS.has(val)) { sawWrite = true; continue; }
+    if (val === "--global") { target = { rawPath: "~/.gitconfig", confidence: "exact" }; continue; }
+    if (val === "--system") { target = { rawPath: "/etc/gitconfig", confidence: "exact" }; continue; }
+    if (val === "--local") { target = CONFIG_DEFAULT_TARGET; continue; }
+    if (val.startsWith("--file=")) { target = { rawPath: val.slice("--file=".length), confidence: "exact" }; continue; }
+    if (val.startsWith("--value=")) { sawRead = true; continue; }
+    if (CONFIG_CONSUME_READ.has(val) && i + 1 < configArgs.length) { sawRead = true; i++; continue; }
+    if (val === "-f" && i + 1 < configArgs.length) {
+      target = { rawPath: configArgs[i + 1]!.value ?? "", confidence: "exact" };
+      i++;
+      continue;
+    }
+    // 未知层级/未知选项（含 --worktree）：目标不确定 → opaque，不猜
+    sawUnknown = true;
+  }
+
+  const isWrite = sawWrite || positional.length >= 2;
+  const isRead = sawRead || positional.length === 1;
+  const t = target ?? CONFIG_DEFAULT_TARGET;
+
+  if (isWrite) {
+    return { cls: "modify", intents: sawUnknown ? [] : [configIntent("write", t)], opaque: sawUnknown };
+  }
+  if (isRead) {
+    // 读型 config 不产生路径 intent：与 git status/log 等 inspect 命令一致（.git/config 在 blocked
+    // paths，产生 intent 会硬拒读型 config，制造新摩擦）；靠 shellPolicy inspect 决策放行
+    return { cls: "inspect", intents: [], opaque: sawUnknown };
+  }
+  // 无法判定 → 保守 modify；有显式目标才给 intent
+  return { cls: "modify", intents: target && !sawUnknown ? [configIntent("write", target)] : [], opaque: sawUnknown };
 }
 
 function positionalArgs(args: ShellArg[]): ShellArg[] {
@@ -119,6 +200,17 @@ export const gitAdapter: CommandAdapter = {
       }
     }
     const subcmd = subcmdIndex >= 0 ? args.slice(subcmdIndex).map((a) => a.value ?? "").join(" ") : "";
+
+    // git config 子命令走专用读写分类与层级目标解析（T-037）
+    if (/^config\b/.test(subcmd)) {
+      const configArgs = subcmdIndex >= 0 ? args.slice(subcmdIndex + 1) : [];
+      const config = analyzeGitConfig(configArgs);
+      return makeSemantics(config.cls, {
+        reason: config.cls === "inspect" ? "read git config" : "set repository/user config",
+        intents: [...pathIntents, ...config.intents],
+        opaque: config.opaque,
+      });
+    }
 
     // match subcommand classification
     for (const def of GIT_CMDS) {

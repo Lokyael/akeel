@@ -338,3 +338,32 @@ test("user denial reports the operation was not executed", async () => {
   assert.ok(result.reason.includes("The user denied the operation"));
   assert.ok(result.reason.includes("was not executed"));
 });
+
+test("git config read is allowed without asking (T-037)", async () => {
+  const { runtime, prompts } = makeRuntime();
+  const result = await evaluateTool("bash", { command: "git config user.name" }, runtime);
+  assert.deepEqual(result, { kind: "allow" });
+  assert.equal(prompts.length, 0);
+});
+
+test("git config write ask keeps the target path for consent (T-037)", async () => {
+  const activeProfile = profile({
+    pathPolicy: {
+      default: { read: "deny", list: "deny", search: "deny", write: "ask" },
+      rules: [
+        { path: "project/**", read: "allow", list: "allow", search: "allow", write: "ask" },
+        { path: "staging/**", read: "allow", list: "allow", search: "allow", write: "allow" },
+      ],
+    },
+  });
+  const { runtime, prompts } = makeRuntime(["Allow once"]);
+  const result = await evaluateTool("bash", { command: "git config --global user.name zev" }, runtime, { profile: activeProfile });
+  assert.deepEqual(result, { kind: "allow" });
+  assert.ok(prompts[0]!.includes(".gitconfig"), `prompt should show target path (got: ${prompts[0]})`);
+});
+
+test("git config local write is blocked by .git protection (T-037)", async () => {
+  const result = await evaluateTool("bash", { command: "git config user.name zev" }, { hasUI: true, select: async () => "Allow once" });
+  assert.equal(result.kind, "block");
+  assert.equal(result.code, "blocked-path");
+});
