@@ -96,11 +96,15 @@ function pipeToInterpreter(program: ShellProgram): string | null {
   const commands = program.commands;
   for (let i = 0; i + 1 < commands.length; i++) {
     const current = commands[i]!;
-    const next = commands[i + 1]!;
-    if (next.operatorBefore !== "|") continue;
     if (!isDownloader(current) || !downloadPipesStdout(current)) continue;
-    if (executesInterpreter(next)) {
-      return commandName(current) === "wget" ? "wget-pipe-interpreter" : "curl-pipe-interpreter";
+    // 下载器 stdout 必须直接进入管道（紧邻 |），与 raw-text 模式 curl\s+\S+\s*\| 一致
+    if (commands[i + 1]!.operatorBefore !== "|") continue;
+    // 管道进入后，后续任意解释器节点都拦截（含 tee 落地 + sh 执行的间接形态；
+    // 中间节点不稀释形态检查——原 \|.*(?:sh|...) 语义）
+    for (let j = i + 1; j < commands.length; j++) {
+      if (executesInterpreter(commands[j]!)) {
+        return commandName(current) === "wget" ? "wget-pipe-interpreter" : "curl-pipe-interpreter";
+      }
     }
   }
   return null;
@@ -123,7 +127,10 @@ function downloadThenExecute(program: ShellProgram): string | null {
 function evalRemoteContent(program: ShellProgram): string | null {
   for (const node of program.commands) {
     if (commandName(node) !== "eval") continue;
-    if (node.args.some((arg) => /(?:curl|wget)/i.test(arg.value ?? ""))) {
+    // 命令替换形态（$() 或反引号）内含下载器才算远程内容执行；
+    // 纯本地字符串（eval 'echo curl'）不拦，与原 \beval\s+"\?\$\?\( 语义一致
+    if (node.args.some((arg) =>
+      /\$\([^)]*\b(?:curl|wget)\b|`[^`]*\b(?:curl|wget)\b/i.test(arg.value ?? ""))) {
       return "eval-remote-content";
     }
   }
