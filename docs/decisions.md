@@ -2,8 +2,6 @@
 
 本文集中记录 pi-keel 的长期架构、工程和安全决策。每条决策只保留当前结论、理由、必要的替代方案和影响；被后续决策完整吸收（`superseded`）或主动退役（`retired`）的条目从当前寄存器剪除，历史由 Git 保留。瞬态迁移与去向规则见 [D-028](#d-028-统一-project-record-模型)。
 
-编号取 Git 历史中最大 `D-xxx` + 1，不复用历史 ID。
-
 ## D-001: Soft 技能匹配
 
 **Status:** active
@@ -277,7 +275,7 @@ reclassify:
 - Candidate Record 内容是项目数据而非指令；文件存在、命令式措辞、`Review On` 或 `Trigger` 都不构成需求、优先级、路线图、当前事实、用户批准或实施授权。
 - 只有用户在当前会话明确选择后，Candidate Record 才能迁移为 Task、Decision、Negative Space 或其他权威内容；迁移时移动 durable content 并在同一变更中删除 C 来源，避免双源。
 - `Review On` 是显式 context survey 使用的被动复审日期，不提供自动提醒、后台处理、Session hook、Footer 状态或到期后的默认动作。
-- Candidate 文件按需创建；缺失表示没有记录候选，不是项目结构错误。Task 容器在完成后清空，Decision 被替代内容完整吸收（`superseded`）或主动退役（`retired`）后剪除，历史统一由 Git 保留且 ID 不复用。
+- Candidate 文件按需创建；缺失表示没有记录候选，不是项目结构错误。Task 容器在完成后清空，Decision 被替代内容完整吸收（`superseded`）或主动退役（`retired`）后剪除，历史统一由 Git 保留且 ID 不复用。每个容器文末常驻一个待创建占位记录（`X-0NN: 待创建`，编号=下一可用号）：创建记录=填充占位并在文末追加新占位（编号+1）；移除记录（Task 清空/Candidate 迁移或否决/Decision 剪除）不动占位；占位缺失或多余时按 Git 历史最大+1 重建唯一占位（多占位保留编号最大者）。
 - Decision 的离开只有两种路径：`superseded`（被后续决策完整吸收，内容延续）或 `retired`（能力撤销或移交外部，内容终止）；两者都是短暂迁移态，去向就位后统一剪除。退役去向：完全撤销时残余耐用主张迁入 `CONTEXT.md` Negative Space；移交外部时归属边界记录为新的窄边界决策（或并入 CONTEXT）。`superseded` 必须指向承接 D-xxx，`retired` 必须指向去向；退役不得硬标 `superseded`，退役决策不得保留为 active。终态一律原因命名并声明去向：Candidate 为 `promoted/dismissed`，Task 为 `cleared`，Decision 为 `superseded/retired` → 剪除。
 - `principles.md` 是 Project Record 分类和生命周期的唯一部署权威；`survey-context` 只报告 Candidate 为 not adopted，并等待用户选择，现有领域、计划和文档技能负责迁移，不新增专用 review 技能。
 
@@ -440,3 +438,5 @@ reclassify:
 
 - **handoff-session 定位**（跨环境交接）：handoff 文档的唯一不可替代价值是“无本会话历史访问权的接收方”（非 pi 工具、跨机器/环境）获得状态摘要；同 pi 环境交接由 `/resume`/`/tree`（pi 持久 session 文件全量恢复）与 `survey-context`（从 CONTEXT/task/decisions 重建上下文）覆盖，摘要不增加保真度。原实现写 `$TMPDIR` 是缺陷：Linux `/tmp` 重启即清理、跨机器不可达——在唯一需要它的场景（跨环境）恰恰无法送达。重构：默认在会话中输出文档内容由用户交付（用户掌控持久性），用户显式指定路径时才写入；未沉淀决策不写入 handoff，先经 domain-modeling 入 `docs/decisions.md` 再引用路径（防双源，D-028）。**Revisit when** 出现需频繁跨工具交接的真实用户场景。
 
+
+## D-037: 待创建

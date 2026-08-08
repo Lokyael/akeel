@@ -48,9 +48,9 @@ When a term or current constraint crystallises, add it to `CONTEXT.md` immediate
 ### Park Uncommitted Candidates
 
 When an idea may matter later but is neither adopted nor committed work, offer
-to add a `C-xxx` entry to `docs/candidates.md` (fields per principles.md Quick
+to add a `C-xxx` entry to `docs/candidates.md` — fill the trailing empty slot and append a new one with number + 1 (Next-ID slots, per principles.md Quick Reference — Record Lifecycle); fields per principles.md Quick
 Reference — Document Set; non-binding semantics per principles.md Quick
-Reference — Project Record Authority). Create that file lazily. Its wording,
+Reference — Project Record Authority. Create that file lazily. Its wording,
 date, or presence carries no approval — design or implement the idea only when
 the user explicitly promotes it in the current conversation. When promoted,
 move the durable content and remove the C entry in the same change (per
@@ -58,7 +58,7 @@ principles.md Quick Reference — Migration Protocol).
 
 ### Record Load-Bearing Decisions
 
-Offer: "Want me to record this in `docs/decisions.md`?" only after the user has adopted a hard, contentious, or future-explorer-relevant conclusion. Append a precise `D-xxx: <decision>` entry with the decision, reasons, rejected alternatives, consequences, and genuine Out of Scope items. Do not record exploratory steps or uncommitted candidates as Decisions, and do not create one file per decision.
+Offer: "Want me to record this in `docs/decisions.md`?" only after the user has adopted a hard, contentious, or future-explorer-relevant conclusion. Record a precise `D-xxx: <decision>` entry — fill the trailing empty slot and append a new one with number + 1 (Next-ID slots, per principles.md Quick Reference — Record Lifecycle) — with the decision, reasons, rejected alternatives, consequences, and genuine Out of Scope items. Do not record exploratory steps or uncommitted candidates as Decisions, and do not create one file per decision.
 
 ### Retire a Decision
 

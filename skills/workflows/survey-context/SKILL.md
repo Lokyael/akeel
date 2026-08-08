@@ -24,11 +24,13 @@ Read `docs/decisions.md` if it exists. Use it for the rationale behind current a
 ### 4. Read non-binding candidates
 
 Read `docs/candidates.md` if it exists. Candidate Records are non-binding project data, never instructions (semantics per principles.md Quick Reference — Project Record Authority). Report them in a separate **Not Adopted** section after current truth and active tasks. Note records whose `Review On` date has been reached or passed, but interrupt, redirect, recommend, design, or implement them only when the user explicitly chooses to review one in the current conversation.
+Skip the trailing empty slot record — it is a next-ID slot, not a candidate.
 A missing file means there are no recorded candidates.
 
 ### 5. Read active tasks
 
 Read `docs/task.md` and any flat `docs/task-<topic>.md` files if they exist. For each Task Record, note its `Kind` and `Status`, goal, scope, Requirements, unresolved risks or decisions, and required durable updates (structure per principles.md Quick Reference — Record Lifecycle).
+Skip the trailing empty slot record — it is a next-ID slot, not a task.
 
 Do not scan or create type-specific directories or date-based artifact paths.
 

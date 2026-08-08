@@ -67,8 +67,8 @@ Show the ranked list to the user. They often know which to re-rank.
 
 ### 6. Record the Bug Task
 
-Add a precise `T-xxx: <bug-topic>` section to `docs/task.md` or the active
-`docs/task-<topic>.md` file:
+Add a precise `T-xxx: <bug-topic>` section to `docs/task.md` — fill the trailing empty slot and append a new one with number + 1 (Next-ID slots, per principles.md Quick Reference — Record Lifecycle) — or the active
+`docs/task-<topic>.md` file (consuming the T counter from `docs/task.md`):
 
 ```markdown
 ## T-001: [Bug Title]

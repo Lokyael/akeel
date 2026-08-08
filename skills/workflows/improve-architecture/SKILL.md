@@ -44,4 +44,4 @@ End with a **Top recommendation** — which to tackle first and why.
 
 Once the user picks a candidate, run the `/skill:grill-plan` skill to walk the decision tree — constraints, dependencies, the shape of the deepened module, what tests survive.
 
-Side effects happen inline as decisions crystallise: update `CONTEXT.md` for new terms and append load-bearing decisions to `docs/decisions.md`.
+Side effects happen inline as decisions crystallise: update `CONTEXT.md` for new terms and record load-bearing decisions in `docs/decisions.md` — fill the trailing empty slot and append a new one with number + 1 (Next-ID slots, per principles.md Quick Reference — Record Lifecycle).
