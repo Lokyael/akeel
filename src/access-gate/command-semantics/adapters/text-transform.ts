@@ -1,8 +1,8 @@
 // 文本处理命令 — sed, awk, sort, uniq 的选项语义
 
-import type { ShellCommandNode, ShellArg, SourceSpan } from "../../shell-parse/types";
+import type { ShellCommandNode, ShellArg } from "../../shell-parse/types";
 import type { CommandAdapter, CommandSemantics, PathIntent, SemanticContext } from "../types";
-import { makeSemantics } from "./shared";
+import { makeSemantics, optionIntent } from "./shared";
 
 interface OptionSchema {
   /** 选项名（短和长）。 */
@@ -67,14 +67,6 @@ const TEXT_CONFIG: Record<string, {
   sort: { class: "inspect", schemas: SORT_OPTS, reason: "sort lines" },
   uniq: { class: "inspect", schemas: UNIQ_OPTS, reason: "unique lines" },
 };
-
-/** 选项派生意图的合成 span：真实 token 位置未知，不参与精确定位。 */
-const SYNTHETIC_SPAN: SourceSpan = { start: 0, end: 0 };
-
-/** 选项派生的路径意图（source: option，conservative 置信度）。 */
-function optionIntent(operation: "read" | "write", rawPath: string): PathIntent {
-  return { operation, rawPath, source: "option", span: SYNTHETIC_SPAN, confidence: "conservative" };
-}
 
 /**
  * 解析选项模式，提取路径 intent。
