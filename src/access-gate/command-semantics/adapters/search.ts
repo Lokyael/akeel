@@ -24,6 +24,8 @@ interface SearchConfig {
   patternOpts?: readonly string[];
   /** 文件选项：提取值为 read intent。 */
   fileOpts?: readonly string[];
+  /** 写文件选项：提取值为 write intent 并升级 modify（如 find -fprint、tree -o）。 */
+  writeValueOpts?: readonly string[];
   /** 破坏性选项：检测到则分类升级为 modify（如 find -delete、-exec）。必须在选项解析前通过原始 args 检测，不能依赖解析后的结果。 */
   destructiveOpts?: readonly string[];
   reason: string;
@@ -34,7 +36,8 @@ const SEARCH_CONFIG: Record<string, SearchConfig> = {
     class: "inspect",
     defaultRoot: ".",
     rootAtArgIndex: 0,
-    valueOpts: ["-type", "-name", "-iname", "-path", "-ipath", "-size", "-mtime", "-atime", "-ctime", "-user", "-group", "-perm", "-exec", "-execdir", "-ok", "-maxdepth", "-mindepth"],
+    valueOpts: ["-type", "-name", "-iname", "-path", "-ipath", "-size", "-mtime", "-atime", "-ctime", "-user", "-group", "-perm", "-exec", "-execdir", "-ok", "-maxdepth", "-mindepth", "-newer", "-anewer", "-cnewer", "-samefile", "-regex", "-iregex", "-inum", "-links", "-printf", "-fprint", "-fprintf", "-fls", "-fwrite"],
+    writeValueOpts: ["-fprint", "-fprintf", "-fls", "-fwrite"],
     destructiveOpts: ["-delete", "-exec", "-execdir", "-ok"],
     reason: "search files",
   },
@@ -42,7 +45,8 @@ const SEARCH_CONFIG: Record<string, SearchConfig> = {
     class: "inspect",
     defaultRoot: ".",
     rootAtArgIndex: 0,
-    valueOpts: ["-L", "--level", "-I", "--ignore", "-P", "--pattern", "--charset"],
+    valueOpts: ["-L", "--level", "-I", "--ignore", "-P", "--pattern", "--charset", "-o"],
+    writeValueOpts: ["-o"],
     reason: "list directory tree",
   },
   grep: {
@@ -51,8 +55,8 @@ const SEARCH_CONFIG: Record<string, SearchConfig> = {
     rootAtArgIndex: 1, // 第一个非选项参数是 pattern，第二个起是 targets
     needsRecursiveFlag: true,
     recursiveOpts: ["-r", "-R", "--recursive"],
-    valueOpts: ["-e", "--regexp", "-f", "--file", "-m", "--max-count", "-A", "-B", "-C", "--include", "--exclude", "--exclude-dir"],
-    attachedValueOpts: ["-e", "--regexp=", "-f", "--file=", "-m", "--max-count=", "-A", "-B", "-C"],
+    valueOpts: ["-e", "--regexp", "-f", "--file", "-m", "--max-count", "-A", "-B", "-C", "--include", "--exclude", "--exclude-dir", "-d", "--directories", "--label"],
+    attachedValueOpts: ["-e", "--regexp=", "-f", "--file=", "-m", "--max-count=", "-A", "-B", "-C", "--directories=", "--label="],
     patternOpts: ["-e", "--regexp", "-f", "--file"],
     fileOpts: ["-f", "--file"],
     reason: "search file contents",
@@ -61,8 +65,8 @@ const SEARCH_CONFIG: Record<string, SearchConfig> = {
     class: "inspect",
     defaultRoot: ".",
     rootAtArgIndex: 1, // pattern 在第一个非选项参数，targets 从第二个起
-    valueOpts: ["-e", "--regexp", "-f", "--file", "-g", "--glob", "-t", "--type", "--type-not", "--iglob", "--iglob-case-insensitive", "-m", "--max-count", "-A", "--after-context", "-B", "--before-context", "-C", "--context", "--max-columns", "--max-depth", "--sort", "--sortr"],
-    attachedValueOpts: ["-e", "--regexp=", "-f", "--file=", "-g", "--glob=", "-t", "--type=", "--type-not=", "--iglob=", "-m", "--max-count=", "-A", "--after-context=", "-B", "--before-context=", "-C", "--context=", "--max-columns=", "--max-depth=", "--sort=", "--sortr="],
+    valueOpts: ["-e", "--regexp", "-f", "--file", "-g", "--glob", "-t", "--type", "--type-not", "--iglob", "--iglob-case-insensitive", "-m", "--max-count", "-A", "--after-context", "-B", "--before-context", "-C", "--context", "--max-columns", "--max-depth", "--sort", "--sortr", "--max-filesize", "--min-filesize"],
+    attachedValueOpts: ["-e", "--regexp=", "-f", "--file=", "-g", "--glob=", "-t", "--type=", "--type-not=", "--iglob=", "-m", "--max-count=", "-A", "--after-context=", "-B", "--before-context=", "-C", "--context=", "--max-columns=", "--max-depth=", "--sort=", "--sortr=", "--max-filesize=", "--min-filesize="],
     patternOpts: ["-e", "--regexp", "-f", "--file"],
     fileOpts: ["-f", "--file"],
     reason: "ripgrep search",
@@ -154,12 +158,17 @@ export const searchAdapter: CommandAdapter = {
       }
     }
 
+    // 写文件选项值（find -fprint、tree -o 等）→ 检测升级 modify；intent 在搜索根之后 push
+    const writeValues = optionValues.filter((entry) => config.writeValueOpts?.includes(entry.option));
+
     const hasPatternOption = optionValues.some((entry) => config.patternOpts?.includes(entry.option));
     const rootIndex = Math.max(0, config.rootAtArgIndex - (hasPatternOption ? 1 : 0));
     const foundRoots = positional.slice(rootIndex).map((arg) => arg.value ?? "");
     const roots = foundRoots.length > 0 ? foundRoots : [config.defaultRoot];
+    // grep -d recurse / --directories=recurse 等价递归
+    const directoriesRecurse = optionValues.some((e) => (e.option === "-d" || e.option === "--directories") && e.value === "recurse");
     const isRecursive = config.recursiveOpts
-      ? config.recursiveOpts.some((option) => hasOption(args, option))
+      ? config.recursiveOpts.some((option) => hasOption(args, option)) || directoriesRecurse
       : true;
 
     // 对于需要递归标记的命令，没有递归标记时不产生搜索 intent
@@ -193,10 +202,21 @@ export const searchAdapter: CommandAdapter = {
       });
     }
 
-    // 检测破坏性选项 → 升级为 modify（find -delete、-exec 等）
+    // 写文件选项值（find -fprint、tree -o 等）→ write intent（搜索根之后）
+    for (const entry of writeValues) {
+      intents.push({
+        operation: "write",
+        rawPath: entry.value,
+        source: "option",
+        span: entry.span,
+        confidence: "conservative",
+      });
+    }
+
+    // 检测破坏性选项 → 升级为 modify（find -delete、-exec 等）；写文件选项同样升级
     const hasDestructive = config.destructiveOpts
       ?.some((opt) => hasOption(args, opt)) ?? false;
-    const cls = hasDestructive ? "modify" : config.class;
+    const cls = hasDestructive || writeValues.length > 0 ? "modify" : config.class;
 
     return makeSemantics(cls, {
       reason: config.reason,
