@@ -161,6 +161,21 @@ function parseOptions(
         index++;
         continue;
       }
+      // 组合纯 flag 短选项：-rn、-cd、-nE（POSIX 组合短选项，逐字符均为无值 flag 时消费）。
+      // 簇内任一带值选项（如 sed -ne、sort -oFILE）不满足，落回后续分支——附着值语义由上面两分支负责，保守不扩展。
+      const clusterChars = val.length > 2 ? val.slice(1).split("") : [];
+      const clusterOk = clusterChars.length > 0 && clusterChars.every((ch) =>
+        schemas.some((s) => !s.takesValue && s.names.includes(`-${ch}`)),
+      );
+      if (clusterOk) {
+        for (const ch of clusterChars) {
+          const s = schemas.find((o) => !o.takesValue && o.names.includes(`-${ch}`))!;
+          if (s.isPattern) sawPattern = true;
+          if (s.operation === "write") sawWrite = true;
+        }
+        index++;
+        continue;
+      }
       // 不认识这个选项 → opaque
       opaque = true;
       index++;
