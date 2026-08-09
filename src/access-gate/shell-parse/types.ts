@@ -37,6 +37,8 @@ export interface ShellRedirectionNode {
 export interface ShellCommandNode {
   envAssignments: readonly ShellArg[];
   wrapper: readonly ShellArg[];
+  /** wrapper 的 positional 参数（如 timeout <duration>）：parser 消费不入 args，仅保留供 token 级扫描（D-037）。 */
+  wrapperArgs: readonly ShellArg[];
   executable: ShellArg | null;
   args: readonly ShellArg[];
   redirections: readonly ShellRedirectionNode[];

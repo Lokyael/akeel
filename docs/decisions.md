@@ -443,7 +443,7 @@ reclassify:
 
 **Status:** active
 
-**Decision:** `shell-parse/parser.ts` 在 wrapper-args 状态下识别嵌套 wrapper 并入栈（重置该 wrapper 的 `WRAPPER_POS_SKIP`）；wrapper 的 positional 参数（`timeout <duration>`）由 parser 消费丢弃，`node.args` 只含真实命令参数。`ShellCommandNode.executable` 只承载真正要运行的命令，**永不可能是 wrapper**。`normalize.ts` 退化为纯出栈：循环弹出 wrapper 链，删除 `promotion` / `guessExecutable` / `removeFromArgs` / unwrap 的 slice 逻辑 / `MAX_UNWRAP_DEPTH`。
+**Decision:** `shell-parse/parser.ts` 在 wrapper-args 状态下识别嵌套 wrapper 并入栈（重置该 wrapper 的 `WRAPPER_POS_SKIP`）；wrapper 的 positional 参数（`timeout <duration>`）由 parser 消费后保留在 `node.wrapperArgs` 供 token 级扫描，`node.args` 只含真实命令参数。`ShellCommandNode.executable` 只承载真正要运行的命令，**永不可能是 wrapper**。`normalize.ts` 退化为纯出栈：循环弹出 wrapper 链与 wrapperArgs，删除 `promotion` / `guessExecutable` / `removeFromArgs` / unwrap 的 slice 逻辑 / `MAX_UNWRAP_DEPTH`。
 
 **Why:**
 - 旧设计仅在嵌套形态下把 wrapper 放 executable 槽（如 `timeout 5 env python` → executable=env），真实命令沉入 args，normalize 用 promotion + guess 恢复——猜测逻辑脆弱，且产生两个已实证的盲点：
@@ -452,7 +452,7 @@ reclassify:
 - 修复放在生产者（parser）：不变量"executable = 真实命令"由构造保证，消费方（preflight、analyzeCd 及未来新增检查）按构造正确，不在消费方复制 wrapper 解包知识（Centralize，D-030 同源）。
 
 **Impact:**
-- 解析后 `node.args` 只含真实命令参数；wrapper positional 不再进入 args，threatScan 的 token 文本覆盖不变（wrapper 名与 executable 仍被扫描）。
+- 解析后 `node.args` 只含真实命令参数；wrapper positional 保留在 `node.wrapperArgs`，threatScan 的 token 文本覆盖不变（时长槽由 wrapperArgs 扫描，防威胁词藏匿——code-audit 回归修正）。
 - preflight 硬规则对嵌套 wrapper 形态按构造闭合：实证的 4 个绕过形态（`timeout 5 env python`、`command env python`、`timeout 5 env -i python`、`env nohup bash`）由 PASS 变拦截，回归测试锁定。
 - `analyzeCd` 正确追踪嵌套 wrapper 下的 cd（`timeout 5 env cd x && rm file` 的路径检查基于正确 cwd，fail-closed 方向）。
 - normalize 大幅简化；删除的正是"猜测 executable"逻辑，与 D-031 诚实分类原则同向。

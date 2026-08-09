@@ -157,6 +157,7 @@ function parseCommandGroup(tokens: LexToken[]): Omit<ShellCommandNode, "operator
 
   const envAssignments: ShellArg[] = [];
   const wrapper: ShellArg[] = [];
+  const wrapperArgs: ShellArg[] = [];
   let executable: ShellArg | null = null;
   const args: ShellArg[] = [];
   const redirections: ShellRedirectionNode[] = [];
@@ -226,8 +227,10 @@ function parseCommandGroup(tokens: LexToken[]): Omit<ShellCommandNode, "operator
           continue;
         }
         // 某些 wrapper 有固定 positional 参数（如 timeout <duration>）：
-        // parser 消费丢弃，不进入 args——args 只含真实命令参数（D-037）
+        // parser 消费不入 args——args 只含真实命令参数（D-037）；token 保留在
+        // wrapperArgs 供 threatScan 扫描（时长槽不能成为威胁扫描盲区）
         if (wrapperSkipRemaining > 0) {
+          wrapperArgs.push(arg);
           wrapperSkipRemaining--;
           i++;
           continue;
@@ -266,6 +269,7 @@ function parseCommandGroup(tokens: LexToken[]): Omit<ShellCommandNode, "operator
   return {
     envAssignments,
     wrapper,
+    wrapperArgs,
     executable,
     args,
     redirections,

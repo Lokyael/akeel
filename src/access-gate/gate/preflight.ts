@@ -160,6 +160,7 @@ function threatScan(program: ShellProgram): string | null {
     .flatMap((node) => [
       ...node.envAssignments,
       ...node.wrapper,
+      ...node.wrapperArgs,
       node.executable,
       ...node.args,
     ])

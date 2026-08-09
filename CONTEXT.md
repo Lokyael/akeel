@@ -24,7 +24,7 @@
 
 - `src/bootstrap/` 在 Session 启动和 compaction 后注入工程原则。
 - `src/access-gate/` 统一处理用户全局 Profile、Shell IR、命令语义、路径策略、Gate、Session 状态和 Footer。
-- `shell-parse/` 输出受限 Shell IR；`command-semantics/` 提取命令类别、路径意图、效果和 cwd 转换，用户全局 `pi-keel/command-overrides.yaml` 只扩展 Shell 命令语义。wrapper 链由 parser 单一拥有——`executable` 永不承载 wrapper，wrapper positional 由 parser 消费丢弃，normalize 纯出栈（D-037）。
+- `shell-parse/` 输出受限 Shell IR；`command-semantics/` 提取命令类别、路径意图、效果和 cwd 转换，用户全局 `pi-keel/command-overrides.yaml` 只扩展 Shell 命令语义。wrapper 链由 parser 单一拥有——`executable` 永不承载 wrapper，wrapper positional 消费后保留在 `wrapperArgs` 供 token 级扫描，normalize 纯出栈（D-037）。
 - `gate/` 编译器将 Shell IR 和 Direct tool 参数转换为 `CompleteAccessPlan`；compiler outcome 另外区分 unsupported form、security block 和 invalid request。`compiler-entry.ts` 是唯一 plan sealing boundary，同步 Policy Kernel 只消费经过 verifier 验证的 plan 和 Profile，产出 `GateDecision`，renderer 将决策转为 host 兼容结果。
 - Direct tool（`read`、`write`、`edit`、`find`、`grep`、`ls`）和 Shell 命令经过各自的 compiler 后进入同一 Policy Kernel。
 - 用户项目运行时文档入口为 `CONTEXT.md`、可选的 `docs/candidates.md`、`docs/decisions.md` 和 `docs/task.md`；Candidate Record 不进入当前事实或 active Decision 索引。

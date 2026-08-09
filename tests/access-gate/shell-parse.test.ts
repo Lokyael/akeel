@@ -319,6 +319,9 @@ test("parser: nested wrapper chain (timeout env)", () => {
   assert.equal(cmd.executable?.value, "rm");
   assert.equal(cmd.args.length, 1);
   assert.equal(cmd.args[0]!.value, "file");
+  // wrapper positional 保留在 wrapperArgs（供 token 级扫描），不入 args
+  assert.equal(cmd.wrapperArgs.length, 1);
+  assert.equal(cmd.wrapperArgs[0]!.value, "5");
 });
 
 test("parser: nested wrapper with env option and assignments", () => {

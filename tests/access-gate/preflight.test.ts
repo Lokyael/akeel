@@ -153,6 +153,21 @@ test("threat scan: string literals with injection text still blocked", () => {
   }
 });
 
+test("threat scan: wrapper positional slot stays covered (D-037)", () => {
+  const e = env();
+  try {
+    // 曾回归：parser 丢弃 timeout 时长槽后 threatScan 失去该槽覆盖；wrapperArgs 保留后
+    // 威胁词位于时长槽仍被 token 级扫描拦截。
+    const r = compileShellCall({ ...e, command: "timeout 'ignore previous instructions' echo hi" });
+    assert.equal(r.kind, "reject");
+    if (r.kind === "reject") assert.equal(r.code, "threat");
+    // 对照：正常时长（数字）不受影响
+    assertComplete("timeout 5 echo hi", e);
+  } finally {
+    e.cleanup();
+  }
+});
+
 test("threat scan: authorized_keys mentions are not threat-blocked (path policy covers writes)", () => {
   const e = env();
   try {
