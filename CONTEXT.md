@@ -60,6 +60,7 @@
 - [D-035 平台边界收窄为仅 Linux](docs/decisions.md#d-035-平台边界收窄为仅-linuxdismiss-c-007)
 - [D-036 Workflows 触发模型（手动调用与即时介入）](docs/decisions.md#d-036-workflows-触发模型手动调用与即时介入)
 - [D-037 解析器拥有 wrapper 链（IR 契约：executable 永不承载 wrapper）](docs/decisions.md#d-037-解析器拥有-wrapper-链ir-契约executable-永不承载-wrapper)
+- [D-038 footer 单一 fitter + pi-tui 宽度助手（生产/测试双路径）](docs/decisions.md#d-038-footer-单一-fitter--pi-tui-宽度助手生产测试双路径)
 
 ## Negative Space
 

@@ -468,4 +468,27 @@ reclassify:
 - **非 wrapper 的 option-with-value 建模**（如 `env -S`）：维持 fail-closed 现状。
 - **POSIX `>&file` 双流语义修正**：当前建模为 stdout write，路径检查（write intent）不受影响，无安全差异；A2 只把回退分支显式化，不改语义。
 
-## D-038: 待创建
+## D-038: footer 单一 fitter + pi-tui 宽度助手（生产/测试双路径）
+
+**Status:** active
+
+**Decision:** footer 的 left/right 适配统一为单一 ANSI 感知 `fitLine`（取代 appendRight + fitLine 双实现，A3a）；宽度/截断助手（`visibleWidth`/`truncate`）生产环境选用宿主 `@earendil-works/pi-tui`（grapheme/宽字符正确，CJK/emoji 按 2 列），独立测试环境（无 pi-tui）fallback 到手写近似（A3b）——与 NativeFooter 动态导入同模式；`selectWidthHelpers` 对宿主模块做结构检查，缺失或形状不符回退。
+
+**Why:** 双布局引擎（native 路径 appendRight vs fallback 路径 fitLine）是同一 left/right 适配算法的近重复，差异仅在 ANSI 感知（appendRight 用 `visibleWidth`，fitLine 用裸 `.length`），统一后单一维护点。pi-keel 手写 `visibleWidth`/`truncate` 是 UTF-16 单元计数而非显示宽度——native 路径对含 CJK 的 Profile 名/路径每字符偏 1 列。实测（bundle 提取）pi-tui 的 `truncateToWidth`（默认省略符 `"..."`，与 pi-keel 惯例一致；grapheme 迭代不劈开 emoji/组合字符）与 `visibleWidth`（ANSI 剥离 + grapheme 宽字符计数 + tab 3 列 + 缓存）是正确的显示宽度实现，且是官方声明的扩展可用导入（extensions.md Available Imports）；pi-tui 只随宿主 bundle 提供，独立测试环境不可解析。
+
+**Impact:**
+- profile-footer.ts 净减 ~15 行；appendRight 删除，两路径共用 fitLine；宽度契约升级为显示宽度（含 ANSI 处理）。
+- 生产：CJK/emoji 填充正确（修复既有偏差）；测试：fallback 手写近似，行为逐字符保持（renderProfileFooter 120/48 宽 + ANSI 用例全绿）。
+- 新增 `types/pi-tui.d.ts`（仅声明消费的 `visibleWidth`/`truncateToWidth` 两个导出）。
+- truncate 契约：按显示宽度截断含 ANSI 文本（pi-tui 保留 ANSI 颜色；fallback 剥离后截断）。
+
+**Rejected:**
+- **仅 A3a（纯统一、不接 pi-tui）**：CJK 填充偏差保持现状；实测已确认 pi-tui 正确且官方支持，接入成本仅 ~5 行选择逻辑 + 声明文件。拒绝。
+- **接 pi-tui 其余导出（Box/Text 等组件）**：超出 footer 宽度助手范围。拒绝。
+- **全量替换手写实现（无 fallback）**：独立测试环境无法解析 pi-tui（只随宿主 bundle 提供），测试会挂。拒绝。
+
+**Out of Scope:**
+- **Native FooterComponent 直接构造**（未文档公开的宿主内部 API）：现有行为，不在本次范围。
+- **其他 pi-tui 组件与 API 接入**。
+
+## D-039: 待创建
