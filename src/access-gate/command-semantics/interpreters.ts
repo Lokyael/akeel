@@ -9,6 +9,6 @@
 export const LANGUAGE_RUNTIMES = ["python", "python3", "node", "ruby", "perl", "tsx"] as const;
 
 /** 能执行 stdin 任意代码的解释器（shell 与未注册为语言运行时的解释器），仅进入硬规则集。 */
-export const STDIN_EXECUTORS = ["sh", "bash", "dash", "zsh", "lua"] as const;
+const STDIN_EXECUTORS = ["sh", "bash", "dash", "zsh", "lua"] as const;
 
 export const HARD_RULE_INTERPRETERS: ReadonlySet<string> = new Set([...LANGUAGE_RUNTIMES, ...STDIN_EXECUTORS]);
