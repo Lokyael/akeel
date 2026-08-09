@@ -230,12 +230,13 @@ const PRINCIPLES_FILE = join(SKILLS_ROOT, "..", "src", "bootstrap", "principles.
 
 interface PrinciplesAnchors {
   quickReference: Set<string>;
-  sections: Map<string, string>;
+  /** 编号标题（§N → 标题文本）；值仅作可读性参考，解析只用键。 */
+  sections: Set<string>;
   bold: Set<string>;
 }
 
 function loadPrinciplesAnchors(): PrinciplesAnchors {
-  const anchors: PrinciplesAnchors = { quickReference: new Set(), sections: new Map(), bold: new Set() };
+  const anchors: PrinciplesAnchors = { quickReference: new Set(), sections: new Set(), bold: new Set() };
   const content = readFileSync(PRINCIPLES_FILE, "utf-8");
   let inQuickReference = false;
   for (const line of content.split(/\r?\n/)) {
@@ -246,7 +247,7 @@ function loadPrinciplesAnchors(): PrinciplesAnchors {
       if (level === 2) inQuickReference = text === "Quick Reference";
       if (inQuickReference && level >= 3) anchors.quickReference.add(text);
       const numbered = text.match(/^(\d+)[.．]\s+(.+)$/);
-      if (numbered) anchors.sections.set(numbered[1]!, text);
+      if (numbered) anchors.sections.add(numbered[1]!);
       continue;
     }
     const boldMatch = line.match(/^\*\*([^*]+)\*\*/);
