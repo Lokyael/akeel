@@ -3,6 +3,7 @@
 import type { ShellCommandNode } from "../../shell-parse/types";
 import type { CommandAdapter, CommandSemantics, SemanticContext } from "../types";
 import { makeSemantics } from "./shared";
+import { LANGUAGE_RUNTIMES } from "../interpreters";
 
 interface InterpRule {
   cls: "inspect" | "execute";
@@ -17,14 +18,11 @@ function buildInterpRules(cmd: string): InterpRule[] {
   ];
 }
 
-const INTERP_RULES: Record<string, InterpRule[]> = {
-  python: buildInterpRules("python"),
-  python3: buildInterpRules("python3"),
-  node: buildInterpRules("node"),
-  ruby: buildInterpRules("ruby"),
-  perl: buildInterpRules("perl"),
-  tsx: buildInterpRules("tsx"),
-};
+// 注册名单与共享解释器列表同源（LANGUAGE_RUNTIMES，T-046 R3）：
+// 新增语言运行时只需改 interpreters.ts，adapter 注册与 preflight 硬规则自动对齐。
+const INTERP_RULES: Record<string, InterpRule[]> = Object.fromEntries(
+  LANGUAGE_RUNTIMES.map((runtime) => [runtime, buildInterpRules(runtime)]),
+);
 
 export const interpreterAdapter: CommandAdapter = {
   names: Object.keys(INTERP_RULES),

@@ -1,43 +1,36 @@
 import type { RawProfiles, ValidationResult } from "./types";
+import { COMMAND_CLASS_SET, COMMAND_CLASS_VALUES, DECISION_SET, PATH_OPERATION_SET } from "../domain";
+import type { CommandClass, ProfileDecision, PathOperation } from "../domain";
+import { isRecord } from "../util";
 
-const DECISIONS = new Set(["allow", "ask", "deny"]);
-const OPERATIONS = new Set(["read", "list", "search", "write"]);
 const PROFILE_KEYS = new Set(["description", "extends", "shellPolicy", "pathPolicy"]);
 const ROOT_KEYS = new Set(["defaultProfile", "profiles"]);
-const SHELL_KEYS = new Set(["inspect", "modify", "execute", "destroy", "unknown"]);
 const PATH_POLICY_KEYS = new Set(["default", "rules"]);
 const RESERVED_KEYS = new Set(["__proto__", "constructor", "prototype"]);
 const MAX_PROFILES = 128;
 const MAX_RULES = 512;
 const MAX_PATTERN_LENGTH = 512;
 
-function record(value: unknown): Record<string, unknown> | null {
-  return value !== null && typeof value === "object" && !Array.isArray(value)
-    ? value as Record<string, unknown>
-    : null;
-}
-
 function fail(error: string): ValidationResult<RawProfiles> {
   return { ok: false, error };
 }
 
 function validDecision(value: unknown): boolean {
-  return typeof value === "string" && DECISIONS.has(value);
+  return typeof value === "string" && DECISION_SET.has(value as ProfileDecision);
 }
 
 function validateDecisionMap(value: unknown, label: string): string | null {
-  const object = record(value);
-  if (!object) return `${label} must be an object`;
-  for (const [key, decision] of Object.entries(object)) {
-    if (!OPERATIONS.has(key)) return `${label} has unknown operation '${key}'`;
+  if (!isRecord(value)) return `${label} must be an object`;
+  for (const [key, decision] of Object.entries(value)) {
+    if (!PATH_OPERATION_SET.has(key as PathOperation)) return `${label} has unknown operation '${key}'`;
     if (!validDecision(decision)) return `${label}.${key} has invalid decision`;
   }
   return null;
 }
 
 function validateProfile(value: unknown, name: string): string | null {
-  const profile = record(value);
-  if (!profile) return `profile '${name}' must be an object`;
+  if (!isRecord(value)) return `profile '${name}' must be an object`;
+  const profile = value;
   if (Object.keys(profile).some((key) => RESERVED_KEYS.has(key) || !PROFILE_KEYS.has(key))) {
     return `profile '${name}' has an unknown field`;
   }
@@ -50,36 +43,33 @@ function validateProfile(value: unknown, name: string): string | null {
   }
 
   if (profile.shellPolicy !== undefined) {
-    const shell = record(profile.shellPolicy);
-    if (!shell || Object.keys(shell).some((key) => RESERVED_KEYS.has(key) || !SHELL_KEYS.has(key))) {
+    if (!isRecord(profile.shellPolicy) || Object.keys(profile.shellPolicy).some((key) => RESERVED_KEYS.has(key) || !COMMAND_CLASS_SET.has(key as CommandClass))) {
       return `profile '${name}'.shellPolicy is invalid`;
     }
-    for (const key of SHELL_KEYS) {
-      if (shell[key] !== undefined && !validDecision(shell[key])) return `profile '${name}'.shellPolicy.${key} is invalid`;
+    for (const key of COMMAND_CLASS_VALUES) {
+      if (profile.shellPolicy[key] !== undefined && !validDecision(profile.shellPolicy[key])) return `profile '${name}'.shellPolicy.${key} is invalid`;
     }
   }
 
   if (profile.pathPolicy !== undefined) {
-    const pathPolicy = record(profile.pathPolicy);
-    if (!pathPolicy || Object.keys(pathPolicy).some((key) => RESERVED_KEYS.has(key) || !PATH_POLICY_KEYS.has(key))) {
+    if (!isRecord(profile.pathPolicy) || Object.keys(profile.pathPolicy).some((key) => RESERVED_KEYS.has(key) || !PATH_POLICY_KEYS.has(key))) {
       return `profile '${name}'.pathPolicy is invalid`;
     }
-    if (pathPolicy.default !== undefined) {
-      const error = validateDecisionMap(pathPolicy.default, `profile '${name}'.pathPolicy.default`);
+    if (profile.pathPolicy.default !== undefined) {
+      const error = validateDecisionMap(profile.pathPolicy.default, `profile '${name}'.pathPolicy.default`);
       if (error) return error;
     }
-    if (pathPolicy.rules !== undefined) {
-      if (!Array.isArray(pathPolicy.rules) || pathPolicy.rules.length > MAX_RULES) {
+    if (profile.pathPolicy.rules !== undefined) {
+      if (!Array.isArray(profile.pathPolicy.rules) || profile.pathPolicy.rules.length > MAX_RULES) {
         return `profile '${name}'.pathPolicy.rules is invalid`;
       }
-      for (const [index, rawRule] of pathPolicy.rules.entries()) {
-        const rule = record(rawRule);
-        if (!rule || typeof rule.path !== "string" || rule.path.length === 0 || rule.path.length > MAX_PATTERN_LENGTH) {
+      for (const [index, rawRule] of profile.pathPolicy.rules.entries()) {
+        if (!isRecord(rawRule) || typeof rawRule.path !== "string" || rawRule.path.length === 0 || rawRule.path.length > MAX_PATTERN_LENGTH) {
           return `profile '${name}'.pathPolicy.rules[${index}] has an invalid path`;
         }
-        for (const [key, decision] of Object.entries(rule)) {
+        for (const [key, decision] of Object.entries(rawRule)) {
           if (key === "path") continue;
-          if (!OPERATIONS.has(key)) return `profile '${name}'.pathPolicy.rules[${index}] has unknown operation '${key}'`;
+          if (!PATH_OPERATION_SET.has(key as PathOperation)) return `profile '${name}'.pathPolicy.rules[${index}] has unknown operation '${key}'`;
           if (!validDecision(decision)) return `profile '${name}'.pathPolicy.rules[${index}].${key} is invalid`;
         }
       }
@@ -89,17 +79,18 @@ function validateProfile(value: unknown, name: string): string | null {
 }
 
 export function validateProfiles(value: unknown): ValidationResult<RawProfiles> {
-  const root = record(value);
-  if (!root) return fail("profiles config must be an object");
+  // 校验基于局部 root（isRecord 就地窄化），value 参数保持 unknown：
+  // 结构化克隆后单转即可（本函数即 JSON → RawProfiles 类型边界）。
+  const root = value;
+  if (!isRecord(root)) return fail("profiles config must be an object");
   if (Object.keys(root).some((key) => RESERVED_KEYS.has(key) || !ROOT_KEYS.has(key))) return fail("profiles config has an unknown field");
-  const profiles = record(root.profiles);
-  if (!profiles || Object.keys(profiles).length === 0 || Object.keys(profiles).length > MAX_PROFILES) return fail("profiles must be a non-empty object");
-  for (const [name, profile] of Object.entries(profiles)) {
+  if (!isRecord(root.profiles) || Object.keys(root.profiles).length === 0 || Object.keys(root.profiles).length > MAX_PROFILES) return fail("profiles must be a non-empty object");
+  for (const [name, profile] of Object.entries(root.profiles)) {
     if (RESERVED_KEYS.has(name) || name.trim() === "") return fail("profile name is invalid");
     const error = validateProfile(profile, name);
     if (error) return fail(error);
   }
-  if (root.defaultProfile !== undefined && (typeof root.defaultProfile !== "string" || !Object.hasOwn(profiles, root.defaultProfile))) {
+  if (root.defaultProfile !== undefined && (typeof root.defaultProfile !== "string" || !Object.hasOwn(root.profiles, root.defaultProfile))) {
     return fail("defaultProfile must reference an existing profile");
   }
   return { ok: true, value: structuredClone(value) as RawProfiles };

@@ -133,7 +133,7 @@
 
 - 每个 plan 由 `compiler-entry.ts` 的私有 sealing boundary defensive-copy、deep-freeze 后加入私有 WeakSet；只有官方 compiler entry 能发行 plan，`access-plan-verifier.ts` 只负责无副作用的完整性和 budget proof，`isCompleteAccessPlan()` 是唯一公开完整性 predicate。
 - Kernel 不接收原始 Shell，也不接收未验证的 plan；compiler outcome 将 dynamic/unsafe/opaque/threat 分为 typed unsupported 或 security category，host renderer 不再通过 DecisionCode 反推 compiler failure kind。
-- coverage 必须逐项对应：command/redirection/effect span 与 operation、顶层 cwd candidates 与 path candidates 去重集合；verifier 独立复核 `maxCommands`、`maxOperations`、`maxCwdCandidates` 和 `maxInputLength`。
+- coverage 必须逐项对应：command/redirection span 与 operation、顶层 cwd candidates 与 path candidates 去重集合；T-046 起 effect 不再有平行 operations 数组——effect 只以 `command.effects` 承载，span 与 command span 相同，verifier 通过 command span 隐含证明 effect 覆盖；verifier 独立复核 `maxCommands`、`maxOperations`、`maxCwdCandidates` 和 `maxInputLength`。
 - Effect policy axis 是封闭映射：`read/search/write/delete/permissionChange/cwdChange → path`，`execute/network → shell`。
 
 ## D-023: 拒绝解释与静态 Guidance
@@ -220,7 +220,7 @@ reclassify:
 - 别名节点替换 executable 名称后传给目标 adapter，adapter 按目标命令规则执行完整分析（含路径提取）
 
 **已知局限：**
-- `reclassify` 的子命令提取（`fullSubcommand`）不跳过取值选项的值。例如 `cargo --manifest-path Cargo.toml build` 产生的子命令是 `"Cargo.toml build"` 而非 `"build"`。这是因为 `fullSubcommand` 不依赖 per-adapter 的 `valueOpts` 配置。实际影响极小：reclassify 的 pattern 使用 substring 匹配（`"build"` 而非 `"^build$"`），且典型场景（如 git 子命令重分类）不存在此问题。详见 `overrides.ts` 中 `fullSubcommand` 的注释。
+- `reclassify` 的子命令提取（`fullSubcommand`）不跳过取值选项的值。例如 `cargo --manifest-path Cargo.toml build` 产生的子命令是 `"Cargo.toml build"` 而非 `"build"`。这是因为 `fullSubcommand` 不依赖 per-adapter 的 `valueOpts` 配置。实际影响极小：reclassify 的 pattern 使用 substring 匹配（`"build"` 而非 `"^build$"`），且典型场景（如 git 子命令重分类）不存在此问题。详见 `adapters/shared.ts` 中 `fullSubcommand` 的注释（T-046 R4 迁入 shared 层）。
 
 ## D-025: Direct 优先与 Shell 安全子集
 

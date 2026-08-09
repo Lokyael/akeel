@@ -2,22 +2,23 @@ import { homedir } from "node:os";
 import { relative } from "node:path";
 import { DEFAULT_BLOCKED_PATHS } from "./blocked-paths";
 import { pathMatches, selectPathRule } from "./match";
-import type { Decision, PathOperation, PathRule, PathPolicy, ResolvedProfile } from "../profile/types";
+import type { ProfileDecision, PathOperation, PathRule, PathPolicy, ResolvedProfile } from "../profile/types";
 import type { ResolvedPath } from "./resolve";
 
 export { resolvePath } from "./resolve";
 export type { ResolvedPath } from "./resolve";
 export type { PathOperation } from "../profile/types";
 
-/** Path decision reason constants — keep in sync with gate/decision-code.ts. */
+/** Path 硬拒 reason 常量；reason → DecisionCode 的类型化映射在 evaluate-request.ts（T-046 R8）。 */
 export const PATH_DENY_REASONS = {
   blocked: "blocked path",
   unclassifiable: "path cannot be classified",
   symlinkEscape: "symlink escapes an allowed root",
 } as const;
+export type PathDenyReason = (typeof PATH_DENY_REASONS)[keyof typeof PATH_DENY_REASONS];
 
 export interface PathDecision {
-  decision: Decision;
+  decision: ProfileDecision;
   hard: boolean;
   reason: string;
   pattern?: string;

@@ -1,5 +1,5 @@
 import { decidePath, resolvePath } from "../path";
-import { PATH_DENY_REASONS } from "../path/policy";
+import { PATH_DENY_REASONS, type PathDenyReason } from "../path/policy";
 import type { ResolvedProfile } from "../profile/types";
 import { isCompleteAccessPlan } from "./compiler-entry";
 import { ANALYSIS_LIMITS, type CommandAccessOperation, type CompleteAccessPlan, type PathAccessOperation } from "./access-request";
@@ -80,13 +80,16 @@ export function evaluateRequest(
 }
 
 // ── path decision → stable code ──
+// reason → DecisionCode 的类型化映射（T-046 R8）：reason 常量改名在此编译期报错，消除字符串耦合
+const PATH_REASON_CODES: Readonly<Record<PathDenyReason, HardDenyCode | "path-denied">> = {
+  [PATH_DENY_REASONS.blocked]: "blocked-path",
+  [PATH_DENY_REASONS.unclassifiable]: "path-unclassifiable",
+  [PATH_DENY_REASONS.symlinkEscape]: "symlink-escape",
+};
 
 function pathDecisionCode(decision: Pick<PathDecision, "hard" | "reason">): HardDenyCode | "path-denied" {
   if (!decision.hard) return "path-denied";
-  if (decision.reason === PATH_DENY_REASONS.blocked) return "blocked-path";
-  if (decision.reason === PATH_DENY_REASONS.symlinkEscape) return "symlink-escape";
-  if (decision.reason === PATH_DENY_REASONS.unclassifiable) return "path-unclassifiable";
-  return "path-denied";
+  return PATH_REASON_CODES[decision.reason as PathDenyReason] ?? "path-denied";
 }
 
 // ── evidence helpers ──

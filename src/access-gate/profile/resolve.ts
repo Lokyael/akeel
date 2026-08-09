@@ -1,8 +1,7 @@
 import { emptyPathPolicy, emptyShellPolicy, mergePathDefaults, mergePathRules, mergeShellPolicy } from "./merge";
 import { validateProfiles } from "./validate";
+import { PATH_OPERATION_VALUES } from "../domain";
 import type { PathRule, RawProfiles, ResolvedProfile, ResolvedProfiles, ShellPolicy, ValidationResult } from "./types";
-
-const PATH_OPERATIONS = ["read", "list", "search", "write"] as const;
 
 function resolveOne(name: string, raw: RawProfiles, cache: Map<string, ResolvedProfile>, stack: string[]): ResolvedProfile {
   const cached = cache.get(name);
@@ -35,7 +34,7 @@ function resolveOne(name: string, raw: RawProfiles, cache: Map<string, ResolvedP
     description: source.description,
     shellPolicy,
     pathPolicy: {
-      default: Object.fromEntries(PATH_OPERATIONS.map((operation) => [operation, pathPolicy.default[operation]])) as ResolvedProfile["pathPolicy"]["default"],
+      default: Object.fromEntries(PATH_OPERATION_VALUES.map((operation) => [operation, pathPolicy.default[operation]])) as ResolvedProfile["pathPolicy"]["default"],
       rules: pathPolicy.rules.map((rule) => ({ ...rule })),
     },
   };

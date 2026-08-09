@@ -8,9 +8,7 @@ import type { ResolvedProfiles } from "./profile/types";
 import { displayName, PROFILE_PREFIX } from "./profile/defaults";
 import { findProjectRoot, createProfileState, type ProfileState } from "./session/profile-state";
 import { clearProfileStatus, installProfileFooter, type ProfileFooterHandle } from "./ui/profile-status";
-
-const SHELL_CLASSES = ["inspect", "modify", "execute", "destroy", "unknown"] as const;
-const PATH_OPERATIONS = ["read", "list", "search", "write"] as const;
+import { COMMAND_CLASS_VALUES, PATH_OPERATION_VALUES } from "./domain";
 
 function formatDecisions<T extends string>(keys: readonly T[], values: Partial<Record<T, string>>): string {
   return keys.flatMap((key) => values[key] ? [`${key}=${values[key]}`] : []).join(" ");
@@ -19,15 +17,15 @@ function formatDecisions<T extends string>(keys: readonly T[], values: Partial<R
 function profileStatus(state: ProfileState, profiles: ResolvedProfiles): string {
   const profile = state.getProfile();
   const pathRules = profile.pathPolicy.rules.length > 0
-    ? profile.pathPolicy.rules.map((rule) => `  ${rule.path}: ${formatDecisions(PATH_OPERATIONS, rule)}`)
+    ? profile.pathPolicy.rules.map((rule) => `  ${rule.path}: ${formatDecisions(PATH_OPERATION_VALUES, rule)}`)
     : ["  (none)"];
   return [
     `Profile: ${displayName(state.getName())}`,
     `Description: ${profile.description}`,
     "Shell:",
-    `  ${formatDecisions(SHELL_CLASSES, profile.shellPolicy)}`,
+    `  ${formatDecisions(COMMAND_CLASS_VALUES, profile.shellPolicy)}`,
     "Path defaults:",
-    `  ${formatDecisions(PATH_OPERATIONS, profile.pathPolicy.default)}`,
+    `  ${formatDecisions(PATH_OPERATION_VALUES, profile.pathPolicy.default)}`,
     "Path rules:",
     ...pathRules,
     `Available profiles: ${Object.keys(profiles.profiles).map(displayName).join(", ")}`,

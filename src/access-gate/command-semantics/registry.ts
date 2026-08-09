@@ -172,7 +172,7 @@ export function analyzeSemantics(
       // 用户显式重分类意味着提供了缺失的语义知识，清除 opaque
       return {
         ...result,
-        class: newClass,
+        commandClass: newClass,
         opaque: false,
         reason: `${result.reason} (reclassified to ${newClass})`,
       };

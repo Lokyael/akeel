@@ -9,10 +9,9 @@ import test from "node:test";
 
 function stubAdapter(names: string[]): CommandAdapter {
   const sem: CommandSemantics = {
-    class: "unknown",
+    commandClass: "unknown",
     effects: [],
     intents: [],
-    cwdTransition: { kind: "none" },
     hardRule: null,
     opaque: false,
     reason: "stub",

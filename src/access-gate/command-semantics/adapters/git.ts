@@ -2,7 +2,8 @@
 
 import type { ShellCommandNode, ShellArg } from "../../shell-parse/types";
 import type { CommandAdapter, CommandSemantics, Effect, PathIntent, SemanticContext } from "../types";
-import { makeSemantics, optionIntent, parseConfigOptions, type ConfigOptionTable, type ConfigTarget } from "./shared";
+import { makeSemantics, optionIntent } from "./shared";
+import { parseConfigOptions, type ConfigOptionTable, type ConfigTarget } from "./config-parse";
 
 /** Git 子命令分类。 */
 type GitClass = "inspect" | "modify" | "destroy";

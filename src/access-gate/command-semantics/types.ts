@@ -6,55 +6,33 @@ import type {
   ShellArg,
   SourceSpan,
 } from "../shell-parse/types";
+import type { CommandClass, Effect, PathOperation, PathSource } from "../domain";
 
-// ─── 命令分类 ───
-// 5 个互斥类，按风险严格递增：inspect < modify < execute < destroy。
-// unknown 为找不到匹配适配器的回退分类。
-//
+// 命令分类与 Effect 的定义见 domain.ts（唯一来源，T-046）。
 // inspect  读取文件 — 所有路径意图均已知，无变更
 // modify   写入/删除/移动文件 — 所有目标均已知
 // execute  运行代码 — 效果取决于外部内容（脚本、二进制文件、Makefile）
 // destroy  不可逆破坏 — 无论信任度如何均不可接受
 // unknown  无匹配适配器
 
-export type CommandClass = "inspect" | "modify" | "execute" | "destroy" | "unknown";
-
-// ─── Effect ───
-
-export type Effect =
-  | "read"
-  | "search"
-  | "write"
-  | "delete"
-  | "permissionChange"
-  | "execute"
-  | "network"
-  | "cwdChange";
+export type { CommandClass, Effect, PathOperation, PathSource } from "../domain";
 
 // ─── 路径意图 ───
 
 export interface PathIntent {
-  operation: "read" | "list" | "search" | "write";
+  operation: PathOperation;
   rawPath: string;
-  source: "argument" | "option" | "redirection" | "cwd" | "wrapper";
+  source: PathSource;
   span: SourceSpan;
   confidence: "exact" | "conservative";
 }
 
-// ─── CWD 转换 ───
-
-export type CwdTransition =
-  | { kind: "none" }
-  | { kind: "change"; path: string; confidence: "exact" | "opaque" }
-  | { kind: "branch"; paths: readonly string[] };
-
 // ─── 完整语义输出 ───
 
 export interface CommandSemantics {
-  class: CommandClass;
+  commandClass: CommandClass;
   effects: readonly Effect[];
   intents: readonly PathIntent[];
-  cwdTransition: CwdTransition;
   hardRule: string | null;
   opaque: boolean;
   reason: string;
@@ -93,6 +71,6 @@ export interface CwdCandidate {
 
 export interface CwdState {
   cwd: string;
-  certainty: "exact" | "joined";
+  certainty: "exact" | "conservative";
   candidates: readonly CwdCandidate[];
 }

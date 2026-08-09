@@ -25,7 +25,7 @@ export type HardDenyCode = Exclude<DecisionCode, "path-denied" | "shell-policy-d
 export type ProfileDenyCode = "path-denied" | "shell-policy-denied";
 
 export interface GateEvidence {
-  readonly kind: "syntax" | "threat" | "command" | "tool" | "redirection" | "path" | "approval";
+  readonly kind: "syntax" | "threat" | "command" | "tool" | "redirection" | "path";
   readonly subject: string;
   readonly span?: SourceSpan;
 }

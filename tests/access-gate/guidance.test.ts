@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { renderCompilationFailure, renderDecision } from "../../src/access-gate/gate/render-decision";
 import { denyResponseKindFor, guidanceFor, guidanceText } from "../../src/access-gate/gate/guidance-catalog";
+import { evidenceKind } from "../../src/access-gate/gate/access-request";
 import type { DenyResponseKind } from "../../src/access-gate/gate/guidance-catalog";
 import type { GateDecision, GateEvidence, GuidanceId, DecisionCode } from "../../src/access-gate/gate/decision-types";
 
@@ -244,6 +245,27 @@ test("classifies every DecisionCode into one renderer response kind", () => {
     "uncertain-cwd": "shell-form", "unknown-effect": "generic", "resource-limit": "generic",
   };
   for (const code of codes) assert.equal(denyResponseKindFor(code), expected[code]);
+});
+
+test("classifies every DecisionCode into one evidence kind", () => {
+  // T-047 #3：evidenceKind 全量锁定——approval-required/user-denied 保持现状
+  //（"command"，审批决策不经 evidenceKind 构造证据）；"approval" kind 成员零生产者另观察。
+  const codes: readonly DecisionCode[] = [
+    "dynamic-shell", "unsafe-syntax", "threat", "opaque-command", "destroy-command",
+    "hard-command-rule", "blocked-path", "symlink-escape", "path-unclassifiable", "path-denied",
+    "shell-policy-denied", "approval-required", "user-denied", "unknown-tool", "invalid-tool-input",
+    "unsupported-redirection", "uncertain-cwd", "unknown-effect", "resource-limit",
+  ];
+  const expected: Record<DecisionCode, GateEvidence["kind"]> = {
+    "dynamic-shell": "syntax", "unsafe-syntax": "syntax", "uncertain-cwd": "syntax",
+    threat: "threat",
+    "unknown-tool": "tool", "invalid-tool-input": "tool", "resource-limit": "tool",
+    "unsupported-redirection": "redirection",
+    "blocked-path": "path", "symlink-escape": "path", "path-unclassifiable": "path", "path-denied": "path",
+    "destroy-command": "command", "hard-command-rule": "command", "shell-policy-denied": "command",
+    "opaque-command": "command", "unknown-effect": "command", "approval-required": "command", "user-denied": "command",
+  };
+  for (const code of codes) assert.equal(evidenceKind(code), expected[code]);
 });
 
 test("allow decision renders as allow", () => {

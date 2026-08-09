@@ -11,13 +11,7 @@ import type {
   RedirectionKind,
   SourceSpan,
 } from "./types";
-
-const WRAPPER_CMDS = new Set(["env", "command", "nohup", "exec", "timeout"]);
-
-/** wrapper 在 executable 之前的额外 positional 参数数量。 */
-const WRAPPER_SKIP_COUNT: Record<string, number> = {
-  timeout: 1,  // timeout <duration> <command> [args...]
-};
+import { WRAPPER_CMDS_SET, WRAPPER_POS_SKIP } from "./wrappers";
 
 const ALL_DIGITS = /^\d+$/;
 
@@ -209,10 +203,10 @@ function parseCommandGroup(tokens: LexToken[]): Omit<ShellCommandNode, "operator
 
       if (state === "preamble") {
         const cmd = tok.value.toLowerCase();
-        if (WRAPPER_CMDS.has(cmd)) {
+        if (WRAPPER_CMDS_SET.has(cmd)) {
           wrapper.push(arg);
           state = "wrapper-args";
-          wrapperSkipRemaining = WRAPPER_SKIP_COUNT[arg.value ?? ""] ?? 0;
+          wrapperSkipRemaining = WRAPPER_POS_SKIP[arg.value ?? ""] ?? 0;
           i++;
           continue;
         }

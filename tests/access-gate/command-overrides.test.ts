@@ -57,7 +57,7 @@ aliases:
   try {
     // fd . 应被 find adapter 识别，产生 search intent
     const sem = analyzeSemantics(parseCmd("fd . -name '*.ts'"), _ctx);
-    assert.equal(sem.class, "inspect");
+    assert.equal(sem.commandClass, "inspect");
     assert.ok(sem.intents.some((i) => i.operation === "search"), "应有 search intent");
     assert.equal(sem.intents[0]!.rawPath, ".");
   } finally {
@@ -73,7 +73,7 @@ aliases:
 `);
   try {
     const sem = analyzeSemantics(parseCmd("bat file.txt"), _ctx);
-    assert.equal(sem.class, "inspect");
+    assert.equal(sem.commandClass, "inspect");
     assert.ok(sem.intents.some((i) => i.operation === "read"));
     assert.equal(sem.intents[0]!.rawPath, "file.txt");
   } finally {
@@ -89,7 +89,7 @@ aliases:
 `);
   try {
     const sem = analyzeSemantics(parseCmd("nosuchtool arg"), _ctx);
-    assert.equal(sem.class, "unknown");
+    assert.equal(sem.commandClass, "unknown");
     assert.ok(sem.reason.includes("nosuchadapter"), `reason 应提到别名目标: ${sem.reason}`);
   } finally {
     cleanup();
@@ -105,7 +105,7 @@ aliases:
   try {
     // 键 "bin/" 经 ./ 归一化命中 "./bin/tool"（./ 无管理意义，不要求用户写 "./bin/" 键）
     const sem = analyzeSemantics(parseCmd("./bin/tool file.txt"), _ctx);
-    assert.equal(sem.class, "inspect");
+    assert.equal(sem.commandClass, "inspect");
     assert.ok(sem.intents.some((i) => i.operation === "read"), "应有 read intent");
     assert.equal(sem.intents[0]!.rawPath, "file.txt");
   } finally {
@@ -123,7 +123,7 @@ aliases:
   try {
     // 精确键（npm 本地 eslint → node）优先于前缀键（bin/ → cat）
     const sem = analyzeSemantics(parseCmd("./bin/eslint --version"), _ctx);
-    assert.equal(sem.class, "inspect");
+    assert.equal(sem.commandClass, "inspect");
     assert.ok(sem.reason.includes("version/help"), `精确键应优先（node 语义）: ${sem.reason}`);
   } finally {
     cleanup();
@@ -140,7 +140,7 @@ aliases:
   try {
     // 项目 bin/scripts/ 目录用 node 语义，bin/ 其他工具用 cat 语义
     const sem = analyzeSemantics(parseCmd("./bin/scripts/deploy --version"), _ctx);
-    assert.equal(sem.class, "inspect");
+    assert.equal(sem.commandClass, "inspect");
     assert.ok(sem.reason.includes("version/help"), `最长前缀应优先（node 语义）: ${sem.reason}`);
   } finally {
     cleanup();
@@ -156,7 +156,7 @@ aliases:
   try {
     // 裸名键只作用于裸调用；路径形式默认 execute（D-031），不被隐式 basename 覆盖
     const sem = analyzeSemantics(parseCmd("./bin/mytool run.ts"), _ctx);
-    assert.equal(sem.class, "execute");
+    assert.equal(sem.commandClass, "execute");
   } finally {
     cleanup();
   }
@@ -170,7 +170,7 @@ aliases:
 `);
   try {
     const sem = analyzeSemantics(parseCmd("./vendor/mytool run.ts"), _ctx);
-    assert.equal(sem.class, "execute");
+    assert.equal(sem.commandClass, "execute");
   } finally {
     cleanup();
   }
@@ -184,7 +184,7 @@ aliases:
 `);
   try {
     const sem = analyzeSemantics(parseCmd("./bin/nosuchtool arg"), _ctx);
-    assert.equal(sem.class, "unknown");
+    assert.equal(sem.commandClass, "unknown");
     assert.ok(sem.reason.includes("nosuchadapter"), `reason 应提到别名目标: ${sem.reason}`);
   } finally {
     cleanup();
@@ -200,7 +200,7 @@ aliases:
   try {
     // 与前缀键一致：精确键也归一化前导 ./，两侧对称
     const sem = analyzeSemantics(parseCmd("./bin/eslint --version"), _ctx);
-    assert.equal(sem.class, "inspect");
+    assert.equal(sem.commandClass, "inspect");
     assert.ok(sem.reason.includes("version/help"), `应命中精确键（node 语义）: ${sem.reason}`);
   } finally {
     cleanup();
@@ -215,7 +215,7 @@ aliases:
 `);
   try {
     const sem = analyzeSemantics(parseCmd("bin/eslint --version"), _ctx);
-    assert.equal(sem.class, "inspect");
+    assert.equal(sem.commandClass, "inspect");
     assert.ok(sem.reason.includes("version/help"), `应命中精确键（node 语义）: ${sem.reason}`);
   } finally {
     cleanup();
@@ -234,7 +234,7 @@ commands:
 `);
   try {
     const sem = analyzeSemantics(parseCmd("mytool src/"), _ctx);
-    assert.equal(sem.class, "inspect");
+    assert.equal(sem.commandClass, "inspect");
     assert.ok(sem.reason.includes("user-defined"), `应复用命令定义: ${sem.reason}`);
     assert.deepStrictEqual(sem.effects, ["read"]);
   } finally {
@@ -253,7 +253,7 @@ aliases:
     // 单步契约：a → b 后把 b 当作最终目标查 adapter（无 b adapter → unknown），
     // 不递归 b → cat——链式让语义需沿解析图追多跳才能确定，D-034 明确拒绝
     const sem = analyzeSemantics(parseCmd("a --version"), _ctx);
-    assert.equal(sem.class, "unknown");
+    assert.equal(sem.commandClass, "unknown");
     assert.ok(sem.reason.includes("aliased to b"), `reason 应说明单步目标: ${sem.reason}`);
   } finally {
     cleanup();
@@ -264,7 +264,7 @@ test("aliases: 无 overrides 时不受影响", () => {
   resetOverrides();
   // DEFAULT_CTX 指向不存在的目录 → loadOverrides 找不到文件，回退到空配置
   const sem = analyzeSemantics(parseCmd("git status"), DEFAULT_CTX);
-  assert.equal(sem.class, "inspect");
+  assert.equal(sem.commandClass, "inspect");
   assert.ok(sem.reason.includes("show working tree"));
 });
 
@@ -275,7 +275,7 @@ test("only the global pi-keel/command-overrides.yaml is read; no project config 
     // setupProject 只写了全局 pi-keel/command-overrides.yaml（内容为空）；
     // 项目目录中没有配置文件，也不存在项目级读取路径。
     const sem = analyzeSemantics(parseCmd("local-git status"), ctx);
-    assert.equal(sem.class, "unknown");
+    assert.equal(sem.commandClass, "unknown");
   } finally {
     cleanup();
   }
@@ -293,7 +293,7 @@ commands:
 `);
   try {
     const sem = analyzeSemantics(parseCmd("my-linter src/"), ctx);
-    assert.equal(sem.class, "inspect");
+    assert.equal(sem.commandClass, "inspect");
     assert.ok(sem.reason.includes("user-defined"));
     assert.deepStrictEqual(sem.effects, ["read"]);
   } finally {
@@ -311,7 +311,7 @@ commands:
 `);
   try {
     const sem = analyzeSemantics(parseCmd("./bin/tool src/"), ctx);
-    assert.equal(sem.class, "inspect");
+    assert.equal(sem.commandClass, "inspect");
     assert.ok(sem.reason.includes("user-defined"));
     assert.deepStrictEqual(sem.effects, ["read"]);
   } finally {
@@ -333,11 +333,11 @@ commands:
 `);
   try {
     const ps = analyzeSemantics(parseCmd("docker ps"), ctx);
-    assert.equal(ps.class, "inspect");
+    assert.equal(ps.commandClass, "inspect");
     assert.ok(ps.reason.includes("ps"));
 
     const build = analyzeSemantics(parseCmd("docker build ."), ctx);
-    assert.equal(build.class, "execute");
+    assert.equal(build.commandClass, "execute");
     assert.ok(build.reason.includes("build"));
     assert.deepStrictEqual(build.effects, ["write", "network"]);
   } finally {
@@ -357,7 +357,7 @@ commands:
 `);
   try {
     const sem = analyzeSemantics(parseCmd("docker unknown-cmd"), ctx);
-    assert.equal(sem.class, "execute");
+    assert.equal(sem.commandClass, "execute");
     assert.equal(sem.opaque, true);
     assert.ok(sem.reason.includes("unrecognized subcommand"));
   } finally {
@@ -376,7 +376,7 @@ commands:
   try {
     // 用户将 git 整体定义为 inspect — 应直接返回，不走 git adapter
     const sem = analyzeSemantics(parseCmd("git push --force origin main"), ctx);
-    assert.equal(sem.class, "inspect");
+    assert.equal(sem.commandClass, "inspect");
     assert.ok(sem.reason.includes("user-defined"));
   } finally {
     cleanup();
@@ -396,11 +396,11 @@ reclassify:
   try {
     // git branch（无 -d）不受影响
     const list = analyzeSemantics(parseCmd("git branch"), ctx);
-    assert.equal(list.class, "inspect");
+    assert.equal(list.commandClass, "inspect");
 
     // git branch -d → reclassify 为 destroy，且 opaque 已被清除
     const del = analyzeSemantics(parseCmd("git branch -d old-branch"), ctx);
-    assert.equal(del.class, "destroy");
+    assert.equal(del.commandClass, "destroy");
     assert.equal(del.opaque, false);
     assert.ok(del.reason.includes("reclassified to destroy"));
   } finally {
@@ -420,7 +420,7 @@ reclassify:
     // adapter 已按 basename 识别命令身份（/usr/local/bin/git → git adapter），
     // reclassify 应对齐该身份，否则用户声明在路径形式下静默失效
     const sem = analyzeSemantics(parseCmd("/usr/local/bin/git status"), ctx);
-    assert.equal(sem.class, "modify");
+    assert.equal(sem.commandClass, "modify");
     assert.ok(sem.reason.includes("reclassified"));
   } finally {
     cleanup();
@@ -437,7 +437,7 @@ reclassify:
 `);
   try {
     const sem = analyzeSemantics(parseCmd("git status"), ctx);
-    assert.equal(sem.class, "inspect");
+    assert.equal(sem.commandClass, "inspect");
     assert.ok(!sem.reason.includes("reclassified"));
   } finally {
     cleanup();
@@ -454,7 +454,7 @@ reclassify:
 `);
   try {
     const sem = analyzeSemantics(parseCmd("git status"), ctx);
-    assert.equal(sem.class, "inspect");
+    assert.equal(sem.commandClass, "inspect");
   } finally {
     cleanup();
   }
@@ -471,7 +471,7 @@ reclassify:
   try {
     // cargo status 不应匹配 git 的 reclassify
     const sem = analyzeSemantics(parseCmd("cargo status"), ctx);
-    assert.notEqual(sem.class, "execute");
+    assert.notEqual(sem.commandClass, "execute");
   } finally {
     cleanup();
   }
@@ -492,7 +492,7 @@ reclassify:
   try {
     // g → git（别名），然后 status 被 reclassify
     const sem = analyzeSemantics(parseCmd("g status"), ctx);
-    assert.equal(sem.class, "execute");
+    assert.equal(sem.commandClass, "execute");
   } finally {
     cleanup();
   }
@@ -511,7 +511,7 @@ commands:
   try {
     // commands 中的 g 定义直接生效，不走 git adapter
     const sem = analyzeSemantics(parseCmd("g push --force"), ctx);
-    assert.equal(sem.class, "inspect");
+    assert.equal(sem.commandClass, "inspect");
     assert.ok(sem.reason.includes("user-defined"));
   } finally {
     cleanup();
@@ -531,7 +531,7 @@ commands:
   try {
     // g 在 commands 中有定义 → 直接使用，不走别名 → git adapter
     const sem = analyzeSemantics(parseCmd("g anything"), ctx);
-    assert.equal(sem.class, "execute");
+    assert.equal(sem.commandClass, "execute");
     assert.ok(sem.reason.includes("user-defined"), `reason: ${sem.reason}`);
   } finally {
     cleanup();
@@ -611,13 +611,13 @@ aliases:
   try {
     process.env.PI_CODING_AGENT_DIR = agent1;
     const sem1 = analyzeSemantics(parseCmd("t1 status"), p1.ctx);
-    assert.equal(sem1.class, "inspect");
+    assert.equal(sem1.commandClass, "inspect");
 
     process.env.PI_CODING_AGENT_DIR = agent2;
     const sem2 = analyzeSemantics(parseCmd("t2 status"), p2.ctx);
-    assert.equal(sem2.class, "inspect");
+    assert.equal(sem2.commandClass, "inspect");
     const sem3 = analyzeSemantics(parseCmd("t1 status"), p2.ctx);
-    assert.equal(sem3.class, "unknown");
+    assert.equal(sem3.commandClass, "unknown");
   } finally {
     p2.cleanup();
     p1.cleanup();
@@ -633,7 +633,7 @@ test("边界: 空 overrides 不影响正常分析", () => {
 `);
   try {
     const sem = analyzeSemantics(parseCmd("git log"), ctx);
-    assert.equal(sem.class, "inspect");
+    assert.equal(sem.commandClass, "inspect");
   } finally {
     cleanup();
   }
@@ -644,7 +644,7 @@ test("边界: 无效 YAML 不崩溃，回退到空配置", () => {
   const { ctx, cleanup } = setupProject(`{invalid: [::`);
   try {
     const sem = analyzeSemantics(parseCmd("git log"), ctx);
-    assert.equal(sem.class, "inspect");
+    assert.equal(sem.commandClass, "inspect");
   } finally {
     cleanup();
   }
@@ -662,7 +662,7 @@ commands:
 `);
   try {
     const sem = analyzeSemantics(parseCmd("./deploy.sh -x"), ctx);
-    assert.equal(sem.class, "inspect", "user-defined path command must win over execute fallback");
+    assert.equal(sem.commandClass, "inspect", "user-defined path command must win over execute fallback");
     assert.ok(sem.reason.includes("user-defined"));
   } finally {
     cleanup();
@@ -679,7 +679,7 @@ reclassify:
 `);
   try {
     const sem = analyzeSemantics(parseCmd("./node_modules/.bin/tsx run.ts"), ctx);
-    assert.equal(sem.class, "inspect", "reclassify must override the path-form execute fallback");
+    assert.equal(sem.commandClass, "inspect", "reclassify must override the path-form execute fallback");
     assert.equal(sem.opaque, false);
     assert.ok(sem.reason.includes("reclassified to inspect"));
   } finally {
@@ -695,7 +695,7 @@ aliases:
 `);
   try {
     const sem = analyzeSemantics(parseCmd("myinsp /tmp"), ctx);
-    assert.equal(sem.class, "inspect", "alias to known adapter wins over unknown fallback");
+    assert.equal(sem.commandClass, "inspect", "alias to known adapter wins over unknown fallback");
   } finally {
     cleanup();
   }

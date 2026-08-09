@@ -2,7 +2,8 @@
 
 import type { ShellArg, ShellCommandNode } from "../../shell-parse/types";
 import type { CommandAdapter, CommandSemantics, PathIntent, SemanticContext } from "../types";
-import { makeSemantics, extractSubcommand, optionIntent, parseConfigOptions, firstNonOptionIndex, type ConfigOptionTable } from "./shared";
+import { makeSemantics, extractSubcommand, optionIntent, firstNonOptionIndex } from "./shared";
+import { parseConfigOptions, type ConfigOptionTable } from "./config-parse";
 
 interface PkgDef {
   cls: "inspect" | "modify" | "execute" | "unknown";

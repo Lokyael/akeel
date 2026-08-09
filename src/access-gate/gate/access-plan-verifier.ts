@@ -3,7 +3,7 @@ import type { SourceSpan } from "../shell-parse/types";
 import type {
   AccessOperation,
   CompleteAccessPlan,
-  PathOperationKind,
+  PathOperation,
   ToolSurface,
 } from "./access-request-types";
 import {
@@ -15,6 +15,8 @@ import {
   REQUEST_BRAND,
   TOOL_SURFACES,
 } from "./access-request-types";
+import { PATH_SOURCE_SET } from "../domain";
+import type { PathSource } from "../domain";
 import { isRecord, uniqueCandidates } from "./access-request";
 
 export function validateCompleteAccessPlan(
@@ -32,17 +34,14 @@ export function validateCompleteAccessPlan(
 
   const commandOperations = value.operations.filter((operation) => isRecord(operation) && operation.kind === "command");
   const pathOperations = value.operations.filter((operation) => isRecord(operation) && operation.kind === "path");
-  const effectOperations = value.operations.filter((operation) => isRecord(operation) && operation.kind === "effect");
-  if (!Array.isArray(value.commands) || !Array.isArray(value.paths) || !Array.isArray(value.effects)
+  if (!Array.isArray(value.commands) || !Array.isArray(value.paths)
     || value.commands.length !== commandOperations.length
     || value.paths.length !== pathOperations.length
-    || value.effects.length !== effectOperations.length
     || value.commands.some((operation, index) => operation !== commandOperations[index])
-    || value.paths.some((operation, index) => operation !== pathOperations[index])
-    || value.effects.some((operation, index) => operation !== effectOperations[index])) return false;
+    || value.paths.some((operation, index) => operation !== pathOperations[index])) return false;
   const coverage = value.coverage as Record<string, unknown>;
   const usage = value.resourceUsage as Record<string, unknown>;
-  const coverageCounts = [coverage.commandCount, coverage.pathOperationCount, coverage.effectOperationCount, coverage.cwdCandidateCount];
+  const coverageCounts = [coverage.commandCount, coverage.pathOperationCount, coverage.cwdCandidateCount];
   const usageCounts = [usage.inputLength, usage.commandCount, usage.operationCount, usage.cwdCandidateCount];
   const commandCount = coverage.commandCount;
   const cwdCandidateCount = coverage.cwdCandidateCount;
@@ -56,16 +55,11 @@ export function validateCompleteAccessPlan(
   if (!Array.isArray(coverage.commandSpans) || !Array.isArray(coverage.redirectionSpans)) return false;
   if (coverage.commandCount !== commandOperations.length || coverage.commandSpans.length !== commandOperations.length) return false;
   if (!coverage.commandSpans.every((span, index) => isSameSpan(span, commandOperations[index]?.span))) return false;
-  if (coverage.pathOperationCount !== pathOperations.length || coverage.effectOperationCount !== effectOperations.length) return false;
+  if (coverage.pathOperationCount !== pathOperations.length) return false;
   const redirectionPaths = pathOperations.filter((operation) => operation.source === "redirection");
   if (coverage.redirectionSpans.length !== redirectionPaths.length
     || !coverage.redirectionSpans.every((span, index) => isSameSpan(span, redirectionPaths[index]?.span))) return false;
   if (coverage.cwdCandidateCount !== pathOperations.reduce((count, operation) => count + (Array.isArray(operation.cwdCandidates) ? operation.cwdCandidates.length : 0), 0)) return false;
-  const declaredEffects = commandOperations.flatMap((operation) => Array.isArray(operation.effects) ? operation.effects : []);
-  const effectValues = effectOperations.map((operation) => operation.effect);
-  if (declaredEffects.length !== effectValues.length || declaredEffects.some((effect, index) => effect !== effectValues[index])) return false;
-  const declaredEffectSpans = commandOperations.flatMap((operation) => Array.isArray(operation.effects) ? operation.effects.map(() => operation.span) : []);
-  if (!effectOperations.every((operation, index) => isSameSpan(operation.span, declaredEffectSpans[index]))) return false;
   if (inputLength > ANALYSIS_LIMITS.maxInputLength
     || usage.commandCount !== coverage.commandCount
     || usage.operationCount !== value.operations.length
@@ -125,10 +119,10 @@ function isValidOperation(value: unknown): value is AccessOperation {
     return typeof value.input === "string"
       && value.input.length <= ANALYSIS_LIMITS.maxArgumentLength
       && typeof value.operation === "string"
-      && PATH_OPERATIONS.has(value.operation as PathOperationKind)
+      && PATH_OPERATIONS.has(value.operation as PathOperation)
       && Array.isArray(value.cwdCandidates)
       && value.cwdCandidates.every(isCwdCandidate)
-      && (value.source === "argument" || value.source === "option" || value.source === "redirection" || value.source === "cwd" || value.source === "wrapper")
+      && PATH_SOURCE_SET.has(value.source as PathSource)
       && (value.confidence === "exact" || value.confidence === "conservative");
   }
   if (value.kind === "command") {

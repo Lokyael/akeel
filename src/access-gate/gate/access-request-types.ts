@@ -1,6 +1,7 @@
-import type { CommandClass, CwdCandidate, Effect } from "../command-semantics/types";
+import type { CwdCandidate } from "../command-semantics/types";
 import type { SourceSpan } from "../shell-parse/types";
 import type { DecisionCode, GateEvidence } from "./decision-types";
+import type { CommandClass, Effect, PathOperation, PathSource, ToolSurface } from "../domain";
 
 export type { DecisionCode, GateEvidence } from "./decision-types";
 
@@ -19,29 +20,20 @@ export const ANALYSIS_LIMITS = {
   maxEditEntries: 64,
 } as const;
 
-// ── closed-world registries ──
-export const TOOL_SURFACES = new Set<ToolSurface>(["bash", "read", "write", "edit", "find", "grep", "ls"]);
-export const PATH_OPERATIONS = new Set<PathOperationKind>(["read", "list", "search", "write"]);
-export const COMMAND_CLASSES = new Set<CommandClass>(["inspect", "modify", "execute", "destroy", "unknown"]);
-export const EFFECTS = new Set<Effect>([
-  "read",
-  "search",
-  "write",
-  "delete",
-  "permissionChange",
-  "execute",
-  "network",
-  "cwdChange",
-]);
+// ── closed-world registries（值同源于 domain.ts，T-046） ──
+export {
+  COMMAND_CLASS_SET as COMMAND_CLASSES,
+  EFFECT_SET as EFFECTS,
+  PATH_OPERATION_SET as PATH_OPERATIONS,
+  TOOL_SURFACE_SET as TOOL_SURFACES,
+} from "../domain";
 
-// ── domain types ──
-export type ToolSurface = "bash" | "read" | "write" | "edit" | "find" | "grep" | "ls";
-export type PathOperationKind = "read" | "list" | "search" | "write";
-export type PathSource = "argument" | "option" | "redirection" | "cwd" | "wrapper";
+// ── domain types（类型同源于 domain.ts） ──
+export type { CommandClass, Effect, PathOperation, PathSource, ToolSurface } from "../domain";
 
 export interface PathAccessOperation {
   readonly kind: "path";
-  readonly operation: PathOperationKind;
+  readonly operation: PathOperation;
   readonly input: string;
   readonly cwdCandidates: readonly CwdCandidate[];
   readonly source: PathSource;
@@ -58,21 +50,16 @@ export interface CommandAccessOperation {
   readonly span: SourceSpan;
 }
 
-export interface EffectAccessOperation {
-  readonly kind: "effect";
-  readonly effect: Effect;
-  readonly confidence: "exact" | "conservative";
-  readonly span: SourceSpan;
-}
+// (T-046 R7) EffectAccessOperation 已删除：effect 只以 command.effects 承载，
+// span 与 command span 相同，verifier 不再需要平行数组对账（D-022 措辞同步）。
 
-export type AccessOperation = PathAccessOperation | CommandAccessOperation | EffectAccessOperation;
+export type AccessOperation = PathAccessOperation | CommandAccessOperation;
 
 export interface PlanCoverage {
   readonly commandSpans: readonly SourceSpan[];
   readonly redirectionSpans: readonly SourceSpan[];
   readonly commandCount: number;
   readonly pathOperationCount: number;
-  readonly effectOperationCount: number;
   readonly cwdCandidateCount: number;
 }
 
@@ -91,7 +78,6 @@ export interface CompleteAccessPlan {
   readonly operations: readonly AccessOperation[];
   readonly commands: readonly CommandAccessOperation[];
   readonly paths: readonly PathAccessOperation[];
-  readonly effects: readonly EffectAccessOperation[];
   readonly cwdCandidates: readonly CwdCandidate[];
   readonly coverage: PlanCoverage;
   readonly resourceUsage: ResourceUsage;

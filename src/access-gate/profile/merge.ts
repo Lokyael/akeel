@@ -1,4 +1,4 @@
-import type { Decision, PathDecisions, PathOperation, PathPolicy, PathRule, ShellPolicy } from "./types";
+import type { ProfileDecision, PathDecisions, PathOperation, PathPolicy, PathRule, ShellPolicy } from "./types";
 
 const DEFAULT_SHELL_POLICY: ShellPolicy = {
   inspect: "deny",
@@ -18,7 +18,7 @@ export function mergeShellPolicy(base: ShellPolicy, override: Partial<ShellPolic
   return { ...base, ...override };
 }
 
-export function mergePathDefaults(base: Record<PathOperation, Decision>, override?: PathDecisions): Record<PathOperation, Decision> {
+export function mergePathDefaults(base: Record<PathOperation, ProfileDecision>, override?: PathDecisions): Record<PathOperation, ProfileDecision> {
   return { ...base, ...(override ?? {}) };
 }
 

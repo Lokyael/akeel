@@ -3,14 +3,9 @@
 
 import type { ShellCommandNode } from "../shell-parse/types";
 import type { NormalizedCommand } from "./types";
+import { WRAPPER_CMDS_SET, WRAPPER_POS_SKIP } from "../shell-parse/wrappers";
 
 const MAX_UNWRAP_DEPTH = 5;
-const WRAPPER_NAMES = new Set(["env", "command", "nohup", "exec", "timeout"]);
-
-/** wrapper 在 args 前的额外 positional 参数数。 */
-const WRAPPER_POS_SKIP: Record<string, number> = {
-  timeout: 1,
-};
 
 export function normalizeCommand(
   node: ShellCommandNode,
@@ -21,7 +16,7 @@ export function normalizeCommand(
   // 先从 wrapper 数组尾部开始展开
   if (node.wrapper.length > 0) {
     const outer = node.wrapper[node.wrapper.length - 1]!.value?.toLowerCase();
-    if (outer && WRAPPER_NAMES.has(outer)) {
+    if (outer && WRAPPER_CMDS_SET.has(outer)) {
       const inner = unwrap(node, outer);
       if (!inner) return null;
       return normalizeCommand(inner, depth + 1);
@@ -30,7 +25,7 @@ export function normalizeCommand(
 
   // executable 自身可能是嵌套 wrapper（parser 把它放在了 executable）
   const cmd = node.executable?.value?.toLowerCase();
-  if (cmd && WRAPPER_NAMES.has(cmd)) {
+  if (cmd && WRAPPER_CMDS_SET.has(cmd)) {
     // 把 executable 提升为 wrapper，递归展开
     if (node.executable) {
       const promoted: ShellCommandNode = {

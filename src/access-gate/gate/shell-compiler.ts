@@ -20,24 +20,30 @@ import {
   type ShellCompilerInput,
 } from "./access-request";
 
-const REDIRECTION_PATH_KINDS = new Set([
-  "stdin",
-  "stdout",
-  "stdoutAppend",
-  "stderr",
-  "stderrAppend",
-]);
-
 function redirectionOperation(
   redirection: ShellRedirectionNode,
   state: { cwd: string; candidates?: readonly CwdCandidate[] },
-): PathAccessOperation | CompilerDraftResult {
-  if (!REDIRECTION_PATH_KINDS.has(redirection.kind)) {
-    return reject("unsupported-redirection", redirection.kind, redirection.span);
+): PathAccessOperation | CompilerDraftResult | null {
+  switch (redirection.kind) {
+    // fdDuplicate (2>&1) 与 fdClose (2>&-) 不引用文件路径，跳过
+    case "fdDuplicate":
+    case "fdClose":
+      return null;
+    // 文件引用重定向 → 路径 intent（stdin 读、其余写）
+    case "stdin":
+    case "stdout":
+    case "stdoutAppend":
+    case "stderr":
+    case "stderrAppend": {
+      if (!redirection.target?.value) return reject("unsupported-redirection", "missing redirection target", redirection.span);
+      const operation = redirection.kind === "stdin" ? "read" : "write";
+      return pathOperation(operation, redirection.target.value, state, "redirection", "exact", redirection.span);
+    }
+    // heredoc/hereString 内容不在命令文本中建模 → 显式拒绝；新增 kind 在此强制编译错误（T-046 R8）
+    case "heredoc":
+    case "hereString":
+      return reject("unsupported-redirection", redirection.kind, redirection.span);
   }
-  if (!redirection.target?.value) return reject("unsupported-redirection", "missing redirection target", redirection.span);
-  const operation = redirection.kind === "stdin" ? "read" : "write";
-  return pathOperation(operation, redirection.target.value, state, "redirection", "exact", redirection.span);
 }
 
 export function compileShellDraft(input: ShellCompilerInput): CompilerDraftResult {
@@ -76,39 +82,34 @@ export function compileShellDraft(input: ShellCompilerInput): CompilerDraftResul
       cwd: flowNode.effectiveCwd.cwd,
     });
     if (semantics.opaque) return reject("opaque-command", normalized.executable ?? "unknown command", flowNode.node.span);
-    if (semantics.class === "destroy") return reject("destroy-command", normalized.executable ?? "destroy command", flowNode.node.span);
+    if (semantics.commandClass === "destroy") return reject("destroy-command", normalized.executable ?? "destroy command", flowNode.node.span);
 
     commandSpans.push(flowNode.node.span);
     const cdInfo = analyzeCd(flowNode.node);
     if (cdInfo.opaque) return reject("uncertain-cwd", "cd target cannot be classified", flowNode.node.span);
-    const isCd = flowNode.node.executable?.value?.toLowerCase() === "cd";
+    // isCd 由 analyzeCd 单点判定（T-047 #5），消除二次 executable === "cd" 判断
+    const isCd = cdInfo.isCd;
     const effects = isCd
       ? (cdInfo.target ? ["cwdChange" as const] : [])
-      : effectsFor(semantics.class, semantics.effects, semantics.intents, flowNode.node.redirections.length > 0);
+      : effectsFor(semantics.commandClass, semantics.effects, semantics.intents, flowNode.node.redirections.length > 0);
     const invalidEffect = validateEffects(effects, flowNode.node.span);
     if (invalidEffect) return invalidEffect;
     operations.push({
       kind: "command",
       origin: "shell",
-      commandClass: semantics.class,
+      commandClass: semantics.commandClass,
       executable: normalized.executable,
       effects,
       span: flowNode.node.span,
     });
-    for (const effect of effects) {
-      operations.push({ kind: "effect", effect, confidence: "exact", span: flowNode.node.span });
-    }
 
     if (cdInfo.target) {
       operations.push(pathOperation("list", cdInfo.target, flowNode.cwdBefore, "cwd", "exact", flowNode.node.span));
     }
 
     for (const redirection of flowNode.node.redirections) {
-      // fdDuplicate (2>&1) 和 fdClose (2>&-) 不引用文件路径，跳过
-      if (redirection.kind === "fdDuplicate" || redirection.kind === "fdClose") {
-        continue;
-      }
       const operation = redirectionOperation(redirection, flowNode.effectiveCwd);
+      if (operation === null) continue;
       if (operation.kind !== "path") return operation;
       operations.push(operation);
       redirectionSpans.push(redirection.span);
@@ -119,7 +120,7 @@ export function compileShellDraft(input: ShellCompilerInput): CompilerDraftResul
     // Conservative fallback: modify-class commands with no explicit paths
     // or redirections get a synthetic write intent on cwd.  Direct tools do not
     // need this fallback because every Direct surface always carries a path arg.
-    if (semantics.class === "modify" && semantics.intents.length === 0 && flowNode.node.redirections.length === 0) {
+    if (semantics.commandClass === "modify" && semantics.intents.length === 0 && flowNode.node.redirections.length === 0) {
       operations.push(pathOperation("write", ".", flowNode.effectiveCwd, "cwd", "conservative", flowNode.node.span));
     }
   }
@@ -130,7 +131,6 @@ export function compileShellDraft(input: ShellCompilerInput): CompilerDraftResul
     redirectionSpans,
     commandCount: commandSpans.length,
     pathOperationCount: operations.filter((operation) => operation.kind === "path").length,
-    effectOperationCount: operations.filter((operation) => operation.kind === "effect").length,
     cwdCandidateCount: cwdCandidates.length,
   }, command.length, { projectRoot: input.projectRoot, stagingDir: input.stagingDir });
 }

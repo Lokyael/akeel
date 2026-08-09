@@ -97,7 +97,7 @@ export function assertSemanticCase(c: SemCase): void {
   for (const cmd of cmds) {
     const sem = analyze(cmd, c.ctx ?? DEFAULT_CTX);
     const label = `[${c.name}] ${cmd}`;
-    if (c.cls !== undefined) assert.equal(sem.class, c.cls, `${label}: class`);
+    if (c.cls !== undefined) assert.equal(sem.commandClass, c.cls, `${label}: class`);
     if (c.opaque !== undefined) assert.equal(sem.opaque, c.opaque, `${label}: opaque`);
     if (c.effects !== undefined) {
       for (const e of c.effects) {

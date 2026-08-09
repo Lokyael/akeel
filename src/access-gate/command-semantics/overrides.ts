@@ -6,12 +6,13 @@
 // 配置路径：$PI_CODING_AGENT_DIR/pi-keel/command-overrides.yaml，默认 ~/.pi/agent/pi-keel/command-overrides.yaml。
 
 import { existsSync, readFileSync } from "node:fs";
-import { homedir } from "node:os";
 import { basename, join } from "node:path";
 import { parse as parseYaml } from "yaml";
 import type { CommandClass, CommandSemantics, Effect } from "./types";
 import type { ShellArg } from "../shell-parse/types";
-import { makeSemantics } from "./adapters/shared";
+import { firstSubcommand, fullSubcommand, makeSemantics } from "./adapters/shared";
+import { COMMAND_CLASS_SET } from "../domain";
+import { getAgentDir } from "../agent-dir";
 
 // ─── 类型 ───
 
@@ -39,15 +40,13 @@ interface CommandOverrides {
 
 // ─── 运行时校验 ───
 
-const VALID_CLASSES = new Set<string>(["inspect", "modify", "execute", "destroy", "unknown"]);
-
 function validateCommandDef(name: string, def: CommandDef): void {
-  if (!VALID_CLASSES.has(def.class)) {
+  if (!COMMAND_CLASS_SET.has(def.class)) {
     throw new Error(`command-overrides: ${name}: invalid class "${def.class}"`);
   }
   if (def.subcommands) {
     for (const [sc, sub] of Object.entries(def.subcommands)) {
-      if (!VALID_CLASSES.has(sub.class)) {
+      if (!COMMAND_CLASS_SET.has(sub.class)) {
         throw new Error(`command-overrides: ${name}.${sc}: invalid class "${sub.class}"`);
       }
     }
@@ -82,10 +81,6 @@ function mergeOverrides(base: CommandOverrides | null, overlay: CommandOverrides
   return merged;
 }
 
-function getAgentDir(): string {
-  return process.env.PI_CODING_AGENT_DIR || join(homedir(), ".pi", "agent");
-}
-
 export function loadOverrides(agentDir = getAgentDir()): CommandOverrides {
   const globalPath = join(agentDir, "pi-keel", "command-overrides.yaml");
   const cached = _cache.get(globalPath);
@@ -101,7 +96,7 @@ export function loadOverrides(agentDir = getAgentDir()): CommandOverrides {
   }
   if (result.reclassify) {
     for (const rule of result.reclassify) {
-      if (!VALID_CLASSES.has(rule.class)) {
+      if (!COMMAND_CLASS_SET.has(rule.class)) {
         throw new Error(`command-overrides: reclassify[${rule.command}]: invalid class "${rule.class}"`);
       }
     }
@@ -117,41 +112,9 @@ export function resetOverrides(): void {
 }
 
 // ─── 应用覆盖 ───
-
-/**
- * 提取第一个非选项参数（用于子命令分发）。
- */
-function firstSubcommand(args: ReadonlyArray<{ value?: string | null }>): string {
-  for (const arg of args) {
-    const v = arg.value ?? "";
-    if (v === "--") return "";
-    if (!v.startsWith("-")) return v;
-  }
-  return "";
-}
-
-/**
- * 提取完整子命令字符串（用于 pattern 匹配）。
- * 从第一个非选项参数开始，取全部非选项参数，空格连接。
- * 与 git.ts adapter 的提取逻辑一致：args.slice(idx).join(" ")。
- *
- * 已知局限：此函数不跳过取值选项的值（如 cargo --manifest-path <v> build
- * 会得到 "<v> build" 而非 "build"），因为它不依赖 per-adapter 配置。
- * reclassify 的 pattern 使用 substring 匹配（如 "build" 而非 "^build$"），
- * 典型场景（git 子命令）无此问题。详见 D-024。
- */
-function fullSubcommand(args: ReadonlyArray<{ value?: string | null }>): string {
-  const parts: string[] = [];
-  let started = false;
-  for (const arg of args) {
-    const v = arg.value ?? "";
-    if (v === "--") break;
-    if (!started && v.startsWith("-")) continue;
-    started = true;
-    parts.push(v);
-  }
-  return parts.join(" ");
-}
+// 子命令提取统一由 shared.ts 提供（T-046 R4）：
+// firstSubcommand（commands 分发，首 token）与 fullSubcommand（reclassify pattern，
+// 含选项尾部）从首个非选项参数起提取；known 局限（不跳过取值选项值）见 shared.ts/D-024。
 
 /**
  * 应用 CommandDef 产生语义结果。

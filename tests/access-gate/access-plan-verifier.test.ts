@@ -38,7 +38,6 @@ function baseClone() {
     operations: base.operations.map(cloneOperation),
     commands: base.commands.slice(),
     paths: base.paths.slice(),
-    effects: base.effects.slice(),
     cwdCandidates: base.cwdCandidates.map(cloneCandidate),
     coverage: {
       ...base.coverage,
@@ -69,24 +68,6 @@ test("rejects redirection spans that do not match redirection path operations", 
 test("rejects a missing redirection span entry", () => {
   const plan = tampered((draft) => {
     draft.coverage.redirectionSpans = [];
-  });
-  assert.equal(verify(plan), false);
-});
-
-test("rejects effect operations that do not match declared command effects", () => {
-  const plan = tampered((draft) => {
-    draft.effects = draft.effects.slice(0, -1);
-  });
-  assert.equal(verify(plan), false);
-});
-
-test("rejects an effect operation with a mismatched span", () => {
-  const plan = tampered((draft) => {
-    draft.operations = draft.operations.map((operation) =>
-      operation.kind === "effect" && operation.effect === "read"
-        ? { ...operation, span: { start: 5, end: 6 } }
-        : operation,
-    );
   });
   assert.equal(verify(plan), false);
 });
@@ -159,15 +140,6 @@ test("rejects a path operation with an invalid source", () => {
   const plan = tampered((draft) => {
     draft.operations = draft.operations.map((operation) =>
       operation.kind === "path" ? ({ ...operation, source: "garbage" } as unknown as AccessOperation) : operation,
-    );
-  });
-  assert.equal(verify(plan), false);
-});
-
-test("rejects an effect operation with an invalid confidence", () => {
-  const plan = tampered((draft) => {
-    draft.operations = draft.operations.map((operation) =>
-      operation.kind === "effect" ? ({ ...operation, confidence: "garbage" } as unknown as AccessOperation) : operation,
     );
   });
   assert.equal(verify(plan), false);

@@ -1,6 +1,8 @@
 import type { CommandClass, CwdCandidate, Effect } from "../command-semantics/types";
 import type { SourceSpan } from "../shell-parse/types";
-import type { DecisionCode, GateEvidence } from "./decision-types";
+import { denyResponseKindFor, evidenceKind } from "./guidance-catalog";
+
+export { isRecord } from "../util";
 import type {
   AccessOperation,
   AccessPlanDraft,
@@ -13,7 +15,7 @@ import type {
   PlanCoverage,
   SecurityCompilationCode,
   UnsupportedCompilationCode,
-  PathOperationKind,
+  PathOperation,
   PathSource,
   ToolSurface,
 } from "./access-request-types";
@@ -22,34 +24,11 @@ import {
   EFFECTS,
 } from "./access-request-types";
 
-// Re-export the public surface from the types module.
+// Re-export the public surface from the types module（T-046 R8：类型再导出改为通配，删手工墙）。
 export { ANALYSIS_LIMITS } from "./access-request-types";
-export type {
-  AccessOperation,
-  AccessPlanDraft,
-  CommandAccessOperation,
-  CompilationCategory,
-  CompilationReject,
-  CompilerDecisionCode,
-  CompilerDraftResult,
-  CompileResult,
-  CompilerContext,
-  CompleteAccessPlan,
-  DecisionCode,
-  DirectToolCompilerInput,
-  EffectAccessOperation,
-  GateEvidence,
-  InvalidCompilationCode,
-  PlanCoverage,
-  SecurityCompilationCode,
-  UnsupportedCompilationCode,
-  PathAccessOperation,
-  PathOperationKind,
-  PathSource,
-  ResourceUsage,
-  ShellCompilerInput,
-  ToolSurface,
-} from "./access-request-types";
+export type * from "./access-request-types";
+// evidenceKind 单一来源在 guidance-catalog（T-047 #3），此处 re-export 保持 consumers 兼容。
+export { evidenceKind } from "./guidance-catalog";
 
 // ── public api ──
 
@@ -65,26 +44,14 @@ export function reject(code: CompilerDecisionCode, subject: string, span?: Sourc
   return { kind: "reject", category, code: code as UnsupportedCompilationCode, evidence };
 }
 
+// code → 类别单一来源（T-046 R5）：编译分类由渲染侧的 denyResponseKindFor 推导，
+// 两份平行的 code 列表合一；unknown-effect 从 unsupported-form 移入 invalid-request，
+// 与 kernel 侧（evaluate-request 的 hardDeny）响应一致。
 function compilationCategoryFor(code: CompilerDecisionCode): CompilationCategory {
-  if (code === "threat" || code === "hard-command-rule" || code === "destroy-command"
-    || code === "blocked-path" || code === "symlink-escape" || code === "path-unclassifiable") {
-    return "security-block";
-  }
-  if (code === "unknown-tool" || code === "invalid-tool-input" || code === "resource-limit") {
-    return "invalid-request";
-  }
-  return "unsupported-form";
-}
-
-export function evidenceKind(code: DecisionCode): GateEvidence["kind"] {
-  if (code === "dynamic-shell" || code === "unsafe-syntax" || code === "uncertain-cwd") return "syntax";
-  if (code === "threat") return "threat";
-  if (code === "unknown-tool" || code === "invalid-tool-input") return "tool";
-  if (code === "unsupported-redirection") return "redirection";
-  if (code === "blocked-path" || code === "symlink-escape" || code === "path-unclassifiable" || code === "path-denied") return "path";
-  if (code === "destroy-command" || code === "hard-command-rule" || code === "shell-policy-denied" || code === "opaque-command") return "command";
-  if (code === "resource-limit") return "tool";
-  return "command";
+  const kind = denyResponseKindFor(code);
+  if (kind === "security-boundary") return "security-block";
+  if (kind === "shell-form") return "unsupported-form";
+  return "invalid-request";
 }
 
 function cwdCandidates(state: { cwd: string; candidates?: readonly CwdCandidate[] }): readonly CwdCandidate[] {
@@ -92,7 +59,7 @@ function cwdCandidates(state: { cwd: string; candidates?: readonly CwdCandidate[
 }
 
 export function pathOperation(
-  operation: PathOperationKind,
+  operation: PathOperation,
   input: string,
   state: { cwd: string; candidates?: readonly CwdCandidate[] },
   source: PathSource,
@@ -137,20 +104,10 @@ export function validateInputLength(value: string, subject: string): Compilation
     : null;
 }
 
-export function isRecord(value: unknown): value is Record<PropertyKey, unknown> {
-  try {
-    if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
-    const prototype = Object.getPrototypeOf(value);
-    return prototype === Object.prototype || prototype === null;
-  } catch {
-    return false;
-  }
-}
-
 export function effectsFor(
   commandClass: CommandClass,
   effects: readonly Effect[],
-  intents: readonly { operation: PathOperationKind }[],
+  intents: readonly { operation: PathOperation }[],
   hasRedirection: boolean,
 ): readonly Effect[] {
   const result = new Set<Effect>(effects);

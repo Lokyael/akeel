@@ -1,4 +1,4 @@
-import type { DecisionCode, Guidance, GuidanceId } from "./decision-types";
+import type { DecisionCode, GateEvidence, Guidance, GuidanceId } from "./decision-types";
 
 export type DenyResponseKind = "shell-form" | "security-boundary" | "generic";
 
@@ -18,6 +18,37 @@ const SECURITY_BOUNDARY_CODES = new Set<DecisionCode>([
   "destroy-command",
   "hard-command-rule",
 ]);
+
+// ── evidence kind 映射（T-047 #3：与 denyResponseKindFor 同模块相邻，共享 code 视图） ──
+// Record<DecisionCode, ...> 全量枚举：新增 DecisionCode 在此编译报错（fail-fast）。
+// approval-required/user-denied 保持 "command"（审批决策不经 evidenceKind 构造证据，
+// 实际证据由 evaluate-request 直接构造为 command/path）。
+
+const EVIDENCE_KIND: Readonly<Record<DecisionCode, GateEvidence["kind"]>> = {
+  "dynamic-shell": "syntax",
+  "unsafe-syntax": "syntax",
+  "uncertain-cwd": "syntax",
+  threat: "threat",
+  "unknown-tool": "tool",
+  "invalid-tool-input": "tool",
+  "resource-limit": "tool",
+  "unsupported-redirection": "redirection",
+  "blocked-path": "path",
+  "symlink-escape": "path",
+  "path-unclassifiable": "path",
+  "path-denied": "path",
+  "destroy-command": "command",
+  "hard-command-rule": "command",
+  "shell-policy-denied": "command",
+  "opaque-command": "command",
+  "unknown-effect": "command",
+  "approval-required": "command",
+  "user-denied": "command",
+};
+
+export function evidenceKind(code: DecisionCode): GateEvidence["kind"] {
+  return EVIDENCE_KIND[code];
+}
 
 export function denyResponseKindFor(code: DecisionCode): DenyResponseKind {
   if (SECURITY_BOUNDARY_CODES.has(code)) return "security-boundary";

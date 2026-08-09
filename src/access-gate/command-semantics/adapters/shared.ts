@@ -20,11 +20,6 @@ export function optionIntent(
   return { operation, rawPath, source: "option", span: { start: 0, end: 0 }, confidence };
 }
 
-/** 配置目标：配置文件路径 + 置信度（exact = 静态确定，conservative = 环境依赖）。 */
-export interface ConfigTarget {
-  rawPath: string;
-  confidence: "exact" | "conservative";
-}
 
 function defaultEffects(cls: CommandClass): readonly Effect[] {
   if (cls === "inspect") return ["read"];
@@ -36,9 +31,9 @@ function defaultEffects(cls: CommandClass): readonly Effect[] {
 
 /**
  * 首个非选项 token 的索引（跳过已知取值选项及其值）。
- * 无子命令（全为选项）时返回 -1。
+ * 无子命令（全为选项）或遇到 `--` 时返回 -1。
  */
-export function firstNonOptionIndex(args: readonly ShellArg[], valueOptions: Iterable<string>): number {
+export function firstNonOptionIndex(args: ReadonlyArray<{ readonly value?: string | null }>, valueOptions: Iterable<string>): number {
   const opts = new Set(valueOptions);
   for (let i = 0; i < args.length; i++) {
     const v = args[i]!.value ?? "";
@@ -53,24 +48,55 @@ export function firstNonOptionIndex(args: readonly ShellArg[], valueOptions: Ite
 }
 
 /**
- * Extract the subcommand from tool arguments.
- * Skips known value-taking options and their values.
- * Returns "" when no subcommand is present (all args are flags).
- *
- * @param valueOptions — options that consume the next token as their value.
- *   Accepts both string[] and Set<string> for caller convenience.
+ * 子命令 token 收集核心（T-046 R4，三个提取器的唯一实现）：
+ * 从首个非选项 token 起收集；includeOptions=false 只收集非选项 token，
+ * includeOptions=true 收集全部后续 token（含选项与取值选项的值——调用方
+ * 不提供 valueOptions 即不知哪些选项取值，D-024 已知局限）。`--` 之前终止。
  */
-export function extractSubcommand(args: readonly ShellArg[], valueOptions: Iterable<string>): string {
+function collectSubcommandTokens(
+  args: ReadonlyArray<{ readonly value?: string | null }>,
+  valueOptions: Iterable<string>,
+  includeOptions: boolean,
+): string[] {
   const idx = firstNonOptionIndex(args, valueOptions);
-  if (idx < 0) return "";
+  if (idx < 0) return [];
   const parts: string[] = [];
   for (let i = idx; i < args.length; i++) {
     const v = args[i]!.value ?? "";
     if (v === "--") break;
-    if (v.startsWith("-")) continue;
+    if (!includeOptions && v.startsWith("-")) continue;
     parts.push(v);
   }
-  return parts.join(" ");
+  return parts;
+}
+
+/**
+ * Extract the subcommand from tool arguments: 全部非选项 token，空格连接。
+ * 跳过已知取值选项及其值（adapter 分发语义）。
+ * 无子命令（全为选项）时返回 ""。
+ *
+ * @param valueOptions — options that consume the next token as their value.
+ *   Accepts both string[] and Set<string> for caller convenience.
+ */
+export function extractSubcommand(args: ReadonlyArray<{ readonly value?: string | null }>, valueOptions: Iterable<string>): string {
+  return collectSubcommandTokens(args, valueOptions, false).join(" ");
+}
+
+/** 子命令：首个非选项 token（overrides commands 分发；无 valueOptions 感知，D-024）。 */
+export function firstSubcommand(args: ReadonlyArray<{ readonly value?: string | null }>): string {
+  return collectSubcommandTokens(args, [], false)[0] ?? "";
+}
+
+/**
+ * 子命令尾部：首个非选项 token 起的全部 token，空格连接（reclassify pattern 匹配用）。
+ * 与 adapter 提取不同，它包含选项及取值选项的值——
+ * 已知局限：不跳过取值选项的值（如 cargo --manifest-path Cargo.toml build
+ * 得到 "Cargo.toml build" 而非 "build"），因为它不依赖 per-adapter 配置。
+ * reclassify 的 pattern 使用 substring 匹配（如 "build" 而非 "^build$"），
+ * 典型场景（git 子命令）无此问题。详见 D-024。
+ */
+export function fullSubcommand(args: ReadonlyArray<{ readonly value?: string | null }>): string {
+  return collectSubcommandTokens(args, [], true).join(" ");
 }
 
 /** 位置参数提取结果：positional + 被消费的取值选项（供目标目录/参考文件等语义判定）。 */
@@ -172,116 +198,14 @@ export function canonicalExecutableName(base: string): string {
   return base;
 }
 
-// ─── 配置命令共享解析引擎（git config / npm config，T-037 系列） ───
-
-/**
- * 配置命令选项表：层级/标志/值消费语义的声明式描述。
- * 读写判定策略由各 adapter 本地决定（git 用 positional 推断，npm 用子命令 op）；
- * 本引擎只共享“遍历、层级解析、值消费、opaque”的确定性部分。
- */
-export interface ConfigOptionTable {
-  /** 读特征选项（改变输出格式/过滤，不改变文件访问）。 */
-  readFlags: ReadonlySet<string>;
-  /** 写特征选项。 */
-  writeFlags: ReadonlySet<string>;
-  /** 读特征且消费下一个 token 为值的选项（值非路径，如 git --type/--default）。 */
-  readConsume: ReadonlySet<string>;
-  /** 读特征且仅支持 = 前缀形式的选项（如 git --value=）。 */
-  readEquals: readonly string[];
-  /** 已知但无目标/读/写语义的修饰选项（如 npm -g/--global），不置 opaque。 */
-  ignoreFlags: ReadonlySet<string>;
-  /** 消费下一个 token 为目标路径的选项（git -f、npm --userconfig）。 */
-  consumeTargets: ReadonlySet<string>;
-  /** 以 = 前缀形式给出目标路径的选项（git --file=、npm --userconfig=）。 */
-  equalsTargets: readonly string[];
-  /** 层级选项 → 静态目标（git --global/--system/--local）。 */
-  staticTargets: Readonly<Record<string, ConfigTarget>>;
-  /** 无显式层级时的默认目标（环境依赖时用 conservative）。 */
-  defaultTarget: ConfigTarget;
-}
-
-export interface ConfigParseResult {
-  /** 显式层级目标（无显式层级时 null）。 */
-  target: ConfigTarget | null;
-  sawRead: boolean;
-  sawWrite: boolean;
-  /** 未知选项/空值目标 → opaque（fail-closed，不猜）。 */
-  sawUnknown: boolean;
-  /** 非选项 token（含 op 位置）。 */
-  positional: readonly string[];
-  /** 首个非选项 token（git 为 key、npm 为子命令 op）。 */
-  op: string;
-}
-
-/**
- * 共享配置参数遍历：识别层级、读写标志、值消费、未知选项。
- * `--` 之后的 token 全部按位置参数处理。
- */
-export function parseConfigOptions(args: readonly ShellArg[], table: ConfigOptionTable): ConfigParseResult {
-  let target: ConfigTarget | null = null;
-  let sawRead = false;
-  let sawWrite = false;
-  let sawUnknown = false;
-  let op = "";
-  const positional: string[] = [];
-
-  for (let i = 0; i < args.length; i++) {
-    const val = args[i]!.value ?? "";
-    if (val === "--") {
-      for (let j = i + 1; j < args.length; j++) positional.push(args[j]!.value ?? "");
-      break;
-    }
-    if (!val.startsWith("-")) {
-      if (!op) op = val;
-      positional.push(val);
-      continue;
-    }
-
-    if (table.readFlags.has(val)) { sawRead = true; continue; }
-    if (table.writeFlags.has(val)) { sawWrite = true; continue; }
-    const staticTarget = table.staticTargets[val];
-    if (staticTarget) { target = staticTarget; continue; }
-    if (table.ignoreFlags.has(val)) continue;
-
-    const eq = val.indexOf("=");
-    if (eq > 0) {
-      const name = val.slice(0, eq);
-      const rest = val.slice(eq + 1);
-      if (table.readEquals.includes(name)) { sawRead = true; continue; }
-      if (table.equalsTargets.includes(name)) {
-        if (!rest) { sawUnknown = true; continue; }  // 空目标不猜，避免空路径 intent
-        target = { rawPath: rest, confidence: "exact" };
-        continue;
-      }
-      sawUnknown = true;
-      continue;
-    }
-
-    if (table.consumeTargets.has(val) && i + 1 < args.length) {
-      const consumed = args[i + 1]!.value ?? "";
-      if (!consumed) { sawUnknown = true; continue; }
-      target = { rawPath: consumed, confidence: "exact" };
-      i++;
-      continue;
-    }
-    if (table.readConsume.has(val) && i + 1 < args.length) { sawRead = true; i++; continue; }
-
-    // 未知选项 → opaque
-    sawUnknown = true;
-  }
-
-  return { target, sawRead, sawWrite, sawUnknown, positional, op };
-}
-
 export function makeSemantics(
   cls: CommandClass,
   opts: MakeSemanticsOpts,
 ): CommandSemantics {
   return {
-    class: cls,
+    commandClass: cls,
     effects: opts.effects ?? defaultEffects(cls),
     intents: opts.intents ?? [],
-    cwdTransition: { kind: "none" },
     hardRule: opts.hardRule ?? null,
     opaque: opts.opaque ?? false,
     reason: opts.reason,

@@ -6,7 +6,7 @@ import { isAbsolute, resolve } from "node:path";
 import { homedir } from "node:os";
 import { statSync } from "node:fs";
 import type { ShellProgram, ShellCommandNode } from "../shell-parse/types";
-import type { CwdCandidate, CwdState, CommandSemantics } from "./types";
+import type { CwdCandidate, CwdState } from "./types";
 
 // ─── 初始状态 ───
 
@@ -21,6 +21,8 @@ export function initialCwd(cwd: string): CwdState {
 // ─── cd 命令分析 ───
 
 export interface CdInfo {
+  /** 是否为 cd 命令（含 cd 无参数、cd -、cd $x 等 opaque 形态）。 */
+  isCd: boolean;
   target: string | null;
   opaque: boolean;
 }
@@ -33,22 +35,22 @@ export interface CdInfo {
  */
 export function analyzeCd(node: ShellCommandNode): CdInfo {
   if (!node.executable || node.executable.value?.toLowerCase() !== "cd") {
-    return { target: null, opaque: false };
+    return { isCd: false, target: null, opaque: false };
   }
   // cd 无参数 → ~
   if (node.args.length === 0) {
-    return { target: "~", opaque: false };
+    return { isCd: true, target: "~", opaque: false };
   }
   // 多于一个参数 → opaque（cd 不允许多个参数，但 Shell 会忽略多余的）
   // 保守处理：多个参数也 opaque
   if (node.args.length > 1) {
-    return { target: null, opaque: true };
+    return { isCd: true, target: null, opaque: true };
   }
   const arg = node.args[0]!;
   if (!arg.value || arg.dynamic || arg.value === "-") {
-    return { target: null, opaque: true };
+    return { isCd: true, target: null, opaque: true };
   }
-  return { target: arg.value, opaque: false };
+  return { isCd: true, target: arg.value, opaque: false };
 }
 
 function isDirectory(path: string): boolean {
@@ -79,14 +81,14 @@ export interface ControlFlowAnalysis {
     node: ShellCommandNode;
     cwdBefore: CwdState;
     effectiveCwd: CwdState;
-    semantics: CommandSemantics | null;
   }[];
   opaque: boolean;
 }
 
 /**
  * 分析 ShellProgram 的控制流。
- * 返回每个命令节点在分析时的有效 cwd 和语义（如果 adapter 已产生）。
+ * 返回每个命令节点在分析时的有效 cwd（T-047 #2：semantics 字段恒 null 死字段已删除，
+ * 语义分析由 shell-compiler 在 control-flow 之后单独调用 analyzeSemantics）。
  */
 export function analyzeControlFlow(
   program: ShellProgram,
@@ -100,8 +102,7 @@ export function analyzeControlFlow(
       nodes: program.commands.map((cmd) => ({
         node: cmd,
         cwdBefore: initial,
-        effectiveCwd: { ...initial, certainty: "joined" },
-        semantics: null,
+        effectiveCwd: { ...initial, certainty: "conservative" },
       })),
       opaque: true,
     };
@@ -143,7 +144,6 @@ export function analyzeControlFlow(
       node: cmd,
       cwdBefore: before,
       effectiveCwd,
-      semantics: null,
     });
     previousBefore = before;
     previousAfter = after;
@@ -156,7 +156,7 @@ function stateFromCandidates(candidates: readonly CwdCandidate[]): CwdState {
   const unique = candidates.filter((candidate, index, values) => values.findIndex((value) => value.cwd === candidate.cwd) === index);
   return {
     cwd: unique[0]?.cwd ?? "",
-    certainty: unique.length === 1 ? "exact" : "joined",
+    certainty: unique.length === 1 ? "exact" : "conservative",
     candidates: unique,
   };
 }

@@ -5,13 +5,13 @@
   "type": "module",
   "scripts": {
     "test": "tsx scripts/validate-docs.ts && tsx scripts/validate-skills.ts && tsc --noEmit && tsx --test tests/access-gate/*.test.ts",
-    "test:profile": "npx tsx tests/access-gate/profile.test.ts && npx tsx tests/access-gate/profile-load.test.ts && npx tsx tests/access-gate/profile-chain.test.ts",
-    "test:path": "npx tsx tests/access-gate/path-policy.test.ts",
-    "test:gate": "npx tsx tests/access-gate/decision-builder.test.ts && npx tsx tests/access-gate/gate-decision.test.ts && npx tsx tests/access-gate/gate.test.ts && npx tsx tests/access-gate/access-request.test.ts && npx tsx tests/access-gate/access-plan-verifier.test.ts && npx tsx tests/access-gate/task2-contract.test.ts && npx tsx tests/access-gate/gate-policy-matrix.test.ts && npx tsx tests/access-gate/guidance.test.ts && npx tsx tests/access-gate/access-request-invariants.test.ts",
-    "test:shell-parse": "npx tsx tests/access-gate/shell-parse.test.ts",
-    "test:cmd-semantics": "npx tsx --test tests/access-gate/command-semantics-*.test.ts tests/access-gate/command-overrides.test.ts",
-    "test:index": "npx tsx tests/access-gate/index.test.ts",
-    "test:footer": "npx tsx tests/access-gate/profile-footer.test.ts"
+    "test:profile": "tsx --test tests/access-gate/profile.test.ts tests/access-gate/profile-load.test.ts tests/access-gate/profile-chain.test.ts",
+    "test:path": "tsx --test tests/access-gate/path-policy.test.ts",
+    "test:gate": "tsx --test tests/access-gate/decision-builder.test.ts tests/access-gate/gate-decision.test.ts tests/access-gate/gate.test.ts tests/access-gate/access-request.test.ts tests/access-gate/access-plan-verifier.test.ts tests/access-gate/task2-contract.test.ts tests/access-gate/gate-policy-matrix.test.ts tests/access-gate/guidance.test.ts tests/access-gate/access-request-invariants.test.ts",
+    "test:shell-parse": "tsx --test tests/access-gate/shell-parse.test.ts",
+    "test:cmd-semantics": "tsx --test tests/access-gate/command-semantics-*.test.ts tests/access-gate/command-overrides.test.ts",
+    "test:index": "tsx --test tests/access-gate/index.test.ts",
+    "test:footer": "tsx --test tests/access-gate/profile-footer.test.ts"
   },
   "dependencies": {
     "yaml": "^2.9.0"

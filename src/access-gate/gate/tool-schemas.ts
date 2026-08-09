@@ -1,5 +1,5 @@
 import type { Effect, CommandClass } from "../command-semantics/types";
-import type { PathOperationKind } from "./access-request";
+import type { PathOperation } from "./access-request";
 
 // Centralized tool schema definitions — single source of truth for Direct tool
 // parameter validation.  Adding a new tool or parameter only requires a schema
@@ -9,12 +9,11 @@ interface FieldSchema {
   readonly type: "string" | "integer" | "array";
   readonly required: boolean;
   readonly min?: number;
-  readonly items?: Record<string, string>;
 }
 
 export interface ToolSchema {
   readonly fields: Record<string, FieldSchema>;
-  readonly pathOperation: PathOperationKind;
+  readonly pathOperation: PathOperation;
   readonly effects: readonly Effect[];
   readonly commandClass: CommandClass;
 }
@@ -42,7 +41,7 @@ export const TOOL_SCHEMAS: Record<string, ToolSchema> = {
   edit: {
     fields: {
       path:  { type: "string", required: true },
-      edits: { type: "array", required: true, items: { oldText: "string", newText: "string" } },
+      edits: { type: "array", required: true },
     },
     pathOperation: "write",
     effects: ["write"],

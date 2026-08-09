@@ -86,7 +86,6 @@ function sealPlan(draft: AccessPlanDraft): CompleteAccessPlan {
     operations: copiedOperations,
     commands: copiedOperations.filter((operation): operation is Extract<AccessOperation, { kind: "command" }> => operation.kind === "command"),
     paths: copiedOperations.filter((operation): operation is Extract<AccessOperation, { kind: "path" }> => operation.kind === "path"),
-    effects: copiedOperations.filter((operation): operation is Extract<AccessOperation, { kind: "effect" }> => operation.kind === "effect"),
     cwdCandidates: draft.cwdCandidates.map(cloneCandidate),
     coverage: {
       ...draft.coverage,
@@ -117,10 +116,7 @@ function cloneOperation(operation: AccessOperation): AccessOperation {
   if (operation.kind === "path") {
     return { ...operation, cwdCandidates: operation.cwdCandidates.map(cloneCandidate), span: cloneSpan(operation.span) };
   }
-  if (operation.kind === "command") {
-    return { ...operation, effects: [...operation.effects], span: cloneSpan(operation.span) };
-  }
-  return { ...operation, span: cloneSpan(operation.span) };
+  return { ...operation, effects: [...operation.effects], span: cloneSpan(operation.span) };
 }
 
 function deepFreeze<T>(value: T): T {

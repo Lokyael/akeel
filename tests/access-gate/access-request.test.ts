@@ -81,14 +81,13 @@ test("validates complete Shell requests that include cd coverage", () => {
   });
 });
 
-test("exposes separate command, path, and effect plan facts", () => {
+test("exposes separate command and path plan facts", () => {
   withContext((env) => {
     const plan = complete(compileShellCall({ ...env, command: "grep -rn pattern allowed" }));
     assert.ok(plan.commands.length >= 1);
     assert.ok(plan.paths.length >= 1);
-    assert.ok(plan.effects.length >= 1);
     assert.ok(plan.paths.some((operation) => operation.operation === "search"));
-    assert.ok(plan.effects.some((operation) => operation.effect === "search"));
+    assert.ok(plan.commands.some((operation) => operation.effects.includes("search")));
   });
 });
 
@@ -109,7 +108,6 @@ test("verifier rejects an issued plan above the command budget", async () => {
       ...request.coverage,
       commandCount: commands.length,
       commandSpans: Array.from({ length: commands.length }, () => request.coverage.commandSpans[0]!),
-      effectOperationCount: 0,
       redirectionSpans: [],
     };
     const overBudget = deepFreeze({
@@ -151,12 +149,11 @@ test("preserves all cwd candidates for a failure branch", () => {
   });
 });
 
-test("compiles Direct read with command and effect evidence", () => {
+test("compiles Direct read with command evidence", () => {
   withContext((env) => {
     const request = complete(compileDirectToolCall({ ...env, surface: "read", args: { path: "allowed/file.ts" } }));
     assert.equal(request.operations.some((operation) => operation.kind === "command"), true);
-    assert.equal(request.operations.some((operation) => operation.kind === "effect" && operation.effect === "read"), true);
-    assert.equal(request.coverage.effectOperationCount > 0, true);
+    assert.ok(request.commands[0]!.effects.includes("read"));
   });
 });
 

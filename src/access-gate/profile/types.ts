@@ -1,22 +1,17 @@
-export type Decision = "allow" | "ask" | "deny";
-export type PathOperation = "read" | "list" | "search" | "write";
+import type { CommandClass, ProfileDecision, PathOperation } from "../domain";
 
-export interface ShellPolicy {
-  inspect: Decision;
-  modify: Decision;
-  execute: Decision;
-  destroy: Decision;
-  unknown: Decision;
-}
+export type { CommandClass, ProfileDecision, PathOperation } from "../domain";
 
-export type PathDecisions = Partial<Record<PathOperation, Decision>>;
+export type ShellPolicy = Record<CommandClass, ProfileDecision>;
+
+export type PathDecisions = Partial<Record<PathOperation, ProfileDecision>>;
 
 export interface PathRule extends PathDecisions {
   path: string;
 }
 
 export interface PathPolicy {
-  default: Record<PathOperation, Decision>;
+  default: Record<PathOperation, ProfileDecision>;
   rules: PathRule[];
 }
 

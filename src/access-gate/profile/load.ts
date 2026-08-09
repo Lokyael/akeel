@@ -1,13 +1,9 @@
 import { existsSync, readFileSync } from "node:fs";
-import { homedir } from "node:os";
 import { join } from "node:path";
-import { BUILTIN_PROFILES_PATH, DEFAULT_PROFILE_NAME } from "./defaults";
+import { BUILTIN_PROFILES_PATH, DEFAULT_PROFILE_NAME, READ_FALLBACK_PROFILE_NAME } from "./defaults";
 import { resolveProfiles } from "./resolve";
 import type { RawProfiles, ResolvedProfiles } from "./types";
-
-function getAgentDir(): string {
-  return process.env.PI_CODING_AGENT_DIR || join(homedir(), ".pi", "agent");
-}
+import { getAgentDir } from "../agent-dir";
 
 function readJson(path: string): unknown {
   return JSON.parse(readFileSync(path, "utf-8"));
@@ -59,9 +55,9 @@ export function loadProfiles(options: ProfileLoadOptions = {}): ResolvedProfiles
   const global = loadLayer(base, join(options.agentDir ?? getAgentDir(), "pi-keel", "profiles.json"));
   if (global.error) {
     options.onError?.(global.error);
-    // 全局配置损坏 → 回退到内置集中最受限的 profile（keel-read），不依赖硬编码名字存在
-    const fallback = Object.keys(builtin.value.profiles).includes("keel-read")
-      ? "keel-read"
+    // 全局配置损坏 → 回退到内置集中最受限的 profile（keel-read），不存在则回退默认
+    const fallback = Object.keys(builtin.value.profiles).includes(READ_FALLBACK_PROFILE_NAME)
+      ? READ_FALLBACK_PROFILE_NAME
       : builtin.value.defaultProfile;
     return { ...builtin.value, defaultProfile: fallback };
   }

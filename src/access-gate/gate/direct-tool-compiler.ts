@@ -98,13 +98,7 @@ export function compileDirectToolDraft(input: DirectToolCompilerInput): Compiler
     effects,
     span,
   };
-  const effectOperations = effects.map((effect) => ({
-    kind: "effect" as const,
-    effect,
-    confidence: "exact" as const,
-    span,
-  }));
-  const operations = [command, ...effectOperations, path];
+  const operations = [command, path];
   return createPlanDraft(
     input.surface as ToolSurface, operations, state.candidates,
     {
@@ -112,7 +106,6 @@ export function compileDirectToolDraft(input: DirectToolCompilerInput): Compiler
       redirectionSpans: [],
       commandCount: 1,
       pathOperationCount: 1,
-      effectOperationCount: effectOperations.length,
       cwdCandidateCount: state.candidates.length,
     },
     serializedArgs.length,
