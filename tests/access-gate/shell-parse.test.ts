@@ -308,6 +308,60 @@ test("parser: exec wrapper", () => {
   assert.equal(cmd.executable?.value, "bash");
 });
 
+// D-037：parser 拥有 wrapper 链——嵌套 wrapper 入栈，executable 永不承载 wrapper，
+// wrapper positional（timeout <duration>）由 parser 消费丢弃，args 只含真实命令参数
+test("parser: nested wrapper chain (timeout env)", () => {
+  const { program } = parse(lex("timeout 5 env rm file").tokens);
+  const cmd = program.commands[0]!;
+  assert.equal(cmd.wrapper.length, 2);
+  assert.equal(cmd.wrapper[0]!.value, "timeout");
+  assert.equal(cmd.wrapper[1]!.value, "env");
+  assert.equal(cmd.executable?.value, "rm");
+  assert.equal(cmd.args.length, 1);
+  assert.equal(cmd.args[0]!.value, "file");
+});
+
+test("parser: nested wrapper with env option and assignments", () => {
+  const { program } = parse(lex("timeout 5 env -i PATH=/x rm file").tokens);
+  const cmd = program.commands[0]!;
+  assert.equal(cmd.wrapper.length, 2);
+  assert.equal(cmd.executable?.value, "rm");
+  assert.equal(cmd.args.length, 1);
+  assert.equal(cmd.args[0]!.value, "file");
+  assert.equal(cmd.envAssignments.length, 1);
+  assert.equal(cmd.envAssignments[0]!.value, "PATH=/x");
+});
+
+test("parser: nested wrapper chain (env command)", () => {
+  const { program } = parse(lex("env command rm file").tokens);
+  const cmd = program.commands[0]!;
+  assert.equal(cmd.wrapper.length, 2);
+  assert.equal(cmd.wrapper[0]!.value, "env");
+  assert.equal(cmd.wrapper[1]!.value, "command");
+  assert.equal(cmd.executable?.value, "rm");
+  assert.equal(cmd.args.length, 1);
+  assert.equal(cmd.args[0]!.value, "file");
+});
+
+test("parser: deep nested wrappers each consume their positional", () => {
+  const { program } = parse(lex("timeout 5 env timeout 3 cmd").tokens);
+  const cmd = program.commands[0]!;
+  assert.equal(cmd.wrapper.length, 3);
+  assert.equal(cmd.wrapper[0]!.value, "timeout");
+  assert.equal(cmd.wrapper[1]!.value, "env");
+  assert.equal(cmd.wrapper[2]!.value, "timeout");
+  assert.equal(cmd.executable?.value, "cmd");
+  assert.equal(cmd.args.length, 0);
+});
+
+test("parser: bare wrapper leaves executable null", () => {
+  const { program } = parse(lex("timeout 5").tokens);
+  const cmd = program.commands[0]!;
+  assert.equal(cmd.wrapper.length, 1);
+  assert.equal(cmd.wrapper[0]!.value, "timeout");
+  assert.equal(cmd.executable, null);
+});
+
 test("parser: cd && cat", () => {
   const { program } = parse(lex("cd project/sub && cat file").tokens);
   assert.equal(program.commands.length, 2);

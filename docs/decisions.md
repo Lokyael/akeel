@@ -439,4 +439,33 @@ reclassify:
 - **handoff-session 定位**（跨环境交接）：handoff 文档的唯一不可替代价值是“无本会话历史访问权的接收方”（非 pi 工具、跨机器/环境）获得状态摘要；同 pi 环境交接由 `/resume`/`/tree`（pi 持久 session 文件全量恢复）与 `survey-context`（从 CONTEXT/task/decisions 重建上下文）覆盖，摘要不增加保真度。原实现写 `$TMPDIR` 是缺陷：Linux `/tmp` 重启即清理、跨机器不可达——在唯一需要它的场景（跨环境）恰恰无法送达。重构：默认在会话中输出文档内容由用户交付（用户掌控持久性），用户显式指定路径时才写入；未沉淀决策不写入 handoff，先经 domain-modeling 入 `docs/decisions.md` 再引用路径（防双源，D-028）。**Revisit when** 出现需频繁跨工具交接的真实用户场景。
 
 
-## D-037: 待创建
+## D-037: 解析器拥有 wrapper 链（IR 契约：executable 永不承载 wrapper）
+
+**Status:** active
+
+**Decision:** `shell-parse/parser.ts` 在 wrapper-args 状态下识别嵌套 wrapper 并入栈（重置该 wrapper 的 `WRAPPER_POS_SKIP`）；wrapper 的 positional 参数（`timeout <duration>`）由 parser 消费丢弃，`node.args` 只含真实命令参数。`ShellCommandNode.executable` 只承载真正要运行的命令，**永不可能是 wrapper**。`normalize.ts` 退化为纯出栈：循环弹出 wrapper 链，删除 `promotion` / `guessExecutable` / `removeFromArgs` / unwrap 的 slice 逻辑 / `MAX_UNWRAP_DEPTH`。
+
+**Why:**
+- 旧设计仅在嵌套形态下把 wrapper 放 executable 槽（如 `timeout 5 env python` → executable=env），真实命令沉入 args，normalize 用 promotion + guess 恢复——猜测逻辑脆弱，且产生两个已实证的盲点：
+  - preflight `download→pipe→interpreter` 硬规则只查 raw executable：`curl … | timeout 5 env python`、`curl … | env nohup bash` 等嵌套形态整体绕过（本地脚本实证：executable=env/nohup，preflight PASS）；
+  - `analyzeCd` 只查 raw executable：`timeout 5 env cd x` 的 cwd 变化不被追踪，后续命令路径检查基于错误 cwd。
+- 修复放在生产者（parser）：不变量"executable = 真实命令"由构造保证，消费方（preflight、analyzeCd 及未来新增检查）按构造正确，不在消费方复制 wrapper 解包知识（Centralize，D-030 同源）。
+
+**Impact:**
+- 解析后 `node.args` 只含真实命令参数；wrapper positional 不再进入 args，threatScan 的 token 文本覆盖不变（wrapper 名与 executable 仍被扫描）。
+- preflight 硬规则对嵌套 wrapper 形态按构造闭合：实证的 4 个绕过形态（`timeout 5 env python`、`command env python`、`timeout 5 env -i python`、`env nohup bash`）由 PASS 变拦截，回归测试锁定。
+- `analyzeCd` 正确追踪嵌套 wrapper 下的 cd（`timeout 5 env cd x && rm file` 的路径检查基于正确 cwd，fail-closed 方向）。
+- normalize 大幅简化；删除的正是"猜测 executable"逻辑，与 D-031 诚实分类原则同向。
+- 深嵌套（`timeout 5 env timeout 3 cmd`）统一正确——旧 guess 机制在此形态下破碎（executable 被猜成数字）。
+- 既有单层 wrapper 行为零变化（shell-parse / control-flow / driver 测试全部存活）。
+
+**Rejected:**
+- **消费方各自 normalize（preflight/analyzeCd 调用 normalizeCommand）**：不变量落在每个消费方，未来新增 preflight 检查会重蹈覆辙，且安全修复不彻底；违反 Centralize。拒绝。
+- **保持 parser 不动、仅独立修 preflight**：A1 目标形态免费闭合安全面（零额外 preflight 代码）；独立修复需在 preflight 复制 wrapper 解包知识，产生双源。拒绝。
+
+**Out of Scope:**
+- **wrapper 名单位扩充**（仍为 env/command/nohup/exec/timeout）：语义扩充属用户 `command-overrides.yaml`（D-024），不内置。
+- **非 wrapper 的 option-with-value 建模**（如 `env -S`）：维持 fail-closed 现状。
+- **POSIX `>&file` 双流语义修正**：当前建模为 stdout write，路径检查（write intent）不受影响，无安全差异；A2 只把回退分支显式化，不改语义。
+
+## D-038: 待创建

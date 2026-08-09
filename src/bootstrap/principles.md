@@ -11,10 +11,9 @@ skill check, before any tool call, before any response.
 *State assumptions. Name confusion. Surface tradeoffs.*
 
 - State your assumptions explicitly. If uncertain, ask.
-- Ask instead of guessing when required information is missing or only they can provide it (preference, intent, approval). Stated assumptions resolve ambiguity; user-held facts come from asking.
+- If required information is missing or only they can provide it (preference, intent, approval), ask instead of guessing. Stated assumptions resolve ambiguity; user-held facts come from asking. If something is unclear, stop, name what's confusing, and ask.
 - If multiple interpretations exist, present them — then state your pick.
 - If a simpler approach exists, say so. Push back when warranted.
-- If something is unclear, stop. Name what's confusing. Ask.
 
 ### 2. Simplicity First
 
@@ -43,7 +42,6 @@ When editing existing code:
 
 When your changes create orphans:
 - Remove imports/variables/functions that YOUR changes made unused.
-- Don't remove pre-existing dead code unless asked.
 
 **Test:** Every changed line should trace directly to the user's request.
 
@@ -139,10 +137,9 @@ creating a parallel version.
 - **Modules:** Prefer a single unified interface over multiple scattered
   entry points. One module = one responsibility = one file to change.
 
-**Why:** Scattered changes cause version drift. When the same logic lives in
-multiple files, updates become partial — one file gets fixed, another stays
-stale. The system accumulates invisible inconsistencies. Every future change
-becomes a scavenger hunt across the codebase.
+**Why:** Updates become partial — one file gets fixed, another stays stale.
+The system accumulates invisible inconsistencies; every future change becomes
+a scavenger hunt across the codebase.
 
 **Test:** To change a behavior, do you edit one file or many? One = correct.
 Many = refactor first. If you don't know which file to edit, the design is
@@ -157,8 +154,8 @@ already scattered.
 When evaluating multiple proposals, design options, or improvement ideas:
 
 - **Expect to reject some.** If you're accepting all of them, you've stopped
-  thinking. More than ~70% acceptance is a red flag — find at least one to
-  reject with a specific reason.
+  thinking. About to accept a batch? Count them — more than ~70% acceptance
+  is a red flag; find at least one to reject with a specific reason.
 - **Every "yes" needs a reason.** For each proposal you'd accept:
   1. What concrete gap does it fill? "Sounds useful" → reject.
   2. Do existing mechanisms already cover this? Check before adding.
@@ -170,9 +167,6 @@ When evaluating multiple proposals, design options, or improvement ideas:
 This applies to evaluating proposals, not direct commands. "Add a login
 button" is a command — build it. "Should we add these 9 things?" is
 evaluation — critique them.
-
-**Test:** About to accept a batch? Count them. More than ~70% acceptance?
-Find at least one to reject before responding.
 
 ---
 

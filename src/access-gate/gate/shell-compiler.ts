@@ -75,7 +75,6 @@ export function compileShellDraft(input: ShellCompilerInput): CompilerDraftResul
 
   for (const flowNode of flow.nodes) {
     const normalized = normalizeCommand(flowNode.node);
-    if (!normalized) return reject("opaque-command", "cannot normalize command wrappers", flowNode.node.span);
     const semantics = analyzeSemantics(normalized.command, {
       projectRoot: input.projectRoot,
       stagingDir: input.stagingDir,

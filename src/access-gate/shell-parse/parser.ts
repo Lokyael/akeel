@@ -19,9 +19,11 @@ const ALL_DIGITS = /^\d+$/;
 
 function redirectKind(op: string, fd: number | null, target: string | null): RedirectionKind {
   if (op === "<" || op === "<>") return "stdin";
+  // <&N / >&N：fd 复制；<&- / >&-：fd 关闭
   if (op === "<&" || op === ">&") {
     if (target === "-") return "fdClose";
     if (target !== null && ALL_DIGITS.test(target)) return "fdDuplicate";
+    // 非数字目标（如 >&file）不是 fd 复制——落到下方 >& 分支按 stdout/stderr 处理
   }
   if (op === ">" || op === ">|") return fd === 2 ? "stderr" : "stdout";
   if (op === ">>") return fd === 2 ? "stderrAppend" : "stdoutAppend";
@@ -29,6 +31,9 @@ function redirectKind(op: string, fd: number | null, target: string | null): Red
   if (op === "&>>") return "stdoutAppend";
   if (op === "<<") return "heredoc";
   if (op === "<<<") return "hereString";
+  // >&file（非数字目标回退到这里）：按 fd 决定 stdout/stderr；POSIX 双流语义
+  // （>&file 同时重定向 stdout+stderr）不在建模范围（D-037）——路径检查只关心
+  // write intent，流选择无安全差异
   if (op === ">&") return fd === 2 ? "stderr" : "stdout";
   return "stdout";
 }
@@ -58,14 +63,10 @@ function tryParseRedirect(
     fd = Number(tokens[i - 1]!.value);
   }
 
+  // heredoc / here-string 与文件重定向同样取下一个 word 作为目标；无目标则只消费自身
   let target: ShellArg | null = null;
-  if (op === "<<" || op === "<<<") {
-    if (next?.kind === "word") { target = wordToArg(next); i += 2; }
-    else { i += 1; }
-  } else {
-    if (next?.kind === "word") { target = wordToArg(next); i += 2; }
-    else { i += 1; }
-  }
+  if (next?.kind === "word") { target = wordToArg(next); i += 2; }
+  else { i += 1; }
 
   const kind = redirectKind(op, fd, target?.value ?? null);
   if (fd === null) {
@@ -109,9 +110,7 @@ export function parse(tokens: LexToken[]): { program: ShellProgram; error: strin
       currentGroup = [];
       lastOp = tok.value as ShellOperator;
     } else if (tok.kind === "redirect") {
-      // redirect + next word = one redirection unit in the current command
-      // 把 redirect token 和下一个 word token 一起推入当前组
-      // 我们用特殊标记：保留 redirect token 原位，parser 逐 token 处理
+      // redirect token 留在组内原位，parseCommandGroup 用 tryParseRedirect 处理
       currentGroup.push(tok);
     } else {
       currentGroup.push(tok);
@@ -151,12 +150,9 @@ export function parse(tokens: LexToken[]): { program: ShellProgram; error: strin
 
 function parseCommandGroup(tokens: LexToken[]): Omit<ShellCommandNode, "operatorBefore"> | null {
   // 状态机：
-  // 0=args-before-cmd (env var assignment)
-  // 1=wrappers
-  // 2=options (wrapper args)
-  // 3=env-assign after wrapper
-  // 4=executable
-  // 5=arguments and redirections
+  // preamble     = 命令前导（env assignment / wrapper / executable 判定）
+  // wrapper-args = wrapper 参数区（选项 / env assignment / wrapper positional / 嵌套 wrapper / executable）
+  // args         = 已进入命令参数区
   let state: "preamble" | "wrapper-args" | "args" = "preamble";
 
   const envAssignments: ShellArg[] = [];
@@ -229,15 +225,21 @@ function parseCommandGroup(tokens: LexToken[]): Omit<ShellCommandNode, "operator
           i++;
           continue;
         }
-        // 某些 wrapper 有固定 positional 参数（如 timeout <duration>）
+        // 某些 wrapper 有固定 positional 参数（如 timeout <duration>）：
+        // parser 消费丢弃，不进入 args——args 只含真实命令参数（D-037）
         if (wrapperSkipRemaining > 0) {
-          // 把 skippable 参数加入 args，不计为 executable
-          args.push(arg);
           wrapperSkipRemaining--;
           i++;
           continue;
         }
-        // first non-option after wrapper = executable
+        // 嵌套 wrapper 继续入栈——executable 永不承载 wrapper（D-037）
+        if (WRAPPER_CMDS_SET.has(tok.value.toLowerCase())) {
+          wrapper.push(arg);
+          wrapperSkipRemaining = WRAPPER_POS_SKIP[arg.value ?? ""] ?? 0;
+          i++;
+          continue;
+        }
+        // first non-wrapper, non-option after wrapper = executable
         executable = arg;
         state = "args";
         i++;

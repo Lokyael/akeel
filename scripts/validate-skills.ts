@@ -219,6 +219,123 @@ function checkExternalUrls(skill: SkillMeta): CheckResult {
   return { pass: true, warnings, errors: [] };
 }
 
+// ─── principles.md 锚点存在性校验 ───
+// 技能引用 principles.md 锚点（D-030 单一来源的引用机制），锚点被删除/改名会让引用静默失效：
+//   - "per principles.md Quick Reference — Record Lifecycle" → Quick Reference 下的 ### 标题
+//   - "per principles.md §7" → 编号标题（### 7. Declare What You Exclude）
+//   - "principles.md Next-ID slots" → 粗体锚点（**Next-ID slots**）
+// 本检查锁住引用可解析性（T-048 Q5）。
+
+const PRINCIPLES_FILE = join(SKILLS_ROOT, "..", "src", "bootstrap", "principles.md");
+
+interface PrinciplesAnchors {
+  quickReference: Set<string>;
+  sections: Map<string, string>;
+  bold: Set<string>;
+}
+
+function loadPrinciplesAnchors(): PrinciplesAnchors {
+  const anchors: PrinciplesAnchors = { quickReference: new Set(), sections: new Map(), bold: new Set() };
+  const content = readFileSync(PRINCIPLES_FILE, "utf-8");
+  let inQuickReference = false;
+  for (const line of content.split(/\r?\n/)) {
+    const heading = line.match(/^(#{1,6})\s+(.+)$/);
+    if (heading) {
+      const level = heading[1]!.length;
+      const text = heading[2]!;
+      if (level === 2) inQuickReference = text === "Quick Reference";
+      if (inQuickReference && level >= 3) anchors.quickReference.add(text);
+      const numbered = text.match(/^(\d+)[.．]\s+(.+)$/);
+      if (numbered) anchors.sections.set(numbered[1]!, text);
+      continue;
+    }
+    const boldMatch = line.match(/^\*\*([^*]+)\*\*/);
+    if (boldMatch) anchors.bold.add(boldMatch[1]!);
+  }
+  return anchors;
+}
+
+interface PrinciplesRef {
+  kind: "qr" | "sec" | "bare";
+  value: string;
+  raw: string;
+}
+
+function extractPrinciplesRefs(content: string): PrinciplesRef[] {
+  const refs: PrinciplesRef[] = [];
+  // 捕获到句末（。或换行）；尾随续文（如 ") only when..."）由 checkPrinciplesRefs 的子串判定容忍
+  const qr = /principles\.md\s+Quick Reference\s+—\s+([^\n。]+)/g;
+  for (const m of content.matchAll(qr)) {
+    refs.push({ kind: "qr", value: m[1]!.trim(), raw: m[0]! });
+  }
+  const sec = /principles\.md\s+§\s*(\d+[a-z]?)/g;
+  for (const m of content.matchAll(sec)) {
+    refs.push({ kind: "sec", value: m[1]!, raw: m[0]! });
+  }
+  // bare 锚点：principles.md 后跟非 "Quick Reference" / "§" 的词组（如 Next-ID slots）
+  const bare = /principles\.md\s+([A-Z][A-Za-z0-9-]+(?:\s+[A-Za-z0-9-]+)*)/g;
+  for (const m of content.matchAll(bare)) {
+    const head = m[1]!.replace(/\s+/g, " ");
+    if (head.startsWith("Quick Reference")) continue;
+    refs.push({ kind: "bare", value: head, raw: m[0]! });
+  }
+  return refs;
+}
+
+function checkPrinciplesRefs(skill: SkillMeta, anchors: PrinciplesAnchors): CheckResult {
+  const errors: string[] = [];
+  for (const ref of extractPrinciplesRefs(skill.content)) {
+    let found = false;
+    if (ref.kind === "sec") {
+      found = anchors.sections.has(ref.value);
+    } else {
+      // 引用文本可能带尾部续文（"... Lifecycle) only when..."）或跨行折行——
+      // 空白归一化后用已知锚点做子串包含判定；锚点被删除/改名时引用不再
+      // 包含任何已知锚点 → 报错（防静默断链，T-048 Q5）。
+      const normalized = ref.value.replace(/\s+/g, " ");
+      const pool = ref.kind === "qr"
+        ? anchors.quickReference
+        : new Set([...anchors.quickReference, ...anchors.bold]);
+      for (const anchor of pool) {
+        if (normalized.includes(anchor)) { found = true; break; }
+      }
+    }
+    if (!found) {
+      errors.push(`principles.md anchor not found: "${ref.raw}" (resolved ${ref.kind}:${ref.value})`);
+    }
+  }
+  return { pass: errors.length === 0, warnings: [], errors };
+}
+
+// ─── Self-check: 锚点规则必须拒绝不存在的引用，同时放行真实引用 ───
+
+function selfCheckPrinciplesAnchorRule(anchors: PrinciplesAnchors): void {
+  const violating: SkillMeta = {
+    dirName: "sample",
+    layer: "workflows",
+    frontmatterError: undefined,
+    name: "sample",
+    description: "sample",
+    disableModelInvocation: false,
+    content: [
+      "per principles.md Quick Reference — Record Lifecycle",
+      "per principles.md §7",
+      "per principles.md Quick Reference — This-Anchor-Does-Not-Exist",
+      "per principles.md §99",
+    ].join("\n"),
+    lineCount: 4,
+  };
+  const result = checkPrinciplesRefs(violating, anchors);
+  const fired = result.errors.filter((e) => e.includes("This-Anchor-Does-Not-Exist") || e.includes("§99")).length;
+  const falsePositive = result.errors.some((e) => e.includes("Record Lifecycle") || e.includes("§7"));
+  if (fired < 2 || falsePositive) {
+    console.error(
+      `❌ Self-check FAILED: principles anchor rule did not behave correctly (fired=${fired}, falsePositive=${falsePositive}). Fix the rule or the self-check.`
+    );
+    process.exit(1);
+  }
+}
+
 // ─── Self-check: the manual-invocation rule must actually reject violations ───
 
 function selfCheckManualInvocationRule(): void {
@@ -255,6 +372,8 @@ function selfCheckManualInvocationRule(): void {
 
 function main() {
   selfCheckManualInvocationRule();
+  const principlesAnchors = loadPrinciplesAnchors();
+  selfCheckPrinciplesAnchorRule(principlesAnchors);
   const skills = collectSkills();
   console.log(`Validating ${skills.length} skills...\n`);
 
@@ -269,6 +388,7 @@ function main() {
       checkNameConsistency(skill),
       checkLineCount(skill),
       checkExternalUrls(skill),
+      checkPrinciplesRefs(skill, principlesAnchors),
     ];
 
     const skillErrors = checks.flatMap((c) => c.errors);

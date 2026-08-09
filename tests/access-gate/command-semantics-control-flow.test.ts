@@ -154,6 +154,15 @@ test("control: cd to absolute path", () => {
   assert.equal(result.nodes[1]!.effectiveCwd.cwd, "/etc");
 });
 
+test("control: nested wrapper cd is tracked (D-037)", () => {
+  // 曾绕过：parser 把 env 放 executable 槽，cd 沉入 args，analyzeCd 不识别 → cwd 不追踪
+  const { program } = parse(lex("timeout 5 env cd subdir && cat file").tokens);
+  const result = analyzeControlFlow(program, initialCwd("/project"));
+  assert.equal(result.nodes.length, 2);
+  assert.equal(result.nodes[0]!.effectiveCwd.cwd, "/project/subdir");
+  assert.equal(result.nodes[1]!.effectiveCwd.cwd, "/project/subdir");
+});
+
 test("control: dynamic program is opaque", () => {
   const { program } = parse(lex("cat $HOME/file").tokens);
   const result = analyzeControlFlow(program, initialCwd("/project"));
