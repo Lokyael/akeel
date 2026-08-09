@@ -238,7 +238,7 @@ Kind: `feature | bug | refactor | investigation | maintenance`. A Task Record co
 
 Records leave the register only via content transfer (durable content moves to its authority level) or abandonment (no durable content remains). Every terminal is reason-named and declares its destination; relocation and removal happen in the same change; Git retains history; IDs are never reused; no archive directory or tombstone files exist.
 
-`survey-context` reads only: `CONTEXT.md`, `docs/candidates.md`, `docs/decisions.md`, `docs/task.md`, and `docs/task-*.md` — no legacy or type-specific artifact paths. A missing `docs/candidates.md` means no recorded Candidate Records, not an error.
+`survey-context` reads only: `CONTEXT.md`, `docs/candidates.md`, `docs/task.md`, and `docs/task-*.md`, plus specific `D-xxx` entries in `docs/decisions.md` on demand when the task touches their scope — no legacy or type-specific artifact paths. A missing `docs/candidates.md` means no recorded Candidate Records, not an error.
 
 ### Temporary Resources
 

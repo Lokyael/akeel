@@ -17,9 +17,12 @@ Read `CONVENTIONS.md` if it exists. Read `AGENTS.md` or `CLAUDE.md` for engineer
 
 Read `CONTEXT.md` if it exists. Internalize its Glossary, Architecture, Security Boundaries, Active Decisions, and Negative Space.
 
-### 3. Read durable decisions
+### 3. Read durable decisions on demand
 
-Read `docs/decisions.md` if it exists. Use it for the rationale behind current architecture and constraints. Do not treat it as an active task list.
+`CONTEXT.md` (step 2) carries the Active Decisions index — IDs and links into
+`docs/decisions.md`. Open a specific `D-xxx` entry only when the current task or
+suggested next action touches that decision's scope; do not read the whole
+register by default. Do not treat decisions as an active task list.
 
 ### 4. Read non-binding candidates
 
