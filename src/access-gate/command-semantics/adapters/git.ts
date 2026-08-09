@@ -32,6 +32,8 @@ const GIT_CMDS: GitDef[] = [
   { cls: "inspect", pattern: (s) => /^fsck\b/.test(s), reason: "verify repository integrity" },
   { cls: "inspect", pattern: (s) => /^archive\b/.test(s), reason: "create repository archive" },
   { cls: "inspect", pattern: (s) => /^describe\b/.test(s), reason: "describe commit" },
+  { cls: "inspect", pattern: (s) => /^check-attr\b/.test(s), reason: "query gitattributes attributes" },
+  { cls: "inspect", pattern: (s) => /^check-ignore\b/.test(s), reason: "query gitignore rules" },
   { cls: "modify", pattern: (s) => /^add\b/.test(s), paths: (args) => positionalArgs(args).map((a) => ({ op: "read" as const, value: a.value ?? "" })), reason: "stage files" },
   { cls: "modify", pattern: (s) => /^rm\b/.test(s), paths: (args) => positionalArgs(args).map((a) => ({ op: "write" as const, value: a.value ?? "" })), reason: "remove tracked files" },
   { cls: "modify", pattern: (s) => /^commit\b/.test(s), reason: "record changes" },

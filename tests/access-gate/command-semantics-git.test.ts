@@ -71,6 +71,7 @@ defineAdapterTests("git", [
   { cmd: "git submodule update --init", name: "submodule carries network effect", cls: "modify", effects: ["network"] },
   { cmd: "git ls-remote origin", name: "ls-remote carries network effect", cls: "inspect", effects: ["network"] },
   { cmd: ["git fsck", "git archive HEAD"], name: "fsck and archive are inspect", cls: "inspect" },
+  { cmd: ["git check-attr text -- src/foo.ts", "git check-attr -a -- src/foo.ts", "git check-ignore src/foo.ts", "git check-ignore -v -- src/foo.ts"], name: "check-attr/check-ignore query gitattributes and gitignore as inspect", cls: "inspect", opaque: false },
   { cmd: "git push origin main", name: "push carries the network effect", effects: ["network"] },
   {
     cmd: ["git fetch origin", "git pull origin main", "git clone https://github.com/x/y.git", "git remote add origin url"],
