@@ -19,11 +19,15 @@
 - **Prompt Surface**：与 LLM 交互的提示词面，按注入方式分层——`principles.md`（恒定注入）、`skills/`（按需加载）、access-gate guidance（失败路径）。
 - **Skill Single Responsibility**：每个 skill 单一职责、调用时内容全量被使用；触发场景互斥的 skill 保持独立，不合并（D-030）。
 - **Single Source of Format**：格式/规则只在 `principles.md` Quick Reference 定义一次，技能只文字引用不内嵌副本（D-030）。
+- **子代理档位**：pi-keel 用档位（tier）抽象管理 pi-subagents 子代理会话权限，共两档——T0 `scratch`（`keel-subagent-scratch`，写仅 `/tmp/pi-work/**`）与 T1 `project`（`keel-subagent-project`，写 `project/**` + scratch）；读均全盘，shell 轴两档一致（inspect-only），差异只在路径写面（D-039）。T0 档 agent 必须无 mutation 工具（bash/write/edit）——pi-subagents 输出契约机制强制（有则被指令自写 output 与路径策略矛盾），scout 删 write+bash、researcher 原生即无（D-039）。
+- **subagentProfiles 映射**：`profiles.json` 可选根键，agent 名→**档位名**（`scratch`/`project`，`"*"` 回退），优先级 显式 > 内置默认 > `*`（D-039）。
+- **父档位钳制**：父会话档位号（1=项目可写档，否则 0）经 `PI_KEEL_PARENT_TIER`（`"0"`/`"1"`）env 传播，父侧算好、子代理零解析；子代理生效档 = min(映射档, 父TIER)——两档下即"父非项目可写 → 一律回退 T0 scratch"——子代理权限上限 = 父会话当前档位（D-039）。
 
 ## Architecture
 
 - `src/bootstrap/` 在 Session 启动和 compaction 后注入工程原则。
 - `src/access-gate/` 统一处理用户全局 Profile、Shell IR、命令语义、路径策略、Gate、Session 状态和 Footer。
+- 子代理会话（pi-subagents `--mode json -p` 子进程，默认加载全局扩展）在 `session_start` 检测 `PI_SUBAGENT_CHILD`/`PI_SUBAGENT_CHILD_AGENT`，初始化为按 agent 映射的子代理档位（T0 `scratch`/T1 `project`）；父会话档位号经 `PI_KEEL_PARENT_TIER` env 钳制子代理生效档（D-039）。
 - `shell-parse/` 输出受限 Shell IR；`command-semantics/` 提取命令类别、路径意图、效果和 cwd 转换，用户全局 `pi-keel/command-overrides.yaml` 只扩展 Shell 命令语义。wrapper 链由 parser 单一拥有——`executable` 永不承载 wrapper，wrapper positional 消费后保留在 `wrapperArgs` 供 token 级扫描，normalize 纯出栈（D-037）。
 - `gate/` 编译器将 Shell IR 和 Direct tool 参数转换为 `CompleteAccessPlan`；compiler outcome 另外区分 unsupported form、security block 和 invalid request。`compiler-entry.ts` 是唯一 plan sealing boundary，同步 Policy Kernel 只消费经过 verifier 验证的 plan 和 Profile，产出 `GateDecision`，renderer 将决策转为 host 兼容结果。
 - Direct tool（`read`、`write`、`edit`、`find`、`grep`、`ls`）和 Shell 命令经过各自的 compiler 后进入同一 Policy Kernel。
@@ -61,6 +65,7 @@
 - [D-036 Workflows 触发模型（手动调用与即时介入）](docs/decisions.md#d-036-workflows-触发模型手动调用与即时介入)
 - [D-037 解析器拥有 wrapper 链（IR 契约：executable 永不承载 wrapper）](docs/decisions.md#d-037-解析器拥有-wrapper-链ir-契约executable-永不承载-wrapper)
 - [D-038 footer 单一 fitter + pi-tui 宽度助手（生产/测试双路径）](docs/decisions.md#d-038-footer-单一-fitter--pi-tui-宽度助手生产测试双路径)
+- [D-039 子代理档位制（pi-keel × pi-subagents）](docs/decisions.md#d-039-子代理档位制pi-keel--pi-subagents)
 
 ## Negative Space
 

@@ -54,6 +54,7 @@ export function resolveProfiles(value: unknown): ValidationResult<ResolvedProfil
       value: {
         defaultProfile: raw.defaultProfile ?? Object.keys(profiles)[0]!,
         profiles,
+        ...(raw.subagentProfiles ? { subagentProfiles: { ...raw.subagentProfiles } } : {}),
       },
     };
   } catch (error) {

@@ -10,13 +10,16 @@ function readJson(path: string): unknown {
 }
 
 function mergeSources(base: RawProfiles, override: unknown): RawProfiles {
-  const layer = override as { defaultProfile?: string; profiles?: Record<string, unknown> };
+  const layer = override as { defaultProfile?: string; profiles?: Record<string, unknown>; subagentProfiles?: Record<string, string> };
   return {
     defaultProfile: layer.defaultProfile ?? base.defaultProfile,
     profiles: {
       ...base.profiles,
       ...(layer.profiles ?? {}),
     } as RawProfiles["profiles"],
+    ...(layer.subagentProfiles !== undefined
+      ? { subagentProfiles: { ...layer.subagentProfiles } as RawProfiles["subagentProfiles"] }
+      : {}),
   };
 }
 

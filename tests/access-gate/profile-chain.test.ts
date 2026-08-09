@@ -134,9 +134,9 @@ test("chain: all profiles have distinct descriptions", () => {
   assert.equal(new Set(descriptions).size, names.length);
 });
 
-test("chain: only read and explore deny all commands", () => {
+test("chain: only read, explore, and sub-agent tiers deny all commands", () => {
   for (const [name, p] of Object.entries(profiles().profiles)) {
-    if (name === "keel-read" || name === "keel-explore") {
+    if (name === "keel-read" || name === "keel-explore" || name === "keel-subagent-scratch" || name === "keel-subagent-project") {
       assert.equal(p.shellPolicy.modify, "deny", `${name}: should deny modify`);
       assert.equal(p.shellPolicy.execute, "deny", `${name}: should deny execute`);
     } else {

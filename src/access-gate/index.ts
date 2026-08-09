@@ -9,6 +9,15 @@ import { displayName, PROFILE_PREFIX } from "./profile/defaults";
 import { findProjectRoot, createProfileState, type ProfileState } from "./session/profile-state";
 import { clearProfileStatus, installProfileFooter, type ProfileFooterHandle } from "./ui/profile-status";
 import { COMMAND_CLASS_VALUES, PATH_OPERATION_VALUES } from "./domain";
+import {
+  effectiveSubagentTier,
+  isSubagentProcess,
+  PARENT_TIER_ENV,
+  parentTierOf,
+  resolveSubagentTier,
+  SUBAGENT_CHILD_AGENT_ENV,
+  SUBAGENT_TIER_PROFILE,
+} from "./profile/tiers";
 
 function formatDecisions<T extends string>(keys: readonly T[], values: Partial<Record<T, string>>): string {
   return keys.flatMap((key) => values[key] ? [`${key}=${values[key]}`] : []).join(" ");
@@ -66,6 +75,8 @@ export default function accessGate(pi: ExtensionAPI): void {
         ctx.ui.notify(`Unknown profile: ${selected}`, "error");
         return;
       }
+      // 父档位号随 /profile 切换更新，供后续 spawn 的子代理钳制（D-039）
+      process.env[PARENT_TIER_ENV] = parentTierOf(current.state.getProfile());
       footer?.refresh();
       ctx.ui.notify(`Active profile: ${displayName(selected)}`, "info");
     },
@@ -79,6 +90,16 @@ export default function accessGate(pi: ExtensionAPI): void {
       },
     });
     state = createProfileState(profiles);
+    // 子代理会话（D-039）：pi-subagents env 检测 → 映射档位 + 钳制（生效档 = min(映射档, 父TIER)）
+    if (isSubagentProcess()) {
+      const agent = process.env[SUBAGENT_CHILD_AGENT_ENV];
+      const mapped = resolveSubagentTier(agent, profiles.subagentProfiles);
+      const tier = effectiveSubagentTier(mapped, process.env[PARENT_TIER_ENV]);
+      const profileName = SUBAGENT_TIER_PROFILE[tier];
+      if (profiles.profiles[profileName]) state.set(profileName);
+    }
+    // 父档位号传播：普通会话 = 自身档位号；子代理 = 自身生效档（孙代理继承，链单调）
+    process.env[PARENT_TIER_ENV] = parentTierOf(state.getProfile());
     footer?.dispose();
     footer = installProfileFooter(
       ctx,

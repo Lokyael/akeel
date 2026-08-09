@@ -75,3 +75,17 @@ Guidance 只能从源码内置的静态 `GuidanceId` catalog 映射，不拼接�
 **状态：** by design。
 
 内置命令语义面向 GNU coreutils / GNU git / npm 生态的常用选项建模，平台边界为**仅保证支持 Linux（以 Arch Linux 为基准工具链）**：Windows、macOS、BSD 不在支持范围，不建模其路径语义与选项方言；其他 Linux 发行版的工具链版本差异不在保证范围。选项解析固定按 GNU 语义处理（选项表以 Arch 工具链为准），不提供按平台或发行版检测方言并切换选项表的机制（D-035）。BSD 工具与 GNU 的选项歧义（`stat -f` 为格式参数、`du -d` 在 BSD 无对应、`df -t` 在 BSD 为 flag）在 GNU 语义下可能被误判为位置参数或忽略——BSD 平台上的行为不在承诺范围，不构成残余风险。
+
+## R-17：子代理会话残余风险
+
+**状态：** by design。
+
+pi-keel 在 pi-subagents 子代理会话内只提供路径轴 + shell 分类（D-039），以下边界不消除：
+
+- **内容级**：write 工具仍可写任意**内容**（policy layer 管路径不管内容，同 R-10）；子代理工作区改动靠父会话 git diff 审查。
+- **read-anywhere**：子代理可读全盘，源码内硬编码密钥不在 blocked paths 覆盖范围（只挡 `.env` 类约定文件）。
+- **durable 内容**：`docs/`、`CONTEXT.md` 可被子代理 Direct 写（T1 `project` 档的 `project/**` 写面包含），防中毒靠父会话 git diff。
+- **`/tmp/pi-work` 非隔离**：外部 scope 路径无 symlink-escape 检查（R-02/R-08 范畴），且为 sticky 共享目录；staging scope 真隔离为候选 C-008。
+- **父档位钳制基于 env 快照**：`PI_KEEL_PARENT_TIER` 在 spawn 时快照，已 spawn 的子代理不随父会话 `/profile` 切换变化；父档位号按"写规则覆盖 `project/src`/`project/tests`（或 `project/`）"近似判定——keel-code 类档只授权 src/tests/docs，而 T1 `project` 档为 `project/**` 全写（略宽）。子代理可改写自身进程 env 影响其后代档位（孙代理继承），威胁前提是子代理有 spawn 能力且恶意——钳制是授权语义（防父会话无意放大）非防恶意模型边界，后代产物仍经父会话 git diff 审核。
+- **读面不钳制**：T0/T1 读全盘，父档读面限制（如 keel-plan 只读 project）不传导子代理——侦察结果经输出转述父会话（信息侧信道），依赖显式委派意图与输出可见性。
+- **bash 分类平台假设**：同 R-16（GNU 工具链基准）。

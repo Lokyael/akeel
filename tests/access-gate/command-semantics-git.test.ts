@@ -40,6 +40,11 @@ defineAdapterTests("git", [
     cls: "modify",
   },
   {
+    cmd: ["git branch -m newname", "git branch -M newname", "git branch --move newname", "git branch --rename newname"],
+    name: "branch rename variants are modify",
+    cls: "modify",
+  },
+  {
     cmd: ["git branch", "git branch -a", "git branch --merged main", "git branch --list"],
     name: "branch listing variants stay inspect",
     cls: "inspect",

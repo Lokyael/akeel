@@ -98,6 +98,32 @@
           { "path": "/tmp/**", "read": "allow", "list": "allow", "search": "allow", "write": "allow" }
         ]
       }
+    },
+
+    "keel-subagent-scratch": {
+      "description": "Sub-agent tier T0: read anywhere; write only /tmp/pi-work/. Inspect Shell commands only.",
+      "extends": ["keel-explore"],
+      "shellPolicy": {
+        "modify": "deny",
+        "execute": "deny",
+        "destroy": "deny",
+        "unknown": "deny"
+      },
+      "pathPolicy": {
+        "rules": [
+          { "path": "/tmp/pi-work/**", "read": "allow", "list": "allow", "search": "allow", "write": "allow" }
+        ]
+      }
+    },
+
+    "keel-subagent-project": {
+      "description": "Sub-agent tier T1: read anywhere; write project/** and /tmp/pi-work/. Inspect Shell commands only.",
+      "extends": ["keel-subagent-scratch"],
+      "pathPolicy": {
+        "rules": [
+          { "path": "project/**", "write": "allow" }
+        ]
+      }
     }
   }
 }

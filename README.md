@@ -84,10 +84,12 @@ Recommended third-party packages that pair well with Pi Keel:
 
 | Package | Source | What it adds |
 |---------|--------|--------------|
+| pi-subagents | `npm:pi-subagents` | Sub-agent delegation: parallel tasks, chains, async runs, and supervisor review. Children load Pi Keel's gate automatically (ambient extensions), and Pi Keel manages sub-agent permissions via tiered sub-agent Profiles (see [D-039](docs/decisions.md#d-039-子代理档位制pi-keel--pi-subagents) and [T-051](docs/task.md))
 | pi-search | `npm:@heyhuynhgiabuu/pi-search` | Research tools for the agent: web search, code search, library docs, repo Q&A, URL fetching, and Firecrawl scraping/crawling |
-| pi-sticky-input | `npm:pi-sticky-input` | Keeps chat input, status widgets, and footer controls anchored while session history updates |
+| pi-sticky-input | `npm:pi-sticky-input` | Keeps chat input, status widgets, and footer anchors anchored while session history updates |
 
 ```bash
+pi install npm:pi-subagents
 pi install npm:@heyhuynhgiabuu/pi-search
 pi install npm:pi-sticky-input
 ```

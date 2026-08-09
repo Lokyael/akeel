@@ -1,82 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import accessGate from "../../src/access-gate/index";
-import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import { startSession, type Footer, type Harness } from "./harness";
 
-type Footer = { render(width: number): string[] };
-type FooterFactory = (
-  tui: { requestRender(): void },
-  theme: { fg(color: string, text: string): string },
-  footerData: { getGitBranch(): string | null },
-) => Footer;
-
-function createHarness(root: string) {
-  const commands = new Map<string, (args: string, ctx: ExtensionContext) => Promise<void>>();
-  type Handler = (event: unknown, ctx: ExtensionContext) => Promise<unknown>;
-  const handlers = new Map<string, Handler>();
-  let footerFactory: FooterFactory | undefined;
-  let renderRequests = 0;
-  const notifications: { message: string; level: string }[] = [];
-  const sessionManager = {
-    getSessionId: () => "test-session",
-    getCwd: () => root,
-    getSessionName: () => undefined,
-    getEntries: () => [],
-    buildContextEntries: () => [],
-  };
-  const pi = {
-    registerCommand(name: string, options: { handler: (args: string, ctx: ExtensionContext) => Promise<void> }) {
-      commands.set(name, options.handler);
-    },
-    on(event: string, handler: Handler) {
-      handlers.set(event, handler);
-    },
-  } as unknown as ExtensionAPI;
-  const ctx = {
-    cwd: root,
-    hasUI: true,
-    sessionManager,
-    ui: {
-      select: async () => undefined,
-      notify: (message: string, level: string) => { notifications.push({ message, level }); },
-      setFooter: (factory: FooterFactory | undefined) => {
-        footerFactory = factory;
-      },
-      getContextUsage: () => ({ percent: 35.2, contextWindow: 272000 }),
-    },
-  } as unknown as ExtensionContext;
-
-  return {
-    commands,
-    handlers,
-    ctx,
-    startFooter(): Footer {
-      assert.ok(footerFactory);
-      return footerFactory(
-        { requestRender: () => renderRequests++ },
-        { fg: (_color, text) => text },
-        { getGitBranch: () => "main" },
-      );
-    },
-    getRenderRequests: () => renderRequests,
-    getNotifications: () => notifications,
-    pi,
-  };
-}
-
-/** Create a harness, start a session, and return the harness + footer. */
-function startSession() {
-  const root = mkdtempSync(join(tmpdir(), "pi-access-index-"));
-  const harness = createHarness(root);
-  const cleanup = () => rmSync(root, { recursive: true, force: true });
-  accessGate(harness.pi);
-  return { harness, root, cleanup };
-}
-
-async function startSessionWithFooter(): Promise<{ harness: ReturnType<typeof createHarness>; footer: Footer; cleanup: () => void }> {
+async function startSessionWithFooter(): Promise<{ harness: Harness; footer: Footer; cleanup: () => void }> {
   const { harness, cleanup } = startSession();
   await harness.handlers.get("session_start")!(undefined, harness.ctx);
   const footer = harness.startFooter();

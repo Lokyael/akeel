@@ -24,6 +24,39 @@ test("validates a profile with a description and complete policies", () => {
   assert.equal(result.ok, true);
 });
 
+test("accepts subagentProfiles with tier names scratch/project", () => {
+  const result = validateProfiles({
+    profiles: { "keel-read": base },
+    subagentProfiles: { worker: "project", "*": "scratch" },
+  });
+  assert.equal(result.ok, true);
+});
+
+test("rejects subagentProfiles with an unknown tier value", () => {
+  const result = validateProfiles({
+    profiles: { "keel-read": base },
+    subagentProfiles: { worker: "admin" },
+  });
+  assert.equal(result.ok, false);
+});
+
+test("rejects subagentProfiles with an empty agent name", () => {
+  const result = validateProfiles({
+    profiles: { "keel-read": base },
+    subagentProfiles: { "": "project" },
+  });
+  assert.equal(result.ok, false);
+});
+
+test("resolveProfiles carries subagentProfiles through", () => {
+  const result = resolveProfiles({
+    profiles: { "keel-read": base },
+    subagentProfiles: { worker: "scratch" },
+  });
+  assert.ok(result.ok);
+  assert.deepEqual(result.value.subagentProfiles, { worker: "scratch" });
+});
+
 test("rejects an unknown profile field and invalid decision", () => {
   const result = validateProfiles({
     profiles: {

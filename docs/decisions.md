@@ -491,4 +491,48 @@ reclassify:
 - **Native FooterComponent 直接构造**（未文档公开的宿主内部 API）：现有行为，不在本次范围。
 - **其他 pi-tui 组件与 API 接入**。
 
-## D-039: 待创建
+## D-039: 子代理档位制（pi-keel × pi-subagents）
+
+**Status:** active
+
+**Decision:** pi-keel 用**档位**（tier）抽象管理 pi-subagents 子代理会话的权限，共两档，差异仅在 Direct 写面（读均全盘、shellPolicy 两档一致）：
+
+| 档位 | 档位名 | profile | Direct 写面 |
+|---|---|---|---|
+| T0 | `scratch` | `keel-subagent-scratch` | 仅 `/tmp/pi-work/**`（不碰项目） |
+| T1 | `project` | `keel-subagent-project` | `project/**` + `/tmp/pi-work/**` |
+
+两档 shellPolicy 相同：inspect=allow，modify/execute/destroy/unknown=deny（bash 重定向写走路径策略）。bash 工具保留仅限 T1 档 agent（worker/reviewer/delegate）；T0 档 agent 必须无 mutation 工具（write/edit/bash）——pi-subagents `hasMutationToolCapability` 判定工具表存在任何非只读集工具即 mutation-capable，输出指令随之改为"自写 output 文件"（项目根），与 T0 路径策略矛盾（被指令写却写不了）；故 scout 删 write+bash（工具表剩 {read,grep,find,ls} ⊆ 只读集），output 契约走 runtime 持久化分支；researcher 原生即无。`session_start` 检测 `PI_SUBAGENT_CHILD=1` 与 `PI_SUBAGENT_CHILD_AGENT=<agent名>`，将子代理会话初始化为按 agent 映射的档位：worker/delegate/reviewer→`project`，scout/researcher/oracle/未知→`scratch`。`profiles.json` 可选根键 `subagentProfiles`（agent 名→档位名 `scratch`/`project`，`"*"` 回退）覆盖内置映射，优先级 显式 > 内置 > `*`。父会话档位号经 `PI_KEEL_PARENT_TIER`（`"0"`/`"1"`）env 传播给子代理（父侧 session_start 与 `/profile` 切换时按自身 pathPolicy 算好，子代理零解析）：父档位号 1 = 父 profile 的 pathPolicy 存在写规则覆盖 `project/src`、`project/tests` 或 `project/`（项目可写档），否则 0；子代理生效档 = min(映射档, 父TIER)——两档下即"父非项目可写 → 一律回退 T0 scratch"。**子代理权限上限 = 父会话当前档位**（宽子代理不接受窄父代理调用）。
+
+**Why:**
+- 子代理是非交互 `pi --mode json -p` 子进程且默认加载全局扩展（pi-subagents `disableAmbientExtensions` 默认 false），pi-keel 在其内生效；profile 选择是 session 内存态 → 子代理吃 `defaultProfile`（keel-plan）→ modify=ask 非交互硬 block（无 UI 时 `askOnce` 返回 approval-required）、execute=deny → worker 无法实现与验证，scout/researcher 的 output 契约破裂（有 write 工具的子代理被指令自己写 `context.md`@项目根，keel-plan 路径策略拦截）。
+- pi-subagents 原生 permissions 只有工具名粒度（write=allow 全盘写）、硬编码拒绝配置 bash（"leaves bash policy to pi-guard"）、ask 走 child watchdog 模型仲裁（非用户批准）——补不了路径轴，也不能表达"bash 只读用法"。
+- 委派提权原则：父会话窄档（keel-plan 不写 src）不应能委派出宽子代理（可写 src）；父档位即授权上限。
+- 嵌套子代理单调：子代理内 pi-keel 将自身（clamp 后）档位写回 env，孙代理 ≤ 子代理 ≤ 父会话。
+
+**Impact:**
+- 两个内置 profile（档位 T0/T1，shell+path 双轴）；`subagentProfiles` 覆盖键（validate.ts ROOT_KEYS + 值须为档位名 `scratch`/`project`）；`session_start` env 检测初始化；`PI_KEEL_PARENT_TIER` 传播（父侧算档位号，子代理零解析）+ 生效档 = min(映射档, 父TIER)。
+- 用户侧配置：scout overrides 删 write+bash（工具表剩只读集）；researcher 原生无 mutation 工具不动。
+- 子代理内审核零设施：无 ask（profile 全 deny/allow）、无模型仲裁、无审计记录；deny + guidance → 子代理经 `contact_supervisor` 升级 → 父会话人审（裁决 + git diff 后 commit）。
+- 操作规则：委派实现工作需父会话处于项目可写档（keel-code/keel-subagent-project/自定义可写档）；默认 keel-plan 下委派 = 子代理 T0 scratch。
+- 未装 pi-subagents 时（env 缺失）零行为变化；env 缺失 fail-closed 回退 T0 scratch。
+- `git.ts` 附带修复 `branch -m/-M` 分类缺口（inspect 负向断言漏排除重命名分支，子代理 deny 姿态下可被利用）。
+
+**Rejected:**
+- **纯原生方案（pi-keel 不进子代理，agent `extensions: []` + 原生 permissions）**：无路径级限制——write=allow 全盘（`.env`、`~/.ssh`、`.git/hooks` 可写，hooks 注入 = 供应链向量）；bash 无政策（裸奔或装 pi-guard）。拒绝。
+- **删 bash 工具（全量）**：子代理失去 git inspect（status/diff/log）与 shell 管道能力；5/6 内置 agent 原生设计含 bash。曾暂采纳后撤回。拒绝。（T0 档 agent 无 bash 系输出契约机制强制，见 Decision，非本条目范畴。）
+- **统一 profile（非 per-agent）**：只读 agent 被授予项目写权；per-agent 差异只在路径轴（shell 轴两档相同）。拒绝。
+- **子代理内审核设施（审计 JSONL / watchdog 模型仲裁 ask）**：审核收敛到配置时声明 + 父会话人审，子代理内零设施。拒绝。
+- **全量 profile 继承传播（父档完整策略序列化给子代理）**：钳制用 env 快照（档位名）+ 档位比较即可，不做完整策略传输。拒绝。
+
+**Out of Scope:**
+- **staging scope scratch**（gate 自建 0700 目录的真隔离 scratch）：`/tmp/pi-work` 是约定非隔离（外部 scope 无 symlink 检查）；候选 C-008。
+- **execute 档（T2，档位名未定）**（子代理可跑测试/构建）：execute=deny 冻结；若 prototype 证明 worker 验证摩擦不可接受再开；候选 C-009。
+- **docs/CONTEXT.md 写保护**（durable 内容防中毒）：默认不做，靠父会话 git diff；用户可 profiles.json 自加规则；候选 C-010。
+- **pi-guard 共存说明**：装了 pi-keel 不需 pi-guard（pi-keel 即官方期望的 bash guard 角色）；候选 C-011。
+- **原生 permissions 默认配置**：工具表即工具层；原生 permissions 仅作角落能力（门控 pi-keel passthrough 工具）。
+- **profile 选择持久化**：`/profile` 仍 session 内存态；钳制用 env 快照而非全量传播。
+- **worktree 隔离模式**（`worktree: true` 并行突变通道，用户显式选择）：子代理改动在独立 worktree，父会话 git diff 审核不适用；走 pi-subagents 原生 patch 捕获审查（capturedDiffs → 用户审 patch → 手动 `git apply`）。
+- **子代理内审计设施**：不引入。
+
+## D-040: 待创建

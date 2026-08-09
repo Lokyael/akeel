@@ -2,11 +2,13 @@ import type { RawProfiles, ValidationResult } from "./types";
 import { COMMAND_CLASS_SET, COMMAND_CLASS_VALUES, DECISION_SET, PATH_OPERATION_SET } from "../domain";
 import type { CommandClass, ProfileDecision, PathOperation } from "../domain";
 import { isRecord } from "../util";
+import { SUBAGENT_TIER_NAMES } from "./tiers";
 
 const PROFILE_KEYS = new Set(["description", "extends", "shellPolicy", "pathPolicy"]);
-const ROOT_KEYS = new Set(["defaultProfile", "profiles"]);
+const ROOT_KEYS = new Set(["defaultProfile", "profiles", "subagentProfiles"]);
 const PATH_POLICY_KEYS = new Set(["default", "rules"]);
 const RESERVED_KEYS = new Set(["__proto__", "constructor", "prototype"]);
+const SUBAGENT_TIER_NAMES_SET = new Set<string>(SUBAGENT_TIER_NAMES);
 const MAX_PROFILES = 128;
 const MAX_RULES = 512;
 const MAX_PATTERN_LENGTH = 512;
@@ -92,6 +94,17 @@ export function validateProfiles(value: unknown): ValidationResult<RawProfiles> 
   }
   if (root.defaultProfile !== undefined && (typeof root.defaultProfile !== "string" || !Object.hasOwn(root.profiles, root.defaultProfile))) {
     return fail("defaultProfile must reference an existing profile");
+  }
+  if (root.subagentProfiles !== undefined) {
+    if (!isRecord(root.subagentProfiles) || Object.keys(root.subagentProfiles).length === 0) {
+      return fail("subagentProfiles must be a non-empty object");
+    }
+    for (const [agent, tier] of Object.entries(root.subagentProfiles)) {
+      if (RESERVED_KEYS.has(agent) || agent.trim() === "") return fail("subagentProfiles agent name is invalid");
+      if (typeof tier !== "string" || !SUBAGENT_TIER_NAMES_SET.has(tier)) {
+        return fail(`subagentProfiles['${agent}'] must be 'scratch' or 'project'`);
+      }
+    }
   }
   return { ok: true, value: structuredClone(value) as RawProfiles };
 }
