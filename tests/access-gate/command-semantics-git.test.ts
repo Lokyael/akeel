@@ -11,6 +11,8 @@ defineAdapterTests("git", [
   { cmd: "git checkout -- src/file.ts", name: "checkout -- writes path", cls: "modify", intents: [{ operation: "write", rawPath: "src/file.ts" }] },
   { cmd: "git clone https://example.test/repo", name: "clone is modify", cls: "modify" },
   { cmd: "git push --force origin main", name: "push --force is destroy", cls: "destroy" },
+  { cmd: "git push --force-with-lease origin main", name: "push --force-with-lease stays destroy via prefix match", cls: "destroy" },
+  { cmd: "git archive --output-directory=x HEAD", name: "archive --output-directory prefix over-matches to modify (fail-safe)", cls: "modify" },
   { cmd: "git -C /repo status", name: "-C option adds list intent", cls: "inspect", intents: [{ operation: "list", rawPath: "/repo" }] },
   { cmd: "git --git-dir=/srv/repo status", name: "--git-dir adds a list intent", cls: "inspect", intents: [{ operation: "list", rawPath: "/srv/repo" }] },
   {
@@ -84,6 +86,8 @@ defineAdapterTests("git", [
   // F4: 裸 git stash 与带消息的 stash 会改动工作树
   { cmd: "git stash", name: "bare stash is modify", cls: "modify" },
   { cmd: "git stash -m wip", name: "stash with message is modify", cls: "modify" },
+  { cmd: "git stash --help", name: "stash --help is inspect", cls: "inspect", opaque: false },
+  { cmd: "git help commit", name: "git help subcommand is inspect", cls: "inspect", opaque: false },
   { cmd: "git clean -n", name: "clean dry-run is inspect", cls: "inspect" },
   { cmd: "git clean --dry-run", name: "clean --dry-run is inspect", cls: "inspect" },
   { cmd: "git clean -fd", name: "clean -fd is destroy", cls: "destroy" },

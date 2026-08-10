@@ -4,7 +4,7 @@
 
 import type { ShellCommandNode } from "../../shell-parse/types";
 import type { CommandAdapter, CommandSemantics, PathIntent, SemanticContext } from "../types";
-import { makeSemantics } from "./shared";
+import { makeSemantics, SYNTHETIC_SPAN } from "./shared";
 
 /** 取值选项：值被消费，不产生路径 intent（-d/--date 的值是时间字符串）。 */
 const VALUE_OPTS = new Set(["-d", "--date"]);
@@ -14,8 +14,6 @@ const FILE_VALUE_OPTS = new Set(["-r", "--reference", "-f", "--file"]);
 const SET_OPTS = new Set(["-s", "--set"]);
 /** 无值标志。 */
 const FLAG_OPTS = new Set(["-u", "-R", "-I", "--utc", "--universal", "--rfc-822", "--iso-8601", "--version", "--help"]);
-
-const SYNTHETIC_SPAN = { start: 0, end: 0 };
 
 function readIntent(rawPath: string): PathIntent {
   return { operation: "read", rawPath, source: "option", span: SYNTHETIC_SPAN, confidence: "conservative" };

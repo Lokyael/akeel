@@ -10,7 +10,7 @@ import { basename, join } from "node:path";
 import { parse as parseYaml } from "yaml";
 import type { CommandClass, CommandSemantics, Effect } from "./types";
 import type { ShellArg } from "../shell-parse/types";
-import { firstSubcommand, fullSubcommand, makeSemantics } from "./adapters/shared";
+import { firstSubcommand, fullSubcommand, makeSemantics, SYNTHETIC_SPAN } from "./adapters/shared";
 import { COMMAND_CLASS_SET } from "../domain";
 import { getAgentDir } from "../agent-dir";
 
@@ -190,6 +190,6 @@ export function aliasNode(
   executable: ShellArg | null,
   targetName: string,
 ): ShellArg | null {
-  if (!executable) return { value: targetName, dynamic: false, span: { start: 0, end: 0 }, quoted: false, raw: targetName };
+  if (!executable) return { value: targetName, dynamic: false, span: SYNTHETIC_SPAN, quoted: false, raw: targetName };
   return { ...executable, value: targetName };
 }

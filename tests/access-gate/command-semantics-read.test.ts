@@ -11,6 +11,7 @@ defineAdapterTests("read", [
   { cmd: "cat - file.txt", name: "cat - skips stdin and keeps files", cls: "inspect", intents: [{ operation: "read", rawPath: "file.txt" }] },
   { cmd: "tail --lines=5 file.txt", name: "tail skips line-count values and checks files", cls: "inspect", intents: [{ operation: "read", rawPath: "file.txt" }] },
   { cmd: "wc -l file.txt", name: "wc checks files after flags", cls: "inspect", intents: [{ operation: "read", rawPath: "file.txt" }] },
+  { cmd: "wc --bogus file.txt", name: "wc unknown option is opaque (tightened)", cls: "inspect", opaque: true },
   { cmd: "cut -d : -f 1 /etc/passwd", name: "cut skips delimiter and field values", cls: "inspect", intents: [{ operation: "read", rawPath: "/etc/passwd" }] },
   { cmd: "diff -u a.txt b.txt", name: "diff reads both files", cls: "inspect", intents: [{ operation: "read", rawPath: "a.txt" }, { operation: "read", rawPath: "b.txt" }] },
   { cmd: "less notes.md", name: "less reads the file", cls: "inspect", intents: [{ operation: "read", rawPath: "notes.md" }] },

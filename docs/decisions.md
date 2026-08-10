@@ -535,4 +535,40 @@ reclassify:
 - **worktree 隔离模式**（`worktree: true` 并行突变通道，用户显式选择）：子代理改动在独立 worktree，父会话 git diff 审核不适用；走 pi-subagents 原生 patch 捕获审查（capturedDiffs → 用户审 patch → 手动 `git apply`）。
 - **子代理内审计设施**：不引入。
 
-## D-040: 待创建
+## D-040: 命令语义分类 token 化与统一选项引擎（GIT_CLASSIFY + option-parse）
+
+**Kind:** architecture
+
+**Status:** adopted
+
+**Origin:** T-054（Security Review 残余风险）+ architecture review（command-semantics 深化）
+
+**Context:**
+- git 子命令分类用「join 成字符串 + 正则」匹配：丢失 token 边界，需 5 处负前瞻、`\s-` 锚定、`-c` 手工跳过补偿；`-oFILE` 附着形式曾因 `\b` 失配落 inspect（写出路径绕过路径策略的安全漏洞，T-054 F1 同族）。
+- 「选项取值消费」被 6 个模块各自实现（text-transform.parseOptions / search 循环 / shared.extractPositionalArgs / git.writeOutputArgs / config-parse / filesystem-read），边界语义分裂：未知选项有的置 opaque（编译器硬拒）有的静默；`-name "-delete"` 曾因 raw args 标志扫描与取值消费不同步误升级 modify（T-054 F2）。
+- 值性质（D-027）与位置参数性质（T-045）已有决策词汇但分散在各 walker 内。
+
+**Decision:**
+1. **GIT_CLASSIFY 表（token 级）**：git.ts 的 49 条正则 pattern 改为声明式数据表 `{ cmd, cls, upgrade?/downgrade?{flags,to,paths?}, paths?, reason }`——首 token 匹配 + 选项调节（升级优先，fail-closed）。负前瞻/锚定/`-c` 跳过删除；finder 保留 `-C`/`-c`/`--git-dir` 跳过（token 正确性必需）。调节 flag 支持 `prefix` 匹配（`-o` 命中 `-oFILE`；`--force` 命中 `--force-with-lease`）。
+2. **子命令族入 parser 注册表**：stash/bundle（多 class 族）从表迁入 `GIT_SUBCOMMAND_PARSERS`（与 config/branch 对齐），parser 签名统一 token 化 `(tokens, subArgs, pathIntents)`。表与注册表的边界由数据形状决定（单 class 行 → 表；多 class 族 → parser）。
+3. **统一选项引擎 option-parse**：`parseOptions(args, schema)` 深模块，收敛 text-transform/search/shared.extractPositionalArgs/git.writeOutputArgs 四套遍历；schema 制度化 D-027（`kind: file|expression|flag`）与 T-045（`positional: file|program-first|set`），`forms` 集合表达分离/等号/短附着/无值后缀四形态（跨名差异拆条），`consumeUntil` 表达 `-exec` 终止符消费（区内 token 标记 consumed）。
+4. **opaque 策略显式化（opaqueOnUnknown）**：未知选项策略由命令级字段显式声明，消除隐式分裂。text-transform/search/filesystem/read → true（收紧：未知选项 opaque 硬拒，堵 `-okdir` 类未建模破坏项）；git 的 `-o` 提取 → false（子集提取，`--format` 等合法选项静默）。为落实收紧，search/fs/read 的**高频 flag 全部建模**（find `-print`/`-o`、cp `-r`、rm `-rf`、wc `-l` 等），否则日常命令被误拒。
+5. **config-parse 独立**：读写轴 + 配置目标解析是分类策略领域（非值消费遍历），不并入引擎（B1 决策）。
+
+**Consequences:**
+- 行为收紧（有意）：fs/read/search 的未知选项从静默 → opaque 拒（如 `cp -z`、`wc --bogus`、`grep --bogus-flag`）；`-ne` 类 cluster 从 opaque → 正确解析（尾随带值语义）。
+- overrides 层（用户 YAML reclassify 的 `fullSubcommand` 字符串匹配）不动（D-024 已知局限，独立表面）。
+- 新增回归测试：`-oFILE` 四形式、`--force-with-lease` prefix、`--output-directory` 前缀误伤 fail-safe、`find -okdir` 堵洞、`cp -r`/`rm -rf`/`find -print` 建模不误拒、`-ne` 解析。npm test 713 全绿。
+
+**Rejected:**
+- 谓词函数 pattern（49 个闭包各写样板，表与 parser 注册表形态趋同诱发合并冲动）。
+- 声明式迷你语言（fields 化不区分升级/降级/子命令族三种语义，组合规则模糊）。
+- 全解析器化（49 个 token 解析器太碎）。
+- config-parse 并入引擎（引擎需输出每 token 分类的复杂结构，收益不抵）。
+
+**Out of Scope:**
+- `git -c`/`-C` 之外的 git 全局选项（`--no-pager` 等）token 化；现行为不变。
+- overrides 层 reclassify 的字符串 pattern 迁移到 token 级（用户 YAML 兼容性，D-024）。
+- `git stash --help` 类分类修正（过拒方向，fail-safe，未立项）。
+
+## D-041: 待创建

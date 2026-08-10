@@ -58,4 +58,19 @@
 - **R2 `git -c key=val`**：subcommand finder 跳过 `-c` 及其值（附着形式 `-ckey=val` 原已跳过）；分类正确化，最终决策仍由 class + path policy 门控，无逃逸面。
 - **R3 `git format-patch`/`bundle`**：format-patch → modify（`-o/--output-directory` write intent，无 `-o` 时 cwd fallback）；bundle create → modify + 文件 write intent，verify/list/header → inspect，unpack → modify。`archiveOutputPaths` 泛化为 `writeOutputArgs`（分离/等号/短附着三形式）供 archive 与 format-patch 复用。
 
+### Security Review 2（deff587...ec84047，D-040 A/B 架构深化）
+
+**结论：无未处理的 HIGH findings（≥8 置信度），Gate 通过。D-040 为净收紧。**
+
+- GIT_CLASSIFY token 级匹配（D-040）：`-oFILE` 类写出逃逸结构性消除（不再 join 字符串），`--force-with-lease` prefix → destroy、`reset HEAD --hard` token 级命中；upgrade 优先 fail-closed；无匹配 → opaque。
+- option-parse 引擎：破坏性检测（-delete/-execdir/-okdir 新建模堵洞）→ flag+write → sawWrite → modify；`-exec` 区内 token 不参与 flags（正确）；fs/read opaque 传递 bug 被收紧测试当场捕获并修复。
+- opaqueOnUnknown 收紧（search/fs/read true）：未知选项静默 → opaque 硬拒（`cp -z`/`wc --bogus`/`grep --bogus-flag` 锁定）；高频 flag 全建模避免日常误拒（`cp -r`/`rm -rf`/`find -print`/`wc -l` 锁定）；git 子集提取 false。
+- 类别：SQLi/XSS/反序列化/加密/模板不适用；无 eval/拼接；secrets 零命中；路径遍历由 path/policy 统一裁决（未改）。
+- 残余风险（前存在，非本 diff 引入，fail-safe 方向）：`dd if=/of=` 目标未建模（cwd fallback 兜底）、`git stash --help` 过拒。
+
+#### 残余风险处理（后续变更集）
+
+- **R4 `dd if=/of=` 读写目标建模**：dd 的 key=value 参数（不以 `-` 开头，引擎当位置参数）在 adapter 层提取——`of=` → write intent、`if=` → read intent，其余（bs/count/skip）忽略。写目标不再依赖 cwd fallback。
+- **R5 `git stash --help` / `git help <cmd>` 过拒**：stash parser 识别 `--help`/`-h`/`--version` → inspect；`help` 加入 GIT_CLASSIFY（inspect）。
+
 ## T-055: 待创建

@@ -39,9 +39,15 @@ defineAdapterTests("fs", [
   { cmd: "install -vd /tmp/build", name: "install -vd flag cluster keeps directory write intents", cls: "modify", intents: [{ operation: "write", rawPath: "/tmp/build" }] },
   { cmd: "mktemp -d", name: "mktemp is modify without opaque", cls: "modify", opaque: false, intents: [] },
   { cmd: "shred -u secret.txt", name: "shred is destroy", cls: "destroy", intents: [{ operation: "write", rawPath: "secret.txt" }] },
-  { cmd: "dd if=/dev/zero of=out.bin bs=1M count=1", name: "dd is modify without opaque", cls: "modify", opaque: false, intents: [] },
+  { cmd: "dd if=/dev/zero of=out.bin bs=1M count=1", name: "dd extracts if=/of= read/write intents", cls: "modify", opaque: false, intents: [{ operation: "read", rawPath: "/dev/zero" }, { operation: "write", rawPath: "out.bin" }] },
+  { cmd: "dd if=/dev/null of=/tmp/x", name: "dd of= target writes the output path", cls: "modify", intents: [{ operation: "read", rawPath: "/dev/null" }, { operation: "write", rawPath: "/tmp/x" }] },
+  { cmd: "dd bs=1M count=1", name: "dd without if=/of= has no path intents", cls: "modify", opaque: false, intents: [] },
   { cmd: "rm -rf build/", name: "rm -rf filters flags and keeps the path", cls: "modify", effects: ["delete"], intents: [{ operation: "write", rawPath: "build/" }] },
   { cmd: "cp source.ts", name: "cp with a single arg has no path intents", cls: "modify", intents: [] },
+  // B 候选：opaqueOnUnknown 收紧——未知选项 → opaque；高频 flag 建模不误拒
+  { cmd: "cp -z a b", name: "cp unknown option is opaque (tightened)", cls: "modify", opaque: true },
+  { cmd: "cp -r src dst", name: "cp -r common flag stays non-opaque", cls: "modify", opaque: false, intents: [{ operation: "read", rawPath: "src" }, { operation: "write", rawPath: "dst" }] },
+  { cmd: "rm -rf build/", name: "rm -rf flags stay non-opaque", cls: "modify", opaque: false, effects: ["delete"], intents: [{ operation: "write", rawPath: "build/" }] },
   // ── 同类问题修复：选项表补全（-t/--reference/-m/-n 值消费与目标语义） ──
   { cmd: "cp -t /tmp src.txt", name: "cp -t writes target directory", cls: "modify", intents: [{ operation: "read", rawPath: "src.txt" }, { operation: "write", rawPath: "/tmp" }] },
   { cmd: "cp -rt /tmp src.txt", name: "cp flag cluster with trailing -t consumes the target directory", cls: "modify", intents: [{ operation: "read", rawPath: "src.txt" }, { operation: "write", rawPath: "/tmp" }] },

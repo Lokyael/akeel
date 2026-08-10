@@ -2,75 +2,86 @@
 
 import type { ShellCommandNode, ShellArg } from "../../shell-parse/types";
 import type { CommandAdapter, CommandSemantics, Effect, PathIntent, SemanticContext } from "../types";
-import { makeSemantics, optionIntent } from "./shared";
+import { makeSemantics, optionIntent, consumedFileIntents, SYNTHETIC_SPAN } from "./shared";
+import { parseOptions, type Opt } from "./option-parse";
 import { parseConfigOptions, type ConfigOptionTable, type ConfigTarget } from "./config-parse";
 
 /** Git 子命令分类。 */
 type GitClass = "inspect" | "modify" | "destroy";
 
-interface GitDef {
+/** 调节标志：prefix 匹配（-o 命中 -oFILE；--force 命中 --force-with-lease，A2 确认）。 */
+interface GitFlagSpec {
+  name: string;
+  prefix?: boolean;
+}
+
+/**
+ * 分类声明表（A 候选，token 级）：每条 = 一个子命令（cmd 集合）的基础分类 +
+ * 选项调节（upgrade/downgrade，升级优先 fail-closed）。表序无关（每 cmd 仅一行）；
+ * 多 class 子命令族（stash/bundle/config/branch）在 GIT_SUBCOMMAND_PARSERS。
+ */
+interface GitClassifyDef {
+  cmd: string | readonly string[];
   cls: GitClass;
-  pattern: (subcmd: string) => boolean;
-  paths?: (args: ShellArg[]) => { op: "read" | "write" | "list"; value: string }[];
+  upgrade?: {
+    flags: readonly GitFlagSpec[];
+    to: "modify" | "destroy";
+    reason?: string;
+    paths?: (args: readonly ShellArg[]) => { op: "read" | "write" | "list"; value: string }[];
+  };
+  downgrade?: {
+    flags: readonly GitFlagSpec[];
+    to: "inspect";
+    reason?: string;
+  };
+  paths?: (args: readonly ShellArg[]) => { op: "read" | "write" | "list"; value: string }[];
   reason: string;
 }
 
-const GIT_CMDS: GitDef[] = [
-  { cls: "inspect", pattern: (s) => /^status\b/.test(s), reason: "show working tree status" },
-  { cls: "inspect", pattern: (s) => /^diff\b/.test(s), reason: "show changes" },
-  { cls: "inspect", pattern: (s) => /^log\b/.test(s), reason: "show commit logs" },
-  { cls: "inspect", pattern: (s) => /^rev-list\b/.test(s), reason: "list reachable commits" },
-  { cls: "inspect", pattern: (s) => /^clean\b.*(-n|--dry-run)\b/.test(s), reason: "preview untracked files" },
-  { cls: "inspect", pattern: (s) => /^show\b/.test(s), reason: "show objects" },
-  { cls: "inspect", pattern: (s) => /^grep\b/.test(s), reason: "search commit contents" },
-  { cls: "inspect", pattern: (s) => /^blame\b/.test(s), reason: "show file blame" },
-  { cls: "inspect", pattern: (s) => /^stash\s+(list|show)\b/.test(s), reason: "list/show stashes" },
-  { cls: "inspect", pattern: (s) => /^ls-files\b/.test(s), reason: "list tracked files" },
-  { cls: "inspect", pattern: (s) => /^ls-tree\b/.test(s), reason: "list tree contents" },
-  { cls: "inspect", pattern: (s) => /^ls-remote\b/.test(s), reason: "list remote refs" },
-  { cls: "inspect", pattern: (s) => /^fsck\b/.test(s), reason: "verify repository integrity" },
-  { cls: "inspect", pattern: (s) => /^archive\b(?!.*(?:\s-o(?:\b|[^\s-])|\s--output\b))/.test(s), reason: "create repository archive" },
-  { cls: "inspect", pattern: (s) => /^describe\b/.test(s), reason: "describe commit" },
-  { cls: "inspect", pattern: (s) => /^bundle\s+(?:verify|list|header)\b/.test(s), reason: "inspect bundle" },
-  { cls: "inspect", pattern: (s) => /^check-attr\b/.test(s), reason: "query gitattributes attributes" },
-  { cls: "inspect", pattern: (s) => /^check-ignore\b/.test(s), reason: "query gitignore rules" },
-  { cls: "modify", pattern: (s) => /^add\b/.test(s), paths: (args) => positionalArgs(args).map((a) => ({ op: "read" as const, value: a.value ?? "" })), reason: "stage files" },
-  { cls: "modify", pattern: (s) => /^rm\b/.test(s), paths: (args) => positionalArgs(args).map((a) => ({ op: "write" as const, value: a.value ?? "" })), reason: "remove tracked files" },
-  { cls: "modify", pattern: (s) => /^commit\b/.test(s), reason: "record changes" },
-  { cls: "modify", pattern: (s) => /^push\b(?!.*(-f|--force)\b)/.test(s), reason: "push to remote" },
-  { cls: "modify", pattern: (s) => /^(checkout|switch)\b/.test(s), paths: (args) => { const idx = args.findIndex((a) => a.value === "--"); return idx >= 0 ? args.slice(idx + 1).map((a) => ({ op: "write" as const, value: a.value ?? "" })) : []; }, reason: "switch branch/restore files" },
-  { cls: "modify", pattern: (s) => /^restore\b/.test(s), paths: (args) => positionalArgs(args).map((a) => ({ op: "write" as const, value: a.value ?? "" })), reason: "restore files" },
-  { cls: "modify", pattern: (s) => /^merge\b/.test(s), reason: "merge branches" },
-  { cls: "modify", pattern: (s) => /^rebase\b/.test(s), reason: "rebase commits" },
-  { cls: "modify", pattern: (s) => /^tag\b/.test(s), reason: "create/list/delete tags" },
-  { cls: "modify", pattern: (s) => /^stash\s+(push|save|pop|apply|drop)\b/.test(s), reason: "modify stash" },
-  // F4: 裸 stash 或未知 stash 子命令（-m/-u/branch 等）都会改动工作树 → modify；
-  // 已知子命令（list/show/push/save/pop/apply/drop/clear）由前面条目与 destroy 条目承接
-  { cls: "modify", pattern: (s) => /^stash\b(?!\s+(?:list|show|push|save|pop|apply|drop|clear)\b)/.test(s), reason: "stash working tree changes" },
-  // R3: git bundle — create/unpack 写对象库/文件；verify/list/header 只读
-  { cls: "modify", pattern: (s) => /^bundle\s+create\b/.test(s), paths: (args) => bundleCreateFile(args), reason: "create bundle" },
-  { cls: "modify", pattern: (s) => /^bundle\s+unpack\b/.test(s), reason: "unpack bundle" },
-  // F1: git archive -o/--output 写输出文件 → modify + 输出路径 intent（否则 inspect 允许时写出路径绕过路径策略）。
-  // `\s-` 前缀锚定：只匹配选项 token，避免子串误匹配（如分支名 my-obranch）。
-  // -o 附着形式（-oFILE）无词边界，需 `[^\s-]` 分支承接。
-  { cls: "modify", pattern: (s) => /^archive\b.*(?:\s-o(?:\b|[^\s-])|\s--output\b)/.test(s), paths: (args) => writeOutputArgs(args, ["-o", "--output"], ["--output"], ["-o"]), reason: "write repository archive to file" },
-  // R3: git format-patch 生成补丁文件（-o/--output-directory 目录；无 -o 时写 cwd，由保守 cwd fallback 承接）
-  { cls: "modify", pattern: (s) => /^format-patch\b/.test(s), paths: (args) => writeOutputArgs(args, ["-o", "--output-directory"], ["--output-directory"], ["-o"]), reason: "generate patch files" },
-  { cls: "modify", pattern: (s) => /^reset\b(?!.*--hard\b)/.test(s), reason: "reset HEAD" },
-  { cls: "modify", pattern: (s) => /^fetch\b/.test(s), reason: "fetch from remote" },
-  { cls: "modify", pattern: (s) => /^pull\b/.test(s), reason: "pull from remote" },
-  { cls: "modify", pattern: (s) => /^clone\b/.test(s), reason: "clone repository" },
-  { cls: "modify", pattern: (s) => /^init\b/.test(s), reason: "initialize repository" },
-  { cls: "modify", pattern: (s) => /^remote\b/.test(s), reason: "manage remotes" },
-  { cls: "modify", pattern: (s) => /^mv\b/.test(s), paths: (args) => positionalArgs(args).map((a) => ({ op: "write" as const, value: a.value ?? "" })), reason: "move/rename tracked files" },
-  { cls: "modify", pattern: (s) => /^(?:cherry-pick|revert)\b/.test(s), reason: "apply commits" },
-  { cls: "modify", pattern: (s) => /^apply\b/.test(s), reason: "apply patch" },
-  { cls: "modify", pattern: (s) => /^gc\b/.test(s), reason: "garbage collect repository" },
-  { cls: "modify", pattern: (s) => /^submodule\b/.test(s), reason: "manage submodules" },
-  { cls: "destroy", pattern: (s) => /^clean\b/.test(s), reason: "delete untracked files" },
-  { cls: "destroy", pattern: (s) => /^push\s+.*(-f|--force)\b/.test(s), reason: "force push" },
-  { cls: "destroy", pattern: (s) => /^reset\s+--hard\b/.test(s), reason: "hard reset" },
-  { cls: "destroy", pattern: (s) => /^stash\s+clear\b/.test(s), reason: "clear all stashes" },
+const GIT_CLASSIFY: readonly GitClassifyDef[] = [
+  // ── inspect ──
+  { cmd: "status", cls: "inspect", reason: "show working tree status" },
+  { cmd: "diff", cls: "inspect", reason: "show changes" },
+  { cmd: "log", cls: "inspect", reason: "show commit logs" },
+  { cmd: "rev-list", cls: "inspect", reason: "list reachable commits" },
+  { cmd: "show", cls: "inspect", reason: "show objects" },
+  { cmd: "grep", cls: "inspect", reason: "search commit contents" },
+  { cmd: "blame", cls: "inspect", reason: "show file blame" },
+  { cmd: "ls-files", cls: "inspect", reason: "list tracked files" },
+  { cmd: "ls-tree", cls: "inspect", reason: "list tree contents" },
+  { cmd: "ls-remote", cls: "inspect", reason: "list remote refs" },
+  { cmd: "fsck", cls: "inspect", reason: "verify repository integrity" },
+  { cmd: "describe", cls: "inspect", reason: "describe commit" },
+  { cmd: "check-attr", cls: "inspect", reason: "query gitattributes attributes" },
+  { cmd: "check-ignore", cls: "inspect", reason: "query gitignore rules" },
+  { cmd: "help", cls: "inspect", reason: "show help" },
+  { cmd: "clean", cls: "destroy", downgrade: { flags: [{ name: "-n" }, { name: "--dry-run" }], to: "inspect", reason: "preview untracked files" }, reason: "delete untracked files" },
+  // F1: -o/--output（含附着 -oFILE）升级 modify + 写路径 intent（prefix 匹配，A2）
+  { cmd: "archive", cls: "inspect", upgrade: { flags: [{ name: "-o", prefix: true }, { name: "--output", prefix: true }], to: "modify", reason: "write repository archive to file", paths: (args) => writeOutputIntents(args, ARCHIVE_OUTPUT_OPTS) }, reason: "create repository archive" },
+  // ── modify ──
+  { cmd: "add", cls: "modify", paths: (args) => positionalArgs(args).map((a) => ({ op: "read" as const, value: a.value ?? "" })), reason: "stage files" },
+  { cmd: "rm", cls: "modify", paths: (args) => positionalArgs(args).map((a) => ({ op: "write" as const, value: a.value ?? "" })), reason: "remove tracked files" },
+  { cmd: "commit", cls: "modify", reason: "record changes" },
+  { cmd: "push", cls: "modify", upgrade: { flags: [{ name: "-f" }, { name: "--force", prefix: true }], to: "destroy", reason: "force push" }, reason: "push to remote" },
+  { cmd: ["checkout", "switch"], cls: "modify", paths: (args) => { const idx = args.findIndex((a) => a.value === "--"); return idx >= 0 ? args.slice(idx + 1).map((a) => ({ op: "write" as const, value: a.value ?? "" })) : []; }, reason: "switch branch/restore files" },
+  { cmd: "restore", cls: "modify", paths: (args) => positionalArgs(args).map((a) => ({ op: "write" as const, value: a.value ?? "" })), reason: "restore files" },
+  { cmd: "merge", cls: "modify", reason: "merge branches" },
+  { cmd: "rebase", cls: "modify", reason: "rebase commits" },
+  { cmd: "tag", cls: "modify", reason: "create/list/delete tags" },
+  { cmd: "reset", cls: "modify", upgrade: { flags: [{ name: "--hard" }], to: "destroy", reason: "hard reset" }, reason: "reset HEAD" },
+  { cmd: "fetch", cls: "modify", reason: "fetch from remote" },
+  { cmd: "pull", cls: "modify", reason: "pull from remote" },
+  { cmd: "clone", cls: "modify", reason: "clone repository" },
+  { cmd: "init", cls: "modify", reason: "initialize repository" },
+  { cmd: "remote", cls: "modify", reason: "manage remotes" },
+  { cmd: "mv", cls: "modify", paths: (args) => positionalArgs(args).map((a) => ({ op: "write" as const, value: a.value ?? "" })), reason: "move/rename tracked files" },
+  { cmd: ["cherry-pick", "revert"], cls: "modify", reason: "apply commits" },
+  { cmd: "apply", cls: "modify", reason: "apply patch" },
+  { cmd: "gc", cls: "modify", reason: "garbage collect repository" },
+  { cmd: "submodule", cls: "modify", reason: "manage submodules" },
+  // R3: format-patch 生成补丁文件（-o/--output-directory 目录；无 -o 时写 cwd，由保守 cwd fallback 承接）
+  { cmd: "format-patch", cls: "modify", paths: (args) => writeOutputIntents(args, FORMAT_PATCH_OUTPUT_OPTS), reason: "generate patch files" },
+// ── 子命令族（A 步骤 2 后：stash/bundle 已迁入 GIT_SUBCOMMAND_PARSERS，此处不再有族）──
 ];
 
 function gitPathOpts(args: ShellArg[]): PathIntent[] {
@@ -79,48 +90,42 @@ function gitPathOpts(args: ShellArg[]): PathIntent[] {
     const val = args[i]!.value ?? "";
     if (val === "-C" && i + 1 < args.length) {
       const p = args[i + 1]!.value ?? "";
-      if (p) intents.push({ operation: "list", rawPath: p, source: "option", span: { start: 0, end: 0 }, confidence: "conservative" });
+      if (p) intents.push({ operation: "list", rawPath: p, source: "option", span: SYNTHETIC_SPAN, confidence: "conservative" });
       i++;
     } else if (val.startsWith("--git-dir=") || val.startsWith("--work-tree=")) {
       const eq = val.indexOf("=");
       const p = val.slice(eq + 1);
-      if (p) intents.push({ operation: "list", rawPath: p, source: "option", span: { start: 0, end: 0 }, confidence: "conservative" });
+      if (p) intents.push({ operation: "list", rawPath: p, source: "option", span: SYNTHETIC_SPAN, confidence: "conservative" });
     }
   }
   return intents;
 }
 
 /**
- * 提取写路径选项的值（-o/--output 类）：分离（-o FILE / --output FILE）、等号（--output=FILE）、
- * 短附着（-oFILE）。`separated` = 分离形式选项名；`equals` = 支持 `=` 形式的长选项名；
- * `attached` = 短附着前缀（单字符短选项）。
+ * 写路径选项提取（引擎子集遍历）：-o/--output 类分离/等号/短附着三形式 → write intent。
+ * opaqueOnUnknown: false —— git 选项面开放（archive --format、format-patch --numbered 等合法），
+ * 子集提取只关心写路径，其余选项静默（B4 决策）。
  */
-function writeOutputArgs(
-  args: readonly ShellArg[],
-  separated: readonly string[],
-  equals: readonly string[],
-  attached: readonly string[],
-): { op: "write"; value: string }[] {
-  const out: { op: "write"; value: string }[] = [];
-  for (let i = 0; i < args.length; i++) {
-    const v = args[i]!.value ?? "";
-    if (separated.includes(v) && i + 1 < args.length) {
-      const value = args[i + 1]!.value ?? "";
-      if (value) out.push({ op: "write", value });
-      i++;
-      continue;
-    }
-    const eqName = equals.find((name) => v.startsWith(`${name}=`));
-    if (eqName) {
-      const value = v.slice(eqName.length + 1);
-      if (value) out.push({ op: "write", value });
-      continue;
-    }
-    const short = attached.find((opt) => v.startsWith(opt) && v.length > opt.length && !v.startsWith("--"));
-    if (short) out.push({ op: "write", value: v.slice(short.length) });
-  }
-  return out;
+function writeOutputIntents(args: readonly ShellArg[], opts: readonly Opt[]): { op: "write"; value: string }[] {
+  const { consumed } = parseOptions(args, { opts, positional: "file", opaqueOnUnknown: false });
+  // 共享 file→intent 映射 + write 过滤 + 类型降级（GIT_CMDS paths 契约）
+  return consumedFileIntents(consumed)
+    .filter((i) => i.operation === "write")
+    .map((i) => ({ op: "write" as const, value: i.rawPath }));
 }
+
+/** git archive 输出：-o（分离/附着）、--output（分离/等号）——跨名差异拆条（B2）。 */
+const ARCHIVE_OUTPUT_OPTS: readonly Opt[] = [
+  { names: ["-o"], kind: "file", operation: "write", forms: ["separated", "attached"] },
+  { names: ["--output"], kind: "file", operation: "write", forms: ["separated", "equals"] },
+];
+
+/** git format-patch 输出目录：-o（分离/附着）、--output-directory（分离/等号）。 */
+const FORMAT_PATCH_OUTPUT_OPTS: readonly Opt[] = [
+  { names: ["-o"], kind: "file", operation: "write", forms: ["separated", "attached"] },
+  { names: ["--output-directory"], kind: "file", operation: "write", forms: ["separated", "equals"] },
+];
+
 
 /** git bundle create <file> 的 bundle 文件：create 之后的第一个位置参数（create 本身由 pattern 保证）。 */
 function bundleCreateFile(args: readonly ShellArg[]): { op: "write"; value: string }[] {
@@ -129,11 +134,56 @@ function bundleCreateFile(args: readonly ShellArg[]): { op: "write"; value: stri
   return file?.value ? [{ op: "write", value: file.value }] : [];
 }
 
-function gitEffects(def: GitDef, subcmd: string): readonly Effect[] {
-  const effects = new Set<Effect>(def.cls === "inspect" ? ["read"] : def.cls === "destroy" ? ["execute"] : ["write"]);
-  if (/^rm\b/.test(subcmd)) effects.add("delete");
-  if (/^(fetch|pull|push|clone|remote|ls-remote|submodule)\b/.test(subcmd)) effects.add("network");
+function gitEffects(cls: GitClass, first: string): readonly Effect[] {
+  const effects = new Set<Effect>(cls === "inspect" ? ["read"] : cls === "destroy" ? ["execute"] : ["write"]);
+  if (first === "rm") effects.add("delete");
+  if (["fetch", "pull", "push", "clone", "remote", "ls-remote", "submodule"].includes(first)) effects.add("network");
   return [...effects];
+}
+
+// ─── 分类匹配器（token 级，A 候选） ───
+
+function cmdMatches(cmd: GitClassifyDef["cmd"], first: string): boolean {
+  return typeof cmd === "string" ? cmd === first : cmd.includes(first);
+}
+
+function flagHits(tokens: readonly string[], flags: readonly GitFlagSpec[]): boolean {
+  return flags.some((spec) => tokens.some((t) => (spec.prefix ? t.startsWith(spec.name) : t === spec.name)));
+}
+
+interface GitClassifyResult {
+  cls: GitClass;
+  reason: string;
+  paths?: GitClassifyDef["paths"];
+}
+
+/** 表序无关（每 cmd 一行）：cmd 命中后按 upgrade（fail-closed 优先）→ downgrade → 基础 裁决。 */
+function classifyGit(tokens: readonly string[], defs: readonly GitClassifyDef[]): GitClassifyResult | null {
+  const first = tokens[0] ?? "";
+  for (const def of defs) {
+    if (!cmdMatches(def.cmd, first)) continue;
+    if (def.upgrade && flagHits(tokens, def.upgrade.flags)) {
+      return { cls: def.upgrade.to, reason: def.upgrade.reason ?? def.reason, paths: def.upgrade.paths };
+    }
+    if (def.downgrade && flagHits(tokens, def.downgrade.flags)) {
+      return { cls: def.downgrade.to, reason: def.downgrade.reason ?? def.reason };
+    }
+    return { cls: def.cls!, reason: def.reason, paths: def.paths };
+  }
+  return null;
+}
+
+function extractGitPaths(
+  paths: NonNullable<GitClassifyDef["paths"]>,
+  subArgs: readonly ShellArg[],
+): PathIntent[] {
+  return paths(subArgs).map((p) => ({
+    operation: p.op,
+    rawPath: p.value,
+    source: "argument" as const,
+    span: SYNTHETIC_SPAN,
+    confidence: "exact" as const,
+  }));
 }
 
 // ─── git config 子命令：读写分类 + 配置层级目标解析（T-037） ───
@@ -211,11 +261,10 @@ const BRANCH_FLAG_SETS = {
   list: new Set(["-a", "--all", "-r", "--remotes", "-v", "-vv", "--verbose", "--list", "--merged", "--no-merged", "--contains", "--no-contains"]),
 };
 
-function analyzeGitBranch(subcmd: string): CommandSemantics {
-  const tokens = subcmd.replace(/^branch\s*/, "").split(/\s+/).filter(Boolean);
+function analyzeGitBranch(tokens: readonly string[]): CommandSemantics {
   const flags = new Set<string>();
   let positionals = 0;
-  for (const token of tokens) {
+  for (const token of tokens.slice(1)) { // 跳过子命令词 branch
     if (token === "--set-upstream-to" || token.startsWith("--set-upstream-to=")) {
       flags.add("--set-upstream-to");
     } else if (token.startsWith("-")) {
@@ -235,12 +284,12 @@ function analyzeGitBranch(subcmd: string): CommandSemantics {
   return makeSemantics("inspect", { reason: "list branches" });
 }
 
-// 专用子命令解析器注册表（T-053 C2）：复杂子命令族走专用解析，GIT_CMDS 表兜底。
-// 新增复杂子命令 = 注册一行，不再加 if 分发。
-type GitSubcommandParser = (subcmd: string, subArgs: readonly ShellArg[], pathIntents: PathIntent[]) => CommandSemantics;
+// 专用子命令解析器注册表（T-053 C2 + A 步骤 2）：复杂子命令族（config/branch/stash/bundle）
+// 走专用解析，GIT_CLASSIFY 表兜底。全部 token 级（tokens 含子命令词，parser 按需 slice）。
+type GitSubcommandParser = (tokens: readonly string[], subArgs: readonly ShellArg[], pathIntents: PathIntent[]) => CommandSemantics;
 
 const GIT_SUBCOMMAND_PARSERS: ReadonlyMap<string, GitSubcommandParser> = new Map([
-    ["config", (_subcmd, subArgs, pathIntents) => {
+    ["config", (_tokens, subArgs, pathIntents) => {
       const config = analyzeGitConfig(subArgs);
       return makeSemantics(config.cls, {
         reason: config.cls === "inspect" ? "read git config" : "set repository/user config",
@@ -248,7 +297,23 @@ const GIT_SUBCOMMAND_PARSERS: ReadonlyMap<string, GitSubcommandParser> = new Map
         opaque: config.opaque,
       });
     }],
-    ["branch", (subcmd) => analyzeGitBranch(subcmd)],
+    ["branch", (tokens) => analyzeGitBranch(tokens)],
+    // F4: 裸 stash / 未知 stash 子命令（-m/-u/branch 等）→ modify；list/show → inspect；clear → destroy；--help/--version → inspect
+    ["stash", (tokens, _subArgs, pathIntents) => {
+      const sub = tokens[1] ?? "";
+      if (sub === "--help" || sub === "-h" || sub === "--version") return makeSemantics("inspect", { reason: "stash help/version", intents: pathIntents });
+      if (sub === "list" || sub === "show") return makeSemantics("inspect", { reason: "list/show stashes", intents: pathIntents });
+      if (sub === "clear") return makeSemantics("destroy", { reason: "clear all stashes", intents: pathIntents });
+      return makeSemantics("modify", { reason: "modify stash", intents: pathIntents });
+    }],
+    // R3: bundle — create（bundle 文件 write intent）/unpack 写；verify/list/header 只读；未知 → opaque
+    ["bundle", (tokens, subArgs, pathIntents) => {
+      const sub = tokens[1] ?? "";
+      if (sub === "create") return makeSemantics("modify", { reason: "create bundle", intents: [...pathIntents, ...extractGitPaths(bundleCreateFile, subArgs)] });
+      if (sub === "unpack") return makeSemantics("modify", { reason: "unpack bundle", intents: pathIntents });
+      if (sub === "verify" || sub === "list" || sub === "header") return makeSemantics("inspect", { reason: "inspect bundle", intents: pathIntents });
+      return makeSemantics("unknown", { reason: `unrecognized git subcommand: ${tokens.join(" ")}`, opaque: true });
+    }],
   ]);
 
 export const gitAdapter: CommandAdapter = {
@@ -274,33 +339,26 @@ export const gitAdapter: CommandAdapter = {
         break;
       }
     }
-    const subcmd = subcmdIndex >= 0 ? args.slice(subcmdIndex).map((a) => a.value ?? "").join(" ") : "";
+    const tokens = subcmdIndex >= 0 ? args.slice(subcmdIndex).map((a) => a.value ?? "") : [];
     const subArgs = subcmdIndex >= 0 ? args.slice(subcmdIndex + 1) : [];
+    const subcmd = tokens.join(" ");
 
-    // 专用子命令解析器（config/branch 复杂族）；未命中走 GIT_CMDS 表
-    const firstWord = subcmd.split(/\s+/)[0] ?? "";
+    // 专用子命令解析器（config/branch 复杂族）；未命中走 GIT_CLASSIFY 表
+    const firstWord = tokens[0] ?? "";
     const parser = GIT_SUBCOMMAND_PARSERS.get(firstWord);
-    if (parser) return parser(subcmd, subArgs, pathIntents);
+    if (parser) return parser(tokens, subArgs, pathIntents);
 
-    // match subcommand classification
-    for (const def of GIT_CMDS) {
-      if (def.pattern(subcmd)) {
-        if (def.paths) {
-          const subcmdArgs = subcmdIndex >= 0 ? args.slice(subcmdIndex + 1) : [];
-          for (const p of def.paths(subcmdArgs)) {
-            pathIntents.push({
-              operation: p.op,
-              rawPath: p.value,
-              source: "argument",
-              span: { start: 0, end: 0 },
-              confidence: "exact",
-            });
-          }
-        }
-        return makeSemantics(def.cls, { reason: def.reason, intents: pathIntents, effects: gitEffects(def, subcmd) });
-      }
-    }
+    // 分类表匹配（token 级）
+    const result = classifyGit(tokens, GIT_CLASSIFY);
+    if (!result) return makeSemantics("unknown", { reason: `unrecognized git subcommand: ${subcmd}`, opaque: true });
 
-    return makeSemantics("unknown", { reason: `unrecognized git subcommand: ${subcmd}`, opaque: true });
+    const intents = result.paths
+      ? [...pathIntents, ...extractGitPaths(result.paths, subArgs)]
+      : pathIntents;
+    return makeSemantics(result.cls, {
+      reason: result.reason,
+      intents,
+      effects: gitEffects(result.cls, firstWord),
+    });
   },
 };

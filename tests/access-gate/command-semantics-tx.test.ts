@@ -37,7 +37,7 @@ defineAdapterTests("tx", [
   { cmd: "sort -nru file.txt", name: "sort three-flag cluster is not opaque", cls: "inspect", opaque: false, intents: [{ operation: "read", rawPath: "file.txt" }] },
   { cmd: "uniq -cd file.txt", name: "uniq combined count+duplicate short flags are not opaque", cls: "inspect", opaque: false, intents: [{ operation: "read", rawPath: "file.txt" }] },
   { cmd: "sed -nE 's/x/y/p' file.txt", name: "sed combined quiet+extended short flags are not opaque", cls: "inspect", opaque: false, intents: [{ operation: "read", rawPath: "file.txt" }] },
-  { cmd: "sed -ne 's/x/y/p' file.txt", name: "cluster with trailing value-taking option stays opaque", opaque: true },
+  { cmd: "sed -ne 's/x/y/p' file.txt", name: "cluster with trailing value-taking option resolves -n flag + -e expression", cls: "inspect", opaque: false, intents: [{ operation: "read", rawPath: "file.txt" }] },
   { cmd: "uniq -c /etc/passwd", name: "uniq positional file produces read intent", cls: "inspect", intents: [{ operation: "read", rawPath: "/etc/passwd" }] },
   { cmd: "sed -i 's/x/y/' file.txt", name: "sed -i turns positional files into write intents (in-place)", cls: "modify", intents: [{ operation: "write", rawPath: "file.txt" }] },
   { cmd: "sort -t, -k2 -n -r file.txt", name: "sort common flags are not opaque", cls: "inspect", opaque: false, intents: [{ operation: "read", rawPath: "file.txt" }] },

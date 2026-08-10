@@ -1,7 +1,10 @@
 // command-semantics/adapters/shared.ts — adapter 共享工具
 
-import type { ShellArg } from "../../shell-parse/types";
+import type { SourceSpan } from "../../shell-parse/types";
 import type { CommandSemantics, CommandClass, Effect, PathIntent } from "../types";
+
+/** 非真实位置的合成 span 哨兵（adapter 无法获得 token 位置的路径 intent 用）。 */
+export const SYNTHETIC_SPAN: SourceSpan = { start: 0, end: 0 };
 
 export interface MakeSemanticsOpts {
   reason: string;
@@ -11,13 +14,23 @@ export interface MakeSemanticsOpts {
   opaque?: boolean;
 }
 
+/**
+ * consumed 中 kind=file 的值 → 路径 intent（source: option，span 取选项 token，confidence 保守）。
+ * 引擎产物（option-parse）的语义补全：各 adapter 共享同一映射，避免逐字段复制。
+ */
+export function consumedFileIntents(consumed: ReadonlyArray<{ kind: "file" | "expression"; operation: "read" | "write"; value: string; span: { start: number; end: number } }>): PathIntent[] {
+  return consumed
+    .filter((e) => e.kind === "file")
+    .map((e) => ({ operation: e.operation, rawPath: e.value, source: "option", span: e.span, confidence: "conservative" }));
+}
+
 /** 选项派生的路径 intent（source: option，span 合成）；confidence 默认 conservative。 */
 export function optionIntent(
   operation: "read" | "write",
   rawPath: string,
   confidence: "exact" | "conservative" = "conservative",
 ): PathIntent {
-  return { operation, rawPath, source: "option", span: { start: 0, end: 0 }, confidence };
+  return { operation, rawPath, source: "option", span: SYNTHETIC_SPAN, confidence };
 }
 
 
@@ -97,101 +110,6 @@ export function firstSubcommand(args: ReadonlyArray<{ readonly value?: string | 
  */
 export function fullSubcommand(args: ReadonlyArray<{ readonly value?: string | null }>): string {
   return collectSubcommandTokens(args, [], true).join(" ");
-}
-
-/** 位置参数提取结果：positional + 被消费的取值选项（供目标目录/参考文件等语义判定）。 */
-interface ExtractedArgs {
-  positional: readonly ShellArg[];
-  /** 被消费的取值选项（-t VALUE、--reference=VALUE 等），选项名归一化（去 = 后缀）。 */
-  consumed: ReadonlyArray<{ option: string; value: string }>;
-  /** 无值标志 token（-d、--directory、cluster 内逐字符 -v -d 等），供 flag 语义判定（如 install -d）。 */
-  flags: readonly string[];
-}
-
-/**
- * 提取位置参数：跳过选项与选项值（valueOptions 消费下一个、attachedOptions 前缀内联），
- * `--` 之后全部按位置参数。被消费的选项值记录在 consumed（供路径语义判定，如 -t 目标目录）。
- */
-export function extractPositionalArgs(
-  args: readonly ShellArg[],
-  valueOptions: readonly string[],
-  attachedOptions: readonly string[],
-): ExtractedArgs {
-  const positional: ShellArg[] = [];
-  const consumed: Array<{ option: string; value: string }> = [];
-  const flags: string[] = [];
-  for (let i = 0; i < args.length; i++) {
-    const val = args[i]!.value ?? "";
-    if (val === "--") {
-      positional.push(...args.slice(i + 1));
-      break;
-    }
-    if (val.startsWith("-")) {
-      if (valueOptions.includes(val) && i + 1 < args.length) {
-        consumed.push({ option: val, value: args[i + 1]!.value ?? "" });
-        i++;
-        continue;
-      }
-      const attached = attachedOptions.find((prefix) => prefix && val.startsWith(prefix) && val.length > prefix.length);
-      if (attached) {
-        consumed.push({ option: attached.endsWith("=") ? attached.slice(0, -1) : attached, value: val.slice(attached.length) });
-        continue;
-      }
-      // POSIX 组合簇 + 尾随带值短选项：-rt d（-t 分离值）、-rref.txt（-r 附着值）、-pm 755
-      // 从前往后扫描单字符短选项，首个命中 valueOptions 的即带值选项；其前字符视为 flag 簇（不验证），
-      // 值 = token 内剩余（附着）或下一 token（分离）；无下一 token（缺值，POSIX 错误输入）时静默不消费。
-      // 未命中则整体跳过（纯 flag 簇/未知，现状）。
-      if (!val.startsWith("--")) {
-        // flag 簇收集：非取值短选项的每个字符按 -X 记录（install -vd → [-v, -d]）
-        for (let k = 1; k < val.length; k++) flags.push(`-${val[k]}`);
-        for (let k = 1; k < val.length; k++) {
-          const opt = `-${val[k]}`;
-          if (valueOptions.includes(opt)) {
-            if (k < val.length - 1) {
-              consumed.push({ option: opt, value: val.slice(k + 1) });
-            } else if (i + 1 < args.length) {
-              consumed.push({ option: opt, value: args[i + 1]!.value ?? "" });
-              i++;
-            }
-            break;
-          }
-        }
-      } else if (val !== "--") {
-        // 纯长选项 flag（--directory 等；--mode= 已在 attached 分支处理）
-        flags.push(val);
-      }
-      continue;
-    }
-    positional.push(args[i]!);
-  }
-  return { positional, consumed, flags };
-}
-
-/** 组合短选项匹配所需的最小选项 schema 形状（text-transform 的 OptionSchema 满足此形状）。 */
-interface FlagSchemaLike {
-  names: readonly string[];
-  takesValue: boolean;
-  operation: "read" | "write";
-  isPattern?: boolean;
-}
-
-/**
- * POSIX 组合短选项匹配：token 形如 -rn（单 "-"、非 "--"、长度 > 2），
- * 逐字符均为无值 flag 才消费。返回命中的 schema 列表（按字符序）；
- * 簇内含带值选项或未知字符返回 null——调用方保持原处置（如 text-transform 的 opaque）。
- */
-export function matchFlagCluster(
-  token: string,
-  schemas: readonly FlagSchemaLike[],
-): FlagSchemaLike[] | null {
-  if (!token.startsWith("-") || token.startsWith("--") || token.length <= 2) return null;
-  const found: FlagSchemaLike[] = [];
-  for (const ch of token.slice(1).split("")) {
-    const schema = schemas.find((s) => !s.takesValue && s.names.includes(`-${ch}`));
-    if (!schema) return null;
-    found.push(schema);
-  }
-  return found;
 }
 
 /**
