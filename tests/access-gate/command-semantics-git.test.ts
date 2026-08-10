@@ -74,9 +74,28 @@ defineAdapterTests("git", [
     name: "branch delete+rename combo is destroy",
     cls: "destroy",
   },
+  // F1: git archive -o/--output 写出路径必须建模并升级 modify
+  { cmd: "git archive -o /tmp/out.tar HEAD", name: "archive -o writes output path", cls: "modify", intents: [{ operation: "write", rawPath: "/tmp/out.tar" }] },
+  { cmd: "git archive --output=/tmp/out.tar HEAD", name: "archive --output= writes exact path", cls: "modify", intents: [{ operation: "write", rawPath: "/tmp/out.tar" }] },
+  { cmd: "git archive HEAD -o out.tar", name: "archive -o after positional writes output path", cls: "modify", intents: [{ operation: "write", rawPath: "out.tar" }] },
+  { cmd: "git archive --output out.tar HEAD", name: "archive --output separated form writes output path", cls: "modify", intents: [{ operation: "write", rawPath: "out.tar" }] },
+  { cmd: "git archive -oout.tar HEAD", name: "archive -oFILE attached form writes output path", cls: "modify", intents: [{ operation: "write", rawPath: "out.tar" }] },
+  { cmd: "git archive HEAD -oout.tar", name: "archive attached -o after positional writes output path", cls: "modify", intents: [{ operation: "write", rawPath: "out.tar" }] },
+  // F4: 裸 git stash 与带消息的 stash 会改动工作树
+  { cmd: "git stash", name: "bare stash is modify", cls: "modify" },
+  { cmd: "git stash -m wip", name: "stash with message is modify", cls: "modify" },
   { cmd: "git clean -n", name: "clean dry-run is inspect", cls: "inspect" },
   { cmd: "git clean --dry-run", name: "clean --dry-run is inspect", cls: "inspect" },
   { cmd: "git clean -fd", name: "clean -fd is destroy", cls: "destroy" },
+  // R2: git -c key=value 的值是配置项，不是子命令
+  { cmd: "git -c user.name=zev status", name: "-c config value is consumed before subcommand", cls: "inspect", opaque: false },
+  { cmd: "git -c core.hooksPath=/tmp commit -m x", name: "-c config with modify subcommand stays modify", cls: "modify" },
+  // R3: format-patch/bundle 写命令精确建模（此前 opaque 拒，过拒非绕过）
+  { cmd: "git format-patch -o patches main", name: "format-patch -o writes output directory", cls: "modify", intents: [{ operation: "write", rawPath: "patches" }] },
+  { cmd: "git format-patch main", name: "format-patch without -o is modify", cls: "modify" },
+  { cmd: "git bundle create repo.bundle main", name: "bundle create writes bundle file", cls: "modify", intents: [{ operation: "write", rawPath: "repo.bundle" }] },
+  { cmd: "git bundle verify repo.bundle", name: "bundle verify is inspect", cls: "inspect" },
+  { cmd: "git bundle unpack repo.bundle", name: "bundle unpack is modify", cls: "modify" },
   { cmd: "git mv old.ts new.ts", name: "mv carries write intents", cls: "modify", intents: [{ operation: "write", rawPath: "old.ts" }, { operation: "write", rawPath: "new.ts" }] },
   { cmd: ["git cherry-pick abc123", "git revert abc123"], name: "cherry-pick and revert are modify", cls: "modify" },
   { cmd: "git config user.name zev", name: "config key value is modify write with conservative target", cls: "modify", opaque: false, intents: [{ operation: "write", rawPath: ".git/config", confidence: "conservative" }] },

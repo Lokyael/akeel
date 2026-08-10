@@ -31,6 +31,12 @@ defineAdapterTests("fs", [
   { cmd: "ln -s target.txt link.txt", name: "ln -s produces read source and write link", cls: "modify", intents: [{ operation: "read", rawPath: "target.txt" }, { operation: "write", rawPath: "link.txt" }] },
   { cmd: "rmdir empty-dir", name: "rmdir produces delete effect", cls: "modify", effects: ["delete"], intents: [{ operation: "write", rawPath: "empty-dir" }] },
   { cmd: "install -m 755 src.sh /usr/local/bin/", name: "install reads source and writes destination", cls: "modify", intents: [{ operation: "read", rawPath: "src.sh" }, { operation: "write", rawPath: "/usr/local/bin/" }] },
+  // F3: install -t/--target-directory 目标目录建模（与 cp/mv/ln 对齐）
+  { cmd: "install -t /tmp/build foo", name: "install -t writes target directory", cls: "modify", intents: [{ operation: "read", rawPath: "foo" }, { operation: "write", rawPath: "/tmp/build" }] },
+  { cmd: "install -m 755 -t /tmp/bin src.sh", name: "install -t with mode consumes mode and writes target dir", cls: "modify", intents: [{ operation: "read", rawPath: "src.sh" }, { operation: "write", rawPath: "/tmp/bin" }] },
+  // R1: install -d/--directory（mkdir 模式）位置参数全是目录创建目标
+  { cmd: "install -d /tmp/build", name: "install -d creates directories as write intents", cls: "modify", intents: [{ operation: "write", rawPath: "/tmp/build" }] },
+  { cmd: "install -vd /tmp/build", name: "install -vd flag cluster keeps directory write intents", cls: "modify", intents: [{ operation: "write", rawPath: "/tmp/build" }] },
   { cmd: "mktemp -d", name: "mktemp is modify without opaque", cls: "modify", opaque: false, intents: [] },
   { cmd: "shred -u secret.txt", name: "shred is destroy", cls: "destroy", intents: [{ operation: "write", rawPath: "secret.txt" }] },
   { cmd: "dd if=/dev/zero of=out.bin bs=1M count=1", name: "dd is modify without opaque", cls: "modify", opaque: false, intents: [] },

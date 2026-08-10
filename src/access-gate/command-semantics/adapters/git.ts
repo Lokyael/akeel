@@ -29,8 +29,9 @@ const GIT_CMDS: GitDef[] = [
   { cls: "inspect", pattern: (s) => /^ls-tree\b/.test(s), reason: "list tree contents" },
   { cls: "inspect", pattern: (s) => /^ls-remote\b/.test(s), reason: "list remote refs" },
   { cls: "inspect", pattern: (s) => /^fsck\b/.test(s), reason: "verify repository integrity" },
-  { cls: "inspect", pattern: (s) => /^archive\b/.test(s), reason: "create repository archive" },
+  { cls: "inspect", pattern: (s) => /^archive\b(?!.*(?:\s-o(?:\b|[^\s-])|\s--output\b))/.test(s), reason: "create repository archive" },
   { cls: "inspect", pattern: (s) => /^describe\b/.test(s), reason: "describe commit" },
+  { cls: "inspect", pattern: (s) => /^bundle\s+(?:verify|list|header)\b/.test(s), reason: "inspect bundle" },
   { cls: "inspect", pattern: (s) => /^check-attr\b/.test(s), reason: "query gitattributes attributes" },
   { cls: "inspect", pattern: (s) => /^check-ignore\b/.test(s), reason: "query gitignore rules" },
   { cls: "modify", pattern: (s) => /^add\b/.test(s), paths: (args) => positionalArgs(args).map((a) => ({ op: "read" as const, value: a.value ?? "" })), reason: "stage files" },
@@ -43,6 +44,18 @@ const GIT_CMDS: GitDef[] = [
   { cls: "modify", pattern: (s) => /^rebase\b/.test(s), reason: "rebase commits" },
   { cls: "modify", pattern: (s) => /^tag\b/.test(s), reason: "create/list/delete tags" },
   { cls: "modify", pattern: (s) => /^stash\s+(push|save|pop|apply|drop)\b/.test(s), reason: "modify stash" },
+  // F4: 裸 stash 或未知 stash 子命令（-m/-u/branch 等）都会改动工作树 → modify；
+  // 已知子命令（list/show/push/save/pop/apply/drop/clear）由前面条目与 destroy 条目承接
+  { cls: "modify", pattern: (s) => /^stash\b(?!\s+(?:list|show|push|save|pop|apply|drop|clear)\b)/.test(s), reason: "stash working tree changes" },
+  // R3: git bundle — create/unpack 写对象库/文件；verify/list/header 只读
+  { cls: "modify", pattern: (s) => /^bundle\s+create\b/.test(s), paths: (args) => bundleCreateFile(args), reason: "create bundle" },
+  { cls: "modify", pattern: (s) => /^bundle\s+unpack\b/.test(s), reason: "unpack bundle" },
+  // F1: git archive -o/--output 写输出文件 → modify + 输出路径 intent（否则 inspect 允许时写出路径绕过路径策略）。
+  // `\s-` 前缀锚定：只匹配选项 token，避免子串误匹配（如分支名 my-obranch）。
+  // -o 附着形式（-oFILE）无词边界，需 `[^\s-]` 分支承接。
+  { cls: "modify", pattern: (s) => /^archive\b.*(?:\s-o(?:\b|[^\s-])|\s--output\b)/.test(s), paths: (args) => writeOutputArgs(args, ["-o", "--output"], ["--output"], ["-o"]), reason: "write repository archive to file" },
+  // R3: git format-patch 生成补丁文件（-o/--output-directory 目录；无 -o 时写 cwd，由保守 cwd fallback 承接）
+  { cls: "modify", pattern: (s) => /^format-patch\b/.test(s), paths: (args) => writeOutputArgs(args, ["-o", "--output-directory"], ["--output-directory"], ["-o"]), reason: "generate patch files" },
   { cls: "modify", pattern: (s) => /^reset\b(?!.*--hard\b)/.test(s), reason: "reset HEAD" },
   { cls: "modify", pattern: (s) => /^fetch\b/.test(s), reason: "fetch from remote" },
   { cls: "modify", pattern: (s) => /^pull\b/.test(s), reason: "pull from remote" },
@@ -75,6 +88,45 @@ function gitPathOpts(args: ShellArg[]): PathIntent[] {
     }
   }
   return intents;
+}
+
+/**
+ * 提取写路径选项的值（-o/--output 类）：分离（-o FILE / --output FILE）、等号（--output=FILE）、
+ * 短附着（-oFILE）。`separated` = 分离形式选项名；`equals` = 支持 `=` 形式的长选项名；
+ * `attached` = 短附着前缀（单字符短选项）。
+ */
+function writeOutputArgs(
+  args: readonly ShellArg[],
+  separated: readonly string[],
+  equals: readonly string[],
+  attached: readonly string[],
+): { op: "write"; value: string }[] {
+  const out: { op: "write"; value: string }[] = [];
+  for (let i = 0; i < args.length; i++) {
+    const v = args[i]!.value ?? "";
+    if (separated.includes(v) && i + 1 < args.length) {
+      const value = args[i + 1]!.value ?? "";
+      if (value) out.push({ op: "write", value });
+      i++;
+      continue;
+    }
+    const eqName = equals.find((name) => v.startsWith(`${name}=`));
+    if (eqName) {
+      const value = v.slice(eqName.length + 1);
+      if (value) out.push({ op: "write", value });
+      continue;
+    }
+    const short = attached.find((opt) => v.startsWith(opt) && v.length > opt.length && !v.startsWith("--"));
+    if (short) out.push({ op: "write", value: v.slice(short.length) });
+  }
+  return out;
+}
+
+/** git bundle create <file> 的 bundle 文件：create 之后的第一个位置参数（create 本身由 pattern 保证）。 */
+function bundleCreateFile(args: readonly ShellArg[]): { op: "write"; value: string }[] {
+  const pos = positionalArgs(args);
+  const file = pos[1];
+  return file?.value ? [{ op: "write", value: file.value }] : [];
 }
 
 function gitEffects(def: GitDef, subcmd: string): readonly Effect[] {
@@ -134,7 +186,7 @@ function analyzeGitConfig(configArgs: readonly ShellArg[]): { cls: "inspect" | "
   return { cls: "modify", intents: r.target ? writeIntents(r.target) : [], opaque: r.sawUnknown };
 }
 
-function positionalArgs(args: ShellArg[]): ShellArg[] {
+function positionalArgs(args: readonly ShellArg[]): ShellArg[] {
   const result: ShellArg[] = [];
   let optionsDone = false;
   for (const a of args) {
@@ -214,6 +266,8 @@ export const gitAdapter: CommandAdapter = {
       if (v === "--") break;
       // skip git repo path options and their values
       if (v === "-C") { i++; continue; }
+      // git -c key=value：值被消费，不是子命令（R2；附着形式 -ckey=val 已被上方 !startsWith("-") 跳过）
+      if (v === "-c") { i++; continue; }
       if (v.startsWith("--git-dir=") || v.startsWith("--work-tree=")) continue;
       if (!v.startsWith("-")) {
         subcmdIndex = i;

@@ -106,6 +106,9 @@ export const searchAdapter: CommandAdapter = {
     // ── 选项值和位置参数提取 ──
     const positional: ShellArg[] = [];
     const optionValues: Array<{ option: string; value: string; span: ShellArg["span"] }> = [];
+    // 被取值选项消费的值 token 索引：不参与后续标志检测（F2：-name "-delete" 的 pattern 值
+    // 不得触发破坏性升级；-e -r 的 pattern 值不得误判递归）
+    const consumedValueIdx = new Set<number>();
     const valueOpts = config.valueOpts ?? [];
     const attachedValueOpts = config.attachedValueOpts ?? [];
     let parseOptions = true;
@@ -133,6 +136,7 @@ export const searchAdapter: CommandAdapter = {
         const hasAttachedValue = attachedValueOpts.some((prefix) => val.startsWith(prefix) && val.length > prefix.length);
         if (takesNext && i + 1 < args.length) {
           const value = args[i + 1]!;
+          consumedValueIdx.add(i + 1);
           optionValues.push({ option: val, value: value.value ?? "", span: value.span });
           i++;
         } else if (hasAttachedValue) {
@@ -144,6 +148,9 @@ export const searchAdapter: CommandAdapter = {
       }
       positional.push(arg);
     }
+
+    // 选项值 token 不参与标志检测（见 consumedValueIdx 注释）
+    const flagArgs = args.filter((_, idx) => !consumedValueIdx.has(idx));
 
     // 文件选项值是 read intent；其他选项值（pattern、glob、type 等）不涉及路径。
     for (const entry of optionValues) {
@@ -168,7 +175,7 @@ export const searchAdapter: CommandAdapter = {
     // grep -d recurse / --directories=recurse 等价递归
     const directoriesRecurse = optionValues.some((e) => (e.option === "-d" || e.option === "--directories") && e.value === "recurse");
     const isRecursive = config.recursiveOpts
-      ? config.recursiveOpts.some((option) => hasOption(args, option)) || directoriesRecurse
+      ? config.recursiveOpts.some((option) => hasOption(flagArgs, option)) || directoriesRecurse
       : true;
 
     // 对于需要递归标记的命令，没有递归标记时不产生搜索 intent
@@ -215,7 +222,7 @@ export const searchAdapter: CommandAdapter = {
 
     // 检测破坏性选项 → 升级为 modify（find -delete、-exec 等）；写文件选项同样升级
     const hasDestructive = config.destructiveOpts
-      ?.some((opt) => hasOption(args, opt)) ?? false;
+      ?.some((opt) => hasOption(flagArgs, opt)) ?? false;
     const cls = hasDestructive || writeValues.length > 0 ? "modify" : config.class;
 
     return makeSemantics(cls, {

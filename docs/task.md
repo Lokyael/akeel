@@ -26,4 +26,36 @@
 
 实施完成：C1 `harness.ts` 加 `makeEnv`/`withEnv`（finally 保证恢复），三测试文件统一（tiers 手写 save/restore → withEnv；init 本地 makeEnv → 共享；session snapshot/restore 删除 → 8 测试 withEnv 包装）；C2 `GIT_SUBCOMMAND_PARSERS` 注册表（config 保留 pathIntents 合并、branch 正向解析），analyze() if 分发 → 注册表 + GIT_CMDS 表兜底；C3 `profileStatus` 迁移 `ui/profile-status.ts`（移动不重构）。npm test 682 全绿（行为零变化）。
 
-## T-054: 待创建
+## T-054: command-semantics 审计修复——F1-F4（inspect 写出逃逸 / 选项值误触发 / install -t / 裸 stash）
+
+**Kind:** bug
+
+**Status:** verified
+
+审计发现并经 TDD 修复的四项：
+
+- **F1（安全）** git `archive -o/--output` 写输出文件：原归 inspect（所有内置 profile allow）且不提取输出路径 → 写出绕过路径策略。修复：inspect pattern 加 `-o/--output` 负前瞻（`\s-` 前缀锚定避免子串误匹配），新增 modify 条目 + `archiveOutputPaths` 提取四种形式（`-o FILE`/`--output FILE`/`--output=FILE`/`-oFILE`）产出 write intent。复审时发现 `-oFILE` 附着形式因无词边界仍落 inspect（同样漏洞），随回归测试补修 pattern。
+- **F2** 选项值误触发标志检测：`find . -name "-delete"` 被升级 modify、`grep -e -r` 误判递归。修复：`consumedValueIdx` 记录被取值选项消费的 token，`hasOption` 检测改用排除后的 `flagArgs`（破坏性与递归检测共用）。
+- **F3** `install -t/--target-directory` 目标目录未建模（cp/mv/ln 已支持）。修复：install paths 改用共享 `copyLikePaths(args, consumed, "read")`。
+- **F4** 裸 `git stash` / `git stash -m msg`（改动工作树）被归 unknown/opaque 硬拒。修复：新增 modify 条目，负前瞻排除已知子命令（list/show/push/save/pop/apply/drop/clear）保持既有分类（inspect/destroy 不变）。
+
+与 D-024/D-027/D-034 一致，无新决策；无文档修订。npm test 704 全绿（新增 22 条回归测试：git 15、search 3、fs 4）。
+
+### Security Review（deff587...2ca72c7）
+
+**结论：无未处理的 HIGH findings（≥8 置信度），Gate 通过。**
+
+- 写能力命令不得落 inspect 的不变量：`archive` 四形式（`-o FILE`/`--output FILE`/`--output=`/`-oFILE`）均 modify + write intent；`-oFILE` 附着形式曾实测落 inspect（真实漏洞），随复审测试修复，10/10 置信度已关闭。
+- 裸 `stash` unknown→modify：非新能力（= `stash push` 同操作），cwd fallback write 门控；keel-plan/keel-read 下 gate 结果不变。
+- `flagArgs` 检测：`-delete` 永不作为值消费、`-exec` 族不被排除 → 无假阴性路径；`-name "-delete"` 假阳性消除（安全方向）。
+- `install -t` 目标目录 intent 精确化（更严格）。
+- 排除项：SQLi/XSS/反序列化/加密/模板注入不适用；无 eval、无输入拼接；secrets 零命中。
+- 残余风险（前存在，非本 diff 引入，全部过拒方向）：`install -d` 目标目录未建模（cwd fallback 兜底）、`git -c key=val` 误解析 opaque 拒（过拒非绕过）、`git format-patch/bundle` 等写命令 opaque 拒（过拒非绕过）。
+
+#### 残余风险处理（同一变更集内完成）
+
+- **R1 `install -d/--directory`（mkdir 模式）**：`extractPositionalArgs` 新增 `flags` 输出（短选项 cluster 逐字符、长选项整体），install paths 检测 `-d` → 位置参数全部为目录 write intent。
+- **R2 `git -c key=val`**：subcommand finder 跳过 `-c` 及其值（附着形式 `-ckey=val` 原已跳过）；分类正确化，最终决策仍由 class + path policy 门控，无逃逸面。
+- **R3 `git format-patch`/`bundle`**：format-patch → modify（`-o/--output-directory` write intent，无 `-o` 时 cwd fallback）；bundle create → modify + 文件 write intent，verify/list/header → inspect，unpack → modify。`archiveOutputPaths` 泛化为 `writeOutputArgs`（分离/等号/短附着三形式）供 archive 与 format-patch 复用。
+
+## T-055: 待创建

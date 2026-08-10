@@ -20,7 +20,7 @@ function copyLikePaths(args: readonly ShellArg[], consumed: ReadonlyArray<{ opti
 
 const FILESYSTEM_CMDS: Record<string, {
   class: "inspect" | "modify" | "destroy";
-  paths: (args: readonly ShellArg[], consumed: ReadonlyArray<{ option: string; value: string }>) => { op: "read" | "write"; value: string }[];
+  paths: (args: readonly ShellArg[], consumed: ReadonlyArray<{ option: string; value: string }>, flags?: readonly string[]) => { op: "read" | "write"; value: string }[];
   effects: readonly Effect[];
   reason: string;
   /** 取值选项：值被消费，不是路径（如 truncate -s SIZE、install -m MODE）。 */
@@ -130,14 +130,14 @@ const FILESYSTEM_CMDS: Record<string, {
   },
   install: {
     class: "modify",
-    // install [opts] <src>... <dst> — 同 cp 的 src read + dst write
-    paths: (args) => {
-      if (args.length < 2) return [];
-      const last = args[args.length - 1]!;
-      return [
-        ...args.slice(0, -1).map((a) => ({ op: "read" as const, value: a.value ?? "" })),
-        { op: "write" as const, value: last.value ?? "" },
-      ];
+    // install [opts] <src>... <dst> — 同 cp 的 src read + dst write；
+    // -t/--target-directory 时位置参数全是 src，目标目录来自选项值（F3，与 cp/mv/ln 对齐）；
+    // -d/--directory（mkdir 模式）时位置参数全是目录创建目标（R1）
+    paths: (args, consumed, flags) => {
+      if (flags?.includes("-d") || flags?.includes("--directory")) {
+        return args.map((a) => ({ op: "write" as const, value: a.value ?? "" }));
+      }
+      return copyLikePaths(args, consumed, "read");
     },
     effects: ["read", "write"],
     reason: "install files",
@@ -176,9 +176,9 @@ export const filesystemAdapter: CommandAdapter = {
     if (!def) return makeSemantics("unknown", { reason: `unknown filesystem command: ${name}`, opaque: true });
 
     // 提取位置参数与消费的选项值：跳过选项与选项值（-s SIZE、--size= 等），-- 后全部按位置参数
-    const { positional, consumed } = extractPositionalArgs(node.args, def.valueOptions ?? [], def.attachedOptions ?? []);
+    const { positional, consumed, flags } = extractPositionalArgs(node.args, def.valueOptions ?? [], def.attachedOptions ?? []);
 
-    const rawPaths = def.paths(positional, consumed);
+    const rawPaths = def.paths(positional, consumed, flags);
     const intents: PathIntent[] = rawPaths
       .filter((p) => p.value.length > 0)
       .map((p) => ({

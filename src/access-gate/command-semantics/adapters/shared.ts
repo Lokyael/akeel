@@ -104,6 +104,8 @@ interface ExtractedArgs {
   positional: readonly ShellArg[];
   /** 被消费的取值选项（-t VALUE、--reference=VALUE 等），选项名归一化（去 = 后缀）。 */
   consumed: ReadonlyArray<{ option: string; value: string }>;
+  /** 无值标志 token（-d、--directory、cluster 内逐字符 -v -d 等），供 flag 语义判定（如 install -d）。 */
+  flags: readonly string[];
 }
 
 /**
@@ -117,6 +119,7 @@ export function extractPositionalArgs(
 ): ExtractedArgs {
   const positional: ShellArg[] = [];
   const consumed: Array<{ option: string; value: string }> = [];
+  const flags: string[] = [];
   for (let i = 0; i < args.length; i++) {
     const val = args[i]!.value ?? "";
     if (val === "--") {
@@ -139,6 +142,8 @@ export function extractPositionalArgs(
       // 值 = token 内剩余（附着）或下一 token（分离）；无下一 token（缺值，POSIX 错误输入）时静默不消费。
       // 未命中则整体跳过（纯 flag 簇/未知，现状）。
       if (!val.startsWith("--")) {
+        // flag 簇收集：非取值短选项的每个字符按 -X 记录（install -vd → [-v, -d]）
+        for (let k = 1; k < val.length; k++) flags.push(`-${val[k]}`);
         for (let k = 1; k < val.length; k++) {
           const opt = `-${val[k]}`;
           if (valueOptions.includes(opt)) {
@@ -151,12 +156,15 @@ export function extractPositionalArgs(
             break;
           }
         }
+      } else if (val !== "--") {
+        // 纯长选项 flag（--directory 等；--mode= 已在 attached 分支处理）
+        flags.push(val);
       }
       continue;
     }
     positional.push(args[i]!);
   }
-  return { positional, consumed };
+  return { positional, consumed, flags };
 }
 
 /** 组合短选项匹配所需的最小选项 schema 形状（text-transform 的 OptionSchema 满足此形状）。 */
