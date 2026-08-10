@@ -183,6 +183,22 @@ function analyzeGitBranch(subcmd: string): CommandSemantics {
   return makeSemantics("inspect", { reason: "list branches" });
 }
 
+// 专用子命令解析器注册表（T-053 C2）：复杂子命令族走专用解析，GIT_CMDS 表兜底。
+// 新增复杂子命令 = 注册一行，不再加 if 分发。
+type GitSubcommandParser = (subcmd: string, subArgs: readonly ShellArg[], pathIntents: PathIntent[]) => CommandSemantics;
+
+const GIT_SUBCOMMAND_PARSERS: ReadonlyMap<string, GitSubcommandParser> = new Map([
+    ["config", (_subcmd, subArgs, pathIntents) => {
+      const config = analyzeGitConfig(subArgs);
+      return makeSemantics(config.cls, {
+        reason: config.cls === "inspect" ? "read git config" : "set repository/user config",
+        intents: [...pathIntents, ...config.intents],
+        opaque: config.opaque,
+      });
+    }],
+    ["branch", (subcmd) => analyzeGitBranch(subcmd)],
+  ]);
+
 export const gitAdapter: CommandAdapter = {
   names: ["git"],
   analyze(node: ShellCommandNode, _context: SemanticContext): CommandSemantics {
@@ -205,22 +221,12 @@ export const gitAdapter: CommandAdapter = {
       }
     }
     const subcmd = subcmdIndex >= 0 ? args.slice(subcmdIndex).map((a) => a.value ?? "").join(" ") : "";
+    const subArgs = subcmdIndex >= 0 ? args.slice(subcmdIndex + 1) : [];
 
-    // git config 子命令走专用读写分类与层级目标解析（T-037）
-    if (/^config\b/.test(subcmd)) {
-      const configArgs = subcmdIndex >= 0 ? args.slice(subcmdIndex + 1) : [];
-      const config = analyzeGitConfig(configArgs);
-      return makeSemantics(config.cls, {
-        reason: config.cls === "inspect" ? "read git config" : "set repository/user config",
-        intents: [...pathIntents, ...config.intents],
-        opaque: config.opaque,
-      });
-    }
-
-    // git branch 子命令：正向标志解析（T-052 C2），从 GIT_CMDS 摘出
-    if (/^branch\b/.test(subcmd)) {
-      return analyzeGitBranch(subcmd);
-    }
+    // 专用子命令解析器（config/branch 复杂族）；未命中走 GIT_CMDS 表
+    const firstWord = subcmd.split(/\s+/)[0] ?? "";
+    const parser = GIT_SUBCOMMAND_PARSERS.get(firstWord);
+    if (parser) return parser(subcmd, subArgs, pathIntents);
 
     // match subcommand classification
     for (const def of GIT_CMDS) {

@@ -86,3 +86,31 @@ export function startSession() {
   accessGate(harness.pi);
   return { harness, root, cleanup };
 }
+
+// ─── env 构造/保存/恢复（T-053 C1：子代理测试样板统一） ───
+
+/** 构造独立 env 对象（默认空），供 env 参数化函数直接断言。 */
+export function makeEnv(overrides: Record<string, string> = {}): NodeJS.ProcessEnv {
+  return { ...overrides };
+}
+
+/** 应用构造 env 到 process.env 并执行 fn，finally 恢复原值（undefined=删除键）。 */
+export async function withEnv(
+  env: Record<string, string | undefined>,
+  fn: () => Promise<void> | void,
+): Promise<void> {
+  const saved: Record<string, string | undefined> = {};
+  for (const key of Object.keys(env)) saved[key] = process.env[key];
+  try {
+    for (const [key, value] of Object.entries(env)) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+    await fn();
+  } finally {
+    for (const [key, value] of Object.entries(saved)) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+  }
+}

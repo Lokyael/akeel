@@ -15,6 +15,7 @@ import {
   SUBAGENT_CHILD_ENV,
   SUBAGENT_TIER_PROFILE,
 } from "../../src/access-gate/profile/tiers";
+import { withEnv } from "./harness";
 
 function builtinProfiles() {
   const agentDir = mkdtempSync(join(tmpdir(), "pi-keel-tiers-"));
@@ -73,17 +74,12 @@ test("tier resolves to builtin profile name", () => {
   assert.equal(SUBAGENT_TIER_PROFILE.project, "keel-subagent-project");
 });
 
-test("isSubagentProcess detects the child env only when present and non-empty", () => {
-  const saved = process.env[SUBAGENT_CHILD_ENV];
-  try {
-    delete process.env[SUBAGENT_CHILD_ENV];
+test("isSubagentProcess detects the child env only when present and non-empty", async () => {
+  await withEnv({ [SUBAGENT_CHILD_ENV]: undefined }, async () => {
     assert.equal(isSubagentProcess(), false);
     process.env[SUBAGENT_CHILD_ENV] = "";
     assert.equal(isSubagentProcess(), false);
     process.env[SUBAGENT_CHILD_ENV] = "1";
     assert.equal(isSubagentProcess(), true);
-  } finally {
-    if (saved === undefined) delete process.env[SUBAGENT_CHILD_ENV];
-    else process.env[SUBAGENT_CHILD_ENV] = saved;
-  }
+  });
 });

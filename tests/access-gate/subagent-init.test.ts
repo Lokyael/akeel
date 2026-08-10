@@ -7,14 +7,11 @@ import test from "node:test";
 import { applySubagentProfile, publishParentTier } from "../../src/access-gate/session/subagent-init";
 import { createProfileState } from "../../src/access-gate/session/profile-state";
 import { loadBuiltinProfiles } from "./helpers";
+import { makeEnv } from "./harness";
 import { PARENT_TIER_ENV, SUBAGENT_CHILD_AGENT_ENV, SUBAGENT_CHILD_ENV } from "../../src/access-gate/profile/tiers";
 import type { ResolvedProfiles } from "../../src/access-gate/profile/types";
 
 const profiles = loadBuiltinProfiles();
-
-function makeEnv(overrides: Record<string, string> = {}): NodeJS.ProcessEnv {
-  return { ...overrides };
-}
 
 function makeState(profilesOverride: ResolvedProfiles = profiles) {
   return createProfileState(profilesOverride);
