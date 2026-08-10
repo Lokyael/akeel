@@ -38,8 +38,9 @@ export interface ResolvedProfile {
 export interface RawProfiles {
   defaultProfile?: string;
   profiles: Record<string, RawProfile>;
-  /** 可选：agent 名→档位名覆盖子代理映射（"*" 回退），优先级 显式 > 内置 > "*"（D-039）。 */
-  subagentProfiles?: Record<string, SubagentTierName>;
+  /** 可选：agent 名→档位名覆盖子代理映射（"*" 回退），优先级 显式 > 内置 > "*"（D-039）。
+   * 值在 Raw 阶段为未校验 string，validateProfiles 通过后窄化为 SubagentTierName（见 ResolvedProfiles）。 */
+  subagentProfiles?: Record<string, string>;
 }
 
 export interface ResolvedProfiles {

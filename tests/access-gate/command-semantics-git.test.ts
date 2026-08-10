@@ -49,6 +49,31 @@ defineAdapterTests("git", [
     name: "branch listing variants stay inspect",
     cls: "inspect",
   },
+  {
+    cmd: ["git branch feature", "git branch fix/123"],
+    name: "branch create without flags is modify",
+    cls: "modify",
+  },
+  {
+    cmd: ["git branch --list feature", "git branch -r", "git branch -v"],
+    name: "branch list flags stay inspect even with a pattern",
+    cls: "inspect",
+  },
+  {
+    cmd: ["git branch -c feat", "git branch -C feat main"],
+    name: "branch copy variants are modify",
+    cls: "modify",
+  },
+  {
+    cmd: ["git branch --set-upstream-to=origin/main", "git branch --track origin/main", "git branch --unset-upstream"],
+    name: "branch upstream changes are modify",
+    cls: "modify",
+  },
+  {
+    cmd: "git branch -d -m",
+    name: "branch delete+rename combo is destroy",
+    cls: "destroy",
+  },
   { cmd: "git clean -n", name: "clean dry-run is inspect", cls: "inspect" },
   { cmd: "git clean --dry-run", name: "clean --dry-run is inspect", cls: "inspect" },
   { cmd: "git clean -fd", name: "clean -fd is destroy", cls: "destroy" },

@@ -20,7 +20,6 @@ const GIT_CMDS: GitDef[] = [
   { cls: "inspect", pattern: (s) => /^diff\b/.test(s), reason: "show changes" },
   { cls: "inspect", pattern: (s) => /^log\b/.test(s), reason: "show commit logs" },
   { cls: "inspect", pattern: (s) => /^rev-list\b/.test(s), reason: "list reachable commits" },
-  { cls: "inspect", pattern: (s) => /^branch\b(?!.*(?:-[dDfmM]|--delete|--force|--move|--rename)\b)/.test(s), reason: "list branches" },
   { cls: "inspect", pattern: (s) => /^clean\b.*(-n|--dry-run)\b/.test(s), reason: "preview untracked files" },
   { cls: "inspect", pattern: (s) => /^show\b/.test(s), reason: "show objects" },
   { cls: "inspect", pattern: (s) => /^grep\b/.test(s), reason: "search commit contents" },
@@ -55,9 +54,6 @@ const GIT_CMDS: GitDef[] = [
   { cls: "modify", pattern: (s) => /^apply\b/.test(s), reason: "apply patch" },
   { cls: "modify", pattern: (s) => /^gc\b/.test(s), reason: "garbage collect repository" },
   { cls: "modify", pattern: (s) => /^submodule\b/.test(s), reason: "manage submodules" },
-  { cls: "modify", pattern: (s) => /^branch\s+(?:-[mM]|--move|--rename)\b/.test(s), reason: "rename branch" },
-  { cls: "modify", pattern: (s) => /^branch\s+(?:-f|--force)\b/.test(s), reason: "force create/move branch" },
-  { cls: "destroy", pattern: (s) => /^branch\s+(?:-[dD]|--delete)\b/.test(s), reason: "delete branch" },
   { cls: "destroy", pattern: (s) => /^clean\b/.test(s), reason: "delete untracked files" },
   { cls: "destroy", pattern: (s) => /^push\s+.*(-f|--force)\b/.test(s), reason: "force push" },
   { cls: "destroy", pattern: (s) => /^reset\s+--hard\b/.test(s), reason: "hard reset" },
@@ -150,6 +146,43 @@ function positionalArgs(args: ShellArg[]): ShellArg[] {
   return result;
 }
 
+// ─── git branch 子命令：正向标志解析（T-052 C2） ───
+// 分类优先级（保守）：delete > force > move > upstream > copy > list/plain。
+// 标志枚举见 DECLARE_BRANCH_FLAGS；纯列表标志即使带位置参数（过滤模式）仍为 inspect。
+
+const BRANCH_FLAG_SETS = {
+  delete: new Set(["-d", "-D", "--delete"]),
+  force: new Set(["-f", "--force"]),
+  move: new Set(["-m", "-M", "--move", "--rename"]),
+  upstream: new Set(["--set-upstream-to", "--track", "--unset-upstream"]),
+  copy: new Set(["-c", "-C", "--copy"]),
+  list: new Set(["-a", "--all", "-r", "--remotes", "-v", "-vv", "--verbose", "--list", "--merged", "--no-merged", "--contains", "--no-contains"]),
+};
+
+function analyzeGitBranch(subcmd: string): CommandSemantics {
+  const tokens = subcmd.replace(/^branch\s*/, "").split(/\s+/).filter(Boolean);
+  const flags = new Set<string>();
+  let positionals = 0;
+  for (const token of tokens) {
+    if (token === "--set-upstream-to" || token.startsWith("--set-upstream-to=")) {
+      flags.add("--set-upstream-to");
+    } else if (token.startsWith("-")) {
+      flags.add(token);
+    } else {
+      positionals++;
+    }
+  }
+  const has = (set: Set<string>) => [...flags].some((flag) => set.has(flag));
+  if (has(BRANCH_FLAG_SETS.delete)) return makeSemantics("destroy", { reason: "delete branch" });
+  if (has(BRANCH_FLAG_SETS.force)) return makeSemantics("modify", { reason: "force create/move branch" });
+  if (has(BRANCH_FLAG_SETS.move)) return makeSemantics("modify", { reason: "rename branch" });
+  if (has(BRANCH_FLAG_SETS.upstream)) return makeSemantics("modify", { reason: "set/change branch upstream" });
+  if (has(BRANCH_FLAG_SETS.copy)) return makeSemantics("modify", { reason: "copy branch" });
+  if (has(BRANCH_FLAG_SETS.list)) return makeSemantics("inspect", { reason: "list branches" });
+  if (positionals > 0) return makeSemantics("modify", { reason: "create/move branch" });
+  return makeSemantics("inspect", { reason: "list branches" });
+}
+
 export const gitAdapter: CommandAdapter = {
   names: ["git"],
   analyze(node: ShellCommandNode, _context: SemanticContext): CommandSemantics {
@@ -182,6 +215,11 @@ export const gitAdapter: CommandAdapter = {
         intents: [...pathIntents, ...config.intents],
         opaque: config.opaque,
       });
+    }
+
+    // git branch 子命令：正向标志解析（T-052 C2），从 GIT_CMDS 摘出
+    if (/^branch\b/.test(subcmd)) {
+      return analyzeGitBranch(subcmd);
     }
 
     // match subcommand classification

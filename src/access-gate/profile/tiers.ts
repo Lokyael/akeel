@@ -59,7 +59,7 @@ export function parentTierOf(profile: ResolvedProfile): "0" | "1" {
 }
 
 /** 子代理进程检测：PI_SUBAGENT_CHILD 存在且非空。 */
-export function isSubagentProcess(): boolean {
-  const child = process.env[SUBAGENT_CHILD_ENV];
+export function isSubagentProcess(env: NodeJS.ProcessEnv = process.env): boolean {
+  const child = env[SUBAGENT_CHILD_ENV];
   return child !== undefined && child !== "";
 }

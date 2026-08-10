@@ -17,9 +17,7 @@ function mergeSources(base: RawProfiles, override: unknown): RawProfiles {
       ...base.profiles,
       ...(layer.profiles ?? {}),
     } as RawProfiles["profiles"],
-    ...(layer.subagentProfiles !== undefined
-      ? { subagentProfiles: { ...layer.subagentProfiles } as RawProfiles["subagentProfiles"] }
-      : {}),
+    ...(layer.subagentProfiles !== undefined ? { subagentProfiles: { ...layer.subagentProfiles } } : {}),
   };
 }
 
