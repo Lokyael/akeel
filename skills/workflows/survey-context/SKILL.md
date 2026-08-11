@@ -57,5 +57,6 @@ Based on the project state:
 - A load-bearing decision is unresolved → suggest `domain-modeling` or `grill-docs`.
 - A Candidate Record is due → list it as not adopted and wait for an explicit user choice; recommend it only on that explicit choice.
 - No `CONTEXT.md` exists → note that current project knowledge has not yet been centralized.
+- The task depends on external facts (library versions, ecosystem practice, real-world status) and project knowledge is uncertain → suggest a quick ecosystem check with available web retrieval tools first (per principles.md §5).
 
 Present the findings concisely and ask: "Ready to proceed with [recommended skill]?"

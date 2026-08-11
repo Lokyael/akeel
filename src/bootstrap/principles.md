@@ -74,6 +74,13 @@ operation when advised.
 
 *Evidence before assertions, always.*
 
+External facts are claims too. Before stating or building on facts that
+drift or are community-sourced — library versions and API surfaces,
+ecosystem best practices, real-world status and behavior — retrieve them
+from current sources (web, library docs, community threads) first, and
+cite the source in your claim. When no retrieval tool is available,
+state the fact as unverified instead of asserting it from memory.
+
 Before claiming any status:
 1. IDENTIFY the command that proves it
 2. RUN it fresh — full command, full output

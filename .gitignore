@@ -31,3 +31,4 @@ logs/
 # Pi runtime artifacts
 .pi/
 .pi-keel/
+.pi-subagents/
