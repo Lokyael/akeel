@@ -191,6 +191,36 @@ test("keel-build still hard-denies blocked home paths despite the ~/** rule (T-0
   }
 });
 
+test("keel-build git config end-to-end: --global asks, --system denies, --local blocked (T-055)", () => {
+  const env = context();
+  try {
+    // 端到端：git adapter 产出 ~/.gitconfig write intent → 路径门禁走 ~/** ask（用户请求的"方便改配置"主路径）
+    const globalReq = complete(compileShellCall({ ...env, command: "git config --global user.name zev" }));
+    const globalDecision = evaluateRequest(globalReq, builtinProfiles.profiles["keel-build"]!);
+    assert.equal(globalDecision.disposition, "ask");
+    if (globalDecision.disposition === "ask") {
+      assert.equal(globalDecision.code, "approval-required");
+      const evidence = globalDecision.approval.evidence.map((e) => e.subject).join(" ");
+      assert.ok(evidence.includes(".gitconfig"), `evidence should name ~/.gitconfig (got: ${evidence})`);
+    }
+    // --system → /etc/gitconfig 无规则命中 → 默认 deny，不开放
+    const systemReq = complete(compileShellCall({ ...env, command: "git config --system user.name zev" }));
+    const systemDecision = evaluateRequest(systemReq, builtinProfiles.profiles["keel-build"]!);
+    assert.equal(systemDecision.disposition, "deny");
+    if (systemDecision.disposition === "deny") assert.equal(systemDecision.enforcement, "profile");
+    // --local → $cwd/.git/config → blocked path 硬拒
+    const localReq = complete(compileShellCall({ ...env, command: "git config --local user.name zev" }));
+    const localDecision = evaluateRequest(localReq, builtinProfiles.profiles["keel-build"]!);
+    assert.equal(localDecision.disposition, "deny");
+    if (localDecision.disposition === "deny") {
+      assert.equal(localDecision.code, "blocked-path");
+      assert.equal(localDecision.enforcement, "hard");
+    }
+  } finally {
+    env.cleanup();
+  }
+});
+
 test("od read command compiles and is allowed under keel-plan (T-040)", () => {
   const env = context();
   try {

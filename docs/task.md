@@ -79,6 +79,6 @@
 
 **Status:** verified
 
-实施完成：`path/policy.ts` 抽取 `homeForm()`（与 blocked 候选同源），`selectedRule` 对 home 路径追加 `~/` 形式匹配——此前 profile 规则只匹配 virtualPath（外部 scope 为绝对路径），`~/...` 规则是死配置；`builtins.json` keel-build 新增 `~/**` write=ask 并更新 description——非 blocked 的 home 配置写（`~/.gitconfig`、`~/.npmrc` 等）从 profile deny 变 ask，blocked 家目录路径（`~/.ssh/**`、`~/.aws/**` 等）仍硬拒不可覆盖。README Profiles 段落补充路径规则形式说明；security-boundaries R-15 增补。npm test 721 全绿（新增 path-policy 2 用例、gate-policy-matrix 2 用例；profile-chain keel-build 规则顺序断言更新）。
+实施完成：`path/policy.ts` 抽取 `homeForm()`（与 blocked 候选同源），`selectedRule` 对 home 路径追加 `~/` 形式匹配——此前 profile 规则只匹配 virtualPath（外部 scope 为绝对路径），`~/...` 规则是死配置；`builtins.json` keel-build 新增 `~/**` write=ask 并更新 description——非 blocked 的 home 配置写（`~/.gitconfig`、`~/.npmrc` 等）从 profile deny 变 ask，blocked 家目录路径（`~/.ssh/**`、`~/.aws/**` 等）仍硬拒不可覆盖。README Profiles 段落补充路径规则形式说明；security-boundaries R-15 增补。npm test 722 全绿（新增 path-policy 2 用例、gate-policy-matrix 3 用例——含 git config 端到端：`--global` ask、`--system` deny、`--local` blocked；profile-chain keel-build 规则顺序断言更新）。code-review 深审后：`makeContext` 冗余 `prepare` 参数清除（与仓库先例一致）。
 
 ## T-056: 待创建

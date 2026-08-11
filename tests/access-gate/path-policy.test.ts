@@ -77,7 +77,7 @@ test("blocked paths are hard denied for every operation", () => {
 });
 
 test("home paths match ~/ profile rules via the home form", () => {
-  const ctx = makeContext("pi-access-path-", () => undefined);
+  const ctx = makeContext("pi-access-path-");
   try {
     const p = profile();
     p.pathPolicy.rules.push({ path: "~/.config/pi/**", write: "ask" });
@@ -93,7 +93,7 @@ test("home paths match ~/ profile rules via the home form", () => {
 });
 
 test("blocked home paths stay hard denied despite ~/ write rules", () => {
-  const ctx = makeContext("pi-access-path-", () => undefined);
+  const ctx = makeContext("pi-access-path-");
   try {
     const p = profile();
     p.pathPolicy.rules.push({ path: "~/**", write: "ask" });
