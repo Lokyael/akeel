@@ -87,7 +87,7 @@
     },
 
     "keel-build": {
-      "description": "Read and write project files and /tmp freely; known modify and execute commands are allowed, unknown commands require approval, and destroy commands are denied.",
+      "description": "Read and write project files and /tmp freely; home config writes require approval; known modify and execute commands are allowed, unknown commands require approval, and destroy commands are denied.",
       "extends": ["keel-develop"],
       "shellPolicy": {
         "modify": "allow",
@@ -95,6 +95,7 @@
       },
       "pathPolicy": {
         "rules": [
+          { "path": "~/**", "write": "ask" },
           { "path": "/tmp/**", "read": "allow", "list": "allow", "search": "allow", "write": "allow" }
         ]
       }

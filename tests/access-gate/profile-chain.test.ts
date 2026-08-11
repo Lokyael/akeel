@@ -119,11 +119,13 @@ test("keel-build: inherits develop, overrides modify ask→allow and execute ask
   assert.equal(p.shellPolicy.execute, "allow");
   // destroy: inherited — must stay deny
   assert.equal(p.shellPolicy.destroy, "deny");
-  // path rules: /tmp/** added by build, prepended before develop's project/**
-  assert.equal(p.pathPolicy.rules[0]?.path, "/tmp/**");
-  assert.equal(p.pathPolicy.rules[0]?.write, "allow");
-  assert.equal(p.pathPolicy.rules[1]?.path, "project/**");
+  // path rules: home config writes ask; /tmp/** and project/** stay allow
+  assert.equal(p.pathPolicy.rules[0]?.path, "~/**");
+  assert.equal(p.pathPolicy.rules[0]?.write, "ask");
+  assert.equal(p.pathPolicy.rules[1]?.path, "/tmp/**");
   assert.equal(p.pathPolicy.rules[1]?.write, "allow");
+  assert.equal(p.pathPolicy.rules[2]?.path, "project/**");
+  assert.equal(p.pathPolicy.rules[2]?.write, "allow");
 });
 
 // ── chain integrity ──

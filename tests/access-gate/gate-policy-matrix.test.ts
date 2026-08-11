@@ -153,6 +153,44 @@ test("bare unknown command stays ask in plan (unknown policy bucket)", () => {
   }
 });
 
+test("keel-build asks for home config writes; keel-develop keeps denying them (T-055)", () => {
+  const env = context();
+  try {
+    const request = complete(compileDirectToolCall({
+      ...env,
+      surface: "write",
+      args: { path: "~/.npmrc", content: "registry=registry.npmjs.org" },
+    }));
+    const build = evaluateRequest(request, builtinProfiles.profiles["keel-build"]!);
+    assert.equal(build.disposition, "ask");
+    if (build.disposition === "ask") assert.equal(build.code, "approval-required");
+    const develop = evaluateRequest(request, builtinProfiles.profiles["keel-develop"]!);
+    assert.equal(develop.disposition, "deny");
+    if (develop.disposition === "deny") assert.equal(develop.enforcement, "profile");
+  } finally {
+    env.cleanup();
+  }
+});
+
+test("keel-build still hard-denies blocked home paths despite the ~/** rule (T-055)", () => {
+  const env = context();
+  try {
+    const request = complete(compileDirectToolCall({
+      ...env,
+      surface: "write",
+      args: { path: join(homedir(), ".ssh", "id_rsa"), content: "secret" },
+    }));
+    const decision = evaluateRequest(request, builtinProfiles.profiles["keel-build"]!);
+    assert.equal(decision.disposition, "deny");
+    if (decision.disposition === "deny") {
+      assert.equal(decision.code, "blocked-path");
+      assert.equal(decision.enforcement, "hard");
+    }
+  } finally {
+    env.cleanup();
+  }
+});
+
 test("od read command compiles and is allowed under keel-plan (T-040)", () => {
   const env = context();
   try {

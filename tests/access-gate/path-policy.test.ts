@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import { makeContext } from "./helpers";
 import { decidePath, resolvePath } from "../../src/access-gate/path/policy";
 import { DEFAULT_BLOCKED_PATHS } from "../../src/access-gate/path/blocked-paths";
@@ -71,6 +71,36 @@ test("blocked paths are hard denied for every operation", () => {
       assert.equal(result.decision, "deny");
       assert.equal(result.hard, true);
     }
+  } finally {
+    ctx.cleanup();
+  }
+});
+
+test("home paths match ~/ profile rules via the home form", () => {
+  const ctx = makeContext("pi-access-path-", () => undefined);
+  try {
+    const p = profile();
+    p.pathPolicy.rules.push({ path: "~/.config/pi/**", write: "ask" });
+    const target = join(homedir(), ".config", "pi", "keel", "config.json");
+    const path = resolvePath(ctx.cwd, ctx.projectRoot, ctx.stagingDir, target);
+    assert.equal(path.scope, "external");
+    const decision = decidePath(path, p, "write");
+    assert.equal(decision.decision, "ask");
+    assert.equal(decision.pattern, "~/.config/pi/**");
+  } finally {
+    ctx.cleanup();
+  }
+});
+
+test("blocked home paths stay hard denied despite ~/ write rules", () => {
+  const ctx = makeContext("pi-access-path-", () => undefined);
+  try {
+    const p = profile();
+    p.pathPolicy.rules.push({ path: "~/**", write: "ask" });
+    const path = resolvePath(ctx.cwd, ctx.projectRoot, ctx.stagingDir, join(homedir(), ".ssh", "config"));
+    const decision = decidePath(path, p, "write", DEFAULT_BLOCKED_PATHS);
+    assert.equal(decision.decision, "deny");
+    assert.equal(decision.hard, true);
   } finally {
     ctx.cleanup();
   }

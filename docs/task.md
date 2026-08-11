@@ -73,4 +73,12 @@
 - **R4 `dd if=/of=` 读写目标建模**：dd 的 key=value 参数（不以 `-` 开头，引擎当位置参数）在 adapter 层提取——`of=` → write intent、`if=` → read intent，其余（bs/count/skip）忽略。写目标不再依赖 cwd fallback。
 - **R5 `git stash --help` / `git help <cmd>` 过拒**：stash parser 识别 `--help`/`-h`/`--version` → inspect；`help` 加入 GIT_CLASSIFY（inspect）。
 
-## T-055: 待创建
+## T-055: keel-build home 配置写 ask（~/** 规则 + home 形式规则匹配）
+
+**Kind:** feature
+
+**Status:** verified
+
+实施完成：`path/policy.ts` 抽取 `homeForm()`（与 blocked 候选同源），`selectedRule` 对 home 路径追加 `~/` 形式匹配——此前 profile 规则只匹配 virtualPath（外部 scope 为绝对路径），`~/...` 规则是死配置；`builtins.json` keel-build 新增 `~/**` write=ask 并更新 description——非 blocked 的 home 配置写（`~/.gitconfig`、`~/.npmrc` 等）从 profile deny 变 ask，blocked 家目录路径（`~/.ssh/**`、`~/.aws/**` 等）仍硬拒不可覆盖。README Profiles 段落补充路径规则形式说明；security-boundaries R-15 增补。npm test 721 全绿（新增 path-policy 2 用例、gate-policy-matrix 2 用例；profile-chain keel-build 规则顺序断言更新）。
+
+## T-056: 待创建

@@ -24,11 +24,16 @@ export interface PathDecision {
   pattern?: string;
 }
 
-function candidates(path: ResolvedPath): string[] {
-  const values = [path.virtualPath, path.absolute, path.input.replace(/\\/g, "/")];
+/** 绝对路径在 home 下的 `~/` 形式（blocked 候选与规则匹配共用；home 自身无此形式）。 */
+function homeForm(path: ResolvedPath): string | null {
   const home = homedir().replace(/\\/g, "/");
-  if (path.absolute.startsWith(home + "/")) values.push(`~/${relative(home, path.absolute).replace(/\\/g, "/")}`);
-  return [...new Set(values)];
+  if (!path.absolute.startsWith(home + "/")) return null;
+  return `~/${relative(home, path.absolute).replace(/\\/g, "/")}`;
+}
+
+function candidates(path: ResolvedPath): string[] {
+  const home = homeForm(path);
+  return [...new Set([path.virtualPath, path.absolute, path.input.replace(/\\/g, "/"), ...(home ? [home] : [])])];
 }
 
 function blockedPattern(path: ResolvedPath, blockedPaths: readonly string[]): string | undefined {
@@ -36,7 +41,14 @@ function blockedPattern(path: ResolvedPath, blockedPaths: readonly string[]): st
 }
 
 function selectedRule(policy: PathPolicy, path: ResolvedPath, operation: PathOperation): PathRule | undefined {
-  return selectPathRule(policy.rules, path.virtualPath, operation);
+  // 规则匹配与 blocked 候选同源：虚拟路径优先，home 路径追加 `~/` 形式（T-055）。
+  const home = homeForm(path);
+  const ruleCandidates = home ? [path.virtualPath, home] : [path.virtualPath];
+  for (const candidate of ruleCandidates) {
+    const rule = selectPathRule(policy.rules, candidate, operation);
+    if (rule) return rule;
+  }
+  return undefined;
 }
 
 export function decidePath(

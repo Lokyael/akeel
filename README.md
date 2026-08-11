@@ -59,7 +59,7 @@ Define user Profiles in `~/.pi/agent/pi-keel/profiles.json`. Built-ins load firs
 }
 ```
 
-Profile decisions are `allow`, `ask`, or `deny`. Path rules independently control `read`, `list`, `search`, and `write`; use `/profile status` to inspect the fully resolved policy.
+Profile decisions are `allow`, `ask`, or `deny`. Path rules independently control `read`, `list`, `search`, and `write`; use `/profile status` to inspect the fully resolved policy. Rule patterns match the resolved path in its virtual form (`project/**`, `staging/**`), absolute form (e.g. `/tmp/**`), or home-relative form (`~/...`, e.g. `~/.gitconfig`). Hard-blocked secret paths under `~/` (`.ssh`, `.aws`, `.gnupg`, `.kube`, `.docker/config.json`, `.config/gcloud`) stay hard-denied regardless of rules.
 
 ### Shell Command Overrides
 

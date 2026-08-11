@@ -70,6 +70,8 @@ Guidance 只能从源码内置的静态 `GuidanceId` catalog 映射，不拼接�
 
 未建模的配置写手（yarn config、pip config、uv、cargo 等）仍按 modify + cwd 保守写检查处理，其外部配置文件写入不经过 PathPolicy 检查——语义扩充属用户 `command-overrides.yaml`（D-024），不内置。
 
+keel-build 的 `~/**` write=ask 规则（T-055）将非 blocked 的 home 配置写从 profile deny 变为 ask（`git config --global`→`~/.gitconfig`、`npm config`/`pnpm config`→`~/.npmrc` 等，需人工批准）；规则匹配与 blocked 候选同源支持 `~/` 形式。blocked 路径（`~/.ssh/**`、`~/.aws/**`、`~/.gnupg/**`、`~/.kube/**`、`~/.docker/config.json`、`~/.config/gcloud/**`）仍硬拒，不受 `~/**` 规则影响。
+
 ## R-16：命令语义的平台假设
 
 **状态：** by design。
