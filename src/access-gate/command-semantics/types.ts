@@ -38,6 +38,9 @@ export interface CommandSemantics {
 }
 
 // ─── 语义注册表上下文 ───
+// 当前所有 adapter 均不消费（analyze 签名保留它作为预留接口，T-059/B2）：
+// 供未来需要项目上下文（相对路径解析、staging 判定）的 adapter 接入；
+// shell-compiler 仍构造并传入，避免签名反复横跳。
 
 export interface SemanticContext {
   projectRoot: string;

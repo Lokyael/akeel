@@ -25,6 +25,24 @@ test("lexer: tracks source spans", () => {
   assert.equal(tokens[1]!.span.end, 12);
 });
 
+test("lexer: quoted word span covers quotes in place (no indexOf backfill drift)", () => {
+  // 引号内含空格的词：raw 含引号，span 必须覆盖原文中的引号位置（T-059/B3）
+  const { tokens } = lex('echo "a b" c');
+  assert.equal(tokens[1]!.rawValue, '"a b"');
+  assert.equal(tokens[1]!.span.start, 5);
+  assert.equal(tokens[1]!.span.end, 10);
+  assert.equal(tokens[2]!.span.start, 11);
+});
+
+test("lexer: repeated raw values keep per-token spans (scan-time positions)", () => {
+  const { tokens } = lex("x x x");
+  assert.deepEqual(tokens.map((t) => t.span), [
+    { start: 0, end: 1 },
+    { start: 2, end: 3 },
+    { start: 4, end: 5 },
+  ]);
+});
+
 test("lexer: control operators (&&, ||, ;, |, &)", () => {
   const { tokens } = lex("a && b || c; d | e & f");
   assert.equal(tokens.length, 11);

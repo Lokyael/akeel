@@ -23,6 +23,7 @@ export interface LexToken {
  */
 interface WordBuilder {
   raw: string;              // 原始字符（含引号）
+  start: number;            // 首个字符在原文中的位置（T-059/B3：扫描时直记 span）
   hadQuote: boolean;        // word 内出现过引号
   hadDynamicInDouble: boolean;  // $ 或 ` 出现在双引号内（触发命令替换）
 }
@@ -49,11 +50,11 @@ export function lex(text: string): { tokens: LexToken[]; unsafeSyntax: string | 
   let unsafeSyntax: string | null = null;
 
   // 当前 word
-  let wb: WordBuilder = { raw: "", hadQuote: false, hadDynamicInDouble: false };
+  let wb: WordBuilder = { raw: "", start: 0, hadQuote: false, hadDynamicInDouble: false };
   let inSingle = false;
   let inDouble = false;
 
-  const flush = () => {
+  const flush = (end: number) => {
     if (wb.raw.length === 0) return;
     const quoted = wb.hadQuote;
     // 未引用 → 检查原始字符中的动态模式
@@ -62,12 +63,16 @@ export function lex(text: string): { tokens: LexToken[]; unsafeSyntax: string | 
     tokens.push({
       kind: "word",
       value: wb.raw,
-      span: { start: 0, end: 0 },
+      span: { start: wb.start, end },
       rawValue: wb.raw,
       quoted,
       dynamic,
     });
-    wb = { raw: "", hadQuote: false, hadDynamicInDouble: false };
+    wb = { raw: "", start: 0, hadQuote: false, hadDynamicInDouble: false };
+  };
+
+  const beginWord = (at: number) => {
+    if (wb.raw.length === 0) wb.start = at;
   };
 
   const emitRedirect = (op: string, start: number) => {
@@ -111,6 +116,7 @@ export function lex(text: string): { tokens: LexToken[]; unsafeSyntax: string | 
 
     // ── 引用 ──
     if (ch === "'" && !inDouble) {
+      beginWord(i);
       wb.raw += ch;
       wb.hadQuote = true;
       inSingle = !inSingle;
@@ -118,6 +124,7 @@ export function lex(text: string): { tokens: LexToken[]; unsafeSyntax: string | 
       continue;
     }
     if (ch === '"' && !inSingle) {
+      beginWord(i);
       wb.raw += ch;
       wb.hadQuote = true;
       inDouble = !inDouble;
@@ -152,7 +159,7 @@ export function lex(text: string): { tokens: LexToken[]; unsafeSyntax: string | 
 
     // 空白 → flush word
     if (/\s/.test(ch)) {
-      flush();
+      flush(i);
       i++;
       while (i < text.length && /\s/.test(text[i]!)) i++;
       continue;
@@ -161,7 +168,7 @@ export function lex(text: string): { tokens: LexToken[]; unsafeSyntax: string | 
     // 重定向操作符 → flush + emit
     const redir = matchOp(REDIRECT_OPS, text, i);
     if (redir) {
-      flush();
+      flush(i);
       emitRedirect(redir, i);
       i += redir.length;
       continue;
@@ -170,32 +177,23 @@ export function lex(text: string): { tokens: LexToken[]; unsafeSyntax: string | 
     // 控制操作符 → flush + emit
     const op = matchOp(CTRL_OPS, text, i);
     if (op) {
-      flush();
+      flush(i);
       emitOperator(op, i);
       i += op.length;
       continue;
     }
 
     // 普通字符
+    beginWord(i);
     wb.raw += ch;
     i++;
   }
 
   // 最后一个 word
-  flush();
+  flush(text.length);
 
   // 未闭合引用
   if (inSingle || inDouble) unsafeSyntax = "unterminated quote";
-
-  // 计算准确的 span（基于 rawValue 在原始 text 中的位置）
-  let pos = 0;
-  for (const tok of tokens) {
-    const idx = text.indexOf(tok.rawValue, pos);
-    if (idx >= 0) {
-      tok.span = { start: idx, end: idx + tok.rawValue.length };
-      pos = idx + tok.rawValue.length;
-    }
-  }
 
   if (tokens.length > LEXER_LIMITS.maxTokens) return { tokens: [], unsafeSyntax: "token count exceeds the lexer budget" };
   return { tokens, unsafeSyntax };
