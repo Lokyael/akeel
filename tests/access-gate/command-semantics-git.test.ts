@@ -76,6 +76,11 @@ defineAdapterTests("git", [
     name: "branch delete+rename combo is destroy",
     cls: "destroy",
   },
+  {
+    cmd: "git branch -fd",
+    name: "branch -fd cluster splits to force+delete (engine cluster semantics)",
+    cls: "destroy",
+  },
   // F1: git archive -o/--output 写出路径必须建模并升级 modify
   { cmd: "git archive -o /tmp/out.tar HEAD", name: "archive -o writes output path", cls: "modify", intents: [{ operation: "write", rawPath: "/tmp/out.tar" }] },
   { cmd: "git archive --output=/tmp/out.tar HEAD", name: "archive --output= writes exact path", cls: "modify", intents: [{ operation: "write", rawPath: "/tmp/out.tar" }] },

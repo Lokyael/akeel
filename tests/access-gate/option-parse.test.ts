@@ -219,3 +219,20 @@ test("engine B1: adjustment via equals form and attached form", () => {
   assert.equal(run("--fix=x", opts).classAdjust, "modify");
   assert.equal(run("-oout.txt", opts).classAdjust, "modify");
 });
+
+test("engine B1: cluster with value-option tail surfaces classAdjust", () => {
+  const opts: Opt[] = [
+    { names: ["-r"], kind: "flag" },
+    { names: ["-s"], kind: "expression", upgradeTo: "modify", forms: ["separated", "attached"] },
+  ];
+  // 簇内取值字符（-s 附着值）→ recordValue → applyAdjust
+  assert.equal(run("-rsnow", opts).classAdjust, "modify");
+});
+
+test("engine B1: cluster destroy wins over modify (pendingAdjust risk order)", () => {
+  const opts: Opt[] = [
+    { names: ["-f"], kind: "flag", upgradeTo: "destroy" },
+    { names: ["-m"], kind: "flag", upgradeTo: "modify" },
+  ];
+  assert.equal(run("-fm", opts).classAdjust, "destroy");
+});
