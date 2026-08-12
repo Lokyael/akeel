@@ -204,7 +204,7 @@ Classify new information in this order:
 3. Uncommitted candidate with a concrete revisit condition and review date → Candidate Record.
 4. Otherwise, do not create a project record.
 
-Requirements, Design, and Plan are Task Record sections, not standalone document types. **Durable Content**: facts, tradeoffs, and commitments that remain load-bearing after the current work or session ends (adopted conclusions, security invariants, external ownership boundaries, rejected alternatives); process artifacts (implementation steps, test logs, review reports) are not durable content and never enter these containers. When a record changes type, move its durable content instead of copying it and remove the source in the same change so two authority levels cannot coexist; optional `Origin: C-xxx` / `T-xxx` / `D-xxx` preserves the transition reference.
+Requirements, Design, and Plan are Task Record sections, not standalone document types. **Durable Content**: facts, tradeoffs, and commitments that remain load-bearing after the current work or session ends (adopted conclusions, security invariants, external ownership boundaries, rejected alternatives); process artifacts (implementation steps, test logs, review reports) are not durable content and never enter these containers. When a record changes type, move its durable content instead of copying it and remove the source in the same change so two authority levels cannot coexist; optional `Origin: C-xxx` / `T-xxx` preserves the transition reference for type transitions. Pruned decisions carry no source annotation — Git retains history.
 
 ### Document Set
 
@@ -239,11 +239,11 @@ Kind: `feature | bug | refactor | investigation | maintenance`. A Task Record co
 | C → T / D / other authority | durable content | remove C entry in the same change | `Origin: C-xxx` |
 | C → dismissed | — (no durable content) | remove C entry in the same change | — |
 | T → D / CONTEXT | extracted long-term info | clear T section in the same change | `Origin: T-xxx` |
-| D → superseded | full conclusion + rationale + rejected alternatives | prune after absorbing D-xxx fully lands | optional `Origin: D-xxx` |
-| D → retired (withdrawn) | residual durable claims → Negative Space | prune once destination is in place | optional `Origin: D-xxx` |
-| D → retired (external handoff) | ownership boundary → new boundary decision / CONTEXT | prune once destination is in place | optional `Origin: D-xxx` |
+| D → superseded | full conclusion + rationale + rejected alternatives | prune after absorbing D-xxx fully lands | — (Git retains history) |
+| D → retired (withdrawn) | residual durable claims → Negative Space | prune once destination is in place | — (Git retains history) |
+| D → retired (external handoff) | ownership boundary → new boundary decision / CONTEXT | prune once destination is in place | — (Git retains history) |
 
-Records leave the register only via content transfer (durable content moves to its authority level) or abandonment (no durable content remains). Every terminal is reason-named and declares its destination; relocation and removal happen in the same change; Git retains history; IDs are never reused; no archive directory or tombstone files exist.
+Records leave the register only via content transfer (durable content moves to its authority level) or abandonment (no durable content remains). Every terminal is reason-named and declares its destination; relocation and removal happen in the same change; references to records in code comments and docs are updated to the absorbing entry in the same change; Git retains history; IDs are never reused; no archive directory or tombstone files exist.
 
 `survey-context` reads only: `CONTEXT.md`, `docs/candidates.md`, `docs/task.md`, and `docs/task-*.md`, plus specific `D-xxx` entries in `docs/decisions.md` on demand when the task touches their scope — no legacy or type-specific artifact paths. A missing `docs/candidates.md` means no recorded Candidate Records, not an error.
 

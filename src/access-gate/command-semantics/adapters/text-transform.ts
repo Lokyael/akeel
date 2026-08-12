@@ -2,7 +2,7 @@
 //
 // B 候选：选项遍历由统一引擎 option-parse 承担（Opt/ParseResult），本文件只剩 schema 声明
 // 与语义映射（consumed → 路径 intent；sawWrite → modify 升级；位置参数性质 → intent 操作）。
-// 制度化 D-027（值性质）与位置参数性质。
+// 制度化 D-040（值性质）与位置参数性质。
 
 import type { ShellCommandNode } from "../../shell-parse/types";
 import type { CommandAdapter, CommandSemantics, PathIntent, SemanticContext } from "../types";
@@ -18,7 +18,7 @@ interface TextConfigEntry {
   inPlace?: boolean;
 }
 
-// 值性质（D-027）：file = 路径 intent；expression = 程序/表达式（-e/-F/-v/-t/-k 等）；flag = 无值。
+// 值性质（D-040）：file = 路径 intent；expression = 程序/表达式（-e/-F/-v/-t/-k 等）；flag = 无值。
 // 附着形式：separated（-e X）、equals（--expression=X）、attached（-eX、-oX）、suffix（-i.bak）。
 
 const SED_OPTS: Opt[] = [

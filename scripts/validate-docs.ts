@@ -1,17 +1,23 @@
 /**
- * validate-docs.ts — Next-ID slots 不变量结构校验
+ * validate-docs.ts — Next-ID slots 不变量结构校验 + 决策 ID 引用存活校验
  *
- * 断言每个记录容器（docs/candidates.md、docs/task.md、docs/decisions.md）：
+ * 一、记录容器（docs/candidates.md、docs/task.md、docs/decisions.md）：
  *   1. 恰有一个占位槽位行 `## X-0NN: 待创建`
  *   2. 槽位是文件最后非空行（记录只能出现在槽位之前）
  *   3. 槽位前缀字母与容器匹配（C→candidates、T→task、D→decisions）
+ *
+ * 二、决策 ID 引用存活校验（AGENTS.md 决策 ID 引用纪律）：
+ *   src/ 与 tests/ 的 .ts 文件中的 `D-xxx` 引用必须命中 docs/decisions.md 的
+ *   存活标题（`## D-NNN:`，排除待创建槽位）。决策合并/剪除后引用即悬空——
+ *   Git 保留历史是溯源手段，不是保留悬空引用的理由；剪除时应在同一变更内
+ *   把引用更新到吸收条目。
  *
  * 只做结构性校验，不做编号 vs Git 历史的比对——编号可被合法重编号（如连续任务压缩），
  * 历史比对会对合法操作误报。
  * 编号正确性由消费式占位结构（填充即消费）+ 记录纪律保障。
  */
 
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 
 const CONTAINERS: ReadonlyArray<{ file: string; prefix: "C" | "T" | "D" }> = [
@@ -21,6 +27,8 @@ const CONTAINERS: ReadonlyArray<{ file: string; prefix: "C" | "T" | "D" }> = [
 ];
 
 const SLOT_RE = /^## ([CTD])-0\d{2,}: 待创建$/;
+const DECISION_HEADING_RE = /^## (D-\d{3}): /;
+const DECISION_REF_RE = /\bD-\d{3}\b/g;
 
 interface CheckResult {
   ok: boolean;
@@ -53,6 +61,54 @@ function checkContainer(file: string, expectedPrefix: string, content: string): 
   return { ok: errors.length === 0, errors };
 }
 
+// ─── 决策 ID 引用存活校验 ───
+
+/** 存活决策 ID：decisions.md 中 `## D-NNN: ` 标题，排除待创建槽位。 */
+function collectLiveDecisionIds(content: string): Set<string> {
+  const ids = new Set<string>();
+  for (const line of content.split(/\r?\n/)) {
+    const m = DECISION_HEADING_RE.exec(line);
+    if (m && !line.includes("待创建")) ids.add(m[1]!);
+  }
+  return ids;
+}
+
+/** 逐行扫描单个文件的决策引用；返回未命中存活集合的错误列表（纯函数，供自检）。 */
+function scanRefs(file: string, content: string, liveIds: Set<string>): string[] {
+  const errors: string[] = [];
+  const lines = content.split(/\r?\n/);
+  for (let i = 0; i < lines.length; i++) {
+    for (const m of lines[i]!.matchAll(DECISION_REF_RE)) {
+      if (!liveIds.has(m[0]!)) {
+        errors.push(`${file}:${i + 1}: ${m[0]} does not resolve to a live decision in docs/decisions.md`);
+      }
+    }
+  }
+  return errors;
+}
+
+/** 递归收集目录下所有 .ts 文件。 */
+function walkTsFiles(dir: string, out: string[]): void {
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const p = join(dir, entry.name);
+    if (entry.isDirectory()) walkTsFiles(p, out);
+    else if (entry.name.endsWith(".ts")) out.push(p);
+  }
+}
+
+/** 扫描 src/ 与 tests/ 下的决策引用是否全部存活。 */
+function checkDecisionRefs(liveIds: Set<string>, roots: readonly string[]): CheckResult {
+  const errors: string[] = [];
+  for (const root of roots) {
+    const files: string[] = [];
+    walkTsFiles(join(import.meta.dirname!, "..", root), files);
+    for (const file of files) {
+      errors.push(...scanRefs(file, readFileSync(file, "utf-8"), liveIds));
+    }
+  }
+  return { ok: errors.length === 0, errors };
+}
+
 // ─── 自检：违规样例必须被拒绝（负向验证，锁规则防回归） ───
 
 function selfCheck(): void {
@@ -71,6 +127,32 @@ function selfCheck(): void {
       process.exit(1);
     }
   }
+
+  // 决策引用自检：存活集合只含真实标题，槽位 ID 不算存活
+  const live = new Set(["D-001", "D-028", "D-040"]);
+  const refCases: Array<[string, string, number]> = [
+    ["live-ref", "// 显式作用域键（D-024）", 1], // D-024 不在存活集合 → 报错（剪除 ID 即悬空）
+    ["pruned-id", "// D-034 覆盖层一致性", 1], // 剪除 ID 必须报错（纪律 2）
+    ["slot-id", "// D-043 待创建", 1], // 槽位 ID 不算存活
+    ["live-ok", "// D-040 值性质", 0],
+    ["multiple", "// D-001 与 D-028 都存活", 0],
+    ["no-ref", "const x = 1;", 0],
+  ];
+  for (const [name, line, expected] of refCases) {
+    const errors = scanRefs("fixture.ts", line, live);
+    if (errors.length !== expected) {
+      console.error(`❌ self-check FAILED: [${name}] expected ${expected} error(s), got ${errors.length}: ${errors.join("; ")}`);
+      process.exit(1);
+    }
+  }
+
+  // 存活集合提取：标题加入集合，槽位标题排除
+  const headings = "## D-001: Soft 技能匹配\n## D-028: 统一 Project Record 模型\n## D-043: 待创建\n";
+  const ids = collectLiveDecisionIds(headings);
+  if (!ids.has("D-001") || !ids.has("D-028") || ids.has("D-043") || ids.size !== 2) {
+    console.error(`❌ self-check FAILED: [live-ids] expected {D-001, D-028}, got ${JSON.stringify([...ids])}`);
+    process.exit(1);
+  }
 }
 
 // ─── main ───
@@ -88,12 +170,21 @@ function main(): void {
       totalErrors += result.errors.length;
     }
   }
-  console.log(`\n${CONTAINERS.length} containers checked. ${totalErrors} error(s).`);
+  const decisionsContent = readFileSync(join(import.meta.dirname!, "..", "docs/decisions.md"), "utf-8");
+  const liveIds = collectLiveDecisionIds(decisionsContent);
+  const refResult = checkDecisionRefs(liveIds, ["src", "tests"]);
+  if (refResult.ok) {
+    console.log(`  ✅ src/ tests/ — ${liveIds.size} live decisions, all D-xxx refs resolve`);
+  } else {
+    for (const e of refResult.errors) console.log(`  ❌ ${e}`);
+    totalErrors += refResult.errors.length;
+  }
+  console.log(`\n${CONTAINERS.length} containers + decision refs checked. ${totalErrors} error(s).`);
   if (totalErrors > 0) {
     console.log("❌ Validation FAILED — fix before committing.");
     process.exit(1);
   }
-  console.log("✅ All slot invariants hold.");
+  console.log("✅ All slot invariants and decision refs hold.");
 }
 
 main();

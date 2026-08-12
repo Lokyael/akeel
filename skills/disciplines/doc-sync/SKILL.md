@@ -32,6 +32,9 @@ Also scan `CONTEXT.md`, `docs/candidates.md`, `docs/decisions.md`, `docs/task.md
 - A Task Record marked `verified` with no remaining action → clear the completed Task Record sections
 - A superseded decision without a replacement reference → update its status and link
 - A retired decision still marked active, or without a documented destination (Negative Space entry or boundary decision) → record the retirement destination or flag the gap
+- A code comment citing an absorbed or pruned record ID → repoint it to the absorbing entry in the same change (per principles.md Quick Reference — Record Lifecycle)
+- A doc or example hardcoding a machine-specific path (e.g. `/home/<user>/...`) → replace with a placeholder (`~`, `$HOME`) or relative path
+- Merging, compressing, or pruning record content (`docs/decisions.md`) → preserve semantic zero-loss: qualifiers, specific terms, enumerations, and terminology are meaning, not filler — delete only synonymous repetition
 
 ### Step 2: Verify Each Against Code
 
@@ -40,8 +43,8 @@ For each identified doc, verify:
 1. **Counts**: "66 rules" → count actual entries in source. Remove hardcoded counts that rot.
 2. **Architecture**: diagrams and pipelines match actual code flow
 3. **Commands**: all listed commands still exist
-4. **References**: cross-references to other docs/files resolve
-5. **Examples**: code examples still work with current API
+4. **References**: cross-references to other docs/files resolve; record IDs (`C-xxx`/`T-xxx`/`D-xxx`) cited in code comments resolve to live entries (per principles.md Quick Reference — Record Lifecycle). Run `grep -rnE 'D-[0-9]{3}' src tests` and resolve each hit against the `docs/decisions.md` headings; skip this check when the project has no record containers.
+5. **Examples**: code examples still work with current API; paths are portable — no machine-specific absolute paths (e.g. `/home/<user>/...`), use placeholders (`~`, `$HOME`) or relative paths
 6. **Record authority**: Candidate Records remain visibly non-binding; promoted content has one authoritative destination and no duplicate C source
 7. **Task lifecycle**: Task Record status matches reality; verified tasks are either cleared or clearly blocked on a durable documentation update
 8. **Slot invariant**: each container (`docs/candidates.md`, `docs/task.md`, `docs/decisions.md`) has exactly one trailing empty slot (per principles.md Next-ID slots)
@@ -68,5 +71,7 @@ After applying this skill:
 - Every architecture description reflects current code
 - Every cross-reference resolves
 - No reference to deleted files, modules, or features
+- No machine-specific local paths in docs or examples
+- Record content edits (merge/compress/prune) preserve semantic zero-loss
 - No completed Task Record remains without a documented reason
 - No Candidate Record is presented as adopted work, and no promoted record remains duplicated across authority levels

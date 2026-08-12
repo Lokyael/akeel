@@ -107,7 +107,7 @@ export function applyCommandDef(
  * 检查 reclassify 规则。
  * 同时匹配原始命令名、别名解析后的名称，以及路径形式的 basename——adapter 已按
  * basename 识别命令身份（./bin/git → git adapter），reclassify 应对齐该身份，
- * 否则用户声明在路径形式下静默失效（D-034 覆盖层一致性）。
+ * 否则用户声明在路径形式下静默失效（D-024 覆盖层一致性）。
  * 返回新的 CommandClass，或 null 表示不覆盖。
  */
 export function applyReclassify(

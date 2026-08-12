@@ -2,7 +2,7 @@
 //
 // 收敛 text-transform/search/shared.extractPositionalArgs/git.writeOutputArgs 四套
 // 「选项取值消费」遍历为一个深模块：小接口 parseOptions(args, schema)，复杂行为内置。
-// 制度化 D-027（值性质 file/expression）与位置参数性质（file/program-first/set）。
+// 制度化 D-040（值性质 file/expression）与位置参数性质（file/program-first/set）。
 // config-parse 独立（读写轴 + 配置目标解析是分类策略领域，非值消费遍历，B1 决策）。
 //
 // 未知选项策略由 OptConfig.opaqueOnUnknown 显式裁决（C 候选落点）：
@@ -14,7 +14,7 @@ import type { ShellArg, SourceSpan } from "../../shell-parse/types";
 /** 选项声明（一条 = 同形式同语义的名字组；跨形式差异拆条，如 -e vs --regexp）。 */
 export interface Opt {
   names: readonly string[];
-  /** D-027 值性质：file = 值产生路径 intent；expression = 值被消费不产生；flag = 无值。 */
+  /** D-040 值性质：file = 值产生路径 intent；expression = 值被消费不产生；flag = 无值。 */
   kind: "file" | "expression" | "flag";
   /** 值/标志产生的路径操作（kind=flag + operation=write = 无值写标志，如 sed -i、find -delete）。 */
   operation?: "read" | "write";

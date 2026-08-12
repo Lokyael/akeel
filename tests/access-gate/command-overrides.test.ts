@@ -244,7 +244,7 @@ commands:
   }
 });
 
-test("aliases: 别名目标为别名时不链式解析（单步契约，D-034）", () => {
+test("aliases: 别名目标为别名时不链式解析（单步契约，D-024）", () => {
   resetConfig();
   const { ctx: _ctx, cleanup } = setupProject(`
 aliases:
@@ -253,7 +253,7 @@ aliases:
 `);
   try {
     // 单步契约：a → b 后把 b 当作最终目标查 adapter（无 b adapter → unknown），
-    // 不递归 b → cat——链式让语义需沿解析图追多跳才能确定，D-034 明确拒绝
+    // 不递归 b → cat——链式让语义需沿解析图追多跳才能确定，D-024 明确拒绝
     const sem = analyzeSemantics(parseCmd("a --version"), _ctx);
     assert.equal(sem.commandClass, "unknown");
     assert.ok(sem.reason.includes("aliased to b"), `reason 应说明单步目标: ${sem.reason}`);
@@ -303,7 +303,7 @@ commands:
   }
 });
 
-test("commands: 路径前缀键覆盖目录内命令定义（D-034 作用域）", () => {
+test("commands: 路径前缀键覆盖目录内命令定义（D-024 作用域）", () => {
   resetConfig();
   const { ctx, cleanup } = setupProject(`
 commands:

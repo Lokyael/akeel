@@ -109,13 +109,13 @@ function indexKey(executable: string): string {
   return canonicalExecutableName(basename(executable));
 }
 
-/** 剥离前导 "./"——./ 是 cwd 相对拼写，无管理意义（D-034），精确键与前缀键对称归一化。 */
+/** 剥离前导 "./"——./ 是 cwd 相对拼写，无管理意义（D-024），精确键与前缀键对称归一化。 */
 function stripDotSlash(s: string): string {
   return s.startsWith("./") ? s.slice(2) : s;
 }
 
 /**
- * 显式作用域键查找（D-034）：
+ * 显式作用域键查找（D-024）：
  * - 精确键优先（裸名或完整路径字符串），前导 "./" 归一化对精确键与前缀键对称生效；
  * - 路径形式按最长路径前缀键匹配（键以 "/" 结尾）；
  * - 不做隐式 basename 匹配——工具身份由用户声明定义，gate 不猜测哪个路径形式
@@ -125,7 +125,7 @@ function stripDotSlash(s: string): string {
 function scopeKey(table: Record<string, unknown> | undefined, name: string): string | null {
   if (!table) return null;
   const normalized = stripDotSlash(name);
-  // 精确键：键与名均做 ./ 归一化后相等即命中（两侧对称，D-034）
+  // 精确键：键与名均做 ./ 归一化后相等即命中（两侧对称，D-024）
   for (const key of Object.keys(table)) {
     if (key.endsWith("/")) continue;
     if (stripDotSlash(key) === normalized) return key;
@@ -154,7 +154,7 @@ export function analyzeSemantics(
   const name = node.executable?.value?.toLowerCase() ?? "";
   const ov = loadOverrides();
 
-  // 1. 用户定义的完整命令（精确 + 路径前缀作用域，D-034）
+  // 1. 用户定义的完整命令（精确 + 路径前缀作用域，D-024）
   const commandKey = scopeKey(ov.commands, name);
   if (commandKey) {
     return applyCommandDef(ov.commands![commandKey], node.args, name);
