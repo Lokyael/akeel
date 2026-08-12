@@ -11,8 +11,9 @@
 
 import type { ShellArg, SourceSpan } from "../../shell-parse/types";
 
-/** class 调节目标（T-059/B1）：选项命中后对命令分类的升降级。 */
-export type ClassAdjust = "destroy" | "modify" | "inspect";
+/** class 调节目标（T-059/B1）：选项命中后对命令分类的升降级。引擎内部类型，
+ * 消费方通过 ParseResult.classAdjust 读取（无需显式引用）。 */
+type ClassAdjust = "destroy" | "modify" | "inspect";
 
 /** 风险序：destroy > modify > inspect（fail-closed，多命中取最高风险）。 */
 const ADJUST_RISK: Readonly<Record<ClassAdjust, number>> = { destroy: 2, modify: 1, inspect: 0 };
