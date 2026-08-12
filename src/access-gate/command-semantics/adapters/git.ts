@@ -2,7 +2,7 @@
 
 import type { ShellCommandNode, ShellArg } from "../../shell-parse/types";
 import type { CommandAdapter, CommandSemantics, Effect, PathIntent, SemanticContext } from "../types";
-import { makeSemantics, optionIntent, consumedFileIntents, SYNTHETIC_SPAN } from "./shared";
+import { makeSemantics, optionIntent, consumedFileIntents, SYNTHETIC_SPAN, semanticsFromRules, type RuleDef } from "./shared";
 import { parseOptions, type Opt } from "./option-parse";
 import { parseConfigOptions, type ConfigOptionTable, type ConfigTarget } from "./config-parse";
 
@@ -19,6 +19,8 @@ interface GitFlagSpec {
  * 分类声明表（A 候选，token 级）：每条 = 一个子命令（cmd 集合）的基础分类 +
  * 选项调节（upgrade/downgrade，升级优先 fail-closed）。表序无关（每 cmd 仅一行）；
  * 多 class 子命令族（stash/bundle/config/branch）在 GIT_SUBCOMMAND_PARSERS。
+ * 调节 flag 检测基于 subArgs 值数组（主流程经引擎提取子命令后）；prefix 匹配
+ * （--force 命中 --force-with-lease）是声明表语义（D-040 决策 1），非重复遍历。
  */
 interface GitClassifyDef {
   cmd: string | readonly string[];
@@ -83,21 +85,24 @@ const GIT_CLASSIFY: readonly GitClassifyDef[] = [
   { cmd: "format-patch", cls: "modify", paths: (args) => writeOutputPaths(args, FORMAT_PATCH_OUTPUT_OPTS), reason: "generate patch files" },
 ];
 
-function gitPathOpts(args: ShellArg[]): PathIntent[] {
-  const intents: PathIntent[] = [];
-  for (let i = 0; i < args.length; i++) {
-    const val = args[i]!.value ?? "";
-    if (val === "-C" && i + 1 < args.length) {
-      const p = args[i + 1]!.value ?? "";
-      if (p) intents.push({ operation: "list", rawPath: p, source: "option", span: SYNTHETIC_SPAN, confidence: "conservative" });
-      i++;
-    } else if (val.startsWith("--git-dir=") || val.startsWith("--work-tree=")) {
-      const eq = val.indexOf("=");
-      const p = val.slice(eq + 1);
-      if (p) intents.push({ operation: "list", rawPath: p, source: "option", span: SYNTHETIC_SPAN, confidence: "conservative" });
-    }
-  }
-  return intents;
+/**
+ * git 全局选项（T-059）：主流程经引擎提取子命令与路径意图。
+ * -C <dir>（file，separated）、-c <key=val>（expression，separated，值非路径）、
+ * --git-dir=<dir>（file，equals）、--work-tree=<dir>（file，equals）。
+ * opaqueOnUnknown: false —— git 选项面开放（D-040 判据：大类 + catch-all 兜底）。
+ */
+const GIT_GLOBAL_OPTS: readonly Opt[] = [
+  { names: ["-C"], kind: "file", forms: ["separated"] },
+  { names: ["-c"], kind: "expression", forms: ["separated"] },
+  { names: ["--git-dir"], kind: "file", forms: ["equals"] },
+  { names: ["--work-tree"], kind: "file", forms: ["equals"] },
+];
+
+/** 全局路径选项的 consumed 值 → list intent（-C/--git-dir/--work-tree 是仓库目录，非读写目标）。 */
+function gitGlobalIntents(consumed: ReadonlyArray<{ option: string; value: string; span: { start: number; end: number } }>): PathIntent[] {
+  return consumed
+    .filter((e) => e.option === "-C" || e.option === "--git-dir" || e.option === "--work-tree")
+    .map((e) => ({ operation: "list" as const, rawPath: e.value, source: "option" as const, span: e.span, confidence: "conservative" as const }));
 }
 
 /**
@@ -147,8 +152,8 @@ function cmdMatches(cmd: GitClassifyDef["cmd"], first: string): boolean {
   return typeof cmd === "string" ? cmd === first : cmd.includes(first);
 }
 
-function flagHits(tokens: readonly string[], flags: readonly GitFlagSpec[]): boolean {
-  return flags.some((spec) => tokens.some((t) => (spec.prefix ? t.startsWith(spec.name) : t === spec.name)));
+function flagHits(values: readonly string[], flags: readonly GitFlagSpec[]): boolean {
+  return flags.some((spec) => values.some((t) => (spec.prefix ? t.startsWith(spec.name) : t === spec.name)));
 }
 
 interface GitClassifyResult {
@@ -157,15 +162,16 @@ interface GitClassifyResult {
   paths?: GitClassifyDef["paths"];
 }
 
-/** 表序无关（每 cmd 一行）：cmd 命中后按 upgrade（fail-closed 优先）→ downgrade → 基础 裁决。 */
-function classifyGit(tokens: readonly string[], defs: readonly GitClassifyDef[]): GitClassifyResult | null {
-  const first = tokens[0] ?? "";
+/** 表序无关（每 cmd 一行）：cmd 命中后按 upgrade（fail-closed 优先）→ downgrade → 基础 裁决。
+ * 调节 flag 检测基于 subArgs 值数组（主流程经引擎提取子命令后传入）。 */
+function classifyGit(subArgs: readonly string[], defs: readonly GitClassifyDef[]): GitClassifyResult | null {
+  const first = subArgs[0] ?? "";
   for (const def of defs) {
     if (!cmdMatches(def.cmd, first)) continue;
-    if (def.upgrade && flagHits(tokens, def.upgrade.flags)) {
+    if (def.upgrade && flagHits(subArgs, def.upgrade.flags)) {
       return { cls: def.upgrade.to, reason: def.upgrade.reason ?? def.reason, paths: def.upgrade.paths };
     }
-    if (def.downgrade && flagHits(tokens, def.downgrade.flags)) {
+    if (def.downgrade && flagHits(subArgs, def.downgrade.flags)) {
       return { cls: def.downgrade.to, reason: def.downgrade.reason ?? def.reason };
     }
     return { cls: def.cls!, reason: def.reason, paths: def.paths };
@@ -248,9 +254,19 @@ function positionalArgs(args: readonly ShellArg[]): ShellArg[] {
   return result;
 }
 
-// ─── git branch 子命令：正向标志解析 ───
+// ─── git branch 子命令：正向标志解析（T-059：BRANCH_OPTS 声明 + 引擎 flags 输出） ───
 // 分类优先级（保守）：delete > force > move > upstream > copy > list/plain。
-// 标志枚举见 DECLARE_BRANCH_FLAGS；纯列表标志即使带位置参数（过滤模式）仍为 inspect。
+// 纯列表标志即使带位置参数（过滤模式）仍为 inspect。
+
+const BRANCH_OPTS: readonly Opt[] = [
+  { names: ["-d", "-D", "--delete"], kind: "flag" },
+  { names: ["-f", "--force"], kind: "flag" },
+  { names: ["-m", "-M", "--move", "--rename"], kind: "flag" },
+  { names: ["--set-upstream-to"], kind: "flag", forms: ["equals"] },
+  { names: ["--track", "--unset-upstream"], kind: "flag" },
+  { names: ["-c", "-C", "--copy"], kind: "flag" },
+  { names: ["-a", "--all", "-r", "--remotes", "-v", "-vv", "--verbose", "--list", "--merged", "--no-merged", "--contains", "--no-contains"], kind: "flag" },
+];
 
 const BRANCH_FLAG_SETS = {
   delete: new Set(["-d", "-D", "--delete"]),
@@ -261,19 +277,15 @@ const BRANCH_FLAG_SETS = {
   list: new Set(["-a", "--all", "-r", "--remotes", "-v", "-vv", "--verbose", "--list", "--merged", "--no-merged", "--contains", "--no-contains"]),
 };
 
-function analyzeGitBranch(tokens: readonly string[]): CommandSemantics {
-  const flags = new Set<string>();
-  let positionals = 0;
-  for (const token of tokens.slice(1)) { // 跳过子命令词 branch
-    if (token === "--set-upstream-to" || token.startsWith("--set-upstream-to=")) {
-      flags.add("--set-upstream-to");
-    } else if (token.startsWith("-")) {
-      flags.add(token);
-    } else {
-      positionals++;
-    }
-  }
-  const has = (set: Set<string>) => [...flags].some((flag) => set.has(flag));
+function analyzeGitBranch(subArgs: readonly ShellArg[]): CommandSemantics {
+  // 引擎 flags 输出（T-059）：-d/-m 等分离 flag、--set-upstream-to= 等号形式统一识别
+  const { flags } = parseOptions(subArgs, { opts: BRANCH_OPTS, positional: "file", opaqueOnUnknown: false });
+  const flagSet = new Set(flags);
+  const has = (set: Set<string>) => [...set].some((flag) => flagSet.has(flag));
+  const positionals = subArgs.filter((a) => {
+    const v = a.value ?? "";
+    return v !== "--" && !v.startsWith("-");
+  }).length;
   if (has(BRANCH_FLAG_SETS.delete)) return makeSemantics("destroy", { reason: "delete branch" });
   if (has(BRANCH_FLAG_SETS.force)) return makeSemantics("modify", { reason: "force create/move branch" });
   if (has(BRANCH_FLAG_SETS.move)) return makeSemantics("modify", { reason: "rename branch" });
@@ -284,12 +296,29 @@ function analyzeGitBranch(tokens: readonly string[]): CommandSemantics {
   return makeSemantics("inspect", { reason: "list branches" });
 }
 
-// 专用子命令解析器注册表：复杂子命令族（config/branch/stash/bundle）
-// 走专用解析，GIT_CLASSIFY 表兜底。全部 token 级（tokens 含子命令词，parser 按需 slice）。
-type GitSubcommandParser = (tokens: readonly string[], subArgs: readonly ShellArg[], pathIntents: PathIntent[]) => CommandSemantics;
+// ─── stash/bundle：规则表化（T-059） ───
+// 前缀模式（semanticsFromRules 吃 positional 数组）：与 package/build 同构。
+// stash 未命中 → 保守 modify（bare stash / 带消息 stash 均改动工作树，F4）。
+// bundle 未命中 → unknown opaque（catch-all，semanticsFromRules 自动 opaque）。
+
+const STASH_RULES: readonly RuleDef[] = [
+  { cls: "inspect", pattern: (s) => /^(?:list|show)\b/.test(s), reason: "list/show stashes" },
+  { cls: "inspect", pattern: (s) => /^(?:--help|-h|--version)$/.test(s), reason: "stash help/version" },
+  { cls: "destroy", pattern: (s) => /^clear\b/.test(s), reason: "clear all stashes" },
+];
+
+const BUNDLE_RULES: readonly RuleDef[] = [
+  { cls: "modify", pattern: (s) => /^(?:create|unpack)\b/.test(s), reason: "create/unpack bundle" },
+  { cls: "inspect", pattern: (s) => /^(?:verify|list|header)\b/.test(s), reason: "inspect bundle" },
+  { cls: "unknown", pattern: () => true, reason: "unrecognized git subcommand" },
+];
+
+// 专用子命令解析器注册表：复杂子命令族（config/branch/stash/bundle）走专用解析，
+// GIT_CLASSIFY 表兜底。全部 token 级；接口统一 (subArgs, pathIntents)（T-059，删 tokens）。
+type GitSubcommandParser = (subArgs: readonly ShellArg[], pathIntents: PathIntent[]) => CommandSemantics;
 
 const GIT_SUBCOMMAND_PARSERS: ReadonlyMap<string, GitSubcommandParser> = new Map([
-    ["config", (_tokens, subArgs, pathIntents) => {
+    ["config", (subArgs, pathIntents) => {
       const config = analyzeGitConfig(subArgs);
       return makeSemantics(config.cls, {
         reason: config.cls === "inspect" ? "read git config" : "set repository/user config",
@@ -297,59 +326,51 @@ const GIT_SUBCOMMAND_PARSERS: ReadonlyMap<string, GitSubcommandParser> = new Map
         opaque: config.opaque,
       });
     }],
-    ["branch", (tokens) => analyzeGitBranch(tokens)],
-    // F4: 裸 stash / 未知 stash 子命令（-m/-u/branch 等）→ modify；list/show → inspect；clear → destroy；--help/--version → inspect
-    ["stash", (tokens, _subArgs, pathIntents) => {
-      const sub = tokens[1] ?? "";
-      if (sub === "--help" || sub === "-h" || sub === "--version") return makeSemantics("inspect", { reason: "stash help/version", intents: pathIntents });
-      if (sub === "list" || sub === "show") return makeSemantics("inspect", { reason: "list/show stashes", intents: pathIntents });
-      if (sub === "clear") return makeSemantics("destroy", { reason: "clear all stashes", intents: pathIntents });
+    ["branch", (subArgs) => analyzeGitBranch(subArgs)],
+    // F4: 裸 stash / 未知 stash 子命令（-m/-u/branch 等）→ modify（规则表未命中保守兜底）；list/show → inspect；clear → destroy；--help/--version → inspect
+    ["stash", (subArgs, pathIntents) => {
+      const matched = semanticsFromRules(subArgs, STASH_RULES);
+      if (matched) return { ...matched, intents: pathIntents };
       return makeSemantics("modify", { reason: "modify stash", intents: pathIntents });
     }],
     // R3: bundle — create（bundle 文件 write intent）/unpack 写；verify/list/header 只读；未知 → opaque
-    ["bundle", (tokens, subArgs, pathIntents) => {
-      const sub = tokens[1] ?? "";
-      if (sub === "create") return makeSemantics("modify", { reason: "create bundle", intents: [...pathIntents, ...extractGitPaths(bundleCreateFile, subArgs)] });
-      if (sub === "unpack") return makeSemantics("modify", { reason: "unpack bundle", intents: pathIntents });
-      if (sub === "verify" || sub === "list" || sub === "header") return makeSemantics("inspect", { reason: "inspect bundle", intents: pathIntents });
-      return makeSemantics("unknown", { reason: `unrecognized git subcommand: ${tokens.join(" ")}`, opaque: true });
+    ["bundle", (subArgs, pathIntents) => {
+      const matched = semanticsFromRules(subArgs, BUNDLE_RULES);
+      if (matched) {
+        const create = matched.commandClass === "modify" && (subArgs[0]?.value ?? "") === "create";
+        const intents = create ? [...pathIntents, ...extractGitPaths(bundleCreateFile, subArgs)] : pathIntents;
+        return { ...matched, intents };
+      }
+      // BUNDLE_RULES 的 catch-all 保证语义必非 null；此处为类型收窄（规则表演化时防静默漏兜底）
+      return makeSemantics("unknown", { reason: "unrecognized git subcommand", opaque: true });
     }],
   ]);
 
 export const gitAdapter: CommandAdapter = {
   names: ["git"],
   analyze(node: ShellCommandNode, _context: SemanticContext): CommandSemantics {
-    const args = [...node.args];
-
-    // extract git repo path options
-    const pathIntents: PathIntent[] = gitPathOpts(args);
-
-    // find subcommand (skip git path options like -C <path>)
-    let subcmdIndex = -1;
-    for (let i = 0; i < args.length; i++) {
-      const v = args[i]!.value ?? "";
-      if (v === "--") break;
-      // skip git repo path options and their values
-      if (v === "-C") { i++; continue; }
-      // git -c key=value：值被消费，不是子命令（R2；附着形式 -ckey=val 已被上方 !startsWith("-") 跳过）
-      if (v === "-c") { i++; continue; }
-      if (v.startsWith("--git-dir=") || v.startsWith("--work-tree=")) continue;
-      if (!v.startsWith("-")) {
-        subcmdIndex = i;
-        break;
-      }
+    // 主流程经引擎定位子命令词（T-059）：-C/-c/--git-dir/--work-tree 被消费，
+    // positional[0] = 子命令词（ShellArg 引用）；全局路径选项 → list intent。
+    // subArgs 取子命令词之后的原始 args 切片——引擎只用于定位，子命令 flag
+    // （--force/-n 等）必须原样保留供 GIT_CLASSIFY 调节与子命令 parser 检测
+    // （引擎 positional 会跳过未知选项，直接用它作 subArgs 会丢 flag）。
+    const { positional, consumed } = parseOptions(node.args, { opts: GIT_GLOBAL_OPTS, positional: "file", opaqueOnUnknown: false });
+    const pathIntents: PathIntent[] = gitGlobalIntents(consumed);
+    const subcmdArg = positional[0];
+    const subcmd = subcmdArg?.value ?? "";
+    if (!subcmdArg) {
+      return makeSemantics("unknown", { reason: `unrecognized git command: ${node.args.map((a) => a.value ?? "").join(" ") || "(none)"}`, opaque: true });
     }
-    const tokens = subcmdIndex >= 0 ? args.slice(subcmdIndex).map((a) => a.value ?? "") : [];
-    const subArgs = subcmdIndex >= 0 ? args.slice(subcmdIndex + 1) : [];
-    const subcmd = tokens.join(" ");
+    const subArgs = node.args.slice(node.args.indexOf(subcmdArg) + 1);
+    const subArgsValues = subArgs.map((a) => a.value ?? "");
 
-    // 专用子命令解析器（config/branch 复杂族）；未命中走 GIT_CLASSIFY 表
-    const firstWord = tokens[0] ?? "";
+    // 专用子命令解析器（config/branch/stash/bundle 复杂族）；未命中走 GIT_CLASSIFY 表
+    const firstWord = subcmdArg.value ?? "";
     const parser = GIT_SUBCOMMAND_PARSERS.get(firstWord);
-    if (parser) return parser(tokens, subArgs, pathIntents);
+    if (parser) return parser(subArgs, pathIntents);
 
-    // 分类表匹配（token 级）
-    const result = classifyGit(tokens, GIT_CLASSIFY);
+    // 分类表匹配（token 级；调节 flag 检测基于子命令词 + 原始子命令参数）
+    const result = classifyGit([firstWord, ...subArgsValues], GIT_CLASSIFY);
     if (!result) return makeSemantics("unknown", { reason: `unrecognized git subcommand: ${subcmd}`, opaque: true });
 
     const intents = result.paths
