@@ -11,6 +11,12 @@
 
 import type { ShellArg, SourceSpan } from "../../shell-parse/types";
 
+/** class 调节目标（T-059/B1）：选项命中后对命令分类的升降级。 */
+export type ClassAdjust = "destroy" | "modify" | "inspect";
+
+/** 风险序：destroy > modify > inspect（fail-closed，多命中取最高风险）。 */
+const ADJUST_RISK: Readonly<Record<ClassAdjust, number>> = { destroy: 2, modify: 1, inspect: 0 };
+
 /** 选项声明（一条 = 同形式同语义的名字组；跨形式差异拆条，如 -e vs --regexp）。 */
 export interface Opt {
   names: readonly string[];
@@ -28,8 +34,13 @@ export interface Opt {
   forms?: readonly ("separated" | "equals" | "attached" | "suffix")[];
   /** 提供程序/模式（-e/-f）：命中后位置参数起点左移（program-first 失效）。 */
   isPattern?: boolean;
-  /** 消费到终止符（-exec → ["+", ";"]）；区内 token 标记 consumed，不参与 flags/positional。 */
+  /** 消费到终止符（-exec → ["+", ";"]）；区内 token 标记 consumed，不参与 flags/positional。
+   * 必须携带 operation: "write"（T-059/E，防静默漏检——见 validateOpts）。 */
   consumeUntil?: readonly string[];
+  /** class 调节（T-059/B1）：命中后升级命令分类（date -s → modify；git push -f → destroy）。 */
+  upgradeTo?: "modify" | "destroy";
+  /** class 调节（T-059/B1）：命中后降级命令分类（black --check → inspect）。 */
+  downgradeTo?: "inspect";
 }
 
 /** 命令级配置。 */
@@ -61,21 +72,76 @@ export interface ParseResult {
   sawWrite: boolean;
   /** 未知选项（按 opaqueOnUnknown 裁决；含未知 cluster 字符，统一 text-transform 语义）。 */
   opaque: boolean;
+  /** class 调节（T-059/B1）：命中的最高风险调节（destroy > modify > inspect）；未命中 null。 */
+  classAdjust: ClassAdjust | null;
 }
 
-function buildIndex(opts: readonly Opt[]): Map<string, Opt> {
-  const index = new Map<string, Opt>();
+// ── 索引 + 校验（按 opts 数组引用缓存，T-059/A） ──
+// opts 均为模块级常量（引用稳定），WeakMap 缓存消除每命令每次的索引重建与重复校验。
+
+interface OptIndex {
+  byName: Map<string, Opt>;
+  /** 声明了 attached 形式的短名（2 字符，-o）。 */
+  attachedNames: readonly { short: string; opt: Opt }[];
+  /** 声明了 suffix 形式的名字（-i、--in-place…）。 */
+  suffixNames: readonly { name: string; opt: Opt }[];
+}
+
+const _indexCache = new WeakMap<readonly Opt[], OptIndex>();
+
+/** 一个名字是否以另一个名字为真前缀（-i 是 -in、-i.bak 匹配候选的歧义来源）。 */
+function isProperPrefix(prefix: string, name: string): boolean {
+  return name.length > prefix.length && name.startsWith(prefix);
+}
+
+function validateOpts(opts: readonly Opt[]): void {
   for (const opt of opts) {
-    for (const name of opt.names) {
-      if (index.has(name)) throw new Error(`option-parse: duplicate option name: ${name}`);
-      index.set(name, opt);
+    // E：consumeUntil 必须声明写操作——引擎在消费区仅标记 sawWrite，无 write 即静默漏检。
+    if (opt.consumeUntil && opt.operation !== "write") {
+      throw new Error(`option-parse: consumeUntil option ${opt.names.join("/")} must declare operation: "write"`);
     }
   }
+  // B：suffix/attached 前缀重叠——匹配按声明顺序线性扫，前缀重叠使归属依赖声明顺序（隐式优先级）。
+  const overlappable = opts.filter((o) => (o.forms ?? []).some((f) => f === "suffix" || f === "attached"));
+  for (let i = 0; i < overlappable.length; i++) {
+    const a = overlappable[i]!;
+    for (let j = i + 1; j < overlappable.length; j++) {
+      const b = overlappable[j]!;
+      for (const na of a.names) {
+        for (const nb of b.names) {
+          if (na === nb) continue; // 精确冲突已由 buildIndex 拒绝
+          if (isProperPrefix(na, nb) || isProperPrefix(nb, na)) {
+            throw new Error(`option-parse: ambiguous prefix overlap between "${na}" and "${nb}" (suffix/attached forms)`);
+          }
+        }
+      }
+    }
+  }
+}
+
+function buildIndex(opts: readonly Opt[]): OptIndex {
+  const cached = _indexCache.get(opts);
+  if (cached) return cached;
+  validateOpts(opts);
+  const byName = new Map<string, Opt>();
+  const attachedNames: { short: string; opt: Opt }[] = [];
+  const suffixNames: { name: string; opt: Opt }[] = [];
+  for (const opt of opts) {
+    const forms = opt.forms ?? [];
+    for (const name of opt.names) {
+      if (byName.has(name)) throw new Error(`option-parse: duplicate option name: ${name}`);
+      byName.set(name, opt);
+      if (forms.includes("suffix")) suffixNames.push({ name, opt });
+      if (forms.includes("attached") && name.length === 2 && name.startsWith("-")) attachedNames.push({ short: name, opt });
+    }
+  }
+  const index: OptIndex = { byName, attachedNames, suffixNames };
+  _indexCache.set(opts, index);
   return index;
 }
 
 export function parseOptions(args: readonly ShellArg[], config: OptConfig): ParseResult {
-  const byName = buildIndex(config.opts);
+  const { byName, attachedNames, suffixNames } = buildIndex(config.opts);
   const positional: ShellArg[] = [];
   const consumed: ConsumedValue[] = [];
   const flags: string[] = [];
@@ -84,16 +150,25 @@ export function parseOptions(args: readonly ShellArg[], config: OptConfig): Pars
   let sawPattern = false;
   let programPending = config.positional === "program-first";
   let afterDoubleDash = false;
+  let classAdjust: ClassAdjust | null = null;
 
   const markWrite = (opt: Opt): void => {
     if (opt.operation === "write") sawWrite = true;
   };
+  /** B1：累计最高风险的 class 调节（destroy > modify > inspect，fail-closed）。 */
+  const applyAdjust = (opt: Opt): void => {
+    const adjust = opt.upgradeTo ?? opt.downgradeTo;
+    if (!adjust) return;
+    if (classAdjust === null || ADJUST_RISK[adjust] > ADJUST_RISK[classAdjust]) classAdjust = adjust;
+  };
   const recordValue = (option: string, value: string, opt: Opt, span: SourceSpan): void => {
     if (opt.isPattern) sawPattern = true;
+    applyAdjust(opt);
     if (value) consumed.push({ option, value, kind: opt.kind === "expression" ? "expression" : "file", operation: opt.operation ?? "read", span });
   };
   const pushFlag = (name: string, opt: Opt): void => {
     if (opt.isPattern) sawPattern = true;
+    applyAdjust(opt);
     flags.push(name);
     markWrite(opt);
   };
@@ -106,7 +181,7 @@ export function parseOptions(args: readonly ShellArg[], config: OptConfig): Pars
     // ── `--` 之后全部位置参数 ──
     if (!afterDoubleDash && val === "--") { afterDoubleDash = true; i++; continue; }
     if (afterDoubleDash || !val.startsWith("-")) {
-      // program-first：首个位置参数是程序（无 -e/-f 时），跳过
+      // program-first：首个位置参数是程序（无 -e/-f 时），跳过；非首位置参数直接落位
       if (programPending && !sawPattern) { programPending = false; i++; continue; }
       programPending = false;
       if (config.positional !== "set") positional.push(token);
@@ -135,33 +210,41 @@ export function parseOptions(args: readonly ShellArg[], config: OptConfig): Pars
       }
     }
 
-    // ── suffix：无值选项的后缀（-i.bak）──
-    if (!opt) {
-      const suffixOpt = config.opts.find(
-        (o) => o.kind === "flag" && (o.forms ?? []).includes("suffix")
-          && !val.startsWith("--")
-          && o.names.some((n) => val.startsWith(n) && val.length > n.length),
-      );
-      if (suffixOpt) {
+    // ── suffix：无值选项的后缀（-i.bak）──（预建索引替代线性扫，B/D）
+    if (!opt && !val.startsWith("--")) {
+      let hitName: string | null = null;
+      let hitOpt: Opt | null = null;
+      for (const { name, opt: candidate } of suffixNames) {
+        if (candidate.kind !== "flag") continue;
+        if (val.startsWith(name) && val.length > name.length) {
+          hitName = name;
+          hitOpt = candidate;
+          break;
+        }
+      }
+      if (hitName && hitOpt) {
         // 推规范名（-i.bak → "-i"）：flags 是「无值标志」集合，不携带后缀杂质
-        const hitName = suffixOpt.names.find((n) => val.startsWith(n) && val.length > n.length)!;
-        pushFlag(hitName, suffixOpt);
+        pushFlag(hitName, hitOpt);
         i++;
         continue;
       }
     }
 
-    // ── attached：短选项取值附着（-oFILE、-ePATTERN、-vfoo）──
-    if (!opt) {
-      const attOpt = config.opts.find(
-        (o) => o.kind !== "flag" && (o.forms ?? []).includes("attached")
-          && !val.startsWith("--")
-          && o.names.some((n) => n.length === 2 && n.startsWith("-") && val.startsWith(n) && val.length > 2),
-      );
-      if (attOpt) {
-        const shortName = attOpt.names.find((n) => n.length === 2 && n.startsWith("-") && val.startsWith(n))!;
-        recordValue(shortName, val.slice(2), attOpt, token.span);
-        markWrite(attOpt);
+    // ── attached：短选项取值附着（-oFILE、-ePATTERN、-vfoo）──（预建索引替代线性扫，B/D）
+    if (!opt && !val.startsWith("--")) {
+      let hitShort: string | null = null;
+      let hitOpt: Opt | null = null;
+      for (const { short, opt: candidate } of attachedNames) {
+        if (candidate.kind === "flag") continue;
+        if (val.startsWith(short) && val.length > short.length) {
+          hitShort = short;
+          hitOpt = candidate;
+          break;
+        }
+      }
+      if (hitShort && hitOpt) {
+        recordValue(hitShort, val.slice(2), hitOpt, token.span);
+        markWrite(hitOpt);
         i++;
         continue;
       }
@@ -172,6 +255,7 @@ export function parseOptions(args: readonly ShellArg[], config: OptConfig): Pars
       if (opt.consumeUntil) {
         // -exec/-execdir/-ok：消费到终止符（+ / ;）或命令末尾；区内 token 不参与 flags/positional
         markWrite(opt);
+        applyAdjust(opt);
         i++;
         while (i < args.length) {
           const v = args[i]!.value ?? "";
@@ -211,6 +295,11 @@ export function parseOptions(args: readonly ShellArg[], config: OptConfig): Pars
       const pendingFlags: string[] = [];
       let pendingWrite = false;
       let pendingPattern = false;
+      let pendingAdjust: ClassAdjust | null = null;
+      const noteAdjust = (opt: Opt): void => {
+        const adjust = opt.upgradeTo ?? opt.downgradeTo;
+        if (adjust && (pendingAdjust === null || ADJUST_RISK[adjust] > ADJUST_RISK[pendingAdjust])) pendingAdjust = adjust;
+      };
       for (let k = 1; k < val.length; k++) {
         const cname = `-${val[k]}`;
         const copt = byName.get(cname);
@@ -218,6 +307,7 @@ export function parseOptions(args: readonly ShellArg[], config: OptConfig): Pars
         if (copt.kind === "flag") {
           if (copt.isPattern) pendingPattern = true;
           if (copt.operation === "write") pendingWrite = true;
+          noteAdjust(copt);
           pendingFlags.push(cname);
         } else {
           // 首个取值字符：其前字符为 flag 簇，其后（如有）为附着值
@@ -232,6 +322,7 @@ export function parseOptions(args: readonly ShellArg[], config: OptConfig): Pars
       }
       if (pendingWrite) sawWrite = true;
       if (pendingPattern) sawPattern = true;
+      if (pendingAdjust && (classAdjust === null || ADJUST_RISK[pendingAdjust] > ADJUST_RISK[classAdjust])) classAdjust = pendingAdjust;
       flags.push(...pendingFlags);
       if (valueOpt) {
         if (valueOpt.idx < val.length - 1) {
@@ -253,5 +344,5 @@ export function parseOptions(args: readonly ShellArg[], config: OptConfig): Pars
     i++;
   }
 
-  return { positional, consumed, flags, sawWrite, opaque };
+  return { positional, consumed, flags, sawWrite, opaque, classAdjust };
 }
