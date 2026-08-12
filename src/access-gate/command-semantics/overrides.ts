@@ -9,7 +9,8 @@
 import type { CommandClass, CommandSemantics } from "./types";
 import type { ShellArg } from "../shell-parse/types";
 import { basename } from "node:path";
-import { firstSubcommand, fullSubcommand, makeSemantics, SYNTHETIC_SPAN } from "./adapters/shared";
+import { fullSubcommand, makeSemantics, SYNTHETIC_SPAN } from "./adapters/shared";
+import { parseOptions } from "./adapters/option-parse";
 import { COMMAND_CLASS_SET } from "../domain";
 import { loadConfig } from "../config";
 import type { CommandDef, CommandOverrides, ReclassifyEntry } from "../config";
@@ -64,9 +65,8 @@ export function loadOverrides(agentDir = getAgentDir()): CommandOverrides {
 }
 
 // ─── 应用覆盖 ───
-// 子命令提取统一由 shared.ts 提供：
-// firstSubcommand（commands 分发，首 token）与 fullSubcommand（reclassify pattern，
-// 含选项尾部）从首个非选项参数起提取；known 局限（不跳过取值选项值）见 shared.ts/D-024。
+// 子命令提取：commands 分发用引擎 positional[0]（首词，T-059）；reclassify pattern 用
+// fullSubcommand（含选项尾部，raw 契约，D-024）。known 局限（取值选项值不跳过）见 shared.ts/D-024。
 
 /**
  * 应用 CommandDef 产生语义结果。
@@ -74,7 +74,7 @@ export function loadOverrides(agentDir = getAgentDir()): CommandOverrides {
  */
 export function applyCommandDef(
   def: CommandDef,
-  args: ReadonlyArray<{ value?: string | null }>,
+  args: readonly ShellArg[],
   commandName: string,
 ): CommandSemantics {
   // 无子命令定义 → 直接返回基类
@@ -85,8 +85,8 @@ export function applyCommandDef(
     });
   }
 
-  // 匹配子命令（只取第一个非选项参数）
-  const subcmd = firstSubcommand(args);
+  // 匹配子命令（首词；用户定义命令无 valueOptions 感知，D-024）
+  const subcmd = parseOptions(args, { opts: [], positional: "file", opaqueOnUnknown: false }).positional[0]?.value ?? "";
   const match = def.subcommands[subcmd];
   if (match) {
     return makeSemantics(match.class, {
@@ -114,7 +114,7 @@ export function applyReclassify(
   rules: readonly ReclassifyEntry[],
   originalName: string,
   resolvedName: string,
-  args: ReadonlyArray<{ value?: string | null }>,
+  args: readonly ShellArg[],
 ): CommandClass | null {
   const subcmd = fullSubcommand(args);
   const names = originalName === resolvedName ? [originalName] : [originalName, resolvedName];

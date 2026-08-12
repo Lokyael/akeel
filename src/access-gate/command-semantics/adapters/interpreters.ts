@@ -32,7 +32,7 @@ export const interpreterAdapter: CommandAdapter = {
     })?.value ?? "";
     const firstArg = !subcmd && args.length > 0 ? args[0]!.value ?? "" : subcmd;
 
-    const matched = semanticsFromRules(firstArg, rules);
+    const matched = semanticsFromRules([{ value: firstArg }], rules);
     return matched ?? makeSemantics("execute", { reason: name + ": execute script" });
   },
 };

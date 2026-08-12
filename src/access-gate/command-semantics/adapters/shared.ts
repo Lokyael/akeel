@@ -42,62 +42,15 @@ function defaultEffects(cls: CommandClass): readonly Effect[] {
   return [];
 }
 
-/**
- * 首个非选项 token 的索引（跳过已知取值选项及其值）。
- * 无子命令（全为选项）或遇到 `--` 时返回 -1。
- */
-export function firstNonOptionIndex(args: ReadonlyArray<{ readonly value?: string | null }>, valueOptions: Iterable<string>): number {
-  const opts = new Set(valueOptions);
+/** 首个非选项 token 的索引（跳过选项；不感知取值选项——raw 契约，D-024）。 */
+function firstNonOptionIndex(args: ReadonlyArray<{ readonly value?: string | null }>): number {
   for (let i = 0; i < args.length; i++) {
     const v = args[i]!.value ?? "";
     if (v === "--") return -1;
-    if (v.startsWith("-")) {
-      if (opts.has(v) && !v.includes("=") && i + 1 < args.length) i++;
-      continue;
-    }
+    if (v.startsWith("-")) continue;
     return i;
   }
   return -1;
-}
-
-/**
- * 子命令 token 收集核心（三个提取器的唯一实现）：
- * 从首个非选项 token 起收集；includeOptions=false 只收集非选项 token，
- * includeOptions=true 收集全部后续 token（含选项与取值选项的值——调用方
- * 不提供 valueOptions 即不知哪些选项取值，D-024 已知局限）。`--` 之前终止。
- */
-function collectSubcommandTokens(
-  args: ReadonlyArray<{ readonly value?: string | null }>,
-  valueOptions: Iterable<string>,
-  includeOptions: boolean,
-): string[] {
-  const idx = firstNonOptionIndex(args, valueOptions);
-  if (idx < 0) return [];
-  const parts: string[] = [];
-  for (let i = idx; i < args.length; i++) {
-    const v = args[i]!.value ?? "";
-    if (v === "--") break;
-    if (!includeOptions && v.startsWith("-")) continue;
-    parts.push(v);
-  }
-  return parts;
-}
-
-/**
- * Extract the subcommand from tool arguments: 全部非选项 token，空格连接。
- * 跳过已知取值选项及其值（adapter 分发语义）。
- * 无子命令（全为选项）时返回 ""。
- *
- * @param valueOptions — options that consume the next token as their value.
- *   Accepts both string[] and Set<string> for caller convenience.
- */
-export function extractSubcommand(args: ReadonlyArray<{ readonly value?: string | null }>, valueOptions: Iterable<string>): string {
-  return collectSubcommandTokens(args, valueOptions, false).join(" ");
-}
-
-/** 子命令：首个非选项 token（overrides commands 分发；无 valueOptions 感知，D-024）。 */
-export function firstSubcommand(args: ReadonlyArray<{ readonly value?: string | null }>): string {
-  return collectSubcommandTokens(args, [], false)[0] ?? "";
 }
 
 /**
@@ -109,7 +62,15 @@ export function firstSubcommand(args: ReadonlyArray<{ readonly value?: string | 
  * 典型场景（git 子命令）无此问题。详见 D-024。
  */
 export function fullSubcommand(args: ReadonlyArray<{ readonly value?: string | null }>): string {
-  return collectSubcommandTokens(args, [], true).join(" ");
+  const idx = firstNonOptionIndex(args);
+  if (idx < 0) return "";
+  const parts: string[] = [];
+  for (let i = idx; i < args.length; i++) {
+    const v = args[i]!.value ?? "";
+    if (v === "--") break;
+    parts.push(v);
+  }
+  return parts.join(" ");
 }
 
 /**
@@ -151,11 +112,14 @@ export interface RuleDef {
   network?: boolean;
 }
 
-/** 按首个子命令词匹配规则表；命中返回语义，全部未命中返回 null。 */
+/** 按子命令 positional 匹配规则表；命中返回语义，全部未命中返回 null。
+ * 子命令串 = positional 数组的 value 空格连接（调用方传入引擎输出的 positional，
+ * 本函数内 join——投影内聚在唯一消费者，T-059）。 */
 export function semanticsFromRules(
-  subcmd: string,
+  positional: ReadonlyArray<{ readonly value?: string | null }>,
   rules: readonly RuleDef[],
 ): CommandSemantics | null {
+  const subcmd = positional.map((a) => a.value ?? "").join(" ");
   for (const def of rules) {
     if (def.pattern(subcmd)) {
       return makeSemantics(def.cls, {

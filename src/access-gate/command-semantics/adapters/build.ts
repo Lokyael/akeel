@@ -2,21 +2,19 @@
 
 import type { ShellCommandNode } from "../../shell-parse/types";
 import type { CommandAdapter, CommandSemantics, SemanticContext } from "../types";
-import { makeSemantics, extractSubcommand, semanticsFromRules, type RuleDef } from "./shared";
+import { makeSemantics, semanticsFromRules, type RuleDef } from "./shared";
+import { parseOptions, type Opt } from "./option-parse";
 
 interface BuildToolConfig {
   rules: RuleDef[];
-  /** 取值选项：选项之后的 token 是值而非子命令的一部分。不穷举，未覆盖的选项导致 unknown（安全降级）。 */
-  valueOpts?: readonly string[];
+  /** 取值选项（值非路径，kind: expression，T-059）——值被消费，不参与子命令提取。 */
+  opts?: readonly Opt[];
 }
 
 const BUILD_CONFIG: Record<string, BuildToolConfig> = {
   cargo: {
-    valueOpts: [
-      "--manifest-path", "--target-dir", "--target", "--color",
-      "--message-format", "--config", "-Z", "-p", "--package",
-      "--bin", "--example", "--test", "--bench", "--profile",
-      "--features", "-j", "--jobs", "--timings",
+    opts: [
+      { names: ["--manifest-path", "--target-dir", "--target", "--color", "--message-format", "--config", "-Z", "-p", "--package", "--bin", "--example", "--test", "--bench", "--profile", "--features", "-j", "--jobs", "--timings"], kind: "expression", forms: ["separated", "equals"] },
     ],
     rules: [
       { cls: "inspect", pattern: (s) => /^search\b/.test(s), reason: "cargo search" },
@@ -38,10 +36,8 @@ const BUILD_CONFIG: Record<string, BuildToolConfig> = {
     ],
   },
   go: {
-    valueOpts: [
-      "-C", "-o", "-p", "-tags", "-ldflags", "-gcflags",
-      "-asmflags", "-buildmode", "-mod", "-modfile", "-overlay",
-      "-pkgdir", "-toolexec", "-trimpath",
+    opts: [
+      { names: ["-C", "-o", "-p", "-tags", "-ldflags", "-gcflags", "-asmflags", "-buildmode", "-mod", "-modfile", "-overlay", "-pkgdir", "-toolexec", "-trimpath"], kind: "expression", forms: ["separated", "equals"] },
     ],
     rules: [
       { cls: "inspect", pattern: (s) => /^doc\b/.test(s), reason: "go doc" },
@@ -74,12 +70,15 @@ export const buildAdapter: CommandAdapter = {
     const config = BUILD_CONFIG[name];
     if (!config) return makeSemantics("unknown", { reason: `unknown build tool: ${name}`, opaque: true });
 
-    const args = [...node.args];
-    let subcmd = extractSubcommand(args, config.valueOpts ?? []);
+    // 引擎投影：取值选项被消费，positional = 子命令 token（T-059）；
+    // opaqueOnUnknown: false（D-040 判据：大类 + catch-all 保守兜底）
+    const { positional } = parseOptions(node.args, { opts: config.opts ?? [], positional: "file", opaqueOnUnknown: false });
     // 全选项输入（如 cargo --version）：用第一个选项作为子命令候选
-    if (!subcmd && args.length > 0) subcmd = args[0]!.value ?? "";
+    const subcmdArgs = positional.length > 0
+      ? positional
+      : (node.args.length > 0 ? [{ value: node.args[0]!.value ?? "" }] : []);
 
-    const matched = semanticsFromRules(subcmd, config.rules);
+    const matched = semanticsFromRules(subcmdArgs, config.rules);
     if (matched) return matched;
 
     return makeSemantics("unknown", { reason: `${name}: unrecognized`, opaque: true });

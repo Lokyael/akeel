@@ -14,7 +14,8 @@
 
 import type { ShellCommandNode, ShellArg } from "../../shell-parse/types";
 import type { CommandAdapter, CommandSemantics, SemanticContext } from "../types";
-import { makeSemantics, extractSubcommand } from "./shared";
+import { makeSemantics } from "./shared";
+import { parseOptions, type Opt } from "./option-parse";
 
 // ─── config types ───
 
@@ -81,28 +82,16 @@ const PY_TOOLS: Record<string, PyToolDef> = {
 // ─── option parsing ───
 
 /**
- * Common Python tool options that take a following value token.
+ * Common Python tool options that take a following value token（值非路径，kind: expression，T-059）。
  * Not exhaustive — missing an option just means its value might be treated
  * as an unknown subcommand, which falls back to the tool's default class.
  * This is safe: it's a false-negative classification, not a security bypass.
  */
-const VALUE_OPTS = new Set([
-  "--config", "--config-file",
-  "--line-length",
-  "--target-version",
-  "--extend-exclude", "--extend-ignore", "--extend-select",
-  "--ignore", "--exclude", "--select",
-  "--output-file", "--output",
-  "--cache-dir",
-  "--python-version", "--platform",
-  "--follow-imports",
-  "--max-line-length",
-  "--cov", "--cov-report", "--cov-config",
-  "--junitxml",
+const VALUE_OPTS: readonly Opt[] = [
+  { names: ["--config", "--config-file", "--line-length", "--target-version", "--extend-exclude", "--extend-ignore", "--extend-select", "--ignore", "--exclude", "--select", "--output-file", "--output", "--cache-dir", "--python-version", "--platform", "--follow-imports", "--max-line-length", "--cov", "--cov-report", "--cov-config", "--junitxml"], kind: "expression", forms: ["separated", "equals"] },
   // pytest
-  "-k", "--maxfail", "--tb",
-  "-n", "--numprocesses", "--dist", "--timeout",
-]);
+  { names: ["-k", "--maxfail", "--tb", "-n", "--numprocesses", "--dist", "--timeout"], kind: "expression", forms: ["separated", "equals"] },
+];
 
 /** Check if any of the given flags are present in args (exact or --flag=value form). */
 function hasFlag(args: readonly ShellArg[], flags: string[]): boolean {
@@ -124,10 +113,11 @@ export const pythonToolsAdapter: CommandAdapter = {
     // 1. Resolve base class: subcommand overrides default
     let cls = def.cls;
     let reason = def.reason;
-    const subcmd = extractSubcommand(node.args, VALUE_OPTS);
+    // 引擎投影：取值选项被消费，positional[0] = 子命令首词（T-059）
+    const { positional } = parseOptions(node.args, { opts: VALUE_OPTS, positional: "file", opaqueOnUnknown: false });
+    const subcmd = positional[0]?.value ?? "";
     if (def.subcommands && subcmd) {
-      const firstToken = subcmd.split(" ")[0]!;
-      const sub = def.subcommands[firstToken];
+      const sub = def.subcommands[subcmd];
       if (sub) {
         cls = sub.cls;
         reason = sub.reason;

@@ -10,10 +10,13 @@
 
 import type { ShellCommandNode } from "../../shell-parse/types";
 import type { CommandAdapter, CommandSemantics, SemanticContext } from "../types";
-import { extractSubcommand, makeSemantics } from "./shared";
+import { makeSemantics } from "./shared";
+import { parseOptions, type Opt } from "./option-parse";
 
-/** 取值选项：值被消费，不参与子命令提取（--session <name>、--remote <target> 等启动器形式）。 */
-const VALUE_OPTS = new Set(["--session", "--remote", "--remote-keybindings"]);
+/** 取值选项（值非路径，kind: expression，T-059）：值被消费，不参与子命令提取（--session <name>、--remote <target> 等启动器形式）。 */
+const VALUE_OPTS: readonly Opt[] = [
+  { names: ["--session", "--remote", "--remote-keybindings"], kind: "expression", forms: ["separated", "equals"] },
+];
 
 /** 纯信息选项：打印后退出，无变更。 */
 const INFO_OPTS = new Set(["-h", "--help", "-V", "--version", "--default-config", "--skill"]);
@@ -26,8 +29,10 @@ export const herdrAdapter: CommandAdapter = {
   analyze(node: ShellCommandNode, _context: SemanticContext): CommandSemantics {
     const args = [...node.args];
     const first = args[0]?.value ?? "";
-    // 子命令首词（跳过取值选项及其值）；信息选项/裸命令分支提前返回时该计算无副作用
-    const head = extractSubcommand(args, VALUE_OPTS).split(" ")[0] ?? "";
+    // 子命令首词（引擎投影：取值选项被消费，positional[0] = 首词）；
+    // 信息选项/裸命令分支提前返回时该计算无副作用
+    const { positional } = parseOptions(args, { opts: VALUE_OPTS, positional: "file", opaqueOnUnknown: false });
+    const head = positional[0]?.value ?? "";
 
     // 裸 herdr 或选项开头：信息选项 → inspect；其余选项（--session/--remote/--remote-keybindings
     // 取值选项、--no-session 模式选项）跳过后若仍解析出子命令则按子命令分类，
