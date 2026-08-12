@@ -22,7 +22,7 @@ interface TextConfigEntry {
 // 附着形式：separated（-e X）、equals（--expression=X）、attached（-eX、-oX）、suffix（-i.bak）。
 
 const SED_OPTS: Opt[] = [
-  { names: ["-i", "--in-place"], kind: "flag", operation: "write", forms: ["suffix", "equals"] },
+  { names: ["-i", "--in-place"], kind: "flag", operation: "write", upgradeTo: "modify", forms: ["suffix", "equals"] },
   { names: ["-e", "--expression"], kind: "expression", isPattern: true, forms: ["separated", "attached", "equals"] },
   { names: ["-f", "--file"], kind: "file", operation: "read", isPattern: true, forms: ["separated", "equals"] },
   { names: ["-l", "--line-length"], kind: "expression", forms: ["separated", "equals"] },
@@ -31,7 +31,7 @@ const SED_OPTS: Opt[] = [
 ];
 
 const AWK_OPTS: Opt[] = [
-  { names: ["-i", "--in-place"], kind: "flag", operation: "write", forms: ["suffix", "equals"] },
+  { names: ["-i", "--in-place"], kind: "flag", operation: "write", upgradeTo: "modify", forms: ["suffix", "equals"] },
   { names: ["-f", "--file"], kind: "file", operation: "read", isPattern: true, forms: ["separated", "equals"] },
   { names: ["-e"], kind: "expression", isPattern: true, forms: ["separated", "attached"] },
   { names: ["-F", "--field-separator"], kind: "expression", forms: ["separated", "attached", "equals"] },
@@ -40,13 +40,13 @@ const AWK_OPTS: Opt[] = [
 ];
 
 const SORT_OPTS: Opt[] = [
-  { names: ["-o", "--output"], kind: "file", operation: "write", forms: ["separated", "attached", "equals"] },
+  { names: ["-o", "--output"], kind: "file", operation: "write", upgradeTo: "modify", forms: ["separated", "attached", "equals"] },
   { names: ["-t", "--field-separator", "-k", "--key"], kind: "expression", forms: ["separated", "attached", "equals"] },
   { names: ["-n", "-r", "-u", "-f", "-b", "-c", "-m", "-h", "-V", "-s", "--numeric-sort", "--reverse", "--unique", "--ignore-case", "--stable", "--check", "--merge", "--version", "--help"], kind: "flag" },
 ];
 
 const UNIQ_OPTS: Opt[] = [
-  { names: ["-o", "--output"], kind: "file", operation: "write", forms: ["separated", "attached", "equals"] },
+  { names: ["-o", "--output"], kind: "file", operation: "write", upgradeTo: "modify", forms: ["separated", "attached", "equals"] },
   { names: ["-c", "-d", "-u", "-i", "--count", "--repeated", "--unique", "--ignore-case", "--version", "--help"], kind: "flag" },
 ];
 
@@ -70,7 +70,7 @@ export const textTransformAdapter: CommandAdapter = {
     const entry = TEXT_CONFIG[name];
     if (!entry) return makeSemantics("unknown", { reason: `unknown text command: ${name}`, opaque: true });
 
-    const { positional, consumed, sawWrite, opaque } = parseOptions([...node.args], entry.config);
+    const { positional, consumed, sawWrite, opaque, classAdjust } = parseOptions([...node.args], entry.config);
 
     // 位置参数：sed/awk 在 in-place 写出现时是原地修改目标（write），否则只读输入
     const positionalOp = entry.inPlace && sawWrite ? "write" : "read";
@@ -82,9 +82,9 @@ export const textTransformAdapter: CommandAdapter = {
       confidence: "exact" as const,
     }));
 
-    // 写意图（-o/--output 或 in-place -i）→ 升级 modify
+    // 写意图（-o/--output 或 in-place -i，T-059/B1：声明 upgradeTo: modify）→ 升级 modify
     const fileIntents = consumedFileIntents(consumed);
-    const hasWrite = sawWrite || fileIntents.some((i) => i.operation === "write");
+    const hasWrite = classAdjust === "modify";
     const cls: "inspect" | "modify" | "unknown" = hasWrite ? "modify" : entry.class;
 
     // 位置参数与选项值 intent 按 token 出现顺序合并（span 排序）

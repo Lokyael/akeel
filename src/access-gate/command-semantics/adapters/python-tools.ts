@@ -12,7 +12,7 @@
 // No path intents for v1.  modify tools rely on the shell-compiler's conservative
 // write-on-cwd fallback; inspect tools are gated by shellPolicy.inspect.
 
-import type { ShellCommandNode, ShellArg } from "../../shell-parse/types";
+import type { ShellCommandNode } from "../../shell-parse/types";
 import type { CommandAdapter, CommandSemantics, SemanticContext } from "../types";
 import { makeSemantics } from "./shared";
 import { parseOptions, type Opt } from "./option-parse";
@@ -22,9 +22,9 @@ import { parseOptions, type Opt } from "./option-parse";
 interface PyToolDef {
   cls: "inspect" | "modify" | "execute";
   subcommands?: Record<string, { cls: "inspect" | "modify" | "execute"; reason: string }>;
-  /** Flags that downgrade modify → inspect (e.g. --check, --diff). */
+  /** Flags that downgrade modify → inspect (e.g. --check, --diff)；声明为 downgradeTo: "inspect"（T-059/B1）。 */
   inspectFlags?: string[];
-  /** Flags that upgrade inspect → modify (e.g. --fix). */
+  /** Flags that upgrade inspect → modify (e.g. --fix)；声明为 upgradeTo: "modify"（T-059/B1）。 */
   modifyFlags?: string[];
   reason: string;
 }
@@ -93,12 +93,12 @@ const VALUE_OPTS: readonly Opt[] = [
   { names: ["-k", "--maxfail", "--tb", "-n", "--numprocesses", "--dist", "--timeout"], kind: "expression", forms: ["separated", "equals"] },
 ];
 
-/** Check if any of the given flags are present in args (exact or --flag=value form). */
-function hasFlag(args: readonly ShellArg[], flags: string[]): boolean {
-  return args.some((a) => {
-    const v = a.value ?? "";
-    return flags.some((f) => v === f || v.startsWith(f + "="));
-  });
+/** 工具级 class 调节 Opt 表（T-059/B1）：inspectFlags → downgradeTo inspect、modifyFlags → upgradeTo modify。 */
+function adjustOpts(def: PyToolDef): Opt[] {
+  const opts: Opt[] = [];
+  if (def.inspectFlags) opts.push({ names: def.inspectFlags, kind: "flag", downgradeTo: "inspect" });
+  if (def.modifyFlags) opts.push({ names: def.modifyFlags, kind: "flag", upgradeTo: "modify" });
+  return opts;
 }
 
 // ─── adapter ───
@@ -110,11 +110,17 @@ export const pythonToolsAdapter: CommandAdapter = {
     const def = PY_TOOLS[name];
     if (!def) return makeSemantics("unknown", { reason: `unknown python tool: ${name}`, opaque: true });
 
+    // 引擎投影：取值选项被消费，positional[0] = 子命令首词；
+    // classAdjust 由工具级调节 flag 声明驱动（T-059/B1，替代 hasFlag 手写扫描）
+    const { positional, classAdjust } = parseOptions(node.args, {
+      opts: [...VALUE_OPTS, ...adjustOpts(def)],
+      positional: "file",
+      opaqueOnUnknown: false,
+    });
+
     // 1. Resolve base class: subcommand overrides default
     let cls = def.cls;
     let reason = def.reason;
-    // 引擎投影：取值选项被消费，positional[0] = 子命令首词（T-059）
-    const { positional } = parseOptions(node.args, { opts: VALUE_OPTS, positional: "file", opaqueOnUnknown: false });
     const subcmd = positional[0]?.value ?? "";
     if (def.subcommands && subcmd) {
       const sub = def.subcommands[subcmd];
@@ -124,11 +130,13 @@ export const pythonToolsAdapter: CommandAdapter = {
       }
     }
 
-    // 2. Apply flag-based overrides (order matters: modify→inspect before inspect→modify)
-    if (cls === "modify" && def.inspectFlags && hasFlag(node.args, def.inspectFlags)) {
+    // 2. Apply classAdjust（引擎风险序 fail-closed：destroy > modify > inspect）：
+    //    modify 工具被 --check 降级 inspect；inspect 工具被 --fix 升级 modify。
+    //    同工具不共存 upgrade+downgrade 命中（black/isort 仅 downgrade、ruff 仅 upgrade）。
+    if (classAdjust === "inspect" && cls === "modify") {
       cls = "inspect";
       reason = `${reason} (check-only)`;
-    } else if (cls === "inspect" && def.modifyFlags && hasFlag(node.args, def.modifyFlags)) {
+    } else if (classAdjust === "modify" && cls === "inspect") {
       cls = "modify";
       reason = `${reason} (with fixes)`;
     }

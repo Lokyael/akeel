@@ -14,9 +14,9 @@ import { parseOptions, type Opt, type OptConfig } from "./option-parse";
 
 const FIND_OPTS: Opt[] = [
   { names: ["-name", "-iname", "-path", "-ipath", "-regex", "-iregex", "-type", "-user", "-group", "-perm", "-size", "-mtime", "-atime", "-ctime", "-maxdepth", "-mindepth", "-newer", "-anewer", "-cnewer", "-samefile", "-inum", "-links", "-printf", "-uid", "-gid", "-D", "-O"], kind: "expression" },
-  { names: ["-fprint", "-fprintf", "-fls", "-fwrite"], kind: "file", operation: "write" },
-  { names: ["-delete", "-okdir"], kind: "flag", operation: "write" },
-  { names: ["-exec", "-execdir", "-ok"], kind: "flag", operation: "write", consumeUntil: ["+", ";"] },
+  { names: ["-fprint", "-fprintf", "-fls", "-fwrite"], kind: "file", operation: "write", upgradeTo: "modify" },
+  { names: ["-delete", "-okdir"], kind: "flag", operation: "write", upgradeTo: "modify" },
+  { names: ["-exec", "-execdir", "-ok"], kind: "flag", operation: "write", upgradeTo: "modify", consumeUntil: ["+", ";"] },
   { names: ["-o", "-a", "-not", "-print", "-print0", "-ls", "-depth", "-xdev", "-L", "-P", "-H", "-noleaf", "-daystart", "-warn", "-nowarn", "-ignore_readdir_race", "-noignore_readdir_race"], kind: "flag" },
 ];
 
@@ -24,7 +24,7 @@ const FIND_OPTS: Opt[] = [
 
 const TREE_OPTS: Opt[] = [
   { names: ["-L", "--level", "-I", "--ignore", "-P", "--pattern", "--charset"], kind: "expression", forms: ["separated", "equals"] },
-  { names: ["-o"], kind: "file", operation: "write", forms: ["separated", "attached"] },
+  { names: ["-o"], kind: "file", operation: "write", upgradeTo: "modify", forms: ["separated", "attached"] },
   { names: ["-a", "-d", "-f", "-i", "-s", "-h", "--dirsfirst", "--noreport", "--du"], kind: "flag" },
 ];
 
@@ -126,10 +126,10 @@ export const searchAdapter: CommandAdapter = {
     const config = SEARCH_CONFIG[name];
     if (!config) return makeSemantics("unknown", { reason: `unknown search command: ${name}`, opaque: true });
 
-    // 引擎遍历：consumed（值，含文件/表达式）+ flags（无值标志）+ sawWrite + opaque
+    // 引擎遍历：consumed（值，含文件/表达式）+ flags（无值标志）+ sawWrite + classAdjust + opaque
     // search 收紧：未知选项 → opaque（B4；-okdir 等未建模破坏项因此被堵）
     const optsConfig: OptConfig = { opts: config.opts, positional: "file", opaqueOnUnknown: true };
-    const { positional, consumed, flags, sawWrite, opaque } = parseOptions([...node.args], optsConfig);
+    const { positional, consumed, flags, opaque, classAdjust } = parseOptions([...node.args], optsConfig);
 
     // kind=file 的值 → 路径 intent（-f 的 pattern 文件 read、-fprint/-o 的输出文件 write）
     const fileIntents = consumedFileIntents(consumed);
@@ -162,8 +162,8 @@ export const searchAdapter: CommandAdapter = {
       ? rootArgs.map((arg) => rootIntent(pathOperation, arg.value ?? "", arg.span))
       : [rootIntent(pathOperation, config.defaultRoot, SYNTHETIC_SPAN)];
 
-    // 破坏性/写选项（sawWrite：-delete/-exec/-o/-fprint…）→ 升级 modify
-    const cls = sawWrite || writeValues.length > 0 ? "modify" : config.class;
+    // 破坏性/写选项（-delete/-exec/-o/-fprint…，T-059/B1：声明 upgradeTo: modify）→ 升级 modify
+    const cls = classAdjust === "modify" ? "modify" : config.class;
 
     // 类别固定顺序（既有契约）：pattern 文件（-f read）→ 搜索根 → 输出文件（-fprint/-o write，从 fileIntents 去重）
     const otherFileIntents = fileIntents.filter((i) => i.operation !== "write");
