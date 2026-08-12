@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { renderCompilationFailure, renderDecision } from "../../src/access-gate/gate/render-decision";
-import { denyResponseKindFor, guidanceFor, guidanceText } from "../../src/access-gate/gate/guidance-catalog";
-import { evidenceKind } from "../../src/access-gate/gate/access-request";
-import type { DenyResponseKind } from "../../src/access-gate/gate/guidance-catalog";
+import { renderCompilationFailure, renderDecision } from "../../src/access-gate/gate/decision/render-decision";
+import { denyResponseKindFor, guidanceFor, guidanceText } from "../../src/access-gate/gate/decision-code-catalog";
+import { evidenceKind } from "../../src/access-gate/gate/plan/request-builder";
+import type { DenyResponseKind } from "../../src/access-gate/gate/decision-code-catalog";
 import type { GateDecision, GateEvidence, GuidanceId, DecisionCode } from "../../src/access-gate/gate/decision-types";
 
 const evidence: GateEvidence[] = [{ kind: "syntax", subject: "~/sensitive/path" }];
@@ -248,8 +248,8 @@ test("classifies every DecisionCode into one renderer response kind", () => {
 });
 
 test("classifies every DecisionCode into one evidence kind", () => {
-  // T-047 #3：evidenceKind 全量锁定——approval-required/user-denied 保持现状
-  //（"command"，审批决策不经 evidenceKind 构造证据）；"approval" kind 成员零生产者另观察。
+  // evidenceKind 全量锁定——approval-required/user-denied 保持现状
+  //（"command"，审批决策不经 evidenceKind 构造证据）。
   const codes: readonly DecisionCode[] = [
     "dynamic-shell", "unsafe-syntax", "threat", "opaque-command", "destroy-command",
     "hard-command-rule", "blocked-path", "symlink-escape", "path-unclassifiable", "path-denied",

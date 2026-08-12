@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
 import assert from "node:assert/strict";
-import type { CompilerContext, CompleteAccessPlan, CompileResult } from "../../src/access-gate/gate/access-request";
+import type { CompilerContext, CompleteAccessPlan, CompileResult } from "../../src/access-gate/gate/plan/request-builder";
 import { resolveProfiles } from "../../src/access-gate/profile/resolve";
 import type { ResolvedProfiles } from "../../src/access-gate/profile/types";
 import { lex } from "../../src/access-gate/shell-parse/lexer";
@@ -82,7 +82,6 @@ export function analyzeCommand(cmd: string, ctx: SemanticContext = DEFAULT_CTX):
 export function analyzeNormalizedCommand(cmd: string, ctx: SemanticContext = DEFAULT_CTX): CommandSemantics {
   const { program } = parse(lex(cmd).tokens);
   const norm = normalizeCommand(program.commands[0]!);
-  if (!norm) throw new Error(`normalize failed for command: ${cmd}`);
   return analyzeSemantics(norm.command, ctx);
 }
 

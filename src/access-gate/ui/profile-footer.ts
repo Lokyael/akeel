@@ -57,7 +57,7 @@ try {
   // The host Pi package is unavailable in standalone unit tests.
 }
 
-// ─── 宽度/截断助手（T-050 A3b）───
+// ─── 宽度/截断助手 ───
 // 生产环境用宿主 pi-tui（grapheme/宽字符正确：CJK/emoji 按 2 列）；独立测试环境
 // 无 pi-tui（只随宿主 bundle 提供），fallback 到手写近似——与 NativeFooter 同模式。
 
@@ -128,7 +128,7 @@ function formatTokens(count: number): string {
 }
 
 /**
- * left/right 适配（T-050 A3a 统一 appendRight + fitLine）：装得下→填充；
+ * left/right 适配（统一 appendRight + fitLine）：装得下→填充；
  * 右超宽→只留右；否则→左截断+填充。宽度 ANSI 感知（pi-tui 或 fallback）。
  */
 export function fitLine(left: string, right: string, width: number): string {

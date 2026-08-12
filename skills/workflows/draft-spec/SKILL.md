@@ -19,7 +19,7 @@ Turn the current conversation into a structured Task Record. Synthesize everythi
 
 ## Output
 
-Add the Requirements sections to the current task file under a precise `T-xxx: <topic>` heading — fill the trailing empty slot in `docs/task.md` and append a new one with number + 1 (Next-ID slots, per principles.md Quick Reference — Record Lifecycle). Use `docs/task.md` by default; use `docs/task-<topic>.md` only when the task has an independent lifecycle. If the user specifies an issue tracker, link it from the Task Record. Do not create a separate spec file or directory.
+Add the Requirements sections to the current task file under a precise `T-xxx: <topic>` heading (per principles.md Next-ID slots). Use `docs/task.md` by default; use `docs/task-<topic>.md` only when the task has an independent lifecycle. If the user specifies an issue tracker, link it from the Task Record. Do not create a separate spec file or directory.
 
 If the source is a `C-xxx` entry, proceed only after the user explicitly commits to the work in the current conversation (migration per principles.md Quick Reference — Migration Protocol). Add optional `Origin: C-xxx` metadata to the Task Record and remove the Candidate Record in the same change. The existence, wording, `Review On`, or `Trigger` of a Candidate Record is never sufficient approval.
 

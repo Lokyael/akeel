@@ -1,4 +1,4 @@
-import type { SourceSpan } from "../shell-parse/types";
+import type { SourceSpan } from "../shell-parse";
 
 export type DecisionCode =
   | "dynamic-shell"

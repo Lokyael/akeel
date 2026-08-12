@@ -1,4 +1,4 @@
-// 子代理会话初始化编排（T-052 C1 / D-039）
+// 子代理会话初始化编排（D-039）
 // 把"档位如何生效"收敛为两个函数：applySubagentProfile（检测→映射→钳制→生效档）
 // 与 publishParentTier（父档位号传播）。env 参数化（默认 process.env）使其可独立测试。
 

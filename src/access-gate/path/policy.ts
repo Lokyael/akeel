@@ -9,7 +9,7 @@ export { resolvePath } from "./resolve";
 export type { ResolvedPath } from "./resolve";
 export type { PathOperation } from "../profile/types";
 
-/** Path 硬拒 reason 常量；reason → DecisionCode 的类型化映射在 evaluate-request.ts（T-046 R8）。 */
+/** Path 硬拒 reason 常量；reason → DecisionCode 的类型化映射在 evaluate-request.ts。 */
 export const PATH_DENY_REASONS = {
   blocked: "blocked path",
   unclassifiable: "path cannot be classified",
@@ -41,7 +41,7 @@ function blockedPattern(path: ResolvedPath, blockedPaths: readonly string[]): st
 }
 
 function selectedRule(policy: PathPolicy, path: ResolvedPath, operation: PathOperation): PathRule | undefined {
-  // 规则匹配与 blocked 候选同源：虚拟路径优先，home 路径追加 `~/` 形式（T-055）。
+  // 规则匹配与 blocked 候选同源：虚拟路径优先，home 路径追加 `~/` 形式。
   const home = homeForm(path);
   const ruleCandidates = home ? [path.virtualPath, home] : [path.virtualPath];
   for (const candidate of ruleCandidates) {

@@ -103,7 +103,7 @@ defineAdapterTests("git", [
   { cmd: "git mv old.ts new.ts", name: "mv carries write intents", cls: "modify", intents: [{ operation: "write", rawPath: "old.ts" }, { operation: "write", rawPath: "new.ts" }] },
   { cmd: ["git cherry-pick abc123", "git revert abc123"], name: "cherry-pick and revert are modify", cls: "modify" },
   { cmd: "git config user.name zev", name: "config key value is modify write with conservative target", cls: "modify", opaque: false, intents: [{ operation: "write", rawPath: ".git/config", confidence: "conservative" }] },
-  // ── T-037: config 读写分类与层级目标解析 ──
+  // ── config 读写分类与层级目标解析 ──
   { cmd: "git config user.name", name: "config single key is inspect without path intent", cls: "inspect", intents: [] },
   { cmd: "git config --global user.name zev", name: "config --global writes ~/.gitconfig", cls: "modify", intents: [{ operation: "write", rawPath: "~/.gitconfig", confidence: "exact" }] },
   { cmd: "git config --system core.filemode false", name: "config --system writes /etc/gitconfig", cls: "modify", intents: [{ operation: "write", rawPath: "/etc/gitconfig", confidence: "exact" }] },

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { hardDeny, profileDeny, requireApproval } from "../../src/access-gate/gate/decision-builder";
+import { hardDeny, profileDeny, requireApproval } from "../../src/access-gate/gate/decision/decision-builder";
 
 test("hard deny gets guidance from catalog", () => {
   const d = hardDeny("dynamic-shell", "glob in command");

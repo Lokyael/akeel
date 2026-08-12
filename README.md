@@ -38,45 +38,89 @@ Hard threats, unsafe Shell syntax, symlink escapes, and blocked paths always den
 
 ## Configuration
 
-Pi Keel loads configuration only from the user agent directory (`~/.pi/agent` by default, or `$PI_CODING_AGENT_DIR`). Profiles and Shell command semantics are user-global configuration only.
+Pi Keel loads configuration **only** from the user agent directory (`~/.pi/agent` by default, or `$PI_CODING_AGENT_DIR`). All user configuration — Profiles, Shell command semantics, and optional tool modeling — is centralized in a single file:
 
-### Profiles
+```text
+~/.pi/agent/pi-keel/config.yaml
+```
 
-Define user Profiles in `~/.pi/agent/pi-keel/profiles.json`. Built-ins load first; a user Profile can extend them, and `defaultProfile` selects the Profile used at the start of every Session.
+```yaml
+# pi-keel 唯一用户配置入口（D-041）
+defaultProfile: team-develop
 
-```json
-{
-  "defaultProfile": "team-develop",
-  "profiles": {
-    "team-develop": {
-      "description": "Project writes allowed; execution requires approval.",
-      "extends": ["keel-develop"],
-      "shellPolicy": {
-        "execute": "ask"
-      }
-    }
-  }
-}
+profiles:
+  team-develop:
+    description: Project writes allowed; execution requires approval.
+    extends: [keel-develop]
+    shellPolicy:
+      execute: ask
+
+subagentProfiles:
+  worker: project
+
+commands:
+  aliases:
+    fd: find
+  commands:
+    docker:
+      class: execute
+      effects: [execute, network]
+
+optionalAdapters:
+  - herdr
 ```
 
 Profile decisions are `allow`, `ask`, or `deny`. Path rules independently control `read`, `list`, `search`, and `write`; use `/profile status` to inspect the fully resolved policy. Rule patterns match the resolved path in its virtual form (`project/**`, `staging/**`), absolute form (e.g. `/tmp/**`), or home-relative form (`~/...`, e.g. `~/.gitconfig`). Hard-blocked secret paths under `~/` (`.ssh`, `.aws`, `.gnupg`, `.kube`, `.docker/config.json`, `.config/gcloud`) stay hard-denied regardless of rules.
 
-### Shell Command Overrides
+### Command Semantics Overrides (`commands`)
 
-Define user-only aliases, simple command semantics, and classification adjustments in `~/.pi/agent/pi-keel/command-overrides.yaml`:
+The `commands` section extends or adjusts Shell command semantics declaratively; built-in TypeScript adapters remain authoritative. Resolution order: `commands` definitions → `aliases` → built-in adapter → `reclassify`.
 
 ```yaml
+# 别名：让未知命令复用已知 adapter 的完整语义分析
+# （路径提取、效果推断和子命令解析全部沿用目标 adapter 的逻辑）。
+# 键为显式作用域：裸名（仅裸调用）/ 完整路径字符串 / 路径前缀（以 / 结尾，
+# 覆盖该前缀下所有路径形式；前缀键与路径形式均做 ./ 归一化；
+# 精确键优先，最长前缀优先）
 aliases:
   fd: find
   bat: cat
+  exa: ls
+  just: make
+  "./node_modules/.bin/eslint": node   # 精确：npm 本地 eslint 按 node 语义
+  "bin/": cat                          # 前缀：项目 bin/ 脚本只读语义（./bin/ 同样命中）
 
+# 新命令定义：为没有对应 adapter 的命令提供声明式分类
+# 适合只需分类、不需要路径提取的简单命令
 commands:
   docker:
     class: execute
     effects: [execute, network]
+    subcommands:
+      ps: { class: inspect, effects: [read] }
+      images: { class: inspect, effects: [read] }
+      build: { class: execute, effects: [write, network] }
+
+# 分类微调：修改内置 adapter 的分类结果
+# pattern 是正则，匹配完整的子命令字符串（从第一个非选项参数起，空格连接）
+reclassify:
+  - command: git
+    pattern: "branch -[dD]"
+    class: destroy
 ```
 
-Built-in TypeScript adapters remain authoritative. Project-local override files are ignored, and unknown Direct tool surfaces are outside this configuration. See [D-024](docs/decisions.md#d-024-命令覆盖层) for the complete schema and precedence rules.
+### Optional Tool Modeling (`optionalAdapters`)
+
+Pi Keel ships token-level command modeling for a few tools that are **not loaded by default**: they only take effect when you explicitly list them under `optionalAdapters`. This keeps the default adapter set closed and predictable, while giving you high-quality modeling (option-value consumption, per-subcommand classes) where the declarative `commands` section is too coarse. Enabling an unknown name fails closed — a loud error is reported and no optional adapters are loaded.
+
+```yaml
+optionalAdapters:
+  - herdr
+```
+
+With `herdr` enabled, `herdr status` classifies as `inspect`, control subcommands (`agent`, `pane`, `workspace`, …) as `execute`, and `herdr update` as `execute` with a network effect; `--session`/`--remote` option values are consumed correctly. Without it, `herdr` keeps the default fallback (bare-name unknown / path-form execute).
+
+Built-in TypeScript adapters remain authoritative. Project-local config files are ignored, and unknown Direct tool surfaces are outside this configuration. See [D-024](docs/decisions.md#d-024-命令覆盖层) for the overrides design and known limitations, and [D-041](docs/decisions.md#d-041-集中配置与可选工具建模configyaml--optionaladapters) for centralized config and optional adapters.
 
 ## Companion Packages
 
@@ -84,14 +128,19 @@ Recommended third-party packages that pair well with Pi Keel:
 
 | Package | Source | What it adds |
 |---------|--------|--------------|
-| pi-subagents | `npm:pi-subagents` | Sub-agent delegation: parallel tasks, chains, async runs, and supervisor review. Children load Pi Keel's gate automatically (ambient extensions), and Pi Keel manages sub-agent permissions via tiered sub-agent Profiles (see [D-039](docs/decisions.md#d-039-子代理档位制pi-keel--pi-subagents) and [T-051](docs/task.md))
+| pi-subagents | `npm:pi-subagents` | Sub-agent delegation: parallel tasks, chains, async runs, and supervisor review. Children load Pi Keel's gate automatically (ambient extensions), and Pi Keel manages sub-agent permissions via tiered sub-agent Profiles (see [D-039](docs/decisions.md#d-039-子代理档位制pi-keel--pi-subagents))
 | pi-search | `npm:@heyhuynhgiabuu/pi-search` | Research tools for the agent: web search, code search, library docs, repo Q&A, URL fetching, and Firecrawl scraping/crawling |
-| pi-sticky-input | `npm:pi-sticky-input` | Keeps chat input, status widgets, and footer anchors anchored while session history updates |
+| herdr | `https://herdr.dev` | Terminal workspace manager for coding agents: persistent panes, tabs, and workspaces, agent lifecycle control, and background terminals that keep running after a session ends. Pairs with the herdr agent skill registered at `~/.pi/agent/skills/herdr` |
 
 ```bash
 pi install npm:pi-subagents
 pi install npm:@heyhuynhgiabuu/pi-search
-pi install npm:pi-sticky-input
+```
+
+Herdr is a standalone binary rather than a Pi package; install it with its own installer:
+
+```bash
+curl -fsSL https://herdr.dev/install.sh | sh
 ```
 
 Review the source of any third-party package before installing — Pi packages run with full system access.
@@ -105,7 +154,6 @@ Review the source of any third-party package before installing — Pi packages r
 | [docs/decisions.md](docs/decisions.md) | Long-term architecture and policy decisions |
 | [docs/task.md](docs/task.md) | Active task records |
 | [docs/traceability.md](docs/traceability.md) | External sources, adoption mapping, and license obligations |
-| [docs/security-boundaries.md](docs/security-boundaries.md) | Residual security boundaries |
 
 ## License
 

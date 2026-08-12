@@ -2,7 +2,7 @@
 //
 // B 候选：选项遍历由统一引擎 option-parse 承担（Opt/ParseResult），本文件只剩 schema 声明
 // 与语义映射（consumed → 路径 intent；sawWrite → modify 升级；位置参数性质 → intent 操作）。
-// 制度化 D-027（值性质）与 T-045（位置参数性质）。
+// 制度化 D-027（值性质）与位置参数性质。
 
 import type { ShellCommandNode } from "../../shell-parse/types";
 import type { CommandAdapter, CommandSemantics, PathIntent, SemanticContext } from "../types";
@@ -50,7 +50,7 @@ const UNIQ_OPTS: Opt[] = [
   { names: ["-c", "-d", "-u", "-i", "--count", "--repeated", "--unique", "--ignore-case", "--version", "--help"], kind: "flag" },
 ];
 
-// tr 无文件参数（GNU/POSIX 均只读 stdin）；选项全为 flag，位置参数（SET1/SET2）是字符集非文件（T-045: set）。
+// tr 无文件参数（GNU/POSIX 均只读 stdin）；选项全为 flag，位置参数（SET1/SET2）是字符集非文件（set）。
 const TR_OPTS: Opt[] = [
   { names: ["-c", "--complement", "-d", "--delete", "-s", "--squeeze-repeats", "-t", "--truncate-set1", "--help", "--version"], kind: "flag" },
 ];
@@ -62,8 +62,6 @@ const TEXT_CONFIG: Record<string, TextConfigEntry> = {
   uniq: { class: "inspect", config: { opts: UNIQ_OPTS, positional: "file", opaqueOnUnknown: true }, reason: "unique lines" },
   tr: { class: "inspect", config: { opts: TR_OPTS, positional: "set", opaqueOnUnknown: true }, reason: "translate characters" },
 };
-
-/** consumed 中 kind=file 的值 → 路径 intent（共享 helper，consumedFileIntents）。 */
 
 export const textTransformAdapter: CommandAdapter = {
   names: Object.keys(TEXT_CONFIG),

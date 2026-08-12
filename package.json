@@ -9,7 +9,7 @@
     "test:path": "tsx --test tests/access-gate/path-policy.test.ts",
     "test:gate": "tsx --test tests/access-gate/decision-builder.test.ts tests/access-gate/gate-decision.test.ts tests/access-gate/gate.test.ts tests/access-gate/access-request.test.ts tests/access-gate/access-plan-verifier.test.ts tests/access-gate/task2-contract.test.ts tests/access-gate/gate-policy-matrix.test.ts tests/access-gate/guidance.test.ts tests/access-gate/access-request-invariants.test.ts",
     "test:shell-parse": "tsx --test tests/access-gate/shell-parse.test.ts",
-    "test:cmd-semantics": "tsx --test tests/access-gate/command-semantics-*.test.ts tests/access-gate/command-overrides.test.ts",
+    "test:cmd-semantics": "tsx --test tests/access-gate/command-semantics-*.test.ts tests/access-gate/command-overrides.test.ts tests/access-gate/config-load.test.ts",
     "test:index": "tsx --test tests/access-gate/index.test.ts",
     "test:footer": "tsx --test tests/access-gate/profile-footer.test.ts"
   },

@@ -65,9 +65,7 @@ test("subagent scout stays scratch even with parent tier 1", async () => {
 test("subagentProfiles override maps worker to scratch", async () => {
   const agentDir = mkdtempSync(join(tmpdir(), "pi-access-subagent-agent-"));
   mkdirSync(join(agentDir, "pi-keel"), { recursive: true });
-  writeFileSync(join(agentDir, "pi-keel", "profiles.json"), JSON.stringify({
-    subagentProfiles: { worker: "scratch" },
-  }));
+  writeFileSync(join(agentDir, "pi-keel", "config.yaml"), "subagentProfiles:\n  worker: scratch\n");
   const previous = process.env.PI_CODING_AGENT_DIR;
   process.env.PI_CODING_AGENT_DIR = agentDir;
   await withEnv({ [SUBAGENT_CHILD_ENV]: "1", [SUBAGENT_CHILD_AGENT_ENV]: "worker", [PARENT_TIER_ENV]: "1" }, async () => {

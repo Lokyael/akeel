@@ -35,12 +35,12 @@ function withContext<T>(fn: (env: TestContext) => T): T {
 }
 
 test("does not expose a raw plan issuer", async () => {
-  const verifier = await import("../../src/access-gate/gate/access-plan-verifier");
+  const verifier = await import("../../src/access-gate/gate/plan/access-plan-verifier");
   assert.equal("issueAccessPlan" in verifier, false);
 });
 
 test("does not expose raw plan constructors", async () => {
-  const request = await import("../../src/access-gate/gate/access-request");
+  const request = await import("../../src/access-gate/gate/plan/request-builder");
   assert.equal("createAccessPlan" in request, false);
   assert.equal("createRequest" in request, false);
 });
@@ -125,7 +125,7 @@ test("verifier rejects an issued plan above the command budget", async () => {
     });
     const issuedPlans = new WeakSet<object>();
     issuedPlans.add(overBudget);
-    const verifier = await import("../../src/access-gate/gate/access-plan-verifier");
+    const verifier = await import("../../src/access-gate/gate/plan/access-plan-verifier");
     assert.equal(verifier.validateCompleteAccessPlan(overBudget, issuedPlans), false);
   });
 });

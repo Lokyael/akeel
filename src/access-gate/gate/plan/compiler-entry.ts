@@ -1,4 +1,4 @@
-import type { CwdCandidate } from "../command-semantics/types";
+import type { CwdCandidate } from "../../command-semantics";
 import { compileDirectToolDraft } from "./direct-tool-compiler";
 import { compileShellDraft } from "./shell-compiler";
 import { validateCompleteAccessPlan } from "./access-plan-verifier";
@@ -14,7 +14,7 @@ import {
   type CompileResult,
   type DirectToolCompilerInput,
   type ShellCompilerInput,
-} from "./access-request";
+} from "./request-builder";
 import type {
   AccessOperation,
   AccessPlanDraft,

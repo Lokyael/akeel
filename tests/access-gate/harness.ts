@@ -87,7 +87,7 @@ export function startSession() {
   return { harness, root, cleanup };
 }
 
-// ─── env 构造/保存/恢复（T-053 C1：子代理测试样板统一） ───
+// ─── env 构造/保存/恢复（子代理测试样板统一） ───
 
 /** 构造独立 env 对象（默认空），供 env 参数化函数直接断言。 */
 export function makeEnv(overrides: Record<string, string> = {}): NodeJS.ProcessEnv {

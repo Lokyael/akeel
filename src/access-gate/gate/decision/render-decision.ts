@@ -1,8 +1,8 @@
-import { denyResponseKindFor, guidanceFor, guidanceText } from "./guidance-catalog";
-import { ANALYSIS_LIMITS, type CompileResult } from "./access-request";
-import type { GateDecision, Guidance } from "./decision-types";
-import type { GateResult } from "./types";
-import type { SourceSpan } from "../shell-parse/types";
+import { denyResponseKindFor, guidanceFor, guidanceText } from "../decision-code-catalog";
+import { ANALYSIS_LIMITS, type CompileResult } from "../plan/request-builder";
+import type { GateDecision, Guidance } from "../decision-types";
+import type { GateResult } from "../host";
+import type { SourceSpan } from "../../shell-parse";
 
 const MAX_RENDERED_REASON = 2_048;
 const MAX_EVIDENCE_ITEMS = 32;

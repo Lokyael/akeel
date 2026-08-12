@@ -61,7 +61,7 @@ export function firstNonOptionIndex(args: ReadonlyArray<{ readonly value?: strin
 }
 
 /**
- * 子命令 token 收集核心（T-046 R4，三个提取器的唯一实现）：
+ * 子命令 token 收集核心（三个提取器的唯一实现）：
  * 从首个非选项 token 起收集；includeOptions=false 只收集非选项 token，
  * includeOptions=true 收集全部后续 token（含选项与取值选项的值——调用方
  * 不提供 valueOptions 即不知哪些选项取值，D-024 已知局限）。`--` 之前终止。
@@ -136,4 +136,34 @@ export function makeSemantics(
     opaque: opts.opaque ?? false,
     reason: opts.reason,
   };
+}
+
+// ─── 子命令表匹配（package/build/interpreters 共用） ───
+// 三份相同的「pattern 规则表 + 首命中返回 + unknown/回退」循环收敛为一处：
+// 规则表驱动（每条 {cls, pattern, reason, network?}），命中即返回；全部未命中返回 null。
+// 表末常以 pattern: () => true 的 catch-all 规则收尾（unknown 或回退分类），
+// 使调用方通常无需处理 null——但 null 语义保留供需要显式回退的 adapter 使用。
+
+export interface RuleDef {
+  cls: CommandClass;
+  pattern: (subcmd: string) => boolean;
+  reason: string;
+  network?: boolean;
+}
+
+/** 按首个子命令词匹配规则表；命中返回语义，全部未命中返回 null。 */
+export function semanticsFromRules(
+  subcmd: string,
+  rules: readonly RuleDef[],
+): CommandSemantics | null {
+  for (const def of rules) {
+    if (def.pattern(subcmd)) {
+      return makeSemantics(def.cls, {
+        reason: def.reason,
+        effects: def.network ? ["network"] : undefined,
+        opaque: def.cls === "unknown",
+      });
+    }
+  }
+  return null;
 }

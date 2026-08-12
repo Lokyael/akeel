@@ -89,7 +89,7 @@
 - `blockedPaths`、威胁模式、unsafe syntax 和 symlink escape 是不可覆盖的 hard deny。
 - `ask` 只提供 `Allow once` 和 `Deny`，不跨调用或 Session 持久化。
 - 每次 Session 从配置的 `defaultProfile` 开始，不继承其他 Session 的临时 Profile。
-- 配置只分内置与用户全局两层：按内置、用户全局顺序合并，全局同名 Profile 替换内置定义。用户全局配置位于 `~/.pi/agent/pi-keel/profiles.json`（`PI_CODING_AGENT_DIR` 可改变 agent 目录）。
+- 配置只分内置与用户全局两层：按内置、用户全局顺序合并，全局同名 Profile 替换内置定义。用户全局配置位于 `~/.pi/agent/pi-keel/config.yaml`（`PI_CODING_AGENT_DIR` 可改变 agent 目录，D-041 集中配置）。
 - 全局配置无效时保留内置 Profiles，并将当前 Session 默认项收紧为 `keel-read`。
 
 ## D-018: Shell IR 与 Access Gate
@@ -131,16 +131,16 @@
 
 **Security invariants:**
 
-- 每个 plan 由 `compiler-entry.ts` 的私有 sealing boundary defensive-copy、deep-freeze 后加入私有 WeakSet；只有官方 compiler entry 能发行 plan，`access-plan-verifier.ts` 只负责无副作用的完整性和 budget proof，`isCompleteAccessPlan()` 是唯一公开完整性 predicate。
+- 每个 plan 由 `compiler-entry.ts` 的私有 sealing boundary defensive-copy、deep-freeze 后加入私有 WeakSet；只有官方 compiler entry 能发行 plan，`access-plan-verifier.ts` 只负责无副作用的完整性和 budget proof，`isCompleteAccessPlan()` 是唯一公开完整性 predicate；WeakSet 在进程生命周期内保持，plan 不跨调用缓存或持久化。
 - Kernel 不接收原始 Shell，也不接收未验证的 plan；compiler outcome 将 dynamic/unsafe/opaque/threat 分为 typed unsupported 或 security category，host renderer 不再通过 DecisionCode 反推 compiler failure kind。
-- coverage 必须逐项对应：command/redirection span 与 operation、顶层 cwd candidates 与 path candidates 去重集合；T-046 起 effect 不再有平行 operations 数组——effect 只以 `command.effects` 承载，span 与 command span 相同，verifier 通过 command span 隐含证明 effect 覆盖；verifier 独立复核 `maxCommands`、`maxOperations`、`maxCwdCandidates` 和 `maxInputLength`。
-- Effect policy axis 是封闭映射：`read/search/write/delete/permissionChange/cwdChange → path`，`execute/network → shell`。
+- coverage 必须逐项对应：command/redirection span 与 operation、顶层 cwd candidates 与 path candidates 去重集合；effect 不再有平行 operations 数组——effect 只以 `command.effects` 承载，span 与 command span 相同，verifier 通过 command span 隐含证明 effect 覆盖；verifier 独立复核 `maxCommands`、`maxOperations`、`maxCwdCandidates` 和 `maxInputLength`。
+- Effect policy axis 是封闭映射：`read/search/write/delete/permissionChange/cwdChange → path`，`execute/network → shell`；gate 对 Shell 命令按 `commandClass` 决策，effects 只在 Direct-origin 操作被消费（shell-only effect 硬拒），不改变 bash 审批路径。
 
 ## D-023: 拒绝解释与静态 Guidance
 
 **Status:** active
 
-**Decision:** 拒绝结果的 guidance 只能引用源码内置的静态 `GuidanceId` catalog，不能拼接可执行 Shell、原始 glob 或用户输入。`renderDecision()` 处理 Policy Kernel 的 `GateDecision`，`renderCompilationFailure()` 处理 typed compiler outcome；两者都执行长度预算（subject ≤ 1,024，reason ≤ 2,048），且 deny 侧 subject 不携带用户派生值（见 D-032 类别化设计）。
+**Decision:** 拒绝结果的 guidance 只能引用源码内置的静态 `GuidanceId` catalog，不能拼接可执行 Shell、原始 glob 或用户输入；renderer 不调用替代 tool、不生成可执行命令。`renderDecision()` 处理 Policy Kernel 的 `GateDecision`，`renderCompilationFailure()` 处理 typed compiler outcome；两者都执行长度预算（subject ≤ 1,024，reason ≤ 2,048），且 deny 侧 subject 不携带用户派生值（见 D-032 类别化设计）。
 
 **Why:** guidance 不能成为间接 code injection 通道；blocked path/threat 不提供绕过建议；deny 侧 subject 只含分类信息（操作类型、可执行名、威胁 id），不携带用户派生值——模型已持有自己提出的命令，gate 不重复具体路径（D-032 类别化取代掩码脱敏）。guidance 文本必须给出可验证判据（如 literal 定义的动态字符集合），且不得建议 LLM 无法自行完成的动作：切换 Profile 只能由用户进行，profile 类 deny 不触发审批弹窗，因此指引改为请求用户更新或批准。
 
@@ -162,55 +162,32 @@
 
 **Status:** active
 
-**Decision:** 不将内置 adapter 的分类规则迁移到声明式文件。提供用户全局 `command-overrides.yaml` 作为 Shell 命令扩展入口，支持别名映射、新命令定义和分类微调。Direct 工具继续由源码 `TOOL_SCHEMAS` 管理。
+**Decision:** 不将内置 adapter 的分类规则迁移到声明式文件。提供用户全局 `config.yaml` 的 `commands` 段（D-041 集中配置）作为 Shell 命令扩展入口，支持别名映射、新命令定义和分类微调。Direct 工具继续由源码 `TOOL_SCHEMAS` 管理。
 
 
 **Why:**
 - Shell adapter 的分类、路径提取和效果推断共享同一趟参数解析——三者是同一个分析的输出，不是可拆分的"数据"和"逻辑"。强行拆分会造成 YAML 和 TS 描述同一命令的双源真理问题。
 - 内置命令分类是权威语义知识；覆盖层用于用户主动补充本机 Shell 命令语义。
-- 命令语义只由内置 adapter 与用户全局 `command-overrides.yaml` 定义，仓库内容不是语义来源。
+- 命令语义只由内置 adapter 与用户全局 `config.yaml` 的 `commands` 段定义，仓库内容不是语义来源。
 - Direct 工具需要精确参数 schema、路径字段和 effect 证明，继续通过源码和测试扩展，不开放 YAML schema。
 
-**格式：**
+**格式：** 完整 schema 与带注释示例见 [README](../README.md#configuration) 的 Command Semantics Overrides 小节；此处只保留最小骨架。
 
 ```yaml
-# ~/.pi/agent/pi-keel/command-overrides.yaml（可选）
-
-# 别名：让未知命令复用已知 adapter 的完整语义分析
-# 路径提取、效果推断和子命令解析全部沿用目标 adapter 的逻辑；
-# 键为显式作用域：裸名（仅裸调用）/ 完整路径字符串 / 路径前缀（以 / 结尾，
-# 覆盖该前缀下所有路径形式；前缀键与路径形式均做 ./ 归一化；
-# 精确键优先，最长前缀优先）（D-034）
-aliases:
-  fd: find
-  bat: cat
-  exa: ls
-  just: make
-  "./node_modules/.bin/eslint": node   # 精确：npm 本地 eslint 按 node 语义
-  "bin/": cat                          # 前缀：项目 bin/ 脚本只读语义（./bin/ 同样命中）
-
-# 新命令定义：为没有对应 adapter 的命令提供声明式分类
-# 适合只需分类、不需要路径提取的简单命令
 commands:
-  docker:
-    class: execute
-    effects: [execute, network]
-    subcommands:
-      ps: { class: inspect, effects: [read] }
-      images: { class: inspect, effects: [read] }
-      build: { class: execute, effects: [write, network] }
-
-# 分类微调：修改内置 adapter 的分类结果
-# pattern 是正则，匹配完整的子命令字符串（从第一个非选项参数起，空格连接）
-reclassify:
-  - command: git
-    pattern: "branch -[dD]"
-    class: destroy
+  aliases:
+    fd: find          # 别名：复用目标 adapter 的完整语义分析
+  commands:
+    docker: { class: execute, effects: [execute, network] }
+  reclassify:
+    - command: git
+      pattern: "branch -[dD]"
+      class: destroy
 ```
 
 **查找顺序：** `commands 定义 → aliases 别名解析 → 内置 adapter → reclassify 覆盖`。
 
-**加载：** 只读取用户全局 `~/.pi/agent/pi-keel/command-overrides.yaml`（`PI_CODING_AGENT_DIR` 可改变 agent 目录）。TypeScript adapter 是内置权威来源。
+**加载：** 只读取用户全局 `~/.pi/agent/pi-keel/config.yaml` 的 `commands` 段（`PI_CODING_AGENT_DIR` 可改变 agent 目录）。TypeScript adapter 是内置权威来源。
 
 **影响：**
 - 内置 adapter 结构和测试不受影响
@@ -220,7 +197,7 @@ reclassify:
 - 别名节点替换 executable 名称后传给目标 adapter，adapter 按目标命令规则执行完整分析（含路径提取）
 
 **已知局限：**
-- `reclassify` 的子命令提取（`fullSubcommand`）不跳过取值选项的值。例如 `cargo --manifest-path Cargo.toml build` 产生的子命令是 `"Cargo.toml build"` 而非 `"build"`。这是因为 `fullSubcommand` 不依赖 per-adapter 的 `valueOpts` 配置。实际影响极小：reclassify 的 pattern 使用 substring 匹配（`"build"` 而非 `"^build$"`），且典型场景（如 git 子命令重分类）不存在此问题。详见 `adapters/shared.ts` 中 `fullSubcommand` 的注释（T-046 R4 迁入 shared 层）。
+- `reclassify` 的子命令提取（`fullSubcommand`）不跳过取值选项的值。例如 `cargo --manifest-path Cargo.toml build` 产生的子命令是 `"Cargo.toml build"` 而非 `"build"`。这是因为 `fullSubcommand` 不依赖 per-adapter 的 `valueOpts` 配置。实际影响极小：reclassify 的 pattern 使用 substring 匹配（`"build"` 而非 `"^build$"`），且典型场景（如 git 子命令重分类）不存在此问题。详见 `adapters/shared.ts` 中 `fullSubcommand` 的注释。
 
 ## D-025: Direct 优先与 Shell 安全子集
 
@@ -240,7 +217,7 @@ reclassify:
 
 **Status:** active
 
-**Decision:** `AGENTS.md` 只定义 pi-keel 自身的维护入口和仓库约定，不复制注入原则、Task 生命周期或当前架构。它随仓库提交并只影响仓库内开发会话。`docs/traceability.md` 只记录外部来源、采用方式、当前文件映射和许可证义务；当前架构、安全边界和长期取舍分别由 `CONTEXT.md`、`docs/security-boundaries.md` 和本决策寄存器维护。
+**Decision:** `AGENTS.md` 只定义 pi-keel 自身的维护入口和仓库约定，不复制注入原则、Task 生命周期或当前架构。它随仓库提交并只影响仓库内开发会话。`docs/traceability.md` 只记录外部来源、采用方式、当前文件映射和许可证义务；当前架构、安全承诺与残余风险、长期取舍分别由 `CONTEXT.md`（含 Negative Space）和本决策寄存器维护。
 
 **Why:** 同一规则或行为在多个长期文档中重复描述会产生漂移。溯源文件只有在来源、revision、采用范围和许可证证据可核查时才具有合规价值；运行时行为和融合取舍放入其中会把它变成第二份架构与决策文档。
 
@@ -262,7 +239,7 @@ reclassify:
 
 **Rejected:** 不把 `-e` 移除出 schema（会导致 opaque 降级）；不为每个取值选项创建独立 adapter；不把 awk `-i`（gawk include 与 in-place 语义冲突）纳入本次修复——保持 fail-closed 的保守 write 分类。不因 sed/awk 的程序/文件位置歧义而放弃 positional 检查——宁可把 program 误判为额外 read 路径（fail-closed 噪声），也不漏掉输入文件（fail-open 漏报）。
 
-**Current implementation:** `OptionSchema.valueKind` 与 `inlineSuffix` 字段；parseOptions 对 expression 值消费但不 push intent，对 inline 后缀产生 conservative write intent。位置参数一律产生路径 intent：sed/awk 在出现写选项（-i）时 positional 升级为 write（原地修改目标），否则为 read；`--` 之后的 token 按文件参数处理。常用无值修饰符（sed -n/-E/-r/-z/-s/-u/--sandbox、awk -V/-h、sort/uniq 常用 flag）标记为 `flag`，不产生 intent 也不置 opaque；awk -F/-v、sed -l、sort -t/-k 等取值选项按 expression 消费；支持短选项内联值（-F,、-vfoo、-es/x/y/）。当前行为：`git rm` 的 delete effect 与 `git push` 等 network effect 生效；`cargo --version` 等全选项输入按 npx 同规则处理（subcmd 为空时回退到第一个选项）。gate 对 bash 命令按 `commandClass` 决策，effects 仅用于 direct-origin 拒绝，git effect 恢复不改变任何审批路径。
+**Current implementation:** `OptionSchema.valueKind` 与 `inlineSuffix` 字段；parseOptions 对 expression 值消费但不 push intent，对 inline 后缀产生 conservative write intent。位置参数一律产生路径 intent：sed/awk 在出现写选项（-i）时 positional 升级为 write（原地修改目标），否则为 read；`--` 之后的 token 按文件参数处理。常用无值修饰符（sed -n/-E/-r、awk -V/-h 等）标记为 `flag`，不产生 intent 也不置 opaque；awk -F/-v、sed -l、sort -t/-k 等取值选项按 expression 消费；支持短选项内联值（`-F,`、`-vfoo`、`-es/x/y/`）。
 
 ## D-028: 统一 Project Record 模型
 
@@ -306,9 +283,9 @@ reclassify:
 
 **Out of Scope:**
 
-- **guidance 文本精简**：失败路径、高压力场景，措辞精度要求最高，压缩风险高于收益。Revisit when guidance 文本总量显著增长。**已评估并 dismiss（C-001，2026-08-08）**：评估结论——进一步压缩无法满足语义零损失，且与总量无关：a9b4448 已把 guidance 从不可执行的含糊短句（`Use a simple literal command or a Direct tool.`）改为可执行判据（动态 token 定义、引号规则、重定向白名单），短句形态因不可执行已被否决；Direct 工具枚举（read/grep/find/ls 等）是模型无法从自身 tool schema 推导的 gate 支持子集，删除即语义损失；其余限定子句（单引号规则、schema 修正、Profile 不可自改、安全边界不可绕过）均为判据或安全祈使。增长哨兵的前提（总量增长→压缩可行）被否定，随 dismiss 撤销，不再设 Revisit。
+- **guidance 文本精简**：失败路径、高压力场景，措辞精度要求最高，压缩风险高于收益。Revisit when guidance 文本总量显著增长。**已评估并 dismiss（C-001，2026-08-08）**：评估结论——进一步压缩无法满足语义零损失，且与总量无关：guidance 已是可执行判据，短句形态因不可执行被否决；Direct 工具枚举（read/grep/find/ls 等）是模型无法从自身 tool schema 推导的 gate 支持子集，删除即语义损失；其余限定子句均为判据或安全祈使。增长哨兵的前提（总量增长→压缩可行）被否定，随 dismiss 撤销，不再设 Revisit。
 - **合并任何触发场景互斥的 skill**（draft-spec→brainstorm-design、draft-tickets→plan-writing、grill-docs→grill-plan）：全量消费约束的必然推论；配对触发场景互斥（想法需探索/已讨论完直接落记录、计划需分解/需求→步骤计划、纯拷问/拷问+文档验证），各自全量使用。Revisit when 实测两 skill 触发场景重合。
-- **token 基线测量与提示词行为测试**：无法可靠操作化“理解认知”，用户明确不做额外验证。Revisit when 出现可观察的遵守度问题。**已评估并 dismiss（C-003，2026-08-08）**：遵守度问题实际出现一次——D-036 中 8 个 workflows skill 的 description 与 `disable-model-invocation` 矛盾（承诺的模型自动响应永不发生）。评估结论：该事故属结构矛盾而非 token 消耗，可操作化的测量是结构层行为测试（validate-skills 新增 `Use /skill:<name>` 强制校验与负向自检，锁 D-036 防回归）；token 基线/“理解认知”级测量维持拒绝，已观察到的遵守度问题由结构校验覆盖，不产生新的测量需求。
+- **token 基线测量与提示词行为测试**：无法可靠操作化“理解认知”，用户明确不做额外验证。Revisit when 出现可观察的遵守度问题。**已评估并 dismiss（C-003，2026-08-08）**：遵守度问题实际出现一次——D-036 中 8 个 workflows skill 的 description 与 `disable-model-invocation` 矛盾（承诺的模型自动响应永不发生），属结构矛盾而非 token 消耗；可操作化的测量是结构层行为测试（validate-skills 强制 `Use /skill:<name>` 开头 + 负向自检，锁 D-036 防回归）。token 基线/“理解认知”级测量维持拒绝，不产生新的测量需求。
 
 ## D-031: 路径可执行与 tsx 解释器归类
 
@@ -316,14 +293,14 @@ reclassify:
 
 **Decision:** 无 adapter 的路径形式可执行文件（executable 含 `/`：`./x`、`../x`、绝对路径、`scripts/x.sh`）分类为 `execute`（non-opaque）；`tsx` 作为语言运行时纳入 interpreter adapter（与 node/python 同规则：`--version`/`-v`/`--help` → inspect，其余 → execute）；无路径的裸名未知命令保持 `unknown`（non-opaque）。
 
-**Why:** 同一操作（运行本地二进制）此前因拼写不同落入不同 Profile 决策——`npx tsx` 为 execute（plan deny/build allow），`./node_modules/.bin/tsx` 为 unknown（plan ask）——这是 spelling-based 分类偏差。含 `/` 的裸词在 POSIX 下即文件路径，路径形式“运行二进制”是事实而非假设，归 execute 是正确语义；裸名可能是 alias/函数/PATH 工具，静态分析无法确定语义，`unknown`→ask 是诚实分类与同意层，语义扩充权留给 D-024 用户覆盖层。内置注册仅限两个封闭范畴：语言运行时（node/python/ruby/perl/tsx，tsx 先例）与 POSIX 只读检查工具（od，T-040；判据：静态可证仅读输入→写 stdout，无 modify/execute/network/destroy 副作用）；两者都是静态可界属性，不构成“任意工具进内置”的先例。
+**Why:** 同一操作（运行本地二进制）此前因拼写不同落入不同 Profile 决策——`npx tsx` 为 execute（plan deny/build allow），`./node_modules/.bin/tsx` 为 unknown（plan ask）——这是 spelling-based 分类偏差。含 `/` 的裸词在 POSIX 下即文件路径，路径形式“运行二进制”是事实而非假设，归 execute 是正确语义；裸名可能是 alias/函数/PATH 工具，静态分析无法确定语义，`unknown`→ask 是诚实分类与同意层，语义扩充权留给 D-024 用户覆盖层。内置注册仅限两个封闭范畴：语言运行时（node/python/ruby/perl/tsx，tsx 先例）与 POSIX 只读检查工具（od；判据：静态可证仅读输入→写 stdout，无 modify/execute/network/destroy 副作用）；两者都是静态可界属性，不构成“任意工具进内置”的先例。
 
 **Impact:** 变更后矩阵——脚本执行场景（`tsx foo.ts`）下 `npx tsx foo.ts`、`./node_modules/.bin/tsx foo.ts`、裸名 `tsx foo.ts` 全部为 execute：keel-plan deny、keel-code/query/develop ask、keel-build allow；裸名无 adapter 命令保持 unknown（keel-plan ask）。版本探测有意不对称：`npx tsx --version` 为 execute（npx 语义＝下载+运行包，flags 不改变风险），而本地解释器 `./node_modules/.bin/tsx --version`/`tsx --version` 为 inspect（与 node/python 同规则）——门禁建模的是命令本身（npx vs 本地解释器），不是目标包。唯一放宽点是 keel-build（路径二进制从 ask 变 allow），与 full-trust 语义一致；keel-plan 对本地脚本从 ask 收紧为 deny，符合其“execute 命令一律拒绝”的声明意图。keel-build 描述保持原样——execute 覆盖路径二进制与该 Profile full-trust 意图一致，不因措辞微调。`analyzeSemantics` 唯一生产调用方是 `shell-compiler.ts`，爆炸半径封闭；不新增 path intent、不触碰任何 hard boundary（blocked path/destroy/dynamic/opaque/threat）、D-024 覆盖层优先级（commands→aliases→adapter→reclassify）不变。
 
 **Rejected:**
 
 - **仅禁 `./node_modules/.bin/*`（按目录）**：误伤 npm scripts 全部本地二进制，且不解决绝对路径与项目脚本；拒绝。
-- **为任意裸名工具新增内置 adapter（eslint/prettier/vitest → execute）**：whack-a-mole——execute 类工具运行任意代码，静态不可界，与 D-024（用户覆盖层是语义扩充的唯一入口）冲突；内置注册的封闭范畴例外仅限语言运行时（tsx）与 POSIX 只读检查工具（od，T-040），不构成“任意工具进内置”的先例。
+- **为任意裸名工具新增内置 adapter（eslint/prettier/vitest → execute）**：whack-a-mole——execute 类工具运行任意代码，静态不可界，与 D-024（用户覆盖层是语义扩充的唯一入口）冲突；内置注册的封闭范畴例外仅限语言运行时（tsx）与 POSIX 只读检查工具（od），不构成“任意工具进内置”的先例。
 - **保持 unknown、仅改 guidance**：不消除 deny/ask 拼写分歧；拒绝。
 - **引入新 commandClass**：破坏 D-017/D-022 的封闭类集合与 effect axis；拒绝。
 - **按项目根判定（仅项目内路径归 execute）**：语义层引入 cwd/path 上下文耦合，绝对路径与 `/usr/local/bin` 工具分类不一致；拒绝。
@@ -331,7 +308,7 @@ reclassify:
 **Out of Scope:**
 
 - Windows `\` 路径（宿主为 Unix 语义，按 POSIX `/` 判定）。
-- 裸名经 PATH 到达的路径：`export PATH=…`（unknown→ask）与裸命令（unknown→ask）是两次审批，不构成静默绕过；裸名工具语义扩充属于用户 `command-overrides.yaml`（D-024），只读检查封闭范畴（od，T-040）除外。
+- 裸名经 PATH 到达的路径：`export PATH=…`（unknown→ask）与裸命令（unknown→ask）是两次审批，不构成静默绕过；裸名工具语义扩充属于用户 `config.yaml`（D-024），只读检查封闭范畴（od）除外。
 - 路径形式的 alias 匹配：已解决——覆盖层键为显式作用域（精确键 + 路径前缀键，D-034），路径形式需精确/前缀键声明语义（裸名键不隐式覆盖路径形式，basename 冲突结构性消除）。
 - PATH 解析与文件存在性探测：静态分类不做 filesystem 检查。
 
@@ -345,14 +322,13 @@ reclassify:
 - unknown 命令没有可提取的路径/效果语义，人类批准是唯一针对该命令本身的防线；审批框只显示 `unknown command: xargs` 时，人类无从判断要批准什么——同意层变成橡皮图章，防线实际失效。
 - 字面文本是门禁对该命令唯一诚实可知的完整信息：原文已在输入中，span 是 lexer/parser 算出的真实字符偏移（verifier 校验过 span 与命令操作的对应），渲染只是展示事实而非推断。语义建模（给 xargs 加 adapter/wrapper）把运行期 stdin 数据驱动的命令构造猜成静态 class，是伪精确，违反 D-024/D-025 的诚实分类原则。
 - 覆盖是结构性的：修复只依赖 "command 证据 + span" 这对每条命令都存在的产物，不依赖任何适配器知识；所有 unknown（以及 profile 下 ask 的 modeled）命令经同一漏斗出口自动受益，不枚举命令、不新增适配器。
-- **审批展示不脱敏**：命令由模型提出，原文已作为 `AssistantMessage` 的 toolCall 参数存在于模型上下文与 session JSONL 中——审批框（TUI 覆盖层，不落 session）脱敏保护不了任何尚未暴露的信息，反而削弱人类否决时所需的完整信息。
-- **类别化取代掩码**：掩码是"嵌入原始值再打码"的补丁。根治：模型侧 deny 证据 subject 不嵌入用户派生值——path 证据只渲染操作类型分类（`write path denied`），命令证据只含可执行名，编译失败 subject 为固定诊断/威胁 id。模型已持有自己提出的命令（toolCall 参数），路径与区域都是它可自行推导的冗余信息，gate 不重复（与"不追加重复信息"同根）；ask 侧保留完整 path 证据——Direct 工具无 literal form，路径是人类同意的唯一信息。
+- **模型侧不脱敏也不重复（类别化取代掩码）**：命令由模型提出，原文已作为 toolCall 参数存在于模型上下文与 session JSONL——审批框（TUI 覆盖层，不落 session）脱敏保护不了任何尚未暴露的信息，反而削弱人类否决时所需的完整信息；掩码是“嵌入原始值再打码”的补丁。根治是类别化：模型侧 deny 证据 subject 不嵌入用户派生值——path 证据只渲染操作类型（`write path denied`），命令证据只含可执行名，编译失败为固定诊断/威胁 id——模型已持有自己提出的命令，路径与区域都是它可自行推导的冗余信息，gate 不重复；ask 侧保留完整 path 证据（Direct 工具无 literal form，路径是人类同意的唯一信息）。
 
 **Impact:**
 - 审批提示从 `unknown command: xargs` 变为 `unknown command — literal form: xargs sed -i 's/…'`——literal form 已包含完整命令（可执行名是首 token），subject 只保留命令类别，不追加重复信息；`sh -c 'rm -rf /'` 显示完整负载，人类批准从盲批变为知情且可完整否决。
 - block/deny 渲染不出现命令重复、不携带原始路径：deny 侧 path 证据为 `read path denied`/`write path denied`，`dynamic shell token` 等固定诊断词原样展示（无掩码误伤）。
 - 删除 `redactSubject`/`SENSITIVE_PREFIXES`/边界启发式全套；无前缀表维护、无脱敏误伤。
-- ask 侧 command subject 按面构造（evaluate-request 决策时只含类别，如 `unknown command`），渲染器纯追加 literal form——不做 subject 格式手术（消除跨模块格式耦合）；deny 侧 subject 含可执行名（模型分类需要）。
+- ask 侧 subject 只含类别（如 `unknown command`），literal form 由渲染器纯追加；deny 侧 subject 含可执行名（模型分类需要）。
 - 不改 plan 形状、`access-plan-verifier`、profile/path policy。
 
 **Rejected:**
@@ -365,13 +341,13 @@ reclassify:
 **Out of Scope:**
 - 逐命令拆分审批：批准粒度仍是 tool-call 级（D-032 只让审批看到全文，不改变批准范围）。
 - xargs 的 stdin 目标静态提取：运行期数据，静态不可知（D-031 同款边界）。
-- 其他 unknown 命令的语义扩充：属 D-024 用户 `command-overrides.yaml`。
+- 其他 unknown 命令的语义扩充：属 D-024 用户 `config.yaml`。
 
 ## D-034: 覆盖层显式作用域键（取代隐式 basename 回退）
 
 **Status:** active（取代隐式 basename 回退）
 
-**Decision:** 覆盖层（`aliases` 与 `commands`）的键改为**显式作用域匹配**：精确键优先（裸名或完整路径字符串，`./` 归一化对精确键与前缀键对称生效），路径形式按最长路径前缀键匹配（键以 `/` 结尾）；**移除隐式 basename 回退**。别名目标可为用户定义的 `commands` 条目（链式：别名 → 命令定义）。解析顺序：commands→aliases→commands(别名目标)→adapter→reclassify。
+**Decision:** 覆盖层（`aliases` 与 `commands`）的键改为**显式作用域匹配**：精确键优先（裸名或完整路径字符串，`./` 归一化对精确键与前缀键对称生效），路径形式按最长路径前缀键匹配（键以 `/` 结尾）；**移除隐式 basename 回退**。别名目标可为用户定义的 `commands` 条目（链式：别名 → 命令定义）。解析顺序：commands→aliases→commands（别名目标）→adapter→reclassify。
 
 **Why:**
 - 隐式 basename 回退（路径形式在精确键未命中时按工具 basename 查键，让一次声明覆盖两种拼写）把"工具身份"与"调用拼写"混为一谈：一个裸名键同时覆盖 `./bin/mytool` 与 `./vendor/mytool`——gate 不做 filesystem 解析（D-031），同名不同工具无法区分，冲突结构性存在。
@@ -386,12 +362,12 @@ reclassify:
 - `./` 归一化对称：精确键与前缀键同样归一化前导 `./`——`"bin/eslint"` 命中 `./bin/eslint`，`"./bin/eslint"` 命中 `bin/eslint`（`./` 无管理意义，拼写差异不产生作用域分裂）。
 - 别名目标可为 `commands` 定义（`aliases: {mytool: my-linter}` 复用 my-linter 的 class/effects/subcommands，reason 用原始调用名）；alias 单步解析，不链式套 alias。
 - `reclassify` 按 basename 对齐 adapter 身份：adapter 已按 basename 识别命令（`/usr/local/bin/git` → git adapter），reclassify 匹配规则命令名时同样回退 basename——用户声明的分类微调在路径形式下不再静默失效（如 `/usr/local/bin/git status` + `{command: git, pattern: "status", class: modify}` 生效）。
-- 爆炸半径：registry.ts（`scopeKey` 3 处调用点：commands、aliases、别名目标的 commands 链式各一）；不碰 plan/verifier/policy。
+- 爆炸半径：registry.ts 的 `scopeKey`；不碰 plan/verifier/policy。
 
 **Rejected:**
 - **保留 basename 回退作为前缀键后的兜底**：冲突只在用户不用新消歧时"休眠"而非消除；显式作用域是更诚实的分类（D-024：语义由用户声明定义）。
 - **realpath/filesystem 消歧**：D-031 明确静态分类不做 filesystem 检查；引入解析会破坏无副作用语义。
-- **alias→alias 链式解析**：单步是显式作用域哲学的延伸——链式让 `a` 的语义需沿解析图追多跳才能确定，与"声明取代猜测"冲突；目标为 alias 键无表达力增量（`lg: lazygit` 一次声明即可），却引入环检测、逐跳作用域重放与 reason 渲染复杂度；commands 链式已覆盖"复用语义定义"的需求（commands 目标携带 class/effects/subcommands，alias 目标只是名字）。
+- **alias→alias 链式解析**：链式让语义需沿解析图追多跳才能确定，与“声明取代猜测”冲突，且无表达力增量（`lg: lazygit` 一次声明即可），却引入环检测与逐跳作用域重放复杂度；commands 链式已覆盖“复用语义定义”的需求（commands 目标携带 class/effects/subcommands，alias 目标只是名字）。
 
 **Out of Scope:**
 - 前缀键的绝对/相对拼写敏感（`"/abs/bin/"` 与 `"bin/"` 是不同作用域）：`./` 已归一化，其余拼写差异由用户声明承担。
@@ -406,7 +382,7 @@ reclassify:
 
 **Why:** 候选 C-007（BSD 选项方言检测）评估确认：触发条件（用户项目实际运行于 BSD 工具链）无现实样本，方言检测收益不抵成本（错配/双维护/误报，详见 Rejected）。用户明确决定不引入方言检测，并把支持承诺锚定为 Arch Linux 基准——开发与验证环境即 Arch，选项表以该环境的 GNU 工具链为准，其他发行版工具链差异由环境承担。GNU 语义成为唯一且无条件的解析基线，消除“POSIX 范围内 BSD 行为未定义”的悬空承诺。
 
-**Impact:** R-16 平台边界表述同步；CONTEXT.md Negative Space 同步（仅保证 Arch Linux，Windows/macOS/BSD 显式列出，其他发行版不在保证范围）；C-007 dismissed（durable content 迁入本决策、R-16 与 Negative Space，同一变更删除候选来源）。代码零改动——选项解析本就固定 GNU 语义，无平台/发行版检测代码。D-031/D-034 中“POSIX 语义”指路径分隔符语义（`/`），与平台支持范围正交，表述不变。
+**Impact:** CONTEXT.md Negative Space 平台边界条目同步（仅保证 Arch Linux，Windows/macOS/BSD 显式列出，其他发行版不在保证范围）；C-007 dismissed（durable content 迁入本决策与 Negative Space 平台条目，同一变更删除候选来源）。代码零改动——选项解析本就固定 GNU 语义，无平台/发行版检测代码。D-031/D-034 中“POSIX 语义”指路径分隔符语义（`/`），与平台支持范围正交，表述不变。
 
 **Rejected:**
 
@@ -446,25 +422,22 @@ reclassify:
 **Decision:** `shell-parse/parser.ts` 在 wrapper-args 状态下识别嵌套 wrapper 并入栈（重置该 wrapper 的 `WRAPPER_POS_SKIP`）；wrapper 的 positional 参数（`timeout <duration>`）由 parser 消费后保留在 `node.wrapperArgs` 供 token 级扫描，`node.args` 只含真实命令参数。`ShellCommandNode.executable` 只承载真正要运行的命令，**永不可能是 wrapper**。`normalize.ts` 退化为纯出栈：循环弹出 wrapper 链与 wrapperArgs，删除 `promotion` / `guessExecutable` / `removeFromArgs` / unwrap 的 slice 逻辑 / `MAX_UNWRAP_DEPTH`。
 
 **Why:**
-- 旧设计仅在嵌套形态下把 wrapper 放 executable 槽（如 `timeout 5 env python` → executable=env），真实命令沉入 args，normalize 用 promotion + guess 恢复——猜测逻辑脆弱，且产生两个已实证的盲点：
-  - preflight `download→pipe→interpreter` 硬规则只查 raw executable：`curl … | timeout 5 env python`、`curl … | env nohup bash` 等嵌套形态整体绕过（本地脚本实证：executable=env/nohup，preflight PASS）；
-  - `analyzeCd` 只查 raw executable：`timeout 5 env cd x` 的 cwd 变化不被追踪，后续命令路径检查基于错误 cwd。
+- 旧设计仅在嵌套形态下把 wrapper 放 executable 槽（如 `timeout 5 env python` → executable=env），真实命令沉入 args，normalize 用 promotion + guess 恢复——猜测逻辑脆弱，且产生两个已实证的盲点：preflight `download→pipe→interpreter` 硬规则与 `analyzeCd` 只查 raw executable，嵌套 wrapper 形态下前者整体绕过、后者 cwd 追踪错误。
 - 修复放在生产者（parser）：不变量"executable = 真实命令"由构造保证，消费方（preflight、analyzeCd 及未来新增检查）按构造正确，不在消费方复制 wrapper 解包知识（Centralize，D-030 同源）。
 
 **Impact:**
-- 解析后 `node.args` 只含真实命令参数；wrapper positional 保留在 `node.wrapperArgs`，threatScan 的 token 文本覆盖不变（时长槽由 wrapperArgs 扫描，防威胁词藏匿——code-audit 回归修正）。
-- preflight 硬规则对嵌套 wrapper 形态按构造闭合：实证的 4 个绕过形态（`timeout 5 env python`、`command env python`、`timeout 5 env -i python`、`env nohup bash`）由 PASS 变拦截，回归测试锁定。
+- 解析后 `node.args` 只含真实命令参数；wrapper positional 保留在 `node.wrapperArgs`，threatScan 的 token 文本覆盖不变（时长槽由 wrapperArgs 扫描，防威胁词藏匿）。
+- preflight 硬规则对嵌套 wrapper 形态按构造闭合（实证的绕过形态由 PASS 变拦截，回归测试锁定）。
 - `analyzeCd` 正确追踪嵌套 wrapper 下的 cd（`timeout 5 env cd x && rm file` 的路径检查基于正确 cwd，fail-closed 方向）。
-- normalize 大幅简化；删除的正是"猜测 executable"逻辑，与 D-031 诚实分类原则同向。
-- 深嵌套（`timeout 5 env timeout 3 cmd`）统一正确——旧 guess 机制在此形态下破碎（executable 被猜成数字）。
-- 既有单层 wrapper 行为零变化（shell-parse / control-flow / driver 测试全部存活）。
+- 深嵌套（`timeout 5 env timeout 3 cmd`）统一正确。
+- 既有单层 wrapper 行为零变化。
 
 **Rejected:**
 - **消费方各自 normalize（preflight/analyzeCd 调用 normalizeCommand）**：不变量落在每个消费方，未来新增 preflight 检查会重蹈覆辙，且安全修复不彻底；违反 Centralize。拒绝。
 - **保持 parser 不动、仅独立修 preflight**：A1 目标形态免费闭合安全面（零额外 preflight 代码）；独立修复需在 preflight 复制 wrapper 解包知识，产生双源。拒绝。
 
 **Out of Scope:**
-- **wrapper 名单位扩充**（仍为 env/command/nohup/exec/timeout）：语义扩充属用户 `command-overrides.yaml`（D-024），不内置。
+- **wrapper 名单位扩充**（仍为 env/command/nohup/exec/timeout）：语义扩充属用户 `config.yaml`（D-024），不内置。
 - **非 wrapper 的 option-with-value 建模**（如 `env -S`）：维持 fail-closed 现状。
 - **POSIX `>&file` 双流语义修正**：当前建模为 stdout write，路径检查（write intent）不受影响，无安全差异；A2 只把回退分支显式化，不改语义。
 
@@ -474,16 +447,16 @@ reclassify:
 
 **Decision:** footer 的 left/right 适配统一为单一 ANSI 感知 `fitLine`（取代 appendRight + fitLine 双实现，A3a）；宽度/截断助手（`visibleWidth`/`truncate`）生产环境选用宿主 `@earendil-works/pi-tui`（grapheme/宽字符正确，CJK/emoji 按 2 列），独立测试环境（无 pi-tui）fallback 到手写近似（A3b）——与 NativeFooter 动态导入同模式；`selectWidthHelpers` 对宿主模块做结构检查，缺失或形状不符回退。
 
-**Why:** 双布局引擎（native 路径 appendRight vs fallback 路径 fitLine）是同一 left/right 适配算法的近重复，差异仅在 ANSI 感知（appendRight 用 `visibleWidth`，fitLine 用裸 `.length`），统一后单一维护点。pi-keel 手写 `visibleWidth`/`truncate` 是 UTF-16 单元计数而非显示宽度——native 路径对含 CJK 的 Profile 名/路径每字符偏 1 列。实测（bundle 提取）pi-tui 的 `truncateToWidth`（默认省略符 `"..."`，与 pi-keel 惯例一致；grapheme 迭代不劈开 emoji/组合字符）与 `visibleWidth`（ANSI 剥离 + grapheme 宽字符计数 + tab 3 列 + 缓存）是正确的显示宽度实现，且是官方声明的扩展可用导入（extensions.md Available Imports）；pi-tui 只随宿主 bundle 提供，独立测试环境不可解析。
+**Why:** 双布局引擎（native 路径 appendRight vs fallback 路径 fitLine）是同一 left/right 适配算法的近重复，差异仅在 ANSI 感知（appendRight 用 `visibleWidth`，fitLine 用裸 `.length`），统一后单一维护点。pi-keel 手写 `visibleWidth`/`truncate` 是 UTF-16 单元计数而非显示宽度——native 路径对含 CJK 的 Profile 名/路径每字符偏 1 列。实测 pi-tui 的 `truncateToWidth`/`visibleWidth` 是正确的显示宽度实现（省略符与 pi-keel 惯例一致；grapheme/宽字符正确），且是官方声明的扩展可用导入（extensions.md Available Imports）；pi-tui 只随宿主 bundle 提供，独立测试环境不可解析。
 
 **Impact:**
-- profile-footer.ts 净减 ~15 行；appendRight 删除，两路径共用 fitLine；宽度契约升级为显示宽度（含 ANSI 处理）。
-- 生产：CJK/emoji 填充正确（修复既有偏差）；测试：fallback 手写近似，行为逐字符保持（renderProfileFooter 120/48 宽 + ANSI 用例全绿）。
+- appendRight 删除，两路径共用 fitLine；宽度契约升级为显示宽度（含 ANSI 处理）。
+- 生产：CJK/emoji 填充正确（修复既有偏差）；测试：fallback 手写近似，行为逐字符保持。
 - 新增 `types/pi-tui.d.ts`（仅声明消费的 `visibleWidth`/`truncateToWidth` 两个导出）。
 - truncate 契约：按显示宽度截断含 ANSI 文本（pi-tui 保留 ANSI 颜色；fallback 剥离后截断）。
 
 **Rejected:**
-- **仅 A3a（纯统一、不接 pi-tui）**：CJK 填充偏差保持现状；实测已确认 pi-tui 正确且官方支持，接入成本仅 ~5 行选择逻辑 + 声明文件。拒绝。
+- **仅 A3a（纯统一、不接 pi-tui）**：CJK 填充偏差保持现状；实测已确认 pi-tui 正确且官方支持。拒绝。
 - **接 pi-tui 其余导出（Box/Text 等组件）**：超出 footer 宽度助手范围。拒绝。
 - **全量替换手写实现（无 fallback）**：独立测试环境无法解析 pi-tui（只随宿主 bundle 提供），测试会挂。拒绝。
 
@@ -502,16 +475,16 @@ reclassify:
 | T0 | `scratch` | `keel-subagent-scratch` | 仅 `/tmp/pi-work/**`（不碰项目） |
 | T1 | `project` | `keel-subagent-project` | `project/**` + `/tmp/pi-work/**` |
 
-两档 shellPolicy 相同：inspect=allow，modify/execute/destroy/unknown=deny（bash 重定向写走路径策略）。bash 工具保留仅限 T1 档 agent（worker/reviewer/delegate）；T0 档 agent 必须无 mutation 工具（write/edit/bash）——pi-subagents `hasMutationToolCapability` 判定工具表存在任何非只读集工具即 mutation-capable，输出指令随之改为"自写 output 文件"（项目根），与 T0 路径策略矛盾（被指令写却写不了）；故 scout 删 write+bash（工具表剩 {read,grep,find,ls} ⊆ 只读集），output 契约走 runtime 持久化分支；researcher 原生即无。`session_start` 检测 `PI_SUBAGENT_CHILD=1` 与 `PI_SUBAGENT_CHILD_AGENT=<agent名>`，将子代理会话初始化为按 agent 映射的档位：worker/delegate/reviewer→`project`，scout/researcher/oracle/未知→`scratch`。`profiles.json` 可选根键 `subagentProfiles`（agent 名→档位名 `scratch`/`project`，`"*"` 回退）覆盖内置映射，优先级 显式 > 内置 > `*`。父会话档位号经 `PI_KEEL_PARENT_TIER`（`"0"`/`"1"`）env 传播给子代理（父侧 session_start 与 `/profile` 切换时按自身 pathPolicy 算好，子代理零解析）：父档位号 1 = 父 profile 的 pathPolicy 存在写规则覆盖 `project/src`、`project/tests` 或 `project/`（项目可写档），否则 0；子代理生效档 = min(映射档, 父TIER)——两档下即"父非项目可写 → 一律回退 T0 scratch"。**子代理权限上限 = 父会话当前档位**（宽子代理不接受窄父代理调用）。
+两档 shellPolicy 相同：inspect=allow，modify/execute/destroy/unknown=deny（bash 重定向写走路径策略）。bash 工具保留仅限 T1 档 agent（worker/reviewer/delegate）；T0 档 agent 必须无 mutation 工具（bash/write/edit）——pi-subagents 输出契约机制强制（有则被指令自写 output，与 T0 路径策略矛盾），故 scout 删 write+bash、researcher 原生即无。`session_start` 检测 `PI_SUBAGENT_CHILD=1` 与 `PI_SUBAGENT_CHILD_AGENT=<agent名>`，将子代理会话初始化为按 agent 映射的档位：worker/delegate/reviewer→`project`，scout/researcher/oracle/未知→`scratch`。`config.yaml` 可选顶层键 `subagentProfiles`（agent 名→档位名 `scratch`/`project`，`"*"` 回退）覆盖内置映射，优先级 显式 > 内置 > `*`。父会话档位号经 `PI_KEEL_PARENT_TIER`（`"0"`/`"1"`）env 传播给子代理（父侧按自身 pathPolicy 算好，子代理零解析）：父档位号 1 = 父 profile 的 pathPolicy 存在写规则覆盖 `project/src`、`project/tests` 或 `project/`（项目可写档），否则 0；子代理生效档 = min(映射档, 父TIER)——两档下即“父非项目可写 → 一律回退 T0 scratch”。**子代理权限上限 = 父会话当前档位**（宽子代理不接受窄父代理调用）。
 
 **Why:**
-- 子代理是非交互 `pi --mode json -p` 子进程且默认加载全局扩展（pi-subagents `disableAmbientExtensions` 默认 false），pi-keel 在其内生效；profile 选择是 session 内存态 → 子代理吃 `defaultProfile`（keel-plan）→ modify=ask 非交互硬 block（无 UI 时 `askOnce` 返回 approval-required）、execute=deny → worker 无法实现与验证，scout/researcher 的 output 契约破裂（有 write 工具的子代理被指令自己写 `context.md`@项目根，keel-plan 路径策略拦截）。
+- 子代理是非交互 `pi --mode json -p` 子进程且默认加载全局扩展（pi-subagents `disableAmbientExtensions` 默认 false），pi-keel 在其内生效；profile 选择是 session 内存态 → 子代理吃 `defaultProfile`（keel-plan）→ modify=ask 非交互硬 block、execute=deny → worker 无法实现与验证，scout/researcher 的 output 契约破裂（被指令自写 output 但 keel-plan 路径策略拦截）。
 - pi-subagents 原生 permissions 只有工具名粒度（write=allow 全盘写）、硬编码拒绝配置 bash（"leaves bash policy to pi-guard"）、ask 走 child watchdog 模型仲裁（非用户批准）——补不了路径轴，也不能表达"bash 只读用法"。
 - 委派提权原则：父会话窄档（keel-plan 不写 src）不应能委派出宽子代理（可写 src）；父档位即授权上限。
 - 嵌套子代理单调：子代理内 pi-keel 将自身（clamp 后）档位写回 env，孙代理 ≤ 子代理 ≤ 父会话。
 
 **Impact:**
-- 两个内置 profile（档位 T0/T1，shell+path 双轴）；`subagentProfiles` 覆盖键（validate.ts ROOT_KEYS + 值须为档位名 `scratch`/`project`）；`session_start` env 检测初始化；`PI_KEEL_PARENT_TIER` 传播（父侧算档位号，子代理零解析）+ 生效档 = min(映射档, 父TIER)。
+- 两个内置 profile（档位 T0/T1，shell+path 双轴）；`subagentProfiles` 覆盖键（`profile/validate.ts` ROOT_KEYS + 值须为档位名 `scratch`/`project`）；`session_start` env 检测初始化；`PI_KEEL_PARENT_TIER` 传播（父侧算档位号，子代理零解析）+ 生效档 = min(映射档, 父TIER)。
 - 用户侧配置：scout overrides 删 write+bash（工具表剩只读集）；researcher 原生无 mutation 工具不动。
 - 子代理内审核零设施：无 ask（profile 全 deny/allow）、无模型仲裁、无审计记录；deny + guidance → 子代理经 `contact_supervisor` 升级 → 父会话人审（裁决 + git diff 后 commit）。
 - 操作规则：委派实现工作需父会话处于项目可写档（keel-code/keel-subagent-project/自定义可写档）；默认 keel-plan 下委派 = 子代理 T0 scratch。
@@ -528,7 +501,7 @@ reclassify:
 **Out of Scope:**
 - **staging scope scratch**（gate 自建 0700 目录的真隔离 scratch）：`/tmp/pi-work` 是约定非隔离（外部 scope 无 symlink 检查）；候选 C-008。
 - **execute 档（T2，档位名未定）**（子代理可跑测试/构建）：execute=deny 冻结；若 prototype 证明 worker 验证摩擦不可接受再开；候选 C-009。
-- **docs/CONTEXT.md 写保护**（durable 内容防中毒）：默认不做，靠父会话 git diff；用户可 profiles.json 自加规则；候选 C-010。
+- **docs/CONTEXT.md 写保护**（durable 内容防中毒）：默认不做，靠父会话 git diff；用户可 config.yaml 自加规则；候选 C-010。
 - **pi-guard 共存说明**：装了 pi-keel 不需 pi-guard（pi-keel 即官方期望的 bash guard 角色）；候选 C-011。
 - **原生 permissions 默认配置**：工具表即工具层；原生 permissions 仅作角落能力（门控 pi-keel passthrough 工具）。
 - **profile 选择持久化**：`/profile` 仍 session 内存态；钳制用 env 快照而非全量传播。
@@ -539,31 +512,30 @@ reclassify:
 
 **Kind:** architecture
 
-**Status:** adopted
+**Status:** active
 
-**Origin:** T-054（Security Review 残余风险）+ architecture review（command-semantics 深化）
+**Origin:** Security Review 残余风险 + architecture review（command-semantics 深化）
 
 **Context:**
-- git 子命令分类用「join 成字符串 + 正则」匹配：丢失 token 边界，需 5 处负前瞻、`\s-` 锚定、`-c` 手工跳过补偿；`-oFILE` 附着形式曾因 `\b` 失配落 inspect（写出路径绕过路径策略的安全漏洞，T-054 F1 同族）。
-- 「选项取值消费」被 6 个模块各自实现（text-transform.parseOptions / search 循环 / shared.extractPositionalArgs / git.writeOutputArgs / config-parse / filesystem-read），边界语义分裂：未知选项有的置 opaque（编译器硬拒）有的静默；`-name "-delete"` 曾因 raw args 标志扫描与取值消费不同步误升级 modify（T-054 F2）。
-- 值性质（D-027）与位置参数性质（T-045）已有决策词汇但分散在各 walker 内。
+- git 子命令分类用「join 成字符串 + 正则」匹配：丢失 token 边界，`-oFILE` 附着形式曾因 `\b` 失配落 inspect（写出路径绕过路径策略的安全漏洞）。
+- 「选项取值消费」被多个模块各自实现，边界语义分裂：未知选项有的置 opaque（编译器硬拒）有的静默；`-name "-delete"` 曾因标志扫描与取值消费不同步误升级 modify。
+- 值性质（D-027）与位置参数性质已有决策词汇但分散在各 walker 内。
 
 **Decision:**
-1. **GIT_CLASSIFY 表（token 级）**：git.ts 的 49 条正则 pattern 改为声明式数据表 `{ cmd, cls, upgrade?/downgrade?{flags,to,paths?}, paths?, reason }`——首 token 匹配 + 选项调节（升级优先，fail-closed）。负前瞻/锚定/`-c` 跳过删除；finder 保留 `-C`/`-c`/`--git-dir` 跳过（token 正确性必需）。调节 flag 支持 `prefix` 匹配（`-o` 命中 `-oFILE`；`--force` 命中 `--force-with-lease`）。
+1. **GIT_CLASSIFY 表（token 级）**：git.ts 的正则 pattern 改为声明式数据表 `{ cmd, cls, upgrade?/downgrade?{flags,to,paths?}, paths?, reason }`——首 token 匹配 + 选项调节（升级优先，fail-closed）。负前瞻/锚定/`-c` 跳过删除；finder 保留 `-C`/`-c`/`--git-dir` 跳过（token 正确性必需）。调节 flag 支持 `prefix` 匹配（`-o` 命中 `-oFILE`；`--force` 命中 `--force-with-lease`）。
 2. **子命令族入 parser 注册表**：stash/bundle（多 class 族）从表迁入 `GIT_SUBCOMMAND_PARSERS`（与 config/branch 对齐），parser 签名统一 token 化 `(tokens, subArgs, pathIntents)`。表与注册表的边界由数据形状决定（单 class 行 → 表；多 class 族 → parser）。
-3. **统一选项引擎 option-parse**：`parseOptions(args, schema)` 深模块，收敛 text-transform/search/shared.extractPositionalArgs/git.writeOutputArgs 四套遍历；schema 制度化 D-027（`kind: file|expression|flag`）与 T-045（`positional: file|program-first|set`），`forms` 集合表达分离/等号/短附着/无值后缀四形态（跨名差异拆条），`consumeUntil` 表达 `-exec` 终止符消费（区内 token 标记 consumed）。
+3. **统一选项引擎 option-parse**：`parseOptions(args, schema)` 深模块，收敛 text-transform/search/shared.extractPositionalArgs/git.writeOutputArgs 四套遍历；schema 制度化 D-027 的值性质（`kind: file|expression|flag`）与位置参数性质（`positional: file|program-first|set`），`forms` 集合表达分离/等号/短附着/无值后缀四形态（跨名差异拆条），`consumeUntil` 表达 `-exec` 终止符消费（区内 token 标记 consumed）。
 4. **opaque 策略显式化（opaqueOnUnknown）**：未知选项策略由命令级字段显式声明，消除隐式分裂。text-transform/search/filesystem/read → true（收紧：未知选项 opaque 硬拒，堵 `-okdir` 类未建模破坏项）；git 的 `-o` 提取 → false（子集提取，`--format` 等合法选项静默）。为落实收紧，search/fs/read 的**高频 flag 全部建模**（find `-print`/`-o`、cp `-r`、rm `-rf`、wc `-l` 等），否则日常命令被误拒。
 5. **config-parse 独立**：读写轴 + 配置目标解析是分类策略领域（非值消费遍历），不并入引擎（B1 决策）。
 
 **Consequences:**
 - 行为收紧（有意）：fs/read/search 的未知选项从静默 → opaque 拒（如 `cp -z`、`wc --bogus`、`grep --bogus-flag`）；`-ne` 类 cluster 从 opaque → 正确解析（尾随带值语义）。
 - overrides 层（用户 YAML reclassify 的 `fullSubcommand` 字符串匹配）不动（D-024 已知局限，独立表面）。
-- 新增回归测试：`-oFILE` 四形式、`--force-with-lease` prefix、`--output-directory` 前缀误伤 fail-safe、`find -okdir` 堵洞、`cp -r`/`rm -rf`/`find -print` 建模不误拒、`-ne` 解析。npm test 713 全绿。
 
 **Rejected:**
-- 谓词函数 pattern（49 个闭包各写样板，表与 parser 注册表形态趋同诱发合并冲动）。
+- 谓词函数 pattern（闭包各写样板，表与 parser 注册表形态趋同诱发合并冲动）。
 - 声明式迷你语言（fields 化不区分升级/降级/子命令族三种语义，组合规则模糊）。
-- 全解析器化（49 个 token 解析器太碎）。
+- 全解析器化（token 解析器太碎）。
 - config-parse 并入引擎（引擎需输出每 token 分类的复杂结构，收益不抵）。
 
 **Out of Scope:**
@@ -571,4 +543,65 @@ reclassify:
 - overrides 层 reclassify 的字符串 pattern 迁移到 token 级（用户 YAML 兼容性，D-024）。
 - `git stash --help` 类分类修正（过拒方向，fail-safe，未立项）。
 
-## D-041: 待创建
+## D-041: 集中配置与可选工具建模（config.yaml + optionalAdapters）
+
+**Status:** active
+
+**Decision:** 所有 pi-keel 用户配置集中到唯一文件 `~/.pi/agent/pi-keel/config.yaml`（`PI_CODING_AGENT_DIR` 可改变 agent 目录）：顶层为 `defaultProfile`/`profiles`/`subagentProfiles`（原 profiles.json，D-018/D-039）、`commands`（原 command-overrides.yaml，D-024）与新增 `optionalAdapters`。旧 `profiles.json`/`command-overrides.yaml` 已废弃且不兼容：config.yaml 是唯一配置来源，旧文件不再读取。
+
+可选工具建模（`optionalAdapters`）：随包分发 token 级 adapter（首个：herdr），**默认不加载**，用户显式列出名字才注册到语义注册表（与 core 同层，用户 `commands` 定义仍优先）。未知启用名 → 响亮报错且整段 fail-closed（不加载任何 optional），与 profiles 损坏同模式。
+
+**Why:** 配置分散在两个文件、两个读取点、两份错误处理，且覆盖层 subcommands 存在已知局限（`firstSubcommand` 不跳过取值选项的值，D-024：`herdr --session dev status` 会把 `dev` 当子命令 → opaque 硬拒）。集中单一文件统一 schema 与错误报告；可选建模给“有限制地建模”合规位置——adapter 质量（token 级）优于声明式，但默认不加载保留 D-031 的内置封闭性（core 集合不变，既有用户零行为变化），启用动作即用户语义声明（D-024 语义扩充权在用户）。
+
+**Impact:**
+- `src/access-gate/config/` 是唯一配置加载入口（缓存 + 顶层结构校验）；profile/load 与 overrides 改为消费集中配置。
+- registry 增加可选索引：`optionalCommandIndex` 按启用名集合缓存，未启用时行为与旧版完全一致（herdr 裸名 unknown / 路径形式 execute）。
+- 错误消息统一为 `pi-keel: ...` 前缀；解析失败/结构非法时响亮报错并 fail-closed 降级。
+- herdr adapter 建模：信息/`status`/`api`/`completion`/`help` → inspect；控制子命令 → execute；`update` → execute + network；取值选项被消费（覆盖层做不到的能力；完整规格见 README optionalAdapters 段）。
+
+**Consequences:**
+- 配置以 config.yaml 为唯一来源；旧 profiles.json/command-overrides.yaml 废弃，不兼容读取。
+- optional adapter 准入门槛（防 whack-a-mole）：(1) 默认不加载；(2) 建模必须 token 级完整（覆盖层表达不了的才有资格）；(3) 语义可机械分类（稳定文档化 CLI）；(4) 随包测试全绿。
+
+**Rejected:**
+- 修订 D-031 开放内置层：core 封闭集合是架构分界（语言运行时 + POSIX 只读工具），为任意裸名 execute 工具开口即 whack-a-mole；可选建模以“默认不加载 + 显式启用”达成同样目的而不破坏封闭性。
+- 仅靠覆盖层 subcommands 建模 herdr：取值选项消费做不到，`--session dev status` 会 opaque 硬拒（D-024 已知局限）。
+- 兼容读取旧 profiles.json/command-overrides.yaml：双源真理违背集中单一入口原则，且保留旧文件让配置位置分裂。
+
+**Out of Scope:**
+- 覆盖层 subcommands 的 valueOptions 感知（独立表面，D-024）；如需可另立决策。
+- 更多可选 adapter 的准入（eslint/prettier/vitest 等 execute 工具不满足 token 级判据，维持 D-031 立场）。
+
+## D-042: gate 物理分层 + 目录 index 统一 + interpreter-names 命名
+
+**Status:** active
+
+**Decision:** `src/access-gate/` 完成三项结构统一：
+
+1. **gate/ 物理分层**：17 文件平铺改为两层 + 共享根——`gate/plan/`（编译器与验证：compiler-entry、shell/direct-tool compiler、preflight、access-plan-verifier 等）、`gate/decision/`（evaluate、decision-builder、render-decision）、根留（`types`/`decision-types`/`guidance-catalog`）。`gate/index.ts` 公共表面不变。
+2. **目录 index 统一**：所有 access-gate 子目录补 `index.ts` 公共表面（profile/session/ui/command-semantics/shell-parse/security），src 内部跨目录引用统一走目录 index，不深入实现文件；测试保持深层引用（测实现是既有惯例）。
+3. **`command-semantics/interpreters.ts` → `interpreter-names.ts`**：消除与 `adapters/interpreters.ts` 的同名歧义（名单 vs adapter 职责）。
+
+**Why:**
+- D-022 的 Compiler/Kernel 分层此前只靠命名表达；物理分组让架构决策在目录中可见。分组按真实依赖设计：guidance-catalog 被 access-request/decision-builder/render-decision 三方共用，强拆 compiler/kernel/render 三层会制造循环依赖（虚假边界），故取 plan/decision 两层 + 共享根。
+- 跨目录引用此前混用目录（`./gate`、`../path`）与深层（`./profile/load`、`./session/profile-state`），index 统一给出每个目录的公共表面，规范新代码的引用方式。
+- interpreter 名单与 interpreter adapter 同名，改名消除维护者误删/误改风险。
+
+**Impact:**
+- 纯结构移动与 import 路径更新，零行为变化。
+- gate 内部 import 边界：plan 组不引用 decision 组；decision 组单向引用 plan 组（读 plan 类型/调 compiler-entry）；共享根被两层引用且不依赖子组。
+- 测试深层路径更新（gate 引用 → plan/decision 前缀）。
+
+**Consequences:**
+- 新代码准则：跨目录引用走目录 index（AGENTS.md 目录速查记录）；测试可继续走深层实现路径。
+- 若未来 guidance-catalog/decision-types 依赖继续演化，重新评估共享根归属，不强行分层。
+
+**Rejected:**
+- gate 强行分 compiler/kernel/render 三组：guidance-catalog 与 decision-types 的三方使用造成跨组循环，物理边界与依赖图不符（虚假分层）。
+- 删除 gate/path 等既有 index 改全深层引用：与"目录边界单一入口"方向相反，且 path/gate/config 的 index 均被真实消费。
+
+**Out of Scope:**
+- 测试目录镜像 src 子目录（tests 平铺 + 通配符是既有准则，D-042 不改）。
+- security/（threat-scan 单文件）与 util.ts（isRecord 单函数）合并：职责表达合理，维持现状。
+
+## D-043: 待创建

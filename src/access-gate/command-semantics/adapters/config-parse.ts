@@ -1,7 +1,7 @@
 // command-semantics/adapters/config-parse.ts — 配置命令共享解析引擎
-// git config / npm config（T-037 系列）的层级/标志/值消费/opaque 确定性解析；
+// git config / npm config 的层级/标志/值消费/opaque 确定性解析；
 // 读写判定策略由各 adapter 本地决定（git 用 positional 推断，npm 用子命令 op）。
-// 从 shared.ts 拆出（T-046 审计 ⚠️2）：与参数提取工具族分离，各自成模块。
+// 从 shared.ts 拆出：与参数提取工具族分离，各自成模块。
 
 import type { ShellArg } from "../../shell-parse/types";
 

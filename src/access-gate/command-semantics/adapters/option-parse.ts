@@ -2,7 +2,7 @@
 //
 // 收敛 text-transform/search/shared.extractPositionalArgs/git.writeOutputArgs 四套
 // 「选项取值消费」遍历为一个深模块：小接口 parseOptions(args, schema)，复杂行为内置。
-// 制度化 D-027（值性质 file/expression）与 T-045（位置参数性质 file/program-first/set）。
+// 制度化 D-027（值性质 file/expression）与位置参数性质（file/program-first/set）。
 // config-parse 独立（读写轴 + 配置目标解析是分类策略领域，非值消费遍历，B1 决策）。
 //
 // 未知选项策略由 OptConfig.opaqueOnUnknown 显式裁决（C 候选落点）：
@@ -35,7 +35,7 @@ export interface Opt {
 /** 命令级配置。 */
 export interface OptConfig {
   opts: readonly Opt[];
-  /** T-045：位置参数性质。program-first 首个位置参数是程序（无 -e/-f 时）；set 全部非文件（tr 字符集）。 */
+  /** 位置参数性质：program-first 首个位置参数是程序（无 -e/-f 时）；set 全部非文件（tr 字符集）。 */
   positional: "file" | "program-first" | "set";
   /** 未知选项策略（C 候选单点裁决）。 */
   opaqueOnUnknown: boolean;

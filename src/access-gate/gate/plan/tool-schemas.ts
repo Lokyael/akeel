@@ -1,5 +1,5 @@
-import type { Effect, CommandClass } from "../command-semantics/types";
-import type { PathOperation } from "./access-request";
+import type { Effect, CommandClass } from "../../command-semantics";
+import type { PathOperation } from "./request-builder";
 
 // Centralized tool schema definitions — single source of truth for Direct tool
 // parameter validation.  Adding a new tool or parameter only requires a schema

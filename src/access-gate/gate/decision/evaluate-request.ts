@@ -1,12 +1,12 @@
-import { decidePath, resolvePath } from "../path";
-import { PATH_DENY_REASONS, type PathDenyReason } from "../path/policy";
-import type { ResolvedProfile } from "../profile/types";
-import { isCompleteAccessPlan } from "./compiler-entry";
-import { ANALYSIS_LIMITS, type CommandAccessOperation, type CompleteAccessPlan, type PathAccessOperation } from "./access-request";
-import type { GateDecision, GateEvidence, HardDenyCode } from "./decision-types";
+import { decidePath, resolvePath } from "../../path";
+import { PATH_DENY_REASONS, type PathDenyReason } from "../../path/policy";
+import type { ResolvedProfile } from "../../profile";
+import { isCompleteAccessPlan } from "../plan/compiler-entry";
+import { ANALYSIS_LIMITS, type CommandAccessOperation, type CompleteAccessPlan, type PathAccessOperation } from "../plan/request-builder";
+import type { GateDecision, GateEvidence, HardDenyCode } from "../decision-types";
 import { hardDeny, profileDeny, requireApproval } from "./decision-builder";
-import type { Effect } from "../command-semantics/types";
-import type { PathDecision } from "../path";
+import type { Effect } from "../../command-semantics";
+import type { PathDecision } from "../../path";
 
 const EFFECT_POLICY_AXIS: Readonly<Record<Effect, "path" | "shell">> = {
   read: "path",
@@ -80,7 +80,7 @@ export function evaluateRequest(
 }
 
 // ── path decision → stable code ──
-// reason → DecisionCode 的类型化映射（T-046 R8）：reason 常量改名在此编译期报错，消除字符串耦合
+// reason → DecisionCode 的类型化映射：reason 常量改名在此编译期报错，消除字符串耦合
 const PATH_REASON_CODES: Readonly<Record<PathDenyReason, HardDenyCode | "path-denied">> = {
   [PATH_DENY_REASONS.blocked]: "blocked-path",
   [PATH_DENY_REASONS.unclassifiable]: "path-unclassifiable",

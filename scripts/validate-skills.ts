@@ -224,7 +224,7 @@ function checkExternalUrls(skill: SkillMeta): CheckResult {
 //   - "per principles.md Quick Reference — Record Lifecycle" → Quick Reference 下的 ### 标题
 //   - "per principles.md §7" → 编号标题（### 7. Declare What You Exclude）
 //   - "principles.md Next-ID slots" → 粗体锚点（**Next-ID slots**）
-// 本检查锁住引用可解析性（T-048 Q5）。
+// 本检查锁住引用可解析性。
 
 const PRINCIPLES_FILE = join(SKILLS_ROOT, "..", "src", "bootstrap", "principles.md");
 
@@ -292,7 +292,7 @@ function checkPrinciplesRefs(skill: SkillMeta, anchors: PrinciplesAnchors): Chec
     } else {
       // 引用文本可能带尾部续文（"... Lifecycle) only when..."）或跨行折行——
       // 空白归一化后用已知锚点做子串包含判定；锚点被删除/改名时引用不再
-      // 包含任何已知锚点 → 报错（防静默断链，T-048 Q5）。
+      // 包含任何已知锚点 → 报错（防静默断链）
       const normalized = ref.value.replace(/\s+/g, " ");
       const pool = ref.kind === "qr"
         ? anchors.quickReference

@@ -1,8 +1,8 @@
-import type { CommandClass, CwdCandidate, Effect } from "../command-semantics/types";
-import type { SourceSpan } from "../shell-parse/types";
-import { denyResponseKindFor, evidenceKind } from "./guidance-catalog";
+import type { CommandClass, CwdCandidate, Effect } from "../../command-semantics";
+import type { SourceSpan } from "../../shell-parse";
+import { denyResponseKindFor, evidenceKind } from "../decision-code-catalog";
 
-export { isRecord } from "../util";
+export { isRecord } from "../../util";
 import type {
   AccessOperation,
   AccessPlanDraft,
@@ -24,11 +24,11 @@ import {
   EFFECTS,
 } from "./access-request-types";
 
-// Re-export the public surface from the types module（T-046 R8：类型再导出改为通配，删手工墙）。
+// Re-export the public surface from the types module（类型再导出改为通配，删手工墙）。
 export { ANALYSIS_LIMITS } from "./access-request-types";
 export type * from "./access-request-types";
-// evidenceKind 单一来源在 guidance-catalog（T-047 #3），此处 re-export 保持 consumers 兼容。
-export { evidenceKind } from "./guidance-catalog";
+// evidenceKind 单一来源在 decision-code-catalog，此处 re-export 保持 consumers 兼容。
+export { evidenceKind } from "../decision-code-catalog";
 
 // ── public api ──
 
@@ -44,7 +44,7 @@ export function reject(code: CompilerDecisionCode, subject: string, span?: Sourc
   return { kind: "reject", category, code: code as UnsupportedCompilationCode, evidence };
 }
 
-// code → 类别单一来源（T-046 R5）：编译分类由渲染侧的 denyResponseKindFor 推导，
+// code → 类别单一来源：编译分类由渲染侧的 denyResponseKindFor 推导，
 // 两份平行的 code 列表合一；unknown-effect 从 unsupported-form 移入 invalid-request，
 // 与 kernel 侧（evaluate-request 的 hardDeny）响应一致。
 function compilationCategoryFor(code: CompilerDecisionCode): CompilationCategory {

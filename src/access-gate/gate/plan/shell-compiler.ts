@@ -1,10 +1,10 @@
-import { analyzeCd, analyzeControlFlow, initialCwd } from "../command-semantics/control-flow";
-import { normalizeCommand } from "../command-semantics/normalize";
-import { analyzeSemantics } from "../command-semantics/registry";
-import { lex } from "../shell-parse/lexer";
-import { parse } from "../shell-parse/parser";
-import type { CwdCandidate } from "../command-semantics/types";
-import type { ShellRedirectionNode, SourceSpan } from "../shell-parse/types";
+import { analyzeCd, analyzeControlFlow, initialCwd } from "../../command-semantics";
+import { normalizeCommand } from "../../command-semantics";
+import { analyzeSemantics } from "../../command-semantics";
+import { lex } from "../../shell-parse";
+import { parse } from "../../shell-parse";
+import type { CwdCandidate } from "../../command-semantics";
+import type { ShellRedirectionNode, SourceSpan } from "../../shell-parse";
 import { runPreflight } from "./preflight";
 import {
   ANALYSIS_LIMITS,
@@ -18,7 +18,7 @@ import {
   type CompilerDraftResult,
   type PathAccessOperation,
   type ShellCompilerInput,
-} from "./access-request";
+} from "./request-builder";
 
 function redirectionOperation(
   redirection: ShellRedirectionNode,
@@ -39,7 +39,7 @@ function redirectionOperation(
       const operation = redirection.kind === "stdin" ? "read" : "write";
       return pathOperation(operation, redirection.target.value, state, "redirection", "exact", redirection.span);
     }
-    // heredoc/hereString 内容不在命令文本中建模 → 显式拒绝；新增 kind 在此强制编译错误（T-046 R8）
+    // heredoc/hereString 内容不在命令文本中建模 → 显式拒绝；新增 kind 在此强制编译错误
     case "heredoc":
     case "hereString":
       return reject("unsupported-redirection", redirection.kind, redirection.span);
@@ -86,7 +86,7 @@ export function compileShellDraft(input: ShellCompilerInput): CompilerDraftResul
     commandSpans.push(flowNode.node.span);
     const cdInfo = analyzeCd(flowNode.node);
     if (cdInfo.opaque) return reject("uncertain-cwd", "cd target cannot be classified", flowNode.node.span);
-    // isCd 由 analyzeCd 单点判定（T-047 #5），消除二次 executable === "cd" 判断
+    // isCd 由 analyzeCd 单点判定，消除二次 executable === "cd" 判断
     const isCd = cdInfo.isCd;
     const effects = isCd
       ? (cdInfo.target ? ["cwdChange" as const] : [])

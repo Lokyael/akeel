@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { classifyTool, evaluateToolCall } from "../../src/access-gate/gate/evaluate";
-import { TOOL_SCHEMAS } from "../../src/access-gate/gate/tool-schemas";
+import { classifyTool, evaluateToolCall } from "../../src/access-gate/gate/decision/evaluate";
+import { TOOL_SCHEMAS } from "../../src/access-gate/gate/plan/tool-schemas";
 import type { ResolvedProfile } from "../../src/access-gate/profile/types";
 import { makeContext } from "./helpers";
 

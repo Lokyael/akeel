@@ -54,7 +54,7 @@ export function resolveProfiles(value: unknown): ValidationResult<ResolvedProfil
       value: {
         defaultProfile: raw.defaultProfile ?? Object.keys(profiles)[0]!,
         profiles,
-        // subagentProfiles 值已在 validateProfiles 校验（T-052 C3：窄化在安全位置，validate 后）
+        // subagentProfiles 值已在 validateProfiles 校验（窄化在安全位置，validate 后）
         ...(raw.subagentProfiles ? { subagentProfiles: raw.subagentProfiles as ResolvedProfiles["subagentProfiles"] } : {}),
       },
     };

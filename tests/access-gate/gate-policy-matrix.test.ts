@@ -3,8 +3,8 @@ import test from "node:test";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { compileDirectToolCall, compileShellCall } from "../../src/access-gate/gate";
-import { evaluateRequest } from "../../src/access-gate/gate/evaluate-request";
-import type { CompilerContext } from "../../src/access-gate/gate/access-request";
+import { evaluateRequest } from "../../src/access-gate/gate/decision/evaluate-request";
+import type { CompilerContext } from "../../src/access-gate/gate/plan/request-builder";
 import type { ResolvedProfile } from "../../src/access-gate/profile/types";
 import { complete, loadBuiltinProfiles, makeContext } from "./helpers";
 
@@ -153,7 +153,7 @@ test("bare unknown command stays ask in plan (unknown policy bucket)", () => {
   }
 });
 
-test("keel-build asks for home config writes; keel-develop keeps denying them (T-055)", () => {
+test("keel-build asks for home config writes; keel-develop keeps denying them", () => {
   const env = context();
   try {
     const request = complete(compileDirectToolCall({
@@ -172,7 +172,7 @@ test("keel-build asks for home config writes; keel-develop keeps denying them (T
   }
 });
 
-test("keel-build still hard-denies blocked home paths despite the ~/** rule (T-055)", () => {
+test("keel-build still hard-denies blocked home paths despite the ~/** rule", () => {
   const env = context();
   try {
     const request = complete(compileDirectToolCall({
@@ -191,7 +191,7 @@ test("keel-build still hard-denies blocked home paths despite the ~/** rule (T-0
   }
 });
 
-test("keel-build git config end-to-end: --global asks, --system denies, --local blocked (T-055)", () => {
+test("keel-build git config end-to-end: --global asks, --system denies, --local blocked", () => {
   const env = context();
   try {
     // 端到端：git adapter 产出 ~/.gitconfig write intent → 路径门禁走 ~/** ask（用户请求的"方便改配置"主路径）
@@ -221,7 +221,7 @@ test("keel-build git config end-to-end: --global asks, --system denies, --local 
   }
 });
 
-test("od read command compiles and is allowed under keel-plan (T-040)", () => {
+test("od read command compiles and is allowed under keel-plan", () => {
   const env = context();
   try {
     const request = complete(compileShellCall({ ...env, command: "od -c file.bin" }));

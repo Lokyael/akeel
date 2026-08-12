@@ -20,7 +20,7 @@ defineAdapterTests("read", [
   { cmd: "stat -c %s file.txt", name: "stat format option value is skipped", cls: "inspect", intents: [{ operation: "read", rawPath: "file.txt" }] },
   { cmd: "du -sh dir", name: "du depth value is skipped", cls: "inspect", intents: [{ operation: "read", rawPath: "dir" }] },
   { cmd: "df -h", name: "df is inspect", cls: "inspect" },
-  // od —— POSIX 只读检查工具（T-040）
+  // od —— POSIX 只读检查工具
   { cmd: "od -c file.bin", name: "od reads the file", cls: "inspect", intents: [{ operation: "read", rawPath: "file.bin" }] },
   { cmd: "od -j 16 file.bin", name: "od skips separated skip-bytes value", cls: "inspect", intents: [{ operation: "read", rawPath: "file.bin" }] },
   { cmd: "od -A d file.bin", name: "od skips separated address-radix value", cls: "inspect", intents: [{ operation: "read", rawPath: "file.bin" }] },

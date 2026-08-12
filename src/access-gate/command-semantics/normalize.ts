@@ -10,7 +10,6 @@ import type { NormalizedCommand } from "./types";
 
 export function normalizeCommand(node: ShellCommandNode): NormalizedCommand {
   return {
-    wrappers: [],
     // 弹出 wrapper 链与 wrapper 簿记：命令的真实参数由 parser 保证，无需再裁切
     command: node.wrapper.length > 0 ? { ...node, wrapper: [], wrapperArgs: [] } : node,
     executable: node.executable?.value ?? null,

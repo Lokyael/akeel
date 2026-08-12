@@ -18,7 +18,9 @@ Pi Keel 是 [pi](https://pi.dev) 的插件包：以 **扩展（extensions）** �
 
 ```
 src/bootstrap/          # 扩展：Session 注入原则（principles.md + index.ts）
-src/access-gate/        # 扩展：Profile、Shell IR、路径策略、Gate、Session、Footer
+src/access-gate/        # 扩展：集中配置（config/）、Profile、Shell IR、命令语义、路径策略、Gate、Session、Footer
+  gate/                 #   Gate 内部：plan/（编译器+验证）、decision/（内核+渲染）、共享根（host/decision-types/decision-code-catalog）
+  */index.ts            #   目录公共表面：跨目录引用统一走目录 index，不深入实现文件
 skills/                 # skills：三目录按加载时机组织（D-005）
   foundations/          #   基础约束（evidence-first）
   disciplines/          #   工程纪律（TDD、代码审查、领域建模等）
@@ -34,7 +36,8 @@ CONTEXT.md              # 当前事实、术语、架构与 Active Decisions 索
 
 - **测试入口**：`npm test` 运行技能校验、TypeScript 检查和 access-gate 测试；修改扩展代码必须保持测试通过。
 - **分发声明**：只有 `package.json` 的 `pi.extensions` 与 `pi.skills` 声明的路径进入用户项目；其余是仓库自身开发内容。
-- **文档边界**：长期决策写 `docs/decisions.md`，当前事实写 `CONTEXT.md`，安全承诺写 `docs/security-boundaries.md`，第三方来源与许可证写 `docs/traceability.md`；AGENTS.md 不承接这些职责。
+- **文档边界**：长期决策写 `docs/decisions.md`，当前事实写 `CONTEXT.md`（安全承诺与残余风险在 decisions.md 安全条目与 CONTEXT Negative Space），第三方来源与许可证写 `docs/traceability.md`；AGENTS.md 不承接这些职责。
+- **决策寄存器内容分诊**：`docs/decisions.md` 只保留决策级内容（当前结论、理由、必要替代方案、影响）；用户使用文档（如 config schema）进 README，实现细节进代码/测试，验证证据（测试计数、用例枚举、迁移过程）不保留，历史由 Git 承载。
 - **技能规则单一来源**：技能只引用 `src/bootstrap/principles.md`，不在技能内重复定义规则（D-013）。
 
 ## 提示词内容改动约定

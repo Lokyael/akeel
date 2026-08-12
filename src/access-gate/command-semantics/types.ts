@@ -3,12 +3,11 @@
 
 import type {
   ShellCommandNode,
-  ShellArg,
   SourceSpan,
 } from "../shell-parse/types";
 import type { CommandClass, Effect, PathOperation, PathSource } from "../domain";
 
-// 命令分类与 Effect 的定义见 domain.ts（唯一来源，T-046）。
+// 命令分类与 Effect 的定义见 domain.ts（唯一来源）。
 // inspect  读取文件 — 所有路径意图均已知，无变更
 // modify   写入/删除/移动文件 — 所有目标均已知
 // execute  运行代码 — 效果取决于外部内容（脚本、二进制文件、Makefile）
@@ -54,9 +53,10 @@ export interface CommandAdapter {
 }
 
 // ─── NormalizedCommand（wrapper 解包后） ───
+// D-037：parser 拥有 wrapper 链，normalize 纯出栈——解包后的命令不再携带 wrapper
+// 簿记（恒空 wrappers 字段已移除，诚实形状）。
 
 export interface NormalizedCommand {
-  wrappers: readonly ShellArg[];
   command: ShellCommandNode;
   executable: string | null;
 }

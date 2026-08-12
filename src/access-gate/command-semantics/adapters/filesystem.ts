@@ -29,6 +29,27 @@ const TARGET_DIR_OPTS: Opt[] = [{ names: ["-t", "--target-directory"], kind: "fi
 /** --reference：参考文件（read）。 */
 const REFERENCE_OPTS: Opt[] = [{ names: ["--reference"], kind: "file", operation: "read", forms: ["separated", "equals"] }];
 
+/**
+ * 参考文件感知的写目标提取（chmod/chown/touch/truncate 共用）：
+ * 参考文件值（--reference/-r）→ 前置 read intent；其余位置参数 → write intent。
+ * skipFirstPositional 时（chmod/chown）首个位置参数是 mode/owner——参考文件出现时该参数不存在，不跳过。
+ */
+function referenceAwareFiles(
+  args: readonly ShellArg[],
+  consumed: ReadonlyArray<{ option: string; value: string }>,
+  refOptions: readonly string[],
+  skipFirstPositional: boolean,
+): { op: "read" | "write"; value: string }[] {
+  const ref = consumed.find((c) => refOptions.includes(c.option))?.value;
+  const writes = args.slice(skipFirstPositional && !ref ? 1 : 0).map((a) => ({ op: "write" as const, value: a.value ?? "" }));
+  return ref ? [{ op: "read" as const, value: ref }, ...writes] : writes;
+}
+
+/** 位置参数全为写目标（rm/mkdir/tee/rmdir/shred 共用）：无选项值、无参考文件语义的命令族。 */
+function writeAllArgs(args: readonly ShellArg[]): { op: "write"; value: string }[] {
+  return args.map((a) => ({ op: "write" as const, value: a.value ?? "" }));
+}
+
 const FILESYSTEM_CMDS: Record<string, {
   class: "inspect" | "modify" | "destroy";
   paths: (args: readonly ShellArg[], consumed: ReadonlyArray<{ option: string; value: string }>, flags?: readonly string[]) => { op: "read" | "write"; value: string }[];
@@ -38,7 +59,7 @@ const FILESYSTEM_CMDS: Record<string, {
 }> = {
   rm: {
     class: "modify",
-    paths: (args) => args.map((a) => ({ op: "write", value: a.value ?? "" })),
+    paths: writeAllArgs,
     effects: ["delete"],
     reason: "remove files",
     opts: [{ names: ["-r", "-R", "-f", "-i", "-v", "-d", "--dir", "--no-preserve-root", "-I", "-P", "-x", "--one-file-system"], kind: "flag" }],
@@ -46,11 +67,7 @@ const FILESYSTEM_CMDS: Record<string, {
   touch: {
     class: "modify",
     // touch [-t STAMP] [-r REF] <file>... — 时间戳/日期被消费；-r/--reference 的参考文件是 read 源
-    paths: (args, consumed) => {
-      const ref = consumed.find((c) => c.option === "-r" || c.option === "--reference")?.value;
-      const writes = args.map((a) => ({ op: "write" as const, value: a.value ?? "" }));
-      return ref ? [{ op: "read" as const, value: ref }, ...writes] : writes;
-    },
+    paths: (args, consumed) => referenceAwareFiles(args, consumed, ["-r", "--reference"], false),
     effects: ["write"],
     reason: "create/update files",
     opts: [
@@ -61,7 +78,7 @@ const FILESYSTEM_CMDS: Record<string, {
   },
   mkdir: {
     class: "modify",
-    paths: (args) => args.map((a) => ({ op: "write", value: a.value ?? "" })),
+    paths: writeAllArgs,
     effects: ["write"],
     reason: "create directories",
     opts: [
@@ -72,12 +89,7 @@ const FILESYSTEM_CMDS: Record<string, {
   chmod: {
     class: "modify",
     // chmod <mode> <file>... — skip first positional arg (mode)；--reference= 出现时无 mode 位置参数，参考文件是 read 源
-    paths: (args, consumed) => {
-      const hasReference = consumed.some((c) => c.option === "--reference");
-      const ref = consumed.find((c) => c.option === "--reference")?.value;
-      const files = args.slice(hasReference ? 0 : 1).map((a) => ({ op: "write" as const, value: a.value ?? "" }));
-      return ref ? [{ op: "read" as const, value: ref }, ...files] : files;
-    },
+    paths: (args, consumed) => referenceAwareFiles(args, consumed, ["--reference"], true),
     effects: ["permissionChange"],
     reason: "change file permissions",
     opts: [
@@ -88,12 +100,7 @@ const FILESYSTEM_CMDS: Record<string, {
   chown: {
     class: "modify",
     // chown <owner> <file>... — skip first positional arg (owner)；--reference= 出现时无 owner 位置参数，参考文件是 read 源
-    paths: (args, consumed) => {
-      const hasReference = consumed.some((c) => c.option === "--reference");
-      const ref = consumed.find((c) => c.option === "--reference")?.value;
-      const files = args.slice(hasReference ? 0 : 1).map((a) => ({ op: "write" as const, value: a.value ?? "" }));
-      return ref ? [{ op: "read" as const, value: ref }, ...files] : files;
-    },
+    paths: (args, consumed) => referenceAwareFiles(args, consumed, ["--reference"], true),
     effects: ["permissionChange"],
     reason: "change file ownership",
     opts: [
@@ -125,7 +132,7 @@ const FILESYSTEM_CMDS: Record<string, {
   },
   rmdir: {
     class: "modify",
-    paths: (args) => args.map((a) => ({ op: "write", value: a.value ?? "" })),
+    paths: writeAllArgs,
     effects: ["delete"],
     reason: "remove empty directories",
     opts: [{ names: ["-p", "-v"], kind: "flag" }],
@@ -143,19 +150,20 @@ const FILESYSTEM_CMDS: Record<string, {
   },
   tee: {
     class: "modify",
-    paths: (args) => args.map((a) => ({ op: "write", value: a.value ?? "" })),
+    paths: writeAllArgs,
     effects: ["write"],
     reason: "write to files",
     opts: [{ names: ["-a", "-i"], kind: "flag" }],
   },
   truncate: {
     class: "modify",
-    paths: (args) => args.map((a) => ({ op: "write", value: a.value ?? "" })),
+    // truncate [-s SIZE] [--reference=RFILE] <file>... — 参考文件是 read 源（与 chmod/chown/touch 一致）
+    paths: (args, consumed) => referenceAwareFiles(args, consumed, ["--reference"], false),
     effects: ["write"],
     reason: "truncate files",
     opts: [
       { names: ["-s", "--size"], kind: "expression", forms: ["separated", "equals"] },
-      { names: ["--reference"], kind: "expression", forms: ["separated", "equals"] },
+      { names: ["--reference"], kind: "file", operation: "read", forms: ["separated", "equals"] },
       { names: ["-c"], kind: "flag" },
     ],
   },
@@ -208,7 +216,7 @@ const FILESYSTEM_CMDS: Record<string, {
   },
   shred: {
     class: "destroy",
-    paths: (args) => args.map((a) => ({ op: "write", value: a.value ?? "" })),
+    paths: writeAllArgs,
     effects: ["delete"],
     reason: "securely delete files",
     opts: [

@@ -1,4 +1,4 @@
-// tests/access-gate/access-plan-verifier.test.ts
+// tests/access-gate/plan/access-plan-verifier.test.ts
 // 直接测试 access-plan-verifier 的每条校验分支（Task Record: 补全 adapter 命令级测试与 verifier 分支测试）
 // 手法：compileShellCall 产生合法 plan → 深拷贝后逐字段篡改 → 深度冻结 →
 //       new WeakSet 注册 → 直接调用 validateCompleteAccessPlan 断言 false。
@@ -8,7 +8,7 @@ import test from "node:test";
 import { deepFreeze, makeContext } from "./helpers";
 import { compileShellCall, ANALYSIS_LIMITS } from "../../src/access-gate/gate";
 import type { AccessOperation } from "../../src/access-gate/gate";
-import { validateCompleteAccessPlan } from "../../src/access-gate/gate/access-plan-verifier";
+import { validateCompleteAccessPlan } from "../../src/access-gate/gate/plan/access-plan-verifier";
 
 const env = makeContext("pi-access-verifier-");
 const base = (() => {

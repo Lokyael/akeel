@@ -16,16 +16,16 @@ test("global profiles override same-name built-ins and set the default", () => {
   const agentDir = mkdtempSync(join(tmpdir(), "pi-access-agent-"));
   try {
     mkdirSync(join(agentDir, "pi-keel"), { recursive: true });
-    writeFileSync(join(agentDir, "pi-keel", "profiles.json"), JSON.stringify({
-      defaultProfile: "keel-develop",
-      profiles: {
-        "keel-develop": {
-          extends: ["keel-read"],
-          description: "Global develop profile.",
-          shellPolicy: { unknown: "ask" },
-        },
-      },
-    }));
+    writeFileSync(join(agentDir, "pi-keel", "config.yaml"), [
+      "defaultProfile: keel-develop",
+      "profiles:",
+      "  keel-develop:",
+      "    extends: [keel-read]",
+      "    description: Global develop profile.",
+      "    shellPolicy:",
+      "      unknown: ask",
+      "",
+    ].join("\n"));
 
     const result = loadProfiles({ agentDir });
 
@@ -36,7 +36,7 @@ test("global profiles override same-name built-ins and set the default", () => {
   }
 });
 
-test("only the global pi-keel/profiles.json is read; no project config exists", () => {
+test("only the global pi-keel/config.yaml is read; no project config exists", () => {
   const agentDir = mkdtempSync(join(tmpdir(), "pi-access-agent-"));
   try {
     // 项目级配置不存在，且不受任何 cwd/projectRoot 影响：
@@ -52,7 +52,7 @@ test("invalid global profiles fail closed to keel-read", () => {
   const agentDir = mkdtempSync(join(tmpdir(), "pi-access-agent-"));
   try {
     mkdirSync(join(agentDir, "pi-keel"), { recursive: true });
-    writeFileSync(join(agentDir, "pi-keel", "profiles.json"), "{ bad json");
+    writeFileSync(join(agentDir, "pi-keel", "config.yaml"), "{ bad yaml [::");
 
     assert.equal(loadProfiles({ agentDir }).defaultProfile, "keel-read");
   } finally {

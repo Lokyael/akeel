@@ -1,5 +1,5 @@
 // tests/access-gate/subagent-init.test.ts
-// 子代理会话初始化编排（T-052 C1）：applySubagentProfile / publishParentTier 函数级测试。
+// 子代理会话初始化编排：applySubagentProfile / publishParentTier 函数级测试。
 // env 参数化——构造对象直接断言，不依赖全局 process.env 与 harness。
 
 import assert from "node:assert/strict";

@@ -87,7 +87,7 @@ export interface ControlFlowAnalysis {
 
 /**
  * 分析 ShellProgram 的控制流。
- * 返回每个命令节点在分析时的有效 cwd（T-047 #2：semantics 字段恒 null 死字段已删除，
+ * 返回每个命令节点在分析时的有效 cwd（semantics 字段恒 null 死字段已删除，
  * 语义分析由 shell-compiler 在 control-flow 之后单独调用 analyzeSemantics）。
  */
 export function analyzeControlFlow(

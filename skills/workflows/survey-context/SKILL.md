@@ -15,7 +15,7 @@ Read `CONVENTIONS.md` if it exists. Read `AGENTS.md` or `CLAUDE.md` for engineer
 
 ### 2. Read current project knowledge
 
-Read `CONTEXT.md` if it exists. Internalize its Glossary, Architecture, Security Boundaries, Active Decisions, and Negative Space.
+Read `CONTEXT.md` if it exists. Internalize its Glossary, Architecture, Active Decisions, and Negative Space.
 
 ### 3. Read durable decisions on demand
 

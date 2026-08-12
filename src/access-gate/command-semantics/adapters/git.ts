@@ -57,7 +57,7 @@ const GIT_CLASSIFY: readonly GitClassifyDef[] = [
   { cmd: "help", cls: "inspect", reason: "show help" },
   { cmd: "clean", cls: "destroy", downgrade: { flags: [{ name: "-n" }, { name: "--dry-run" }], to: "inspect", reason: "preview untracked files" }, reason: "delete untracked files" },
   // F1: -o/--output（含附着 -oFILE）升级 modify + 写路径 intent（prefix 匹配，A2）
-  { cmd: "archive", cls: "inspect", upgrade: { flags: [{ name: "-o", prefix: true }, { name: "--output", prefix: true }], to: "modify", reason: "write repository archive to file", paths: (args) => writeOutputIntents(args, ARCHIVE_OUTPUT_OPTS) }, reason: "create repository archive" },
+  { cmd: "archive", cls: "inspect", upgrade: { flags: [{ name: "-o", prefix: true }, { name: "--output", prefix: true }], to: "modify", reason: "write repository archive to file", paths: (args) => writeOutputPaths(args, ARCHIVE_OUTPUT_OPTS) }, reason: "create repository archive" },
   // ── modify ──
   { cmd: "add", cls: "modify", paths: (args) => positionalArgs(args).map((a) => ({ op: "read" as const, value: a.value ?? "" })), reason: "stage files" },
   { cmd: "rm", cls: "modify", paths: (args) => positionalArgs(args).map((a) => ({ op: "write" as const, value: a.value ?? "" })), reason: "remove tracked files" },
@@ -80,8 +80,7 @@ const GIT_CLASSIFY: readonly GitClassifyDef[] = [
   { cmd: "gc", cls: "modify", reason: "garbage collect repository" },
   { cmd: "submodule", cls: "modify", reason: "manage submodules" },
   // R3: format-patch 生成补丁文件（-o/--output-directory 目录；无 -o 时写 cwd，由保守 cwd fallback 承接）
-  { cmd: "format-patch", cls: "modify", paths: (args) => writeOutputIntents(args, FORMAT_PATCH_OUTPUT_OPTS), reason: "generate patch files" },
-// ── 子命令族（A 步骤 2 后：stash/bundle 已迁入 GIT_SUBCOMMAND_PARSERS，此处不再有族）──
+  { cmd: "format-patch", cls: "modify", paths: (args) => writeOutputPaths(args, FORMAT_PATCH_OUTPUT_OPTS), reason: "generate patch files" },
 ];
 
 function gitPathOpts(args: ShellArg[]): PathIntent[] {
@@ -102,13 +101,14 @@ function gitPathOpts(args: ShellArg[]): PathIntent[] {
 }
 
 /**
- * 写路径选项提取（引擎子集遍历）：-o/--output 类分离/等号/短附着三形式 → write intent。
- * opaqueOnUnknown: false —— git 选项面开放（archive --format、format-patch --numbered 等合法），
- * 子集提取只关心写路径，其余选项静默（B4 决策）。
+ * 写路径选项提取（引擎子集遍历）：-o/--output 类分离/等号/短附着三形式 → write paths。
+ * 返回 GIT_CLASSIFY paths 契约的 {op, value} 形状（非 PathIntent——无 source/span/confidence，
+ * 由 extractGitPaths 在分类时补齐）；opaqueOnUnknown: false —— git 选项面开放
+ * （archive --format、format-patch --numbered 等合法），子集提取只关心写路径，其余选项静默（B4 决策）。
  */
-function writeOutputIntents(args: readonly ShellArg[], opts: readonly Opt[]): { op: "write"; value: string }[] {
+function writeOutputPaths(args: readonly ShellArg[], opts: readonly Opt[]): { op: "write"; value: string }[] {
   const { consumed } = parseOptions(args, { opts, positional: "file", opaqueOnUnknown: false });
-  // 共享 file→intent 映射 + write 过滤 + 类型降级（GIT_CMDS paths 契约）
+  // 共享 file→intent 映射 + write 过滤 + 类型降级（GIT_CLASSIFY paths 契约）
   return consumedFileIntents(consumed)
     .filter((i) => i.operation === "write")
     .map((i) => ({ op: "write" as const, value: i.rawPath }));
@@ -186,7 +186,7 @@ function extractGitPaths(
   }));
 }
 
-// ─── git config 子命令：读写分类 + 配置层级目标解析（T-037） ───
+// ─── git config 子命令：读写分类 + 配置层级目标解析 ───
 
 const GIT_CONFIG_TABLE: ConfigOptionTable = {
   readFlags: new Set([
@@ -248,7 +248,7 @@ function positionalArgs(args: readonly ShellArg[]): ShellArg[] {
   return result;
 }
 
-// ─── git branch 子命令：正向标志解析（T-052 C2） ───
+// ─── git branch 子命令：正向标志解析 ───
 // 分类优先级（保守）：delete > force > move > upstream > copy > list/plain。
 // 标志枚举见 DECLARE_BRANCH_FLAGS；纯列表标志即使带位置参数（过滤模式）仍为 inspect。
 
@@ -284,7 +284,7 @@ function analyzeGitBranch(tokens: readonly string[]): CommandSemantics {
   return makeSemantics("inspect", { reason: "list branches" });
 }
 
-// 专用子命令解析器注册表（T-053 C2 + A 步骤 2）：复杂子命令族（config/branch/stash/bundle）
+// 专用子命令解析器注册表：复杂子命令族（config/branch/stash/bundle）
 // 走专用解析，GIT_CLASSIFY 表兜底。全部 token 级（tokens 含子命令词，parser 按需 slice）。
 type GitSubcommandParser = (tokens: readonly string[], subArgs: readonly ShellArg[], pathIntents: PathIntent[]) => CommandSemantics;
 

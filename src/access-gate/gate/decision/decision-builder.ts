@@ -1,11 +1,11 @@
-import { guidanceFor } from "./guidance-catalog";
+import { guidanceFor } from "../decision-code-catalog";
 import type {
   GateDecision,
   GateEvidence,
   HardDenyCode,
   ProfileDenyCode,
-} from "./decision-types";
-import { evidenceKind } from "./access-request";
+} from "../decision-types";
+import { evidenceKind } from "../plan/request-builder";
 
 export function hardDeny(
   code: HardDenyCode,

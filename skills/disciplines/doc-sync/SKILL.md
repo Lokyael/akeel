@@ -44,7 +44,7 @@ For each identified doc, verify:
 5. **Examples**: code examples still work with current API
 6. **Record authority**: Candidate Records remain visibly non-binding; promoted content has one authoritative destination and no duplicate C source
 7. **Task lifecycle**: Task Record status matches reality; verified tasks are either cleared or clearly blocked on a durable documentation update
-8. **Slot invariant**: each container (`docs/candidates.md`, `docs/task.md`, `docs/decisions.md`) has exactly one trailing empty slot numbered as history max + 1; missing or duplicated slots are flagged for restoration by the next creator (Next-ID slots, per principles.md Quick Reference — Record Lifecycle)
+8. **Slot invariant**: each container (`docs/candidates.md`, `docs/task.md`, `docs/decisions.md`) has exactly one trailing empty slot (per principles.md Next-ID slots)
 
 ### Step 3: Fix or Flag
 

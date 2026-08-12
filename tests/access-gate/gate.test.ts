@@ -2,8 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { evaluateToolCall } from "../../src/access-gate/gate/evaluate";
-import type { GateRuntime } from "../../src/access-gate/gate/types";
+import { evaluateToolCall } from "../../src/access-gate/gate/decision/evaluate";
+import type { GateRuntime } from "../../src/access-gate/gate/host";
 import type { ResolvedProfile } from "../../src/access-gate/profile/types";
 import { makeContext } from "./helpers";
 
@@ -339,14 +339,14 @@ test("user denial reports the operation was not executed", async () => {
   assert.ok(result.reason.includes("was not executed"));
 });
 
-test("git config read is allowed without asking (T-037)", async () => {
+test("git config read is allowed without asking", async () => {
   const { runtime, prompts } = makeRuntime();
   const result = await evaluateTool("bash", { command: "git config user.name" }, runtime);
   assert.deepEqual(result, { kind: "allow" });
   assert.equal(prompts.length, 0);
 });
 
-test("git config write ask keeps the target path for consent (T-037)", async () => {
+test("git config write ask keeps the target path for consent", async () => {
   const activeProfile = profile({
     pathPolicy: {
       default: { read: "deny", list: "deny", search: "deny", write: "ask" },
@@ -362,7 +362,7 @@ test("git config write ask keeps the target path for consent (T-037)", async () 
   assert.ok(prompts[0]!.includes(".gitconfig"), `prompt should show target path (got: ${prompts[0]})`);
 });
 
-test("git config local write is blocked by .git protection (T-037)", async () => {
+test("git config local write is blocked by .git protection", async () => {
   const result = await evaluateTool("bash", { command: "git config user.name zev" }, { hasUI: true, select: async () => "Allow once" });
   assert.equal(result.kind, "block");
   assert.equal(result.code, "blocked-path");

@@ -8,7 +8,7 @@ import {
   type CompilerDraftResult,
   type DirectToolCompilerInput,
   type ToolSurface,
-} from "./access-request";
+} from "./request-builder";
 import { TOOL_SCHEMAS, type ToolSchema } from "./tool-schemas";
 
 function validateEditEntries(edits: unknown): string | null {

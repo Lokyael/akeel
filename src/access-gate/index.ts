@@ -3,12 +3,12 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { evaluateToolCall } from "./gate";
-import { loadProfiles } from "./profile/load";
-import type { ResolvedProfiles } from "./profile/types";
-import { displayName, PROFILE_PREFIX } from "./profile/defaults";
-import { findProjectRoot, createProfileState, type ProfileState } from "./session/profile-state";
-import { applySubagentProfile, publishParentTier } from "./session/subagent-init";
-import { clearProfileStatus, installProfileFooter, profileStatus, type ProfileFooterHandle } from "./ui/profile-status";
+import { loadProfiles } from "./profile";
+import type { ResolvedProfiles } from "./profile";
+import { displayName, PROFILE_PREFIX } from "./profile";
+import { findProjectRoot, createProfileState, type ProfileState } from "./session";
+import { applySubagentProfile, publishParentTier } from "./session";
+import { disposeProfileFooter, installProfileFooter, profileStatus, type ProfileFooterHandle } from "./ui";
 
 export default function accessGate(pi: ExtensionAPI): void {
   let profiles: ResolvedProfiles | undefined;
@@ -85,7 +85,7 @@ export default function accessGate(pi: ExtensionAPI): void {
   });
 
   pi.on("session_shutdown", async (_event, _ctx) => {
-    clearProfileStatus(footer);
+    disposeProfileFooter(footer);
     footer = undefined;
     if (stagingDir) rmSync(stagingDir, { recursive: true, force: true });
     stagingDir = undefined;

@@ -20,7 +20,7 @@
 - **Skill Single Responsibility**：每个 skill 单一职责、调用时内容全量被使用；触发场景互斥的 skill 保持独立，不合并（D-030）。
 - **Single Source of Format**：格式/规则只在 `principles.md` Quick Reference 定义一次，技能只文字引用不内嵌副本（D-030）。
 - **子代理档位**：pi-keel 用档位（tier）抽象管理 pi-subagents 子代理会话权限，共两档——T0 `scratch`（`keel-subagent-scratch`，写仅 `/tmp/pi-work/**`）与 T1 `project`（`keel-subagent-project`，写 `project/**` + scratch）；读均全盘，shell 轴两档一致（inspect-only），差异只在路径写面（D-039）。T0 档 agent 必须无 mutation 工具（bash/write/edit）——pi-subagents 输出契约机制强制（有则被指令自写 output 与路径策略矛盾），scout 删 write+bash、researcher 原生即无（D-039）。
-- **subagentProfiles 映射**：`profiles.json` 可选根键，agent 名→**档位名**（`scratch`/`project`，`"*"` 回退），优先级 显式 > 内置默认 > `*`（D-039）。
+- **subagentProfiles 映射**：`config.yaml`（集中配置，D-041）可选顶层键，agent 名→**档位名**（`scratch`/`project`，`"*"` 回退），优先级 显式 > 内置默认 > `*`（D-039）。
 - **父档位钳制**：父会话档位号（1=项目可写档，否则 0）经 `PI_KEEL_PARENT_TIER`（`"0"`/`"1"`）env 传播，父侧算好、子代理零解析；子代理生效档 = min(映射档, 父TIER)——两档下即"父非项目可写 → 一律回退 T0 scratch"——子代理权限上限 = 父会话当前档位（D-039）。
 
 ## Architecture
@@ -28,15 +28,11 @@
 - `src/bootstrap/` 在 Session 启动和 compaction 后注入工程原则。
 - `src/access-gate/` 统一处理用户全局 Profile、Shell IR、命令语义、路径策略、Gate、Session 状态和 Footer。
 - 子代理会话（pi-subagents `--mode json -p` 子进程，默认加载全局扩展）在 `session_start` 检测 `PI_SUBAGENT_CHILD`/`PI_SUBAGENT_CHILD_AGENT`，初始化为按 agent 映射的子代理档位（T0 `scratch`/T1 `project`）；父会话档位号经 `PI_KEEL_PARENT_TIER` env 钳制子代理生效档（D-039）。
-- `shell-parse/` 输出受限 Shell IR；`command-semantics/` 提取命令类别、路径意图、效果和 cwd 转换，用户全局 `pi-keel/command-overrides.yaml` 只扩展 Shell 命令语义。wrapper 链由 parser 单一拥有——`executable` 永不承载 wrapper，wrapper positional 消费后保留在 `wrapperArgs` 供 token 级扫描，normalize 纯出栈（D-037）。
-- `gate/` 编译器将 Shell IR 和 Direct tool 参数转换为 `CompleteAccessPlan`；compiler outcome 另外区分 unsupported form、security block 和 invalid request。`compiler-entry.ts` 是唯一 plan sealing boundary，同步 Policy Kernel 只消费经过 verifier 验证的 plan 和 Profile，产出 `GateDecision`，renderer 将决策转为 host 兼容结果。
+- `shell-parse/` 输出受限 Shell IR；`command-semantics/` 提取命令类别、路径意图、效果和 cwd 转换，用户全局 `pi-keel/config.yaml` 的 `commands` 段只扩展 Shell 命令语义，`optionalAdapters` 段显式启用随包分发的可选工具建模（默认不加载，D-041）。wrapper 链由 parser 单一拥有——`executable` 永不承载 wrapper，wrapper positional 消费后保留在 `wrapperArgs` 供 token 级扫描，normalize 纯出栈（D-037）。
+- `gate/` 编译器将 Shell IR 和 Direct tool 参数转换为 `CompleteAccessPlan`；compiler outcome 另外区分 unsupported form、security block 和 invalid request。`compiler-entry.ts` 是唯一 plan sealing boundary，同步 Policy Kernel 只消费经过 verifier 验证的 plan 和 Profile，产出 `GateDecision`，renderer 将决策转为 host 兼容结果。物理分两层 + 共享根（D-042）：`plan/`（compiler-entry/shell-compiler/direct-tool-compiler/request-builder/preflight/access-plan-verifier 等）、`decision/`（evaluate/evaluate-request/decision-builder/render-decision）、根（`host`/`decision-types`/`decision-code-catalog`——被两层共用，避免循环依赖）。
 - `command-semantics/` 分类器：git 子命令用 token 级 `GIT_CLASSIFY` 声明表（cmd + upgrade/downgrade 调节 + 子命令族 parser）；选项遍历由统一引擎 `option-parse.ts` 承担（值性质 file/expression/flag、位置参数性质 file/program-first/set、未知选项策略 opaqueOnUnknown 显式声明，D-040）。
 - Direct tool（`read`、`write`、`edit`、`find`、`grep`、`ls`）和 Shell 命令经过各自的 compiler 后进入同一 Policy Kernel。
 - 用户项目运行时文档入口为 `CONTEXT.md`、可选的 `docs/candidates.md`、`docs/decisions.md` 和 `docs/task.md`；Candidate Record 不进入当前事实或 active Decision 索引。
-
-## Security Boundaries
-
-当前安全边界和残余风险以 [`docs/security-boundaries.md`](docs/security-boundaries.md) 为准。该文件是独立的安全承诺，不记录实施任务或测试过程。
 
 ## Active Decisions
 
@@ -67,14 +63,21 @@
 - [D-037 解析器拥有 wrapper 链（IR 契约：executable 永不承载 wrapper）](docs/decisions.md#d-037-解析器拥有-wrapper-链ir-契约executable-永不承载-wrapper)
 - [D-038 footer 单一 fitter + pi-tui 宽度助手（生产/测试双路径）](docs/decisions.md#d-038-footer-单一-fitter--pi-tui-宽度助手生产测试双路径)
 - [D-039 子代理档位制（pi-keel × pi-subagents）](docs/decisions.md#d-039-子代理档位制pi-keel--pi-subagents)
-- [D-040 命令语义分类 token 化与统一选项引擎（GIT_CLASSIFY + option-parse）](docs/decisions.md#d-040-命令语义分类-token-化与统一选项引擎git-classify--option-parse)
+- [D-040 命令语义分类 token 化与统一选项引擎（GIT_CLASSIFY + option-parse）](docs/decisions.md#d-040-命令语义分类-token-化与统一选项引擎git_classify--option-parse)
+- [D-041 集中配置与可选工具建模（config.yaml + optionalAdapters）](docs/decisions.md#d-041-集中配置与可选工具建模configyaml--optionaladapters)
+- [D-042 gate 物理分层 + 目录 index 统一 + interpreter-names 命名](docs/decisions.md#d-042-gate-物理分层--目录-index-统一--interpreter-names-命名)
 
 ## Negative Space
 
 - 不提供 OS-level sandbox、容器、VM、seccomp、Landlock、network namespace 或独立 network policy 轴。
 - 仅保证支持 Linux 平台（以 Arch Linux 的 GNU 工具链为基准）；不提供 Windows / macOS / BSD 支持，不建模其路径语义与选项方言；其他 Linux 发行版的工具链差异不在保证范围。
-- 不承诺 pathname check 与实际文件操作之间的 TOCTOU 消除。
-- 不拦截 `user_bash`、`shellCommandPrefix`、Bash `spawnHook`、tool override、custom tool backend、未知 Direct tool surface 或其他 Extension 的直接操作。
+- 不承诺 pathname check 与实际文件操作之间的 TOCTOU 消除：gate 是纯决策层，不执行文件操作，与执行方之间没有 fd 传递通道；消除需 pi 宿主提供 fd/OS 级原子机制，结构性超出 pi-keel 能力。
+- 不拦截 `user_bash`、`shellCommandPrefix`、Bash `spawnHook`、tool override、custom tool backend、未知 Direct tool surface 或其他 Extension 的直接操作；用户安装的其他 Extension 可直接调用 Node fs/child_process。
+- 审批后的实际文件操作由操作系统权限决定；gate 只做前置策略检查，不控制执行后的行为。
+- 不提供完整 security log scrubbing：执行记录（`BashExecutionMessage.command`）由 pi 宿主负责。
+- Shell IR 不是完整 Bash 语法树：结构化控制流（for/while/if/函数定义）没有安全语义；动态 token 在决策前 hard deny，未知命令按 `shellPolicy.unknown` 决策不代表语法已验证。
+- 未建模的配置写手（yarn/pip/uv/cargo 等）的外部配置文件写入不经过 PathPolicy，按 modify + cwd 保守写检查；已建模的 git/npm/pnpm config 写目标经 PathPolicy（含 keel-build 的 `~/**` write=ask 规则）。
+- 子代理读全盘（读面不钳制，源码内硬编码密钥不在 blocked paths 覆盖）；write 管路径不管内容（durable 内容防中毒靠父会话 git diff）；`/tmp/pi-work` 是约定非隔离（sticky 共享目录、无 symlink 检查）；父档位钳制基于 spawn 时 env 快照。
 - 不为 Candidate Record 提供自动提醒、后台定时器、Session hook、Footer 状态或专用 review 技能；复审只在显式 context survey 中报告。
 - 不把短期 Task Record、实施过程或审查报告作为永久项目知识。
 - 不自动识别、不写入用户项目的自有文档体系，不提供容器级迁移引导；非标准体系由用户在 `AGENTS.md` 或会话中显式声明。
@@ -85,5 +88,4 @@
 - [`docs/candidates.md`](docs/candidates.md)：当前未采纳、未承诺实施的候选事项；不得作为指令、路线图或当前事实。
 - [`docs/decisions.md`](docs/decisions.md)：长期决策寄存器。
 - [`docs/task.md`](docs/task.md)：活跃任务记录。
-- [`docs/security-boundaries.md`](docs/security-boundaries.md)：安全承诺和残余风险。
 - [`docs/traceability.md`](docs/traceability.md)：外部来源、采用方式、文件映射和许可证义务；不定义当前架构、行为或决策。

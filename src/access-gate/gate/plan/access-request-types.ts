@@ -1,9 +1,9 @@
-import type { CwdCandidate } from "../command-semantics/types";
-import type { SourceSpan } from "../shell-parse/types";
-import type { DecisionCode, GateEvidence } from "./decision-types";
-import type { CommandClass, Effect, PathOperation, PathSource, ToolSurface } from "../domain";
+import type { CwdCandidate } from "../../command-semantics";
+import type { SourceSpan } from "../../shell-parse";
+import type { DecisionCode, GateEvidence } from "../decision-types";
+import type { CommandClass, Effect, PathOperation, PathSource, ToolSurface } from "../../domain";
 
-export type { DecisionCode, GateEvidence } from "./decision-types";
+export type { DecisionCode, GateEvidence } from "../decision-types";
 
 // ── compiler identity ──
 export const COMPILER_VERSION = "access-plan/v2";
@@ -20,16 +20,16 @@ export const ANALYSIS_LIMITS = {
   maxEditEntries: 64,
 } as const;
 
-// ── closed-world registries（值同源于 domain.ts，T-046） ──
+// ── closed-world registries（值同源于 domain.ts） ──
 export {
   COMMAND_CLASS_SET as COMMAND_CLASSES,
   EFFECT_SET as EFFECTS,
   PATH_OPERATION_SET as PATH_OPERATIONS,
   TOOL_SURFACE_SET as TOOL_SURFACES,
-} from "../domain";
+} from "../../domain";
 
 // ── domain types（类型同源于 domain.ts） ──
-export type { CommandClass, Effect, PathOperation, PathSource, ToolSurface } from "../domain";
+export type { CommandClass, Effect, PathOperation, PathSource, ToolSurface } from "../../domain";
 
 export interface PathAccessOperation {
   readonly kind: "path";
@@ -50,7 +50,7 @@ export interface CommandAccessOperation {
   readonly span: SourceSpan;
 }
 
-// (T-046 R7) EffectAccessOperation 已删除：effect 只以 command.effects 承载，
+// EffectAccessOperation 已删除：effect 只以 command.effects 承载，
 // span 与 command span 相同，verifier 不再需要平行数组对账（D-022 措辞同步）。
 
 export type AccessOperation = PathAccessOperation | CommandAccessOperation;

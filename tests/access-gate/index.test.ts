@@ -15,7 +15,7 @@ async function startSessionWithFooter(): Promise<{ harness: Harness; footer: Foo
 test("reports invalid global profile configuration at session start", async () => {
   const agentDir = mkdtempSync(join(tmpdir(), "pi-access-invalid-agent-"));
   mkdirSync(join(agentDir, "pi-keel"), { recursive: true });
-  writeFileSync(join(agentDir, "pi-keel", "profiles.json"), "{ bad json");
+  writeFileSync(join(agentDir, "pi-keel", "config.yaml"), "{ bad yaml [::");
   const previous = process.env.PI_CODING_AGENT_DIR;
   process.env.PI_CODING_AGENT_DIR = agentDir;
   const { harness, cleanup } = startSession();
@@ -33,19 +33,28 @@ test("reports invalid global profile configuration at session start", async () =
 test("/profile status reports the complete resolved policy", async () => {
   const agentDir = mkdtempSync(join(tmpdir(), "pi-access-status-agent-"));
   mkdirSync(join(agentDir, "pi-keel"), { recursive: true });
-  writeFileSync(join(agentDir, "pi-keel", "profiles.json"), JSON.stringify({
-    defaultProfile: "status-test",
-    profiles: {
-      "status-test": {
-        description: "Status test profile.",
-        shellPolicy: { inspect: "allow", modify: "ask", execute: "deny", destroy: "deny", unknown: "ask" },
-        pathPolicy: {
-          default: { read: "allow", list: "allow", search: "ask", write: "deny" },
-          rules: [{ path: "project/docs/**", write: "allow" }],
-        },
-      },
-    },
-  }));
+  writeFileSync(join(agentDir, "pi-keel", "config.yaml"), [
+    "defaultProfile: status-test",
+    "profiles:",
+    "  status-test:",
+    "    description: Status test profile.",
+    "    shellPolicy:",
+    "      inspect: allow",
+    "      modify: ask",
+    "      execute: deny",
+    "      destroy: deny",
+    "      unknown: ask",
+    "    pathPolicy:",
+    "      default:",
+    "        read: allow",
+    "        list: allow",
+    "        search: ask",
+    "        write: deny",
+    "      rules:",
+    "        - path: project/docs/**",
+    "          write: allow",
+    "",
+  ].join("\n"));
   const previous = process.env.PI_CODING_AGENT_DIR;
   process.env.PI_CODING_AGENT_DIR = agentDir;
   const { harness, cleanup } = startSession();

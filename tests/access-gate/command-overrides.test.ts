@@ -9,7 +9,7 @@ import test from "node:test";
 import { lex } from "../../src/access-gate/shell-parse/lexer";
 import { parse } from "../../src/access-gate/shell-parse/parser";
 import { analyzeSemantics } from "../../src/access-gate/command-semantics/registry";
-import { resetOverrides } from "../../src/access-gate/command-semantics/overrides";
+import { resetConfig } from "../../src/access-gate/config";
 import type { SemanticContext } from "../../src/access-gate/command-semantics/types";
 
 // ─── helpers ───
@@ -24,7 +24,9 @@ function setupProject(overridesContent: string): { root: string; ctx: SemanticCo
   const root = mkdtempSync(join(parent, "pi-keel-overrides-project-"));
   const agentDir = mkdtempSync(join(parent, "pi-keel-overrides-agent-"));
   mkdirSync(join(agentDir, "pi-keel"), { recursive: true });
-  writeFileSync(join(agentDir, "pi-keel", "command-overrides.yaml"), overridesContent, "utf-8");
+  // 测试内容视为 config.yaml 的 commands 段：统一缩进包裹（D-041 集中配置）
+  const indented = overridesContent.split("\n").map((l) => (l.trim() === "" ? "" : `  ${l}`)).join("\n");
+  writeFileSync(join(agentDir, "pi-keel", "config.yaml"), `commands:\n${indented}\n`, "utf-8");
   const previous = process.env.PI_CODING_AGENT_DIR;
   process.env.PI_CODING_AGENT_DIR = agentDir;
 
@@ -34,7 +36,7 @@ function setupProject(overridesContent: string): { root: string; ctx: SemanticCo
     root,
     ctx,
     cleanup: () => {
-      resetOverrides();
+      resetConfig();
       if (previous === undefined) delete process.env.PI_CODING_AGENT_DIR;
       else process.env.PI_CODING_AGENT_DIR = previous;
       rmSync(root, { recursive: true, force: true });
@@ -49,7 +51,7 @@ const DEFAULT_CTX: SemanticContext = { projectRoot: "/tmp/pi-keel-test", staging
 // ─── aliases ───
 
 test("aliases: fd → find（search adapter 接管）", () => {
-  resetOverrides();
+  resetConfig();
   const { ctx: _ctx, cleanup } = setupProject(`
 aliases:
   fd: find
@@ -66,7 +68,7 @@ aliases:
 });
 
 test("aliases: bat → cat（read adapter 接管）", () => {
-  resetOverrides();
+  resetConfig();
   const { ctx: _ctx, cleanup } = setupProject(`
 aliases:
   bat: cat
@@ -82,7 +84,7 @@ aliases:
 });
 
 test("aliases: 别名目标不存在 → unknown", () => {
-  resetOverrides();
+  resetConfig();
   const { ctx: _ctx, cleanup } = setupProject(`
 aliases:
   nosuchtool: nosuchadapter
@@ -97,7 +99,7 @@ aliases:
 });
 
 test("aliases: 路径前缀键覆盖目录内路径形式（含 ./ 归一化）", () => {
-  resetOverrides();
+  resetConfig();
   const { ctx: _ctx, cleanup } = setupProject(`
 aliases:
   "bin/": cat
@@ -114,7 +116,7 @@ aliases:
 });
 
 test("aliases: 路径形式精确键优先于前缀键", () => {
-  resetOverrides();
+  resetConfig();
   const { ctx: _ctx, cleanup } = setupProject(`
 aliases:
   "./bin/eslint": node
@@ -131,7 +133,7 @@ aliases:
 });
 
 test("aliases: 最长路径前缀键优先", () => {
-  resetOverrides();
+  resetConfig();
   const { ctx: _ctx, cleanup } = setupProject(`
 aliases:
   "bin/": cat
@@ -148,7 +150,7 @@ aliases:
 });
 
 test("aliases: 裸名键不再隐式覆盖路径形式（basename 冲突消除）", () => {
-  resetOverrides();
+  resetConfig();
   const { ctx: _ctx, cleanup } = setupProject(`
 aliases:
   mytool: cat
@@ -163,7 +165,7 @@ aliases:
 });
 
 test("aliases: 前缀键不误伤其他目录同名工具", () => {
-  resetOverrides();
+  resetConfig();
   const { ctx: _ctx, cleanup } = setupProject(`
 aliases:
   "bin/": cat
@@ -177,7 +179,7 @@ aliases:
 });
 
 test("aliases: 路径前缀键目标不存在 → unknown", () => {
-  resetOverrides();
+  resetConfig();
   const { ctx: _ctx, cleanup } = setupProject(`
 aliases:
   "bin/": nosuchadapter
@@ -192,7 +194,7 @@ aliases:
 });
 
 test("aliases: ./ 归一化对精确键同样生效（bin/eslint 命中 ./bin/eslint）", () => {
-  resetOverrides();
+  resetConfig();
   const { ctx: _ctx, cleanup } = setupProject(`
 aliases:
   "bin/eslint": node
@@ -208,7 +210,7 @@ aliases:
 });
 
 test("aliases: ./ 精确键与无 ./ 键等价（./bin/eslint 命中 bin/eslint）", () => {
-  resetOverrides();
+  resetConfig();
   const { ctx: _ctx, cleanup } = setupProject(`
 aliases:
   "./bin/eslint": node
@@ -223,7 +225,7 @@ aliases:
 });
 
 test("aliases: 别名目标为 commands 定义时链式解析", () => {
-  resetOverrides();
+  resetConfig();
   const { ctx: _ctx, cleanup } = setupProject(`
 aliases:
   mytool: my-linter
@@ -243,7 +245,7 @@ commands:
 });
 
 test("aliases: 别名目标为别名时不链式解析（单步契约，D-034）", () => {
-  resetOverrides();
+  resetConfig();
   const { ctx: _ctx, cleanup } = setupProject(`
 aliases:
   a: b
@@ -261,18 +263,18 @@ aliases:
 });
 
 test("aliases: 无 overrides 时不受影响", () => {
-  resetOverrides();
+  resetConfig();
   // DEFAULT_CTX 指向不存在的目录 → loadOverrides 找不到文件，回退到空配置
   const sem = analyzeSemantics(parseCmd("git status"), DEFAULT_CTX);
   assert.equal(sem.commandClass, "inspect");
   assert.ok(sem.reason.includes("show working tree"));
 });
 
-test("only the global pi-keel/command-overrides.yaml is read; no project config exists", () => {
-  resetOverrides();
+test("only the global pi-keel/config.yaml is read; no project config exists", () => {
+  resetConfig();
   const { ctx, cleanup } = setupProject("");
   try {
-    // setupProject 只写了全局 pi-keel/command-overrides.yaml（内容为空）；
+    // setupProject 只写了全局 pi-keel/config.yaml（commands 段为空）；
     // 项目目录中没有配置文件，也不存在项目级读取路径。
     const sem = analyzeSemantics(parseCmd("local-git status"), ctx);
     assert.equal(sem.commandClass, "unknown");
@@ -284,7 +286,7 @@ test("only the global pi-keel/command-overrides.yaml is read; no project config 
 // ─── commands ───
 
 test("commands: 简单命令（无子命令）→ 使用 YAML 定义的 class", () => {
-  resetOverrides();
+  resetConfig();
   const { ctx, cleanup } = setupProject(`
 commands:
   my-linter:
@@ -302,7 +304,7 @@ commands:
 });
 
 test("commands: 路径前缀键覆盖目录内命令定义（D-034 作用域）", () => {
-  resetOverrides();
+  resetConfig();
   const { ctx, cleanup } = setupProject(`
 commands:
   "bin/":
@@ -320,7 +322,7 @@ commands:
 });
 
 test("commands: 带子命令定义 → 子命令匹配", () => {
-  resetOverrides();
+  resetConfig();
   const { ctx, cleanup } = setupProject(`
 commands:
   docker:
@@ -346,7 +348,7 @@ commands:
 });
 
 test("commands: 子命令未匹配 → 基类 + opaque", () => {
-  resetOverrides();
+  resetConfig();
   const { ctx, cleanup } = setupProject(`
 commands:
   docker:
@@ -366,7 +368,7 @@ commands:
 });
 
 test("commands: 同名命令覆盖内置 adapter（用户定义优先）", () => {
-  resetOverrides();
+  resetConfig();
   const { ctx, cleanup } = setupProject(`
 commands:
   git:
@@ -386,7 +388,7 @@ commands:
 // ─── reclassify ───
 
 test("reclassify: 匹配 pattern 时覆盖分类", () => {
-  resetOverrides();
+  resetConfig();
   const { ctx, cleanup } = setupProject(`
 reclassify:
   - command: git
@@ -409,7 +411,7 @@ reclassify:
 });
 
 test("reclassify: 路径形式按 basename 对齐 adapter 身份（/usr/local/bin/git → 应用规则）", () => {
-  resetOverrides();
+  resetConfig();
   const { ctx, cleanup } = setupProject(`
 reclassify:
   - command: git
@@ -428,7 +430,7 @@ reclassify:
 });
 
 test("reclassify: 不匹配时保留原分类", () => {
-  resetOverrides();
+  resetConfig();
   const { ctx, cleanup } = setupProject(`
 reclassify:
   - command: git
@@ -445,7 +447,7 @@ reclassify:
 });
 
 test("reclassify: pattern 是无效正则时跳过", () => {
-  resetOverrides();
+  resetConfig();
   const { ctx, cleanup } = setupProject(`
 reclassify:
   - command: git
@@ -461,7 +463,7 @@ reclassify:
 });
 
 test("reclassify: 只匹配指定命令名", () => {
-  resetOverrides();
+  resetConfig();
   const { ctx, cleanup } = setupProject(`
 reclassify:
   - command: git
@@ -480,7 +482,7 @@ reclassify:
 // ─── 组合 ───
 
 test("组合: aliases + reclassify 同时生效", () => {
-  resetOverrides();
+  resetConfig();
   const { ctx, cleanup } = setupProject(`
 aliases:
   g: git
@@ -499,7 +501,7 @@ reclassify:
 });
 
 test("组合: commands 定义优先于别名和内置", () => {
-  resetOverrides();
+  resetConfig();
   const { ctx, cleanup } = setupProject(`
 aliases:
   g: git
@@ -519,7 +521,7 @@ commands:
 });
 
 test("组合: 别名 + commands → commands 优先于别名", () => {
-  resetOverrides();
+  resetConfig();
   const { ctx, cleanup } = setupProject(`
 aliases:
   g: git
@@ -541,7 +543,7 @@ commands:
 // ─── 运行时校验 ───
 
 test("校验: commands 中无效 class 抛出明确错误", () => {
-  resetOverrides();
+  resetConfig();
   const { ctx, cleanup } = setupProject(`
 commands:
   badtool:
@@ -558,7 +560,7 @@ commands:
 });
 
 test("校验: reclassify 中无效 class 抛出明确错误", () => {
-  resetOverrides();
+  resetConfig();
   const { ctx, cleanup } = setupProject(`
 reclassify:
   - command: git
@@ -576,7 +578,7 @@ reclassify:
 });
 
 test("校验: subcommands 中无效 class 抛出明确错误", () => {
-  resetOverrides();
+  resetConfig();
   const { ctx, cleanup } = setupProject(`
 commands:
   tool:
@@ -597,7 +599,7 @@ commands:
 // ─── 缓存隔离 ───
 
 test("缓存: 不同 global agentDir 加载不同的 overrides", () => {
-  resetOverrides();
+  resetConfig();
   const p1 = setupProject(`
 aliases:
   t1: git
@@ -627,7 +629,7 @@ aliases:
 // ─── 边界 ───
 
 test("边界: 空 overrides 不影响正常分析", () => {
-  resetOverrides();
+  resetConfig();
   const { ctx, cleanup } = setupProject(`
 # 只有注释，无实际内容
 `);
@@ -640,7 +642,7 @@ test("边界: 空 overrides 不影响正常分析", () => {
 });
 
 test("边界: 无效 YAML 不崩溃，回退到空配置", () => {
-  resetOverrides();
+  resetConfig();
   const { ctx, cleanup } = setupProject(`{invalid: [::`);
   try {
     const sem = analyzeSemantics(parseCmd("git log"), ctx);
@@ -653,7 +655,7 @@ test("边界: 无效 YAML 不崩溃，回退到空配置", () => {
 // ─── 路径 fallback 与覆盖层优先级 ───
 
 test("commands: 路径键优先于路径 fallback（用户定义直接生效）", () => {
-  resetOverrides();
+  resetConfig();
   const { ctx, cleanup } = setupProject(`
 commands:
   ./deploy.sh:
@@ -670,7 +672,7 @@ commands:
 });
 
 test("reclassify: 可覆盖路径 fallback 的 execute", () => {
-  resetOverrides();
+  resetConfig();
   const { ctx, cleanup } = setupProject(`
 reclassify:
   - command: ./node_modules/.bin/tsx
@@ -688,7 +690,7 @@ reclassify:
 });
 
 test("aliases: 仍先于 adapter/fallback 生效（裸名映射到已知 adapter）", () => {
-  resetOverrides();
+  resetConfig();
   const { ctx, cleanup } = setupProject(`
 aliases:
   myinsp: ls

@@ -2,21 +2,16 @@
 
 import type { ShellArg, ShellCommandNode } from "../../shell-parse/types";
 import type { CommandAdapter, CommandSemantics, PathIntent, SemanticContext } from "../types";
-import { makeSemantics, extractSubcommand, optionIntent, firstNonOptionIndex } from "./shared";
+import { makeSemantics, extractSubcommand, optionIntent, firstNonOptionIndex, semanticsFromRules, type RuleDef } from "./shared";
 import { parseConfigOptions, type ConfigOptionTable } from "./config-parse";
 
-interface PkgDef {
-  cls: "inspect" | "modify" | "execute" | "unknown";
-  pattern: (subcmd: string) => boolean;
-  reason: string;
-  network?: boolean;
-}
+// 规则表类型统一由 shared.ts 的 RuleDef 承担：本地不再有平行规则接口。
 
-function buildPkgRules(cmd: string): PkgDef[] {
+function buildPkgRules(cmd: string): RuleDef[] {
   // npm 用 install；pnpm/yarn 用 add/install（pnpm add 是核心安装命令）
   const installPat = cmd === "npm" ? /^install\b/ : /^(?:add|install)\b/;
   const removePat = cmd === "yarn" ? /^(?:remove|upgrade)\b/ : /^(?:remove|uninstall)\b/;
-  const rules: PkgDef[] = [
+  const rules: RuleDef[] = [
     { cls: "inspect", pattern: (s) => /^view\b/.test(s) || /^info\b/.test(s), reason: `${cmd} package info` },
     { cls: "inspect", pattern: (s) => /^outdated\b/.test(s), reason: `${cmd} outdated packages` },
     { cls: "inspect", pattern: (s) => /^(?:search|ls|list)\b/.test(s), reason: `${cmd} search/list` },
@@ -53,19 +48,19 @@ const PKG_VALUE_OPTS = [
 
 // npx always executes (potentially after download).  Flags like --version/--help
 // are inspect; everything else is execute + network.
-const NPX_RULES: PkgDef[] = [
+const NPX_RULES: RuleDef[] = [
   { cls: "inspect", pattern: (s) => /^(--version|-v|--help)$/.test(s), reason: "npx version/help" },
   { cls: "execute", pattern: () => true, reason: "npx execute package", network: true },
 ];
 
-const PKG_RULES: Record<string, PkgDef[]> = {
+const PKG_RULES: Record<string, RuleDef[]> = {
   npm: buildPkgRules("npm"),
   pnpm: buildPkgRules("pnpm"),
   yarn: buildPkgRules("yarn"),
   npx: NPX_RULES,
 };
 
-// ─── npm/pnpm config 子命令：写目标层级解析（T-037） ───
+// ─── npm/pnpm config 子命令：写目标层级解析 ───
 
 const NPM_CONFIG_TABLE: ConfigOptionTable = {
   readFlags: new Set(),
@@ -110,7 +105,7 @@ export const packageAdapter: CommandAdapter = {
       subcmd = args[0]!.value ?? "";
     }
 
-    // T-037: npm/pnpm config 写命令（set/delete/edit）→ modify + 配置目标 write intent；
+    // npm/pnpm config 写命令（set/delete/edit）→ modify + 配置目标 write intent；
     // get/list/未知交回规则循环（yarn config 不在范围，维持 modify 无 intent）
     if (name !== "yarn" && subcmd.startsWith("config")) {
       const idx = firstNonOptionIndex(args, PKG_VALUE_OPTS);
@@ -121,15 +116,8 @@ export const packageAdapter: CommandAdapter = {
       }
     }
 
-    for (const def of rules) {
-      if (def.pattern(subcmd)) {
-        return makeSemantics(def.cls, {
-          reason: def.reason,
-          effects: def.network ? ["network"] : undefined,
-          opaque: def.cls === "unknown",
-        });
-      }
-    }
+    const matched = semanticsFromRules(subcmd, rules);
+    if (matched) return matched;
 
     return makeSemantics("unknown", { reason: `${name}: unrecognized command`, opaque: true });
   },

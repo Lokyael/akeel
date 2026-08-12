@@ -1,5 +1,5 @@
-import type { CommandClass, CwdCandidate, Effect } from "../command-semantics/types";
-import type { SourceSpan } from "../shell-parse/types";
+import type { CommandClass, CwdCandidate, Effect } from "../../command-semantics";
+import type { SourceSpan } from "../../shell-parse";
 import type {
   AccessOperation,
   CompleteAccessPlan,
@@ -15,9 +15,9 @@ import {
   REQUEST_BRAND,
   TOOL_SURFACES,
 } from "./access-request-types";
-import { PATH_SOURCE_SET } from "../domain";
-import type { PathSource } from "../domain";
-import { isRecord, uniqueCandidates } from "./access-request";
+import { PATH_SOURCE_SET } from "../../domain";
+import type { PathSource } from "../../domain";
+import { isRecord, uniqueCandidates } from "./request-builder";
 
 export function validateCompleteAccessPlan(
   value: unknown,
@@ -132,11 +132,6 @@ function isValidOperation(value: unknown): value is AccessOperation {
       && COMMAND_CLASSES.has(value.commandClass as CommandClass)
       && Array.isArray(value.effects)
       && value.effects.every((effect) => typeof effect === "string" && EFFECTS.has(effect as Effect));
-  }
-  if (value.kind === "effect") {
-    return typeof value.effect === "string"
-      && EFFECTS.has(value.effect as Effect)
-      && (value.confidence === "exact" || value.confidence === "conservative");
   }
   return false;
 }

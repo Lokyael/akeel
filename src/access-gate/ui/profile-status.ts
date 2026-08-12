@@ -1,16 +1,10 @@
-import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { createProfileFooter, type ProfileFooterComponent, type ProfileFooterModel } from "./profile-footer";
+// access-gate/ui/profile-status.ts — /profile status 完整解析策略文本渲染（footer 安装见 footer-install.ts）
+
 import { displayName } from "../profile/defaults";
 import { COMMAND_CLASS_VALUES, PATH_OPERATION_VALUES } from "../domain";
-import type { ResolvedProfile, ResolvedProfiles } from "../profile/types";
+import type { ResolvedProfiles } from "../profile/types";
 import type { ProfileState } from "../session/profile-state";
 
-export interface ProfileFooterHandle {
-  refresh(): void;
-  dispose(): void;
-}
-
-/** /profile status 的完整解析策略文本渲染（T-053 C3：从 index.ts 迁入）。 */
 export function profileStatus(state: ProfileState, profiles: ResolvedProfiles): string {
   const profile = state.getProfile();
   const pathRules = profile.pathPolicy.rules.length > 0
@@ -31,39 +25,4 @@ export function profileStatus(state: ProfileState, profiles: ResolvedProfiles): 
 
 function formatDecisions<T extends string>(keys: readonly T[], values: Partial<Record<T, string>>): string {
   return keys.flatMap((key) => values[key] ? [`${key}=${values[key]}`] : []).join(" ");
-}
-
-export function installProfileFooter(
-  ctx: ExtensionContext,
-  profile: () => ResolvedProfile,
-  model: () => ProfileFooterModel | undefined,
-  thinkingLevel: () => string,
-  contextUsage: () => { percent: number | null; contextWindow: number } | undefined,
-): ProfileFooterHandle | undefined {
-  if (!ctx.hasUI || !ctx.sessionManager || (ctx.mode && ctx.mode !== "tui")) return undefined;
-
-  let tui: { requestRender(): void } | undefined;
-  let component: ProfileFooterComponent | undefined;
-  const session = ctx.sessionManager;
-  ctx.ui.setFooter((nextTui, theme, footerData) => {
-    tui = nextTui;
-    component = createProfileFooter(session, profile, model, thinkingLevel, contextUsage, footerData, theme);
-    return component;
-  });
-
-  return {
-    refresh() {
-      component?.invalidate();
-      tui?.requestRender();
-    },
-    dispose() {
-      ctx.ui.setFooter(undefined);
-      component = undefined;
-      tui = undefined;
-    },
-  };
-}
-
-export function clearProfileStatus(footer: ProfileFooterHandle | undefined): void {
-  footer?.dispose();
 }

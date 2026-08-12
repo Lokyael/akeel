@@ -60,6 +60,7 @@ defineAdapterTests("fs", [
   { cmd: "mkdir -m 755 src", name: "mkdir -m consumes mode", cls: "modify", intents: [{ operation: "write", rawPath: "src" }] },
   { cmd: "mkdir -pm 755 src", name: "mkdir flag cluster with trailing -m consumes mode", cls: "modify", intents: [{ operation: "write", rawPath: "src" }] },
   { cmd: "truncate -s5 f.txt", name: "truncate attached -s value is consumed", cls: "modify", intents: [{ operation: "write", rawPath: "f.txt" }] },
+  { cmd: "truncate --reference=ref.txt f.txt", name: "truncate --reference reads the reference file", cls: "modify", intents: [{ operation: "read", rawPath: "ref.txt" }, { operation: "write", rawPath: "f.txt" }] },
   { cmd: "chmod --reference=ref.txt file.txt", name: "chmod --reference keeps file arg and reads reference", cls: "modify", intents: [{ operation: "read", rawPath: "ref.txt" }, { operation: "write", rawPath: "file.txt" }] },
   { cmd: "chown --reference=ref.txt file.txt", name: "chown --reference keeps file arg and reads reference", cls: "modify", intents: [{ operation: "read", rawPath: "ref.txt" }, { operation: "write", rawPath: "file.txt" }] },
   { cmd: "shred -n 3 file.txt", name: "shred -n consumes iterations", cls: "destroy", intents: [{ operation: "write", rawPath: "file.txt" }] },

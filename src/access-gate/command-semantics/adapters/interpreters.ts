@@ -2,25 +2,19 @@
 
 import type { ShellCommandNode } from "../../shell-parse/types";
 import type { CommandAdapter, CommandSemantics, SemanticContext } from "../types";
-import { makeSemantics } from "./shared";
-import { LANGUAGE_RUNTIMES } from "../interpreters";
+import { makeSemantics, semanticsFromRules, type RuleDef } from "./shared";
+import { LANGUAGE_RUNTIMES } from "../interpreter-names";
 
-interface InterpRule {
-  cls: "inspect" | "execute";
-  pattern: (firstArg: string) => boolean;
-  reason: string;
-}
-
-function buildInterpRules(cmd: string): InterpRule[] {
+function buildInterpRules(cmd: string): RuleDef[] {
   return [
     { cls: "inspect", pattern: (s) => /^(--version|-V|-v|--help)$/.test(s), reason: cmd + " version/help" },
     { cls: "execute", pattern: () => true, reason: cmd + " execute script" },
   ];
 }
 
-// 注册名单与共享解释器列表同源（LANGUAGE_RUNTIMES，T-046 R3）：
+// 注册名单与共享解释器列表同源（LANGUAGE_RUNTIMES）：
 // 新增语言运行时只需改 interpreters.ts，adapter 注册与 preflight 硬规则自动对齐。
-const INTERP_RULES: Record<string, InterpRule[]> = Object.fromEntries(
+const INTERP_RULES: Record<string, RuleDef[]> = Object.fromEntries(
   LANGUAGE_RUNTIMES.map((runtime) => [runtime, buildInterpRules(runtime)]),
 );
 
@@ -38,12 +32,7 @@ export const interpreterAdapter: CommandAdapter = {
     })?.value ?? "";
     const firstArg = !subcmd && args.length > 0 ? args[0]!.value ?? "" : subcmd;
 
-    for (const def of rules) {
-      if (def.pattern(firstArg)) {
-        return makeSemantics(def.cls, { reason: def.reason });
-      }
-    }
-
-    return makeSemantics("execute", { reason: name + ": execute script" });
+    const matched = semanticsFromRules(firstArg, rules);
+    return matched ?? makeSemantics("execute", { reason: name + ": execute script" });
   },
 };

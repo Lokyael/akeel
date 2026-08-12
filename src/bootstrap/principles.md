@@ -10,8 +10,8 @@ skill check, before any tool call, before any response.
 
 *State assumptions. Name confusion. Surface tradeoffs.*
 
-- State your assumptions explicitly. If uncertain, ask.
-- If required information is missing or only they can provide it (preference, intent, approval), ask instead of guessing. Stated assumptions resolve ambiguity; user-held facts come from asking. If something is unclear, stop, name what's confusing, and ask.
+- State your assumptions explicitly. If something is unclear, stop, name what's confusing, and ask.
+- If required information is missing or only they can provide it (preference, intent, approval), ask instead of guessing — stated assumptions resolve ambiguity; user-held facts come from asking.
 - If multiple interpretations exist, present them — then state your pick.
 - If a simpler approach exists, say so. Push back when warranted.
 
@@ -257,7 +257,6 @@ external repos or docs. Remove resources when done.
 ```
 ## Glossary           ← domain terms and precise meanings
 ## Architecture       ← current structure and invariants
-## Security Boundaries ← current security promises and residual limits
 ## Active Decisions   ← IDs and links into docs/decisions.md
 ## Negative Space     ← what the project deliberately excludes
 ```

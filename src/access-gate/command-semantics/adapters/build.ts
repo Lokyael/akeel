@@ -2,17 +2,10 @@
 
 import type { ShellCommandNode } from "../../shell-parse/types";
 import type { CommandAdapter, CommandSemantics, SemanticContext } from "../types";
-import { makeSemantics, extractSubcommand } from "./shared";
-
-interface BuildDef {
-  cls: "inspect" | "modify" | "execute" | "unknown";
-  pattern: (subcmd: string) => boolean;
-  reason: string;
-  network?: boolean;
-}
+import { makeSemantics, extractSubcommand, semanticsFromRules, type RuleDef } from "./shared";
 
 interface BuildToolConfig {
-  rules: BuildDef[];
+  rules: RuleDef[];
   /** 取值选项：选项之后的 token 是值而非子命令的一部分。不穷举，未覆盖的选项导致 unknown（安全降级）。 */
   valueOpts?: readonly string[];
 }
@@ -86,15 +79,8 @@ export const buildAdapter: CommandAdapter = {
     // 全选项输入（如 cargo --version）：用第一个选项作为子命令候选
     if (!subcmd && args.length > 0) subcmd = args[0]!.value ?? "";
 
-    for (const def of config.rules) {
-      if (def.pattern(subcmd)) {
-        return makeSemantics(def.cls, {
-          reason: def.reason,
-          effects: def.network ? ["network"] : undefined,
-          opaque: def.cls === "unknown",
-        });
-      }
-    }
+    const matched = semanticsFromRules(subcmd, config.rules);
+    if (matched) return matched;
 
     return makeSemantics("unknown", { reason: `${name}: unrecognized`, opaque: true });
   },

@@ -19,7 +19,7 @@ const SECURITY_BOUNDARY_CODES = new Set<DecisionCode>([
   "hard-command-rule",
 ]);
 
-// ── evidence kind 映射（T-047 #3：与 denyResponseKindFor 同模块相邻，共享 code 视图） ──
+// ── evidence kind 映射（与 denyResponseKindFor 同模块相邻，共享 code 视图） ──
 // Record<DecisionCode, ...> 全量枚举：新增 DecisionCode 在此编译报错（fail-fast）。
 // approval-required/user-denied 保持 "command"（审批决策不经 evidenceKind 构造证据，
 // 实际证据由 evaluate-request 直接构造为 command/path）。

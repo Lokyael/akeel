@@ -1,8 +1,8 @@
-import { scanThreats } from "../security/threat-scan";
-import { reject, type CompilationReject } from "./access-request";
-import type { ShellCommandNode, ShellProgram } from "../shell-parse/types";
-import { canonicalExecutableName } from "../command-semantics/adapters/shared";
-import { HARD_RULE_INTERPRETERS } from "../command-semantics/interpreters";
+import { scanThreats } from "../../security";
+import { reject, type CompilationReject } from "./request-builder";
+import type { ShellCommandNode, ShellProgram } from "../../shell-parse";
+import { canonicalExecutableName } from "../../command-semantics";
+import { HARD_RULE_INTERPRETERS } from "../../command-semantics";
 
 // ── hard command rules（结构级） ──
 // 无条件拦截形态，不因 Profile 或用户批准放行（F1）：
@@ -12,7 +12,7 @@ import { HARD_RULE_INTERPRETERS } from "../command-semantics/interpreters";
 // 匹配基于 parse 后的命令结构（executable/args/操作符），而非原始文本：
 //   - 引号拆分（s'h'、pyth'on3、ev'al）经 shellWord 拼接规范化后不再逃逸；
 //   - 注释与字符串字面量不产生执行结构，不再误报。
-// 解释器名单与 interpreter adapter 同源（interpreters.ts，T-046 R3）：
+// 解释器名单与 interpreter adapter 同源（interpreters.ts）：
 // 语言运行时自动进入硬规则集，tsx 由此被拦截（curl | tsx）。
 // 新形态直接添加检查函数到 PREFLIGHT_CHECKS。
 

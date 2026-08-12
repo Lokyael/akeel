@@ -7,7 +7,7 @@ description: Use when you have requirements for a multi-step task, before touchi
 
 Write comprehensive implementation plans assuming the engineer has zero context and questionable taste. Document everything: which files to touch, code, testing, verification. DRY. YAGNI. TDD. Frequent commits.
 
-**Save plans to:** Add a `Kind: feature|refactor|maintenance` Task Record to `docs/task.md` — fill the trailing empty slot and append a new one with number + 1 (Next-ID slots, per principles.md Quick Reference — Record Lifecycle); if the slot is missing, restore it as Git-history max + 1 first. Use `docs/task-<topic>.md` only for genuinely independent concurrent tasks — such records consume the T counter from `docs/task.md` and advance its slot. Plans never live in `docs/candidates.md`: a Candidate Record is non-binding candidate data, not approval to plan or implement. Promote a C record only after the user explicitly commits to the work in the current conversation; then add optional `Origin: C-xxx` metadata and remove the source C entry in the same change.
+**Save plans to:** Add a `Kind: feature|refactor|maintenance` Task Record to `docs/task.md` (per principles.md Next-ID slots). Use `docs/task-<topic>.md` only for genuinely independent concurrent tasks — such records consume the T counter from `docs/task.md` and advance its slot. Plans never live in `docs/candidates.md`: a Candidate Record is non-binding candidate data, not approval to plan or implement. Promote a C record only after the user explicitly commits to the work in the current conversation; then add optional `Origin: C-xxx` metadata and remove the source C entry in the same change.
 
 ## Plan Header
 

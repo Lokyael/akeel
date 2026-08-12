@@ -13,96 +13,82 @@ test("control: unavailable cd target returns exists=false without throwing", () 
   assert.deepEqual(result, { cwd: "/path/that/does/not/exist/missing/subdir", exists: false });
 });
 
-
 test("normalize: env rm keeps underlying executable", () => {
   const { program } = parse(lex("env rm file").tokens);
-  const cmd = program.commands[0]!;
-  const norm = normalizeCommand(cmd);
-  assert.notEqual(norm, null);
-  assert.equal(norm!.executable, "rm");
-  assert.equal(norm!.command.args.length, 1);
-  assert.equal(norm!.command.args[0]!.value, "file");
+  const norm = normalizeCommand(program.commands[0]!);
+  assert.equal(norm.executable, "rm");
+  assert.equal(norm.command.args.length, 1);
+  assert.equal(norm.command.args[0]!.value, "file");
 });
 
 test("normalize: env with VAR=value keeps rm", () => {
   const { program } = parse(lex("env PATH=/tmp rm file").tokens);
   const norm = normalizeCommand(program.commands[0]!);
-  assert.notEqual(norm, null);
-  assert.equal(norm!.executable, "rm");
-  assert.equal(norm!.command.args.length, 1);
-  assert.equal(norm!.command.args[0]!.value, "file");
+  assert.equal(norm.executable, "rm");
+  assert.equal(norm.command.args.length, 1);
+  assert.equal(norm.command.args[0]!.value, "file");
 });
 
 test("normalize: command cp keeps underlying executable", () => {
   const { program } = parse(lex("command cp src dst").tokens);
   const norm = normalizeCommand(program.commands[0]!);
-  assert.notEqual(norm, null);
-  assert.equal(norm!.executable, "cp");
-  assert.equal(norm!.command.args.length, 2);
+  assert.equal(norm.executable, "cp");
+  assert.equal(norm.command.args.length, 2);
 });
 
 test("normalize: timeout 5 sleep 10 becomes sleep", () => {
   const { program } = parse(lex("timeout 5 sleep 10").tokens);
   const norm = normalizeCommand(program.commands[0]!);
-  assert.notEqual(norm, null);
-  assert.equal(norm!.executable, "sleep");
-  assert.equal(norm!.command.args.length, 1);
-  assert.equal(norm!.command.args[0]!.value, "10");
+  assert.equal(norm.executable, "sleep");
+  assert.equal(norm.command.args.length, 1);
+  assert.equal(norm.command.args[0]!.value, "10");
 });
 
 test("normalize: nohup command preserves executable", () => {
   const { program } = parse(lex("nohup long-running &").tokens);
   const norm = normalizeCommand(program.commands[0]!);
-  assert.notEqual(norm, null);
-  assert.equal(norm!.executable, "long-running");
+  assert.equal(norm.executable, "long-running");
 });
 
 test("normalize: exec bash -c preserves bash", () => {
   const { program } = parse(lex("exec bash -c 'echo hi'").tokens);
   const norm = normalizeCommand(program.commands[0]!);
-  assert.notEqual(norm, null);
-  assert.equal(norm!.executable, "bash");
+  assert.equal(norm.executable, "bash");
 });
 
 test("normalize: naked command stays unchanged", () => {
   const { program } = parse(lex("cat file.txt").tokens);
   const norm = normalizeCommand(program.commands[0]!);
-  assert.notEqual(norm, null);
-  assert.equal(norm!.executable, "cat");
-  assert.equal(norm!.wrappers.length, 0);
+  assert.equal(norm.executable, "cat");
 });
 
 test("normalize: env rm ~/.ssh/id_rsa has correct path arg", () => {
   const { program } = parse(lex("env rm ~/.ssh/id_rsa").tokens);
   const norm = normalizeCommand(program.commands[0]!);
-  assert.notEqual(norm, null);
-  assert.equal(norm!.executable, "rm");
-  assert.equal(norm!.command.args[0]!.value, "~/.ssh/id_rsa");
+  assert.equal(norm.executable, "rm");
+  assert.equal(norm.command.args[0]!.value, "~/.ssh/id_rsa");
 });
 
 test("normalize: command cp src dst has correct args", () => {
   const { program } = parse(lex("command cp src dst").tokens);
   const norm = normalizeCommand(program.commands[0]!);
-  assert.notEqual(norm, null);
-  assert.equal(norm!.executable, "cp");
-  assert.equal(norm!.command.args[0]!.value, "src");
-  assert.equal(norm!.command.args[1]!.value, "dst");
+  assert.equal(norm.executable, "cp");
+  assert.equal(norm.command.args[0]!.value, "src");
+  assert.equal(norm.command.args[1]!.value, "dst");
 });
 
 test("normalize: nested timeout env rm", () => {
   const { program } = parse(lex("timeout 30 env rm file").tokens);
   const norm = normalizeCommand(program.commands[0]!);
-  assert.notEqual(norm, null);
-  assert.equal(norm!.executable, "rm");
-  assert.equal(norm!.command.args.length, 1);
-  assert.equal(norm!.command.args[0]!.value, "file");
+  assert.equal(norm.executable, "rm");
+  assert.equal(norm.command.args.length, 1);
+  assert.equal(norm.command.args[0]!.value, "file");
 });
 
 test("normalize: env with options before command", () => {
   const { program } = parse(lex("env -i PATH=/usr/bin rm file").tokens);
   const norm = normalizeCommand(program.commands[0]!);
-  assert.notEqual(norm, null);
-  assert.equal(norm!.executable, "rm");
+  assert.equal(norm.executable, "rm");
 });
 
 // ─── Control Flow ───
@@ -178,8 +164,7 @@ test("control: glob in command is opaque", () => {
 test("control: empty cwd analysis for env rm", () => {
   const { program } = parse(lex("env rm ~/.ssh/id_rsa").tokens);
   const norm = normalizeCommand(program.commands[0]!);
-  assert.notEqual(norm, null);
-  assert.equal(norm!.executable, "rm");
+  assert.equal(norm.executable, "rm");
 });
 
 test("control: nohup wrapper preserves cwd", () => {

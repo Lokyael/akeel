@@ -1,53 +1,30 @@
 // command-semantics/overrides.ts — 命令覆盖层
 //
-// 为 Shell 命令提供用户全局的轻量扩展入口。
-// 内置 adapter 仍是权威来源；此文件只处理用户定义的扩展和覆盖。
+// 集中配置（config.yaml，D-041）的 commands 段消费方。
+// 内置 adapter 仍是权威来源；本文件把 config.yaml 的 commands 段
+// （aliases / commands / reclassify）归一为扩展语义并应用。
 //
-// 配置路径：$PI_CODING_AGENT_DIR/pi-keel/command-overrides.yaml，默认 ~/.pi/agent/pi-keel/command-overrides.yaml。
+// 配置来源：$PI_CODING_AGENT_DIR/pi-keel/config.yaml，默认 ~/.pi/agent/pi-keel/config.yaml。
 
-import { existsSync, readFileSync } from "node:fs";
-import { basename, join } from "node:path";
-import { parse as parseYaml } from "yaml";
-import type { CommandClass, CommandSemantics, Effect } from "./types";
+import type { CommandClass, CommandSemantics } from "./types";
 import type { ShellArg } from "../shell-parse/types";
+import { basename } from "node:path";
 import { firstSubcommand, fullSubcommand, makeSemantics, SYNTHETIC_SPAN } from "./adapters/shared";
 import { COMMAND_CLASS_SET } from "../domain";
+import { loadConfig } from "../config";
+import type { CommandDef, CommandOverrides, ReclassifyEntry } from "../config";
 import { getAgentDir } from "../agent-dir";
-
-// ─── 类型 ───
-
-/** 单个命令的声明式定义（用于 YAML 中的 commands 段）。 */
-interface CommandDef {
-  class: CommandClass;
-  effects?: Effect[];
-  /** 子命令覆盖。key 是第一个非选项参数值。 */
-  subcommands?: Record<string, { class: CommandClass; effects?: Effect[] }>;
-}
-
-/** 分类微调规则。pattern 是正则表达式，匹配命令的子命令部分。 */
-interface ReclassifyEntry {
-  command: string;
-  pattern: string;
-  class: CommandClass;
-}
-
-/** command-overrides.yaml 的完整结构。 */
-interface CommandOverrides {
-  aliases?: Record<string, string>;
-  commands?: Record<string, CommandDef>;
-  reclassify?: ReclassifyEntry[];
-}
 
 // ─── 运行时校验 ───
 
 function validateCommandDef(name: string, def: CommandDef): void {
   if (!COMMAND_CLASS_SET.has(def.class)) {
-    throw new Error(`command-overrides: ${name}: invalid class "${def.class}"`);
+    throw new Error(`config.yaml: ${name}: invalid class "${def.class}"`);
   }
   if (def.subcommands) {
     for (const [sc, sub] of Object.entries(def.subcommands)) {
       if (!COMMAND_CLASS_SET.has(sub.class)) {
-        throw new Error(`command-overrides: ${name}.${sc}: invalid class "${sub.class}"`);
+        throw new Error(`config.yaml: ${name}.${sc}: invalid class "${sub.class}"`);
       }
     }
   }
@@ -55,70 +32,45 @@ function validateCommandDef(name: string, def: CommandDef): void {
 
 // ─── 加载 ───
 
-const _cache = new Map<string, CommandOverrides>();
+/** 记忆已校验的 commands 对象（引用来自 loadConfig 缓存，同一 agentDir 稳定；
+ * 配置变化重新加载后是新对象，自动重新校验；无需显式 reset 联动）。 */
+const _validated = new WeakSet<CommandOverrides>();
 
-function loadFile(path: string): CommandOverrides | null {
-  if (!existsSync(path)) return null;
-  try {
-    const raw = readFileSync(path, "utf-8");
-    const parsed = parseYaml(raw);
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
-    return parsed as CommandOverrides;
-  } catch (error) {
-    // 与 profiles 加载（响亮报错）一致：解析失败必须可见，不能静默回退默认语义
-    console.error(`command-overrides: failed to parse ${path}: ${error instanceof Error ? error.message : String(error)}`);
-    return null;
-  }
-}
-
-function mergeOverrides(base: CommandOverrides | null, overlay: CommandOverrides | null): CommandOverrides {
-  if (!overlay) return base ?? {};
-  if (!base) return overlay;
-  const merged: CommandOverrides = {};
-  if (base.aliases || overlay.aliases) merged.aliases = { ...base.aliases, ...overlay.aliases };
-  if (base.commands || overlay.commands) merged.commands = { ...base.commands, ...overlay.commands };
-  if (base.reclassify || overlay.reclassify) merged.reclassify = [...(base.reclassify ?? []), ...(overlay.reclassify ?? [])];
-  return merged;
-}
-
+/** 返回 config.yaml 的 commands 段；无配置/无该段时返回空覆盖。 */
 export function loadOverrides(agentDir = getAgentDir()): CommandOverrides {
-  const globalPath = join(agentDir, "pi-keel", "command-overrides.yaml");
-  const cached = _cache.get(globalPath);
-  if (cached) return cached;
+  const loaded = loadConfig(agentDir);
+  if (loaded.kind !== "ok") return {};
+  const commands = loaded.value.commands;
+  if (!commands) return {};
 
-  const result = mergeOverrides(null, loadFile(globalPath));
+  // 已校验对象直接返回（避免每次命令分析重复校验，原 _cache 语义，D-041）
+  if (_validated.has(commands)) return commands;
 
   // 运行时校验 class 字段（commands 和 reclassify）
-  if (result.commands) {
-    for (const [name, def] of Object.entries(result.commands)) {
+  if (commands.commands) {
+    for (const [name, def] of Object.entries(commands.commands)) {
       validateCommandDef(name, def);
     }
   }
-  if (result.reclassify) {
-    for (const rule of result.reclassify) {
+  if (commands.reclassify) {
+    for (const rule of commands.reclassify) {
       if (!COMMAND_CLASS_SET.has(rule.class)) {
-        throw new Error(`command-overrides: reclassify[${rule.command}]: invalid class "${rule.class}"`);
+        throw new Error(`config.yaml: reclassify[${rule.command}]: invalid class "${rule.class}"`);
       }
     }
   }
-
-  _cache.set(globalPath, result);
-  return result;
-}
-
-/** 仅用于测试：重置加载缓存。 */
-export function resetOverrides(): void {
-  _cache.clear();
+  _validated.add(commands);
+  return commands;
 }
 
 // ─── 应用覆盖 ───
-// 子命令提取统一由 shared.ts 提供（T-046 R4）：
+// 子命令提取统一由 shared.ts 提供：
 // firstSubcommand（commands 分发，首 token）与 fullSubcommand（reclassify pattern，
 // 含选项尾部）从首个非选项参数起提取；known 局限（不跳过取值选项值）见 shared.ts/D-024。
 
 /**
  * 应用 CommandDef 产生语义结果。
- * 用于 YAML commands 段中完整定义的命令。
+ * 用于 config.yaml commands 段中完整定义的命令。
  */
 export function applyCommandDef(
   def: CommandDef,
