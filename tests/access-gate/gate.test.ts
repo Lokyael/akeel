@@ -391,7 +391,7 @@ test("multi-line inspect chain stays allowed command-by-command", async () => {
 });
 
 test("<> open-readwrite redirect gates the write side", async () => {
-  // `<>` O_RDWR 按 write 侧建模（D-043 write⇒read 一致性：允许写即允许读）；
+  // `<>` O_RDWR 按 write 侧建模（D-017 write⇒read 一致性：允许写即允许读）；
   // 写意图必须受 PathPolicy 约束（project write=ask → 审批 → Deny → block）
   const result = await evaluateBash("cat <> out.txt", profile(), "Deny");
   assert.equal(result.kind, "block");

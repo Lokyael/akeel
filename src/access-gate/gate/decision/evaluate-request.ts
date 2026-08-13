@@ -50,7 +50,7 @@ export function evaluateRequest(
       profileDenial = profileDeny("shell-policy-denied", commandEvidence(operation).subject);
     } else if (decision === "ask") {
       // ask 侧 subject 只含命令类别（"unknown command"），可执行名与参数由 literal form 提供，
-      // 渲染器纯追加不做格式手术（D-032：不追加重复信息）。
+      // 渲染器纯追加不做格式手术（D-023：不追加重复信息）。
       asks.push(commandEvidence(operation, true));
     }
   }
@@ -64,7 +64,7 @@ export function evaluateRequest(
       if (decision.decision === "deny") {
         const code = pathDecisionCode(decision);
         // 模型侧 deny 只携带操作类型分类，不含原始路径——模型已持有命令（toolCall 参数），
-        // 不重复具体路径信息（D-032）。ask 侧（pathEvidence）保留完整路径供人类同意。
+        // 不重复具体路径信息（D-023）。ask 侧（pathEvidence）保留完整路径供人类同意。
         const denySubject = `${operation.operation} path denied`;
         if (decision.hard) return hardDeny(code === "path-denied" ? "path-unclassifiable" : code, denySubject, evidence[0]!.span);
         if (code === "path-denied" && !profileDenial) profileDenial = profileDeny(code, denySubject);

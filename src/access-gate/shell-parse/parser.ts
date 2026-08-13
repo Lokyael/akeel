@@ -19,7 +19,7 @@ const ALL_DIGITS = /^\d+$/;
 
 function redirectKind(op: string, fd: number | null, target: string | null): RedirectionKind {
   if (op === "<") return "stdin";
-  // <> 是 O_RDWR 读写打开：按 write 侧建模（write⇒read 一致性原则 D-043——
+  // <> 是 O_RDWR 读写打开：按 write 侧建模（write⇒read 一致性原则 D-017——
   // 允许写的路径应允许读，write 决策即覆盖双面；只建模 read 会漏写侧）
   if (op === "<>") return fd === 2 ? "stderr" : "stdout";
   // <&N / >&N：fd 复制；<&- / >&-：fd 关闭

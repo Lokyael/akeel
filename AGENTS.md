@@ -40,7 +40,7 @@ CONTEXT.md              # 当前事实、术语、架构与 Active Decisions 索
 - **路径可移植性**：文档、注释、示例与测试不写死本机具体路径（如 `/home/<user>/...` 绝对路径、本机工作区目录名）；用相对路径、角色化表述或占位符（`~`、`$HOME`）——本机路径随环境迁移或他人开发失效。
 - **文档边界**：长期决策写 `docs/decisions.md`，当前事实写 `CONTEXT.md`（安全承诺与残余风险在 decisions.md 安全条目与 CONTEXT Negative Space），第三方来源与许可证写 `docs/traceability.md`；AGENTS.md 不承接这些职责。
 - **决策寄存器内容分诊**：`docs/decisions.md` 只保留决策级内容（当前结论、理由、必要替代方案、影响）；用户使用文档（如 config schema）进 README，实现细节进代码/测试，验证证据（测试计数、用例枚举、迁移过程）不保留，历史由 Git 承载；条目段落顺序见 decisions.md 头部条目模板。
-- **技能规则单一来源**：技能只引用 `src/bootstrap/principles.md`，不在技能内重复定义规则（D-013）。
+- **技能规则单一来源**：技能只引用 `src/bootstrap/principles.md`，不在技能内重复定义规则（D-030）。
 - **技能单一职责**：每个 skill 只做一件事、调用时内容全量被使用；触发场景互斥的 skill 保持独立、不合并（D-030）。
 - **决策 ID 引用**：代码层（src/tests 的 .ts）与文档层（docs/skills 的 .md、CONTEXT/AGENTS/README）中的 `D-xxx` 引用只指向 `docs/decisions.md` 存活条目（validate-docs 强制）；决策合并/剪除时在同一变更内把全部引用更新到吸收条目，不保留剪除 ID 引用——Git 保留历史是溯源手段，不是保留悬空引用的理由。
 - **记录可追溯性**：合并/改写历史后，若容器占位引用了历史中不存在的记录 ID（如跳号），按 Git 历史最大+1 重建占位；提交信息不引用不可追溯的记录 ID。

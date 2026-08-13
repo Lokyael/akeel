@@ -39,7 +39,7 @@ function redirectionOperation(
       const operation = redirection.kind === "stdin" ? "read" : "write";
       return pathOperation(operation, redirection.target.value, state, "redirection", "exact", redirection.span);
     }
-    // heredoc/hereString 内容不在命令文本中建模 → 显式拒绝（D-043 复杂形态可拒绝原则）；新增 kind 在此强制编译错误
+    // heredoc/hereString 内容不在命令文本中建模 → 显式拒绝（D-018 复杂形态可拒绝原则）；新增 kind 在此强制编译错误
     case "heredoc":
     case "hereString":
       return reject("unsupported-redirection", redirection.kind, redirection.span);

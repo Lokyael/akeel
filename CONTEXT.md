@@ -29,44 +29,38 @@
 - `src/access-gate/` 统一处理用户全局 Profile、Shell IR、命令语义、路径策略、Gate、Session 状态和 Footer。
 - 子代理会话（pi-subagents `--mode json -p` 子进程，默认加载全局扩展）在 `session_start` 检测 `PI_SUBAGENT_CHILD`/`PI_SUBAGENT_CHILD_AGENT`，按 `subagentProfiles` 映射（优先级 显式 > 内置默认 > `*`）初始化为子代理档位（T0 `scratch`/T1 `project`）。T0 档 agent 必须无 mutation 工具（bash/write/edit）——pi-subagents 输出契约机制强制（有则被指令自写 output 与 T0 路径策略矛盾），scout 删 write+bash、researcher 原生即无。父会话档位号（1=项目可写档，否则 0）由父侧按自身 pathPolicy 算好，经 `PI_KEEL_PARENT_TIER` env 传播、子代理零解析；生效档 = min(映射档, 父TIER)——两档下即"父非项目可写 → 一律回退 T0 scratch"——子代理权限上限 = 父会话当前档位（D-039）。
 - `shell-parse/` 输出受限 Shell IR；`command-semantics/` 提取命令类别、路径意图、效果和 cwd 转换，用户全局 `pi-keel/config.yaml` 的 `commands` 段只扩展 Shell 命令语义，`optionalAdapters` 段显式启用随包分发的可选工具建模（默认不加载，D-041）。wrapper 链由 parser 单一拥有——`executable` 永不承载 wrapper，wrapper positional 消费后保留在 `wrapperArgs` 供 token 级扫描，normalize 纯出栈（D-037）。换行是命令分隔符（等价 `;`）；`&&`/`||`/`|`/`&` 与重定向操作符后紧跟的换行为行尾延续，不产分隔（bash 语义）。
-- `gate/` 编译器将 Shell IR 和 Direct tool 参数转换为 `CompleteAccessPlan`；compiler outcome 另外区分 unsupported form、security block 和 invalid request。`compiler-entry.ts` 是唯一 plan sealing boundary，同步 Policy Kernel 只消费经过 verifier 验证的 plan 和 Profile，产出 `GateDecision`，renderer 将决策转为 host 兼容结果。物理分两层 + 共享根（D-042）：`plan/`（compiler-entry/shell-compiler/direct-tool-compiler/request-builder/preflight/access-plan-verifier 等）、`decision/`（evaluate/evaluate-request/decision-builder/render-decision）、根（`host`/`decision-types`/`decision-code-catalog`——被两层共用，避免循环依赖）。
+- `gate/` 编译器将 Shell IR 和 Direct tool 参数转换为 `CompleteAccessPlan`；compiler outcome 另外区分 unsupported form、security block 和 invalid request。`compiler-entry.ts` 是唯一 plan sealing boundary，同步 Policy Kernel 只消费经过 verifier 验证的 plan 和 Profile，产出 `GateDecision`，renderer 将决策转为 host 兼容结果。物理分两层 + 共享根（D-022）：`plan/`（compiler-entry/shell-compiler/direct-tool-compiler/request-builder/preflight/access-plan-verifier 等）、`decision/`（evaluate/evaluate-request/decision-builder/render-decision）、根（`host`/`decision-types`/`decision-code-catalog`——被两层共用，避免循环依赖）。
 - `command-semantics/` 分类器：子命令提取收敛到统一引擎 `option-parse.ts`（值性质 file/expression/flag、位置参数性质 file/program-first/set、未知选项策略 opaqueOnUnknown 显式声明、class 调节原语 upgradeTo/downgradeTo，D-040）；git 用 token 级 `GIT_CLASSIFY` 声明表（cmd + upgrade/downgrade 调节，主流程经引擎定位子命令），stash/bundle 子命令族规则表化，config/branch 走专用 parser（D-040）。
 - Direct tool（`read`、`write`、`edit`、`find`、`grep`、`ls`）和 Shell 命令经过各自的 compiler 后进入同一 Policy Kernel。
 - 用户项目运行时文档入口为 `CONTEXT.md`、可选的 `docs/candidates.md`、`docs/decisions.md` 和 `docs/task.md`；Candidate Record 不进入当前事实或 active Decision 索引。
 
 ## Active Decisions
 
-- [D-001 Soft 技能匹配](docs/decisions.md#d-001-soft-技能匹配)
-- [D-002 统一 Access Gate](docs/decisions.md#d-002-统一-access-gate)
+- [D-002 统一 Access Gate 与用户态边界](docs/decisions.md#d-002-统一-access-gate-与用户态边界)
 - [D-003 bigpowers 技能精选](docs/decisions.md#d-003-bigpowers-技能精选)
-- [D-004 用户态路径策略边界](docs/decisions.md#d-004-用户态路径策略边界)
 - [D-005 技能组织](docs/decisions.md#d-005-技能组织)
 - [D-009 项目分发与文档边界](docs/decisions.md#d-009-项目分发与文档边界)
-- [D-013 原则部署](docs/decisions.md#d-013-原则部署)
 - [D-017 Profile 访问策略](docs/decisions.md#d-017-profile-访问策略)
 - [D-018 Shell IR 与 Access Gate](docs/decisions.md#d-018-shell-ir-与-access-gate)
 - [D-019 Profile Footer](docs/decisions.md#d-019-profile-footer)
 - [D-022 Compiler-Kernel 分层与请求真实性](docs/decisions.md#d-022-compiler-kernel-分层与请求真实性)
-- [D-023 拒绝解释与静态 Guidance](docs/decisions.md#d-023-拒绝解释与静态-guidance)
+- [D-023 决策渲染与知情同意（静态 Guidance + literal form）](docs/decisions.md#d-023-决策渲染与知情同意静态-guidance--literal-form)
 - [D-024 命令覆盖层](docs/decisions.md#d-024-命令覆盖层)
 - [D-025 Direct 优先与 Shell 安全子集](docs/decisions.md#d-025-direct-优先与-shell-安全子集)
 - [D-028 统一 Project Record 模型](docs/decisions.md#d-028-统一-project-record-模型)
-- [D-030 提示词体系边界（Prompt Surface）](docs/decisions.md#d-030-提示词体系边界prompt-surface)
+- [D-030 提示词体系边界与原则部署（Prompt Surface）](docs/decisions.md#d-030-提示词体系边界与原则部署prompt-surface)
 - [D-031 路径可执行与 tsx 解释器归类](docs/decisions.md#d-031-路径可执行与-tsx-解释器归类)
-- [D-032 ask 渲染展示 unknown 命令的 literal form（知情同意）](docs/decisions.md#d-032-ask-渲染展示-unknown-命令的-literal-form知情同意)
 - [D-035 平台边界收窄为仅 Linux](docs/decisions.md#d-035-平台边界收窄为仅-linuxdismiss-c-007)
 - [D-036 Workflows 触发模型（手动调用与即时介入）](docs/decisions.md#d-036-workflows-触发模型手动调用与即时介入)
 - [D-037 解析器拥有 wrapper 链（IR 契约：executable 永不承载 wrapper）](docs/decisions.md#d-037-解析器拥有-wrapper-链ir-契约executable-永不承载-wrapper)
 - [D-039 子代理档位制（pi-keel × pi-subagents）](docs/decisions.md#d-039-子代理档位制pi-keel--pi-subagents)
 - [D-040 命令语义分类与统一选项引擎](docs/decisions.md#d-040-命令语义分类与统一选项引擎)
 - [D-041 集中配置与可选工具建模（config.yaml + optionalAdapters）](docs/decisions.md#d-041-集中配置与可选工具建模configyaml--optionaladapters)
-- [D-042 gate 物理分层 + 目录 index 统一 + interpreter-names 命名](docs/decisions.md#d-042-gate-物理分层--目录-index-统一--interpreter-names-命名)
-- [D-043 访问控制职责边界与配置一致性原则（自定义 profile 不保证 + 复杂形态可拒绝 + write⇒read）](docs/decisions.md#d-043-访问控制职责边界与配置一致性原则自定义-profile-不保证--复杂形态可拒绝--write⇒read)
 
 ## Negative Space
 
 - 不提供 OS-level sandbox、容器、VM、seccomp、Landlock、network namespace 或独立 network policy 轴。
-- 自定义 profile 的矛盾配置（如 write 宽于 read、read=deny + write=allow 同路径）不在保证范围：write⇒read 是配置一致性预期（D-043），gate 不校验自定义配置一致性，也不为矛盾组合的行为追责。
+- 自定义 profile 的矛盾配置（如 write 宽于 read、read=deny + write=allow 同路径）不在保证范围：write⇒read 是配置一致性预期（D-017），gate 不校验自定义配置一致性，也不为矛盾组合的行为追责。
 - 仅保证支持 Linux 平台（以 Arch Linux 的 GNU 工具链为基准）；不提供 Windows / macOS / BSD 支持，不建模其路径语义与选项方言；其他 Linux 发行版的工具链差异不在保证范围。
 - 不承诺 pathname check 与实际文件操作之间的 TOCTOU 消除：gate 是纯决策层，不执行文件操作，与执行方之间没有 fd 传递通道；消除需 pi 宿主提供 fd/OS 级原子机制，结构性超出 pi-keel 能力。
 - 不拦截 `user_bash`、`shellCommandPrefix`、Bash `spawnHook`、tool override、custom tool backend、未知 Direct tool surface 或其他 Extension 的直接操作；用户安装的其他 Extension 可直接调用 Node fs/child_process。
