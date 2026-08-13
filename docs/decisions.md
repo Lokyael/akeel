@@ -434,7 +434,7 @@
 **延伸（T-059，D-040 补记）：**
 
 - **opaqueOnUnknown 判据**：未知选项漏判后命令是否可能落入 shellPolicy 允许类（inspect）且具未建模破坏性/写行为——是则 true（fail-closed，第一层防线：fs/read/search/text-transform/date），否则 false（分类是大类 + catch-all 保守兜底，第二层 shellPolicy 兜底：build/package/python-tools/herdr/interpreters/git）。判据取代“选项面大小”的经验理由。
-- **收敛**：五套并行遍历（shared.ts 提取器家族、git 手写 finder/gitPathOpts/analyzeGitBranch、interpreters 内联 finder）全部删除，子命令提取收敛到 option-parse 输出投影（`semanticsFromRules` 吃 positional 数组；查表首词 = `positional[0]`）；`fullSubcommand` 保留（reclassify 含选项 raw 契约，D-024）。
+- **收敛**：子命令提取统一走 option-parse 输出投影——`semanticsFromRules` 吃 positional 数组（查表首词 = `positional[0]`）；git 经引擎定位子命令，复杂子命令族（config/branch/stash/bundle）入 `GIT_SUBCOMMAND_PARSERS` 注册表，`GIT_CLASSIFY` 表兜底；`fullSubcommand` 保留（reclassify 含选项 raw 契约，D-024）。
 - **valueOpts → Opt(expression)**：覆盖层/适配器的取值选项列表提升为 Opt 声明时一律 `kind: "expression"`（只消费不产生 intent，行为零损失）；路径建模（如 `--manifest-path` 实为路径）另立决策，不在收敛中混入。
 - **class 调节原语**：Opt 增加 `upgradeTo: "modify"|"destroy"` / `downgradeTo: "inspect"`，引擎输出命中的调节集合并按风险优先（destroy > modify > inspect，fail-closed）给默认裁决，adapter 可覆盖；date `-s/--set`、search/text-transform 写选项升级、python-tools `--check/--fix`、git GIT_CLASSIFY upgrade/downgrade 全部声明化，删除手写 flag 检查。
 

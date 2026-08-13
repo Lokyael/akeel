@@ -10,7 +10,7 @@ pi-keel does not create snapshots or provide a `/rollback` command.
 
 ## File Recovery
 
-Use `git restore` or `git revert`. Before any destructive operation (`git reset --hard`, `git checkout --`, `git clean`), confirm the exact paths and scope with the user and obtain explicit approval.
+Use `git restore` or `git revert`. Destructive recovery commands (`git reset --hard`, `git checkout --`, `git clean`) run only with explicit user intent (per principles.md §9); confirm the exact paths and scope before running them.
 
 ## Conversation Recovery
 
