@@ -15,6 +15,9 @@ import { parseDocument } from "yaml";
 const SKILLS_ROOT = join(import.meta.dirname!, "..", "skills");
 const SKILL_LAYERS = ["foundations", "disciplines", "workflows"] as const;
 
+/** 触发句前缀（disciplines 强制 + 模型可调用 workflow 告警共用）。 */
+const TRIGGER_PREFIXES = ["Use when", "Use before", "Use after", "Use during"] as const;
+
 interface FrontmatterResult {
   values: Record<string, unknown>;
   error?: string;
@@ -140,8 +143,7 @@ function checkDescriptionConvention(skill: SkillMeta): CheckResult {
 
   // Disciplines must start with "Use when/before/after/during..."
   if (skill.layer === "disciplines") {
-    const validTriggers = ["Use when", "Use before", "Use after", "Use during"];
-    if (!validTriggers.some((t) => skill.description.startsWith(t))) {
+    if (!TRIGGER_PREFIXES.some((t) => skill.description.startsWith(t))) {
       errors.push(
         `description MUST start with "Use when/before/after/during..." (disciplines auto-match convention). Got: "${skill.description.slice(0, 60)}..."`
       );
@@ -160,6 +162,16 @@ function checkDescriptionConvention(skill: SkillMeta): CheckResult {
     errors.push(
       `description MUST start with "Use /skill:${skill.name}" (disable-model-invocation skills are user-invoked only; model-facing trigger wording would never fire). Got: "${skill.description.slice(0, 60)}..."`
     );
+  }
+
+  // Model-invocable workflows (no disable-model-invocation): trigger sentence first —
+  // the trigger is what the model matches on; burying it mid-description weakens matching.
+  if (skill.layer === "workflows" && !skill.disableModelInvocation) {
+    if (!TRIGGER_PREFIXES.some((t) => skill.description.startsWith(t))) {
+      warnings.push(
+        `description should start with "Use when/before/after/during..." (model-invocable workflow convention). Got: "${skill.description.slice(0, 60)}..."`
+      );
+    }
   }
 
   // Description length
@@ -229,23 +241,25 @@ function checkExternalUrls(skill: SkillMeta): CheckResult {
 const PRINCIPLES_FILE = join(SKILLS_ROOT, "..", "src", "bootstrap", "principles.md");
 
 interface PrinciplesAnchors {
-  quickReference: Set<string>;
+  /** Quick Reference 与 Project Records 两节的 ### 锚点（S4b 拆节后合并收集）。 */
+  anchorSections: Set<string>;
   /** 编号标题（§N → 标题文本）；值仅作可读性参考，解析只用键。 */
   sections: Set<string>;
   bold: Set<string>;
 }
 
 function loadPrinciplesAnchors(): PrinciplesAnchors {
-  const anchors: PrinciplesAnchors = { quickReference: new Set(), sections: new Set(), bold: new Set() };
+  const anchors: PrinciplesAnchors = { anchorSections: new Set(), sections: new Set(), bold: new Set() };
   const content = readFileSync(PRINCIPLES_FILE, "utf-8");
-  let inQuickReference = false;
+  let inAnchorSection = false;
   for (const line of content.split(/\r?\n/)) {
     const heading = line.match(/^(#{1,6})\s+(.+)$/);
     if (heading) {
       const level = heading[1]!.length;
       const text = heading[2]!;
-      if (level === 2) inQuickReference = text === "Quick Reference";
-      if (inQuickReference && level >= 3) anchors.quickReference.add(text);
+      // Quick Reference 与 Project Records 都是可引用锚点节（S4b 拆节后项目记录锚点独立成节）
+      if (level === 2) inAnchorSection = text === "Quick Reference" || text === "Project Records";
+      if (inAnchorSection && level >= 3) anchors.anchorSections.add(text);
       const numbered = text.match(/^(\d+)[.．]\s+(.+)$/);
       if (numbered) anchors.sections.add(numbered[1]!);
       continue;
@@ -264,8 +278,9 @@ interface PrinciplesRef {
 
 function extractPrinciplesRefs(content: string): PrinciplesRef[] {
   const refs: PrinciplesRef[] = [];
-  // 捕获到句末（。或换行）；尾随续文（如 ") only when..."）由 checkPrinciplesRefs 的子串判定容忍
-  const qr = /principles\.md\s+Quick Reference\s+—\s+([^\n。]+)/g;
+  // 捕获到句末（。或换行）；尾随续文（如 ") only when..."）由 checkPrinciplesRefs 的子串判定容忍；
+  // 节名允许折行（principles.md Project\nRecords — X，domain-modeling 既有折行形式）
+  const qr = /principles\.md\s+(?:Quick\s+Reference|Project\s+Records)\s+—\s+([^\n。]+)/g;
   for (const m of content.matchAll(qr)) {
     refs.push({ kind: "qr", value: m[1]!.trim(), raw: m[0]! });
   }
@@ -273,11 +288,17 @@ function extractPrinciplesRefs(content: string): PrinciplesRef[] {
   for (const m of content.matchAll(sec)) {
     refs.push({ kind: "sec", value: m[1]!, raw: m[0]! });
   }
+  // 裸 §N 引用（无 principles.md 前缀）：技能内 § 只用于原则编号引用（如 "(§9 Centralize...)"）；
+  // 编号归位时这类引用同样必须存活——曾因裸 § 未被提取而静默悬空（S4a 回归）
+  const bareSec = /(?:^|[^\w])§\s*(\d+[a-z]?)/g;
+  for (const m of content.matchAll(bareSec)) {
+    refs.push({ kind: "sec", value: m[1]!, raw: m[0]! });
+  }
   // bare 锚点：principles.md 后跟非 "Quick Reference" / "§" 的词组（如 Next-ID slots）
   const bare = /principles\.md\s+([A-Z][A-Za-z0-9-]+(?:\s+[A-Za-z0-9-]+)*)/g;
   for (const m of content.matchAll(bare)) {
     const head = m[1]!.replace(/\s+/g, " ");
-    if (head.startsWith("Quick Reference")) continue;
+    if (head.startsWith("Quick Reference") || head.startsWith("Project Records")) continue;
     refs.push({ kind: "bare", value: head, raw: m[0]! });
   }
   return refs;
@@ -295,8 +316,8 @@ function checkPrinciplesRefs(skill: SkillMeta, anchors: PrinciplesAnchors): Chec
       // 包含任何已知锚点 → 报错（防静默断链）
       const normalized = ref.value.replace(/\s+/g, " ");
       const pool = ref.kind === "qr"
-        ? anchors.quickReference
-        : new Set([...anchors.quickReference, ...anchors.bold]);
+        ? anchors.anchorSections
+        : new Set([...anchors.anchorSections, ...anchors.bold]);
       for (const anchor of pool) {
         if (normalized.includes(anchor)) { found = true; break; }
       }
@@ -320,16 +341,19 @@ function selfCheckPrinciplesAnchorRule(anchors: PrinciplesAnchors): void {
     disableModelInvocation: false,
     content: [
       "per principles.md Quick Reference — Record Lifecycle",
+      "per principles.md Project Records — Record Lifecycle",
+      "per principles.md Project\nRecords — Also-Not-Real", // 折行引用必须被提取并拒绝（锁折行提取）
       "per principles.md §7",
       "per principles.md Quick Reference — This-Anchor-Does-Not-Exist",
+      "per principles.md Project Records — Also-Not-Real",
       "per principles.md §99",
     ].join("\n"),
     lineCount: 4,
   };
   const result = checkPrinciplesRefs(violating, anchors);
-  const fired = result.errors.filter((e) => e.includes("This-Anchor-Does-Not-Exist") || e.includes("§99")).length;
+  const fired = result.errors.filter((e) => e.includes("This-Anchor-Does-Not-Exist") || e.includes("Also-Not-Real") || e.includes("§99")).length;
   const falsePositive = result.errors.some((e) => e.includes("Record Lifecycle") || e.includes("§7"));
-  if (fired < 2 || falsePositive) {
+  if (fired < 5 || falsePositive) {
     console.error(
       `❌ Self-check FAILED: principles anchor rule did not behave correctly (fired=${fired}, falsePositive=${falsePositive}). Fix the rule or the self-check.`
     );
@@ -369,10 +393,46 @@ function selfCheckManualInvocationRule(): void {
   }
 }
 
+// ─── Self-check: model-invocable workflow trigger-first convention must warn on violations ───
+
+function selfCheckModelInvocableConvention(): void {
+  const violating: SkillMeta = {
+    dirName: "sample",
+    layer: "workflows",
+    frontmatterError: undefined,
+    name: "sample",
+    description: "Per-task context bootstrap — descriptive-first description.",
+    disableModelInvocation: false,
+    content: "",
+    lineCount: 1,
+  };
+  const result = checkDescriptionConvention(violating);
+  const ruleFired = result.warnings.some((w) => w.includes("model-invocable workflow convention"));
+  if (!ruleFired) {
+    console.error(
+      "❌ Self-check FAILED: model-invocable workflow convention did not warn on a descriptive-first description. Fix the rule or the self-check."
+    );
+    process.exit(1);
+  }
+  // 触发句前置的描述不应误报（warn 只针对描述优先措辞）
+  const conforming: SkillMeta = {
+    ...violating,
+    description: "Use when the user wants to stress-test their thinking.",
+  };
+  const ok = checkDescriptionConvention(conforming);
+  if (ok.warnings.some((w) => w.includes("model-invocable workflow convention"))) {
+    console.error(
+      "❌ Self-check FAILED: model-invocable workflow convention false-positives on a trigger-first description. Fix the rule or the self-check."
+    );
+    process.exit(1);
+  }
+}
+
 // ─── Main ───
 
 function main() {
   selfCheckManualInvocationRule();
+  selfCheckModelInvocableConvention();
   const principlesAnchors = loadPrinciplesAnchors();
   selfCheckPrinciplesAnchorRule(principlesAnchors);
   const skills = collectSkills();

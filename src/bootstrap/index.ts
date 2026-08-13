@@ -1,6 +1,6 @@
 /**
- * bootstrap — Injects Karpathy principles + verification iron law at session start
- * and after every compaction. Soft enforcement (recommend, not demand).
+ * bootstrap — Injects core behavioral principles + evidence-first verification at
+ * session start and after every compaction. Soft enforcement (recommend, not demand).
  */
 
 import { readFileSync } from "node:fs";
@@ -19,7 +19,7 @@ const CORE_PRINCIPLES = readFileSync(resolve(EXTENSION_DIR, "principles.md"), "u
 
 let needsInjection = true;
 
-export default function piSkillsBootstrap(pi: ExtensionAPI) {
+export default function piKeelBootstrap(pi: ExtensionAPI) {
   // On session start, mark for injection
   pi.on("session_start", async () => {
     needsInjection = true;

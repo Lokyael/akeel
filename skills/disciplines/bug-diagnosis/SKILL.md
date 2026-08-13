@@ -1,6 +1,6 @@
 ---
 name: bug-diagnosis
-description: Use when the user reports a bug that is intermittent, flaky, or environment-specific — no reliable reproduction exists. Build a tight feedback loop before any investigation.
+description: Use when the user reports a bug that is intermittent, flaky, or environment-specific — no reliable reproduction exists. Build a tight feedback loop before any investigation. For investigation and tracking, use bug-investigation.
 ---
 
 # Build a Feedback Loop for Hard Bugs

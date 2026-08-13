@@ -5,7 +5,7 @@ description: Use when reviewing pending changes, before merge, during verify-wor
 
 # Security Review
 
-> **HARD GATE** — Requires git context (branch with merge-base or diff). Add the report to the current security-review section of the active Task Record (`docs/task.md` or `docs/task-<topic>.md`); create a `Kind: maintenance` Task Record in `docs/task.md` (Kind per principles.md Quick Reference — Record Lifecycle) only when no active task exists.
+> **HARD GATE** — Requires git context (branch with merge-base or diff). Add the report to the current security-review section of the active Task Record (`docs/task.md` or `docs/task-<topic>.md`); create a `Kind: maintenance` Task Record in `docs/task.md` (Kind per principles.md Project Records — Record Lifecycle) only when no active task exists.
 
 ## 5-Phase Scan
 

@@ -7,7 +7,8 @@
  *   3. 槽位前缀字母与容器匹配（C→candidates、T→task、D→decisions）
  *
  * 二、决策 ID 引用存活校验（AGENTS.md 决策 ID 引用纪律）：
- *   src/ 与 tests/ 的 .ts 文件中的 `D-xxx` 引用必须命中 docs/decisions.md 的
+ *   代码（src/、tests/ 的 .ts）与文档层（docs/、skills/ 的 .md，以及
+ *   CONTEXT.md、AGENTS.md、README.md）中的 `D-xxx` 引用必须命中 docs/decisions.md 的
  *   存活标题（`## D-NNN:`，排除待创建槽位）。决策合并/剪除后引用即悬空——
  *   Git 保留历史是溯源手段，不是保留悬空引用的理由；剪除时应在同一变更内
  *   把引用更新到吸收条目。
@@ -78,6 +79,9 @@ function scanRefs(file: string, content: string, liveIds: Set<string>): string[]
   const errors: string[] = [];
   const lines = content.split(/\r?\n/);
   for (let i = 0; i < lines.length; i++) {
+    // 槽位标题（`## X-0NN: 待创建`）的编号不是存活决策引用，跳过；只锚定标题行，
+    // 避免同行的真实引用被误跳过（如 CONTEXT Glossary 条目同时含“待创建”与 D-xxx）
+    if (/^## [CTD]-\d+: 待创建$/.test(lines[i]!)) continue;
     for (const m of lines[i]!.matchAll(DECISION_REF_RE)) {
       if (!liveIds.has(m[0]!)) {
         errors.push(`${file}:${i + 1}: ${m[0]} does not resolve to a live decision in docs/decisions.md`);
@@ -96,15 +100,20 @@ function walkTsFiles(dir: string, out: string[]): void {
   }
 }
 
-/** 扫描 src/ 与 tests/ 下的决策引用是否全部存活。 */
-function checkDecisionRefs(liveIds: Set<string>, roots: readonly string[]): CheckResult {
+/** 递归收集目录下所有 .md 文件（docs/、skills/）。 */
+function walkMdFiles(dir: string, out: string[]): void {
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const p = join(dir, entry.name);
+    if (entry.isDirectory()) walkMdFiles(p, out);
+    else if (entry.name.endsWith(".md")) out.push(p);
+  }
+}
+
+/** 扫描代码与文档层文件，校验决策引用是否全部存活。 */
+function checkDecisionRefs(liveIds: Set<string>, files: readonly string[]): CheckResult {
   const errors: string[] = [];
-  for (const root of roots) {
-    const files: string[] = [];
-    walkTsFiles(join(import.meta.dirname!, "..", root), files);
-    for (const file of files) {
-      errors.push(...scanRefs(file, readFileSync(file, "utf-8"), liveIds));
-    }
+  for (const file of files) {
+    errors.push(...scanRefs(file, readFileSync(file, "utf-8"), liveIds));
   }
   return { ok: errors.length === 0, errors };
 }
@@ -133,7 +142,8 @@ function selfCheck(): void {
   const refCases: Array<[string, string, number]> = [
     ["live-ref", "// 显式作用域键（D-024）", 1], // D-024 不在存活集合 → 报错（剪除 ID 即悬空）
     ["pruned-id", "// D-034 覆盖层一致性", 1], // 剪除 ID 必须报错（纪律 2）
-    ["slot-id", "// D-043 待创建", 1], // 槽位 ID 不算存活
+    ["slot-line-skipped", "## D-043: 待创建", 0], // 槽位标题行不扫描，编号不算存活
+    ["live-with-slot-word", "// 槽位机制见 D-028（待创建占位）", 0], // 非标题行含“待创建”仍扫描（D-028 存活）
     ["live-ok", "// D-040 值性质", 0],
     ["multiple", "// D-001 与 D-028 都存活", 0],
     ["no-ref", "const x = 1;", 0],
@@ -172,9 +182,18 @@ function main(): void {
   }
   const decisionsContent = readFileSync(join(import.meta.dirname!, "..", "docs/decisions.md"), "utf-8");
   const liveIds = collectLiveDecisionIds(decisionsContent);
-  const refResult = checkDecisionRefs(liveIds, ["src", "tests"]);
+  // 代码层（src/tests）与文档层（docs/skills + 根文档）全部纳入存活校验
+  const refFiles: string[] = [];
+  walkTsFiles(join(import.meta.dirname!, "..", "src"), refFiles);
+  walkTsFiles(join(import.meta.dirname!, "..", "tests"), refFiles);
+  walkMdFiles(join(import.meta.dirname!, "..", "docs"), refFiles);
+  walkMdFiles(join(import.meta.dirname!, "..", "skills"), refFiles);
+  for (const rootFile of ["CONTEXT.md", "AGENTS.md", "README.md"]) {
+    refFiles.push(join(import.meta.dirname!, "..", rootFile));
+  }
+  const refResult = checkDecisionRefs(liveIds, refFiles);
   if (refResult.ok) {
-    console.log(`  ✅ src/ tests/ — ${liveIds.size} live decisions, all D-xxx refs resolve`);
+    console.log(`  ✅ 代码层 + 文档层 — ${liveIds.size} live decisions, all D-xxx refs resolve`);
   } else {
     for (const e of refResult.errors) console.log(`  ❌ ${e}`);
     totalErrors += refResult.errors.length;

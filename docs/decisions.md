@@ -2,6 +2,8 @@
 
 本文集中记录 pi-keel 的长期架构、工程和安全决策。每条只保留当前结论、理由、必要替代方案和影响；被完整吸收（`superseded`）或主动退役（`retired`）的条目从寄存器剪除，历史由 Git 保留（规则见 [D-028](#d-028-统一-project-record-模型)）。
 
+**条目模板**：每条的段落顺序固定为 `Status` → `Decision`（可选规格子节紧随其后，如 `Rules`/`Security invariants`/`Guidance mapping`/`Enforcement scope`/`格式`/`延伸`）→ `Why` → `Impact` → `Rejected` → `Out of Scope`；无内容的段落省略，不留空标题。
+
 ## D-001: Soft 技能匹配
 
 **Status:** active
@@ -95,8 +97,6 @@
 
 **Decision:** 采用 `shell-parse/`、`command-semantics/`、`gate/` 三层架构，以不可执行的 Shell IR 传递结构化结果。Shell 文件修改与其他路径操作使用同一套 hard boundary、canonical path policy 和 Profile gate。
 
-**Why:** Direct 写保护无法覆盖重定向、`tee`、`cp`、`mv` 等 Shell 写入入口，secret 扫描也不承担访问控制职责；统一 IR 和语义层集中提取命令类别、路径 intent 与 effect，避免分类和策略漂移。
-
 **Security invariants:**
 
 - blocked intent hard deny，不能由 Profile 或 `Allow once` 覆盖。
@@ -109,6 +109,8 @@
 **Enforcement scope:**
 
 只对 Pi `tool_call` 中的 `bash` 和 `TOOL_SCHEMAS` 已知 Direct surface 执行策略；未知 Direct surface passthrough。不承诺全局 enforcement：`user_bash`、`shellCommandPrefix`、Bash `spawnHook`、tool override、custom tool backend 及后续 handler 对 input 的修改不在范围内。
+
+**Why:** Direct 写保护无法覆盖重定向、`tee`、`cp`、`mv` 等 Shell 写入入口，secret 扫描也不承担访问控制职责；统一 IR 和语义层集中提取命令类别、路径 intent 与 effect，避免分类和策略漂移。
 
 ## D-019: Profile Footer
 
@@ -130,8 +132,6 @@
 
 **Decision:** enforcement pipeline 为 compiler → compiler-entry sealing boundary/verifier → Policy Kernel → host adapter。Compiler 只生成经过 brand 和 coverage 证明的 `CompleteAccessPlan` 或带 category 的 typed outcome，不接 Profile 或审批。Policy Kernel 是同步纯函数，只消费 compiler-entry 发行、verifier 验证的 plan 和 Profile，验证 authenticity（WeakSet issuance）后执行封闭 policy evaluation。
 
-**Why:** 分层保证分析证据（request）和授权结果（GateDecision）不混淆；compiler 可独立证明 fail-closed 边界，Kernel 可独立证明 monotonic policy。
-
 **Security invariants:**
 
 - plan 只能由 `compiler-entry.ts` 私有 sealing boundary 发行：defensive-copy、deep-freeze 后加入进程级私有 WeakSet，不跨调用缓存或持久化；`isCompleteAccessPlan()` 是唯一公开完整性 predicate，`access-plan-verifier.ts` 只做无副作用的完整性与 budget proof。
@@ -139,13 +139,13 @@
 - coverage 逐项对应 command/redirection span 与 operation、顶层 cwd 与 path candidates 去重集合；effect 只以 `command.effects` 承载（verifier 隐含证明覆盖），并独立复核 `maxCommands`/`maxOperations`/`maxCwdCandidates`/`maxInputLength`。
 - Effect policy axis 是封闭映射：`read/search/write/delete/permissionChange/cwdChange → path`，`execute/network → shell`；Shell 命令按 `commandClass` 决策，effects 只在 Direct-origin 操作被消费（shell-only effect 硬拒）。
 
+**Why:** 分层保证分析证据（request）和授权结果（GateDecision）不混淆；compiler 可独立证明 fail-closed 边界，Kernel 可独立证明 monotonic policy。
+
 ## D-023: 拒绝解释与静态 Guidance
 
 **Status:** active
 
 **Decision:** 拒绝结果的 guidance 只能引用源码内置的静态 `GuidanceId` catalog，不能拼接可执行 Shell、原始 glob 或用户输入；renderer 不调用替代 tool、不生成可执行命令。`renderDecision()` 处理 Policy Kernel 的 `GateDecision`，`renderCompilationFailure()` 处理 typed compiler outcome；两者都执行长度预算（subject ≤ 1,024，reason ≤ 2,048），且 deny 侧 subject 不携带用户派生值（见 D-032 类别化设计）。
-
-**Why:** guidance 不能成为间接 code injection 通道：blocked path/threat 不提供绕过建议；deny 侧 subject 只含分类信息，不携带用户派生值（模型已持有自己提出的命令，D-032 类别化）；文本必须给出可验证判据，且不得建议模型无法自行完成的动作——profile 类 deny 只能请求用户更新或批准。
 
 **Guidance mapping:**
 
@@ -163,13 +163,13 @@
 | `resource-limit` | `split-supported-commands` |
 | 其他 deny code | 无（避免诱导绕过）|
 
+**Why:** guidance 不能成为间接 code injection 通道：blocked path/threat 不提供绕过建议；deny 侧 subject 只含分类信息，不携带用户派生值（模型已持有自己提出的命令，D-032 类别化）；文本必须给出可验证判据，且不得建议模型无法自行完成的动作——profile 类 deny 只能请求用户更新或批准。
+
 ## D-024: 命令覆盖层
 
 **Status:** active
 
 **Decision:** 不将内置 adapter 的分类规则迁移到声明式文件。用户全局 `config.yaml` 的 `commands` 段（D-041）是 Shell 命令扩展入口，支持别名映射、新命令定义和分类微调；Direct 工具继续由源码 `TOOL_SCHEMAS` 管理。
-
-**Why:** 分类、路径提取和效果推断共享同一趟参数解析，是同一个分析的输出——拆成声明式 YAML 与 TS 双源会产生双源真理；内置分类是权威语义知识，覆盖层只用于用户主动补充本机 Shell 命令语义；Direct 工具需要精确参数 schema、路径字段和 effect 证明，继续通过源码和测试扩展。显式作用域取代隐式 basename 回退，因为回退把工具身份与调用拼写混为一谈——一个裸名键同时覆盖 `./bin/mytool` 与 `./vendor/mytool`，gate 不做 filesystem 解析（D-031），同名不同工具无法区分；想覆盖两种拼写就写两条声明（`mytool: cat` + `"bin/": cat`），声明取代猜测。
 
 **格式：** 完整 schema 与带注释示例见 [README](../README.md#configuration) 的 Command Semantics Overrides 小节。
 
@@ -177,13 +177,15 @@
 
 **作用域键：** 覆盖层键为显式作用域匹配——精确键优先（裸名或完整路径字符串，`./` 归一化对称生效），路径形式按最长路径前缀键匹配（键以 `/` 结尾）；**移除隐式 basename 回退**。别名目标可为 `commands` 定义（复用 class/effects/subcommands，reason 用原始调用名），alias 单步解析不链式；`reclassify` 按 basename 对齐 adapter 身份（路径形式下分类微调不静默失效）。
 
-**Rejected:** 保留 basename 兜底（冲突休眠而非消除）；realpath/filesystem 消歧（D-031 静态分类不做 filesystem 检查）；alias→alias 链式（语义需沿解析图追多跳才能确定，commands 链式已覆盖“复用语义定义”需求）。
-
-**Out of Scope:** 前缀键绝对/相对拼写敏感（`"/abs/bin/"` 与 `"bin/"` 是不同作用域）；Windows `\` 路径（POSIX 语义）；目录内多个前缀键重叠（最长前缀优先）。
-
 **加载：** 只读取用户全局 `~/.pi/agent/pi-keel/config.yaml` 的 `commands` 段（`PI_CODING_AGENT_DIR` 可改变 agent 目录）；TypeScript adapter 是内置权威来源。本配置不改变 Profile、PathPolicy、Gate、Shell IR 或 Direct/passthrough 行为。
 
 **已知局限：** `reclassify` 的子命令提取（`fullSubcommand`）不跳过取值选项的值（如 `cargo --manifest-path Cargo.toml build` 得子命令 `"Cargo.toml build"`）；实际影响极小，pattern 用 substring 匹配即可规避，实现细节见 `adapters/shared.ts`。
+
+**Why:** 分类、路径提取和效果推断共享同一趟参数解析，是同一个分析的输出——拆成声明式 YAML 与 TS 双源会产生双源真理；内置分类是权威语义知识，覆盖层只用于用户主动补充本机 Shell 命令语义；Direct 工具需要精确参数 schema、路径字段和 effect 证明，继续通过源码和测试扩展。显式作用域取代隐式 basename 回退，因为回退把工具身份与调用拼写混为一谈——一个裸名键同时覆盖 `./bin/mytool` 与 `./vendor/mytool`，gate 不做 filesystem 解析（D-031），同名不同工具无法区分；想覆盖两种拼写就写两条声明（`mytool: cat` + `"bin/": cat`），声明取代猜测。
+
+**Rejected:** 保留 basename 兜底（冲突休眠而非消除）；realpath/filesystem 消歧（D-031 静态分类不做 filesystem 检查）；alias→alias 链式（语义需沿解析图追多跳才能确定，commands 链式已覆盖“复用语义定义”需求）。
+
+**Out of Scope:** 前缀键绝对/相对拼写敏感（`"/abs/bin/"` 与 `"bin/"` 是不同作用域）；Windows `\` 路径（POSIX 语义）；目录内多个前缀键重叠（最长前缀优先）。
 
 ## D-025: Direct 优先与 Shell 安全子集
 
@@ -191,13 +193,13 @@
 
 **Decision:** 文件检查场景优先选择 Direct `read`、`grep`、`find`、`ls` 工具，但不因为存在 Direct 等价入口而全局禁用 Shell 命令。字面且能完成路径和效果分析的 Shell inspect 命令继续经过 Profile 和 PathPolicy；只有无法安全建模的 Shell 语法以及明确的安全风险才 hard deny。
 
-**Why:** Direct 工具提供结构化参数和更窄的访问面，适合作为模型默认选择；Shell 仍承载 pipeline、命令特有选项和组合语义。按命令名禁用会把工具选择问题错误地变成能力禁止，并破坏合法的组合操作。
-
 **Deny feedback:** dynamic、unsafe、opaque 和 unsupported 语法的拒绝必须说明“当前 Shell 形式不能批准”，并指向 Direct 工具或更简单的字面命令。threat、blocked path、symlink escape、destroy 和 hard command rule 等不可覆盖边界必须说明不可绕过，不能提供替代执行建议。两类 guidance 都只能使用静态 catalog 文本（D-023）。
 
-**Rejected:** 不采用“Direct 存在即禁用 Shell”等价命令；不把 Direct 工具作为 Shell gate 的绕过路径；不在本决策中实现 Shell glob 的安全展开。
+**Why:** Direct 工具提供结构化参数和更窄的访问面，适合作为模型默认选择；Shell 仍承载 pipeline、命令特有选项和组合语义。按命令名禁用会把工具选择问题错误地变成能力禁止，并破坏合法的组合操作。
 
-**Current implementation:** Direct-first 是 `principles.md` 中的模型工具选择偏好，不是 host 层自动路由或 Policy Kernel 的强制优先级；安全可分析的字面 Shell 仍然允许。
+**Impact:** Direct-first 是 `principles.md` 中的模型工具选择偏好，不是 host 层自动路由或 Policy Kernel 的强制优先级；安全可分析的字面 Shell 仍然允许。
+
+**Rejected:** 不采用“Direct 存在即禁用 Shell”等价命令；不把 Direct 工具作为 Shell gate 的绕过路径；不在本决策中实现 Shell glob 的安全展开。
 
 ## D-028: 统一 Project Record 模型
 
@@ -228,7 +230,7 @@
 
 **Status:** active
 
-**Decision:** 提示词按注入面分层：`principles.md`（恒定注入，承载原则与唯一格式/规则来源）、`skills/`（按需加载，每个 skill 单一职责、调用时全量消费）、access-gate guidance（失败路径，保持原样不精简）。两条约束：① skill 单一职责——一个 skill 只做一件事，触发场景互斥的 skill 保持独立，不合并；② 格式/规则单一来源——只在 `principles.md` Quick Reference 定义一次，技能只文字引用（如 "per principles.md Quick Reference — Record Lifecycle"），不内嵌副本。
+**Decision:** 提示词按注入面分层：`principles.md`（恒定注入，承载原则与唯一格式/规则来源）、`skills/`（按需加载，每个 skill 单一职责、调用时全量消费）、access-gate guidance（失败路径，保持原样不精简）。两条约束：① skill 单一职责——一个 skill 只做一件事，触发场景互斥的 skill 保持独立，不合并；② 格式/规则单一来源——只在 `principles.md` 参考节（Quick Reference / Project Records）定义一次，技能只文字引用（如 "per principles.md Project Records — Record Lifecycle"），不内嵌副本。
 
 **Why:** 混合职责的 skill 调用时部分内容永远用不到，浪费 token、稀释注意力并使触发匹配模糊；内嵌格式副本在多个 skill 间漂移（survey-context 与 principles 的 Candidate Record 措辞已出现分歧）。principles 每 session 恒定注入，格式放此处零额外注入成本，模型无需额外 read 即获权威定义。
 
@@ -410,26 +412,11 @@
 
 **Status:** active
 
-**值性质：** 取值选项按 `kind` 分类——`file`（值是文件路径，产生 read/write 路径 intent）与 `expression`（值是程序/表达式，消费但不产生 intent），sed `-e`/`--expression`、awk `-e` 为 expression，`-f`/`--file` 为 file；inline 后缀（`sed -i.bak`、`--in-place=.bak`）视为与 `-i` 相同的 conservative write intent，不降级为 opaque。位置参数是输入文件，必须产生路径 intent：sed/awk 出现写选项（-i）时 positional 升级为 write，否则为 read。
-
-**Why:** 表达式不是文件，当 read 路径检查会把表达式字符串交给 PathPolicy 产生无意义拦截；此前 positional 被完全忽略导致 PathPolicy 被整体绕过（`sed 's/x/y/' /etc/passwd` 无任何路径检查）。
-
-**Rejected:** 不把 `-e` 移除出 schema（导致 opaque 降级）；awk `-i`（gawk include 与 in-place 语义冲突）不纳入，保持保守 write 分类；不因程序/文件位置歧义放弃 positional 检查（宁可误判为额外 read，不漏掉输入文件）。
-
-**Context:**
-
-- git 子命令分类用「join 成字符串 + 正则」匹配：丢失 token 边界，`-oFILE` 附着形式曾因 `\b` 失配落 inspect（写出路径绕过路径策略的安全漏洞）；「选项取值消费」被多个模块各自实现，边界语义分裂（未知选项有的置 opaque 有的静默，`-name "-delete"` 曾误升级 modify）；值性质（expression vs file）词汇已定但分散在各 walker 内。
-
-**Decision:**
+**Decision:** 取值选项按 `kind` 分类——`file`（值是文件路径，产生 read/write 路径 intent）与 `expression`（值是程序/表达式，消费但不产生 intent），sed `-e`/`--expression`、awk `-e` 为 expression，`-f`/`--file` 为 file；inline 后缀（`sed -i.bak`、`--in-place=.bak`）视为与 `-i` 相同的 conservative write intent，不降级为 opaque。位置参数是输入文件，必须产生路径 intent：sed/awk 出现写选项（-i）时 positional 升级为 write，否则为 read。实现分三项：
 
 1. **GIT_CLASSIFY 表（token 级）**：git.ts 的正则 pattern 改为声明式数据表——首 token 匹配 + 选项调节（升级优先，fail-closed），负前瞻/锚定/`-c` 跳过删除；finder 保留 `-C`/`-c`/`--git-dir` 跳过（token 正确性必需）；调节 flag 支持 `prefix` 匹配（`-o` 命中 `-oFILE`）；多 class 子命令族（stash/bundle）入 `GIT_SUBCOMMAND_PARSERS` 注册表，表与注册表边界由数据形状决定。
 2. **统一选项引擎 option-parse**：`parseOptions(args, schema)` 深模块收敛四套选项遍历，schema 制度化值性质分类（`kind: file|expression|flag`，见上）与位置参数性质（`positional: file|program-first|set`），并表达四形态 `forms` 与 `-exec` 终止符 `consumeUntil`；opaque 策略由命令级 `opaqueOnUnknown` 显式声明——text-transform/search/filesystem/read 收紧为 true（未知选项 opaque 硬拒），git 的 `-o` 提取为 false（合法选项静默），并补全高频 flag 建模防误拒。
 3. **config-parse 独立**：读写轴 + 配置目标解析是分类策略领域（非值消费遍历），不并入引擎。
-
-**Consequences:**
-
-- 行为收紧（有意）：fs/read/search 的未知选项从静默 → opaque 拒（如 `cp -z`、`wc --bogus`、`grep --bogus-flag`）；`-ne` 类 cluster 从 opaque → 正确解析（尾随带值语义）。
-- overrides 层（reclassify 的 `fullSubcommand` 字符串匹配）不动（D-024 已知局限，独立表面）。
 
 **延伸（T-059，D-040 补记）：**
 
@@ -438,8 +425,18 @@
 - **valueOpts → Opt(expression)**：覆盖层/适配器的取值选项列表提升为 Opt 声明时一律 `kind: "expression"`（只消费不产生 intent，行为零损失）；路径建模（如 `--manifest-path` 实为路径）另立决策，不在收敛中混入。
 - **class 调节原语**：Opt 增加 `upgradeTo: "modify"|"destroy"` / `downgradeTo: "inspect"`，引擎输出命中的调节集合并按风险优先（destroy > modify > inspect，fail-closed）给默认裁决，adapter 可覆盖；date `-s/--set`、search/text-transform 写选项升级、python-tools `--check/--fix`、git GIT_CLASSIFY upgrade/downgrade 全部声明化，删除手写 flag 检查。
 
+**Why:** 表达式不是文件，当 read 路径检查会把表达式字符串交给 PathPolicy 产生无意义拦截；此前 positional 被完全忽略导致 PathPolicy 被整体绕过（`sed 's/x/y/' /etc/passwd` 无任何路径检查）。旧实现的缺陷：
+
+- git 子命令分类用「join 成字符串 + 正则」匹配：丢失 token 边界，`-oFILE` 附着形式曾因 `\b` 失配落 inspect（写出路径绕过路径策略的安全漏洞）；「选项取值消费」被多个模块各自实现，边界语义分裂（未知选项有的置 opaque 有的静默，`-name "-delete"` 曾误升级 modify）；值性质（expression vs file）词汇已定但分散在各 walker 内。
+
+**Impact:**
+
+- 行为收紧（有意）：fs/read/search 的未知选项从静默 → opaque 拒（如 `cp -z`、`wc --bogus`、`grep --bogus-flag`）；`-ne` 类 cluster 从 opaque → 正确解析（尾随带值语义）。
+- overrides 层（reclassify 的 `fullSubcommand` 字符串匹配）不动（D-024 已知局限，独立表面）。
+
 **Rejected:**
 
+- 不把 `-e` 移除出 schema（导致 opaque 降级）；awk `-i`（gawk include 与 in-place 语义冲突）不纳入，保持保守 write 分类；不因程序/文件位置歧义放弃 positional 检查（宁可误判为额外 read，不漏掉输入文件）。
 - 谓词函数 pattern / 声明式迷你语言 / 全解析器化：闭包各写样板且形态趋同诱发合并冲动；fields 化不区分升级/降级/子命令族语义，组合规则模糊；token 解析器太碎。
 - config-parse 并入引擎（引擎需输出每 token 分类的复杂结构，收益不抵）。
 
@@ -465,9 +462,6 @@
 - registry 增加可选索引：`optionalCommandIndex` 按启用名集合缓存，未启用时行为与旧版完全一致（herdr 裸名 unknown / 路径形式 execute）。
 - 错误消息统一为 `pi-keel: ...` 前缀；解析失败/结构非法时响亮报错并 fail-closed 降级。
 - herdr adapter 建模：信息/`status`/`api`/`completion`/`help` → inspect；控制子命令 → execute；`update` → execute + network；取值选项被消费（覆盖层做不到；完整规格见 README optionalAdapters 段）。
-
-**Consequences:**
-
 - 配置以 config.yaml 为唯一来源；旧 profiles.json/command-overrides.yaml 废弃，不兼容读取。
 - optional adapter 准入门槛（防 whack-a-mole）：(1) 默认不加载；(2) 建模必须 token 级完整（覆盖层表达不了的才有资格）；(3) 语义可机械分类（稳定文档化 CLI）；(4) 随包测试全绿。
 
@@ -501,9 +495,6 @@
 
 - 纯结构移动与 import 路径更新，零行为变化；测试深层路径更新（gate 引用 → plan/decision 前缀）。
 - gate 内部 import 边界：plan 组不引用 decision 组；decision 组单向引用 plan 组；共享根被两层引用且不依赖子组。
-
-**Consequences:**
-
 - 新代码准则：跨目录引用走目录 index（AGENTS.md 目录速查记录）；测试可继续走深层实现路径。若未来共享根（`host`/`decision-types`/`decision-code-catalog`）依赖继续演化，重新评估共享根归属，不强行分层。
 
 **Rejected:**
@@ -536,9 +527,6 @@
 
 - `<>` 重定向建模为 write 侧（`<>`→stdout、`2<>`→stderr）；只建模 read 会漏写侧（原缺陷），write 建模在 write⇒read 原则下覆盖双面。
 - 新形态处理顺序确立：识别 → 建模（write⇒read 下语义完整）→ 拒绝拆解；不再引入无法建模的中间状态。
-
-**Consequences:**
-
 - 新增 adapter/重定向形态时按上述顺序评估；拒绝路径必须携带拆解 guidance。
 - 自定义矛盾 profile 下 `<>` 的读侧行为不保证（配置责任）。
 

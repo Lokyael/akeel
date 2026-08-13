@@ -1,6 +1,6 @@
 ---
 name: grill-plan
-description: Relentlessly interview the user about every aspect of a plan, decision, or idea until every branch of the decision tree is resolved. Use when the user wants to stress-test their thinking, says "grill me", or uses any 'grill' trigger phrases. For doc-grounded variant, use grill-docs.
+description: Use when the user wants to stress-test their thinking, says "grill me", or uses any 'grill' trigger phrases — relentlessly interview them about every aspect of a plan, decision, or idea until every branch of the decision tree is resolved. For the doc-grounded variant, use grill-docs.
 ---
 
 # Grill Plan

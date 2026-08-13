@@ -26,10 +26,10 @@ Every Task Record MUST include:
 
 ### Out of Scope
 
-(per principles.md §7 — what + why not now + revisit when. Omit if nothing.)
+(per principles.md §8 — what + why not now + revisit when. Omit if nothing.)
 ```
 
-Status transitions and cleanup: per principles.md Quick Reference — Record Lifecycle.
+Status transitions and cleanup: per principles.md Project Records — Record Lifecycle.
 
 ## Task Right-Sizing
 

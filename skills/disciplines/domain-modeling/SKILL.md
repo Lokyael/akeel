@@ -48,13 +48,13 @@ When a term or current constraint crystallises, add it to `CONTEXT.md` immediate
 ### Park Uncommitted Candidates
 
 When an idea may matter later but is neither adopted nor committed work, offer
-to add a `C-xxx` entry to `docs/candidates.md` (per principles.md Next-ID slots); fields per principles.md Quick
-Reference — Document Set; non-binding semantics per principles.md Quick
-Reference — Project Record Authority. Create that file lazily. Its wording,
+to add a `C-xxx` entry to `docs/candidates.md` (per principles.md Next-ID slots); fields per principles.md Project
+Records — Document Set; non-binding semantics per principles.md Project
+Records — Project Record Authority. Create that file lazily. Its wording,
 date, or presence carries no approval — design or implement the idea only when
 the user explicitly promotes it in the current conversation. When promoted,
 move the durable content and remove the C entry in the same change (per
-principles.md Quick Reference — Migration Protocol).
+principles.md Project Records — Migration Protocol).
 
 ### Record Load-Bearing Decisions
 

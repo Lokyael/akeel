@@ -14,7 +14,7 @@ Break the Task Record in the current task file (`docs/task.md` or `docs/task-<to
 **Goal:** [One sentence]
 **Depends on:** [Ticket IDs this blocks on, or "none"]
 **Blocks:** [Ticket IDs that depend on this]
-**Out of Scope:** (per principles.md §7 — what this ticket deliberately excludes. Omit if nothing.)
+**Out of Scope:** (per principles.md §8 — what this ticket deliberately excludes. Omit if nothing.)
 
 **Acceptance Criteria:**
 - [ ] [Criterion]

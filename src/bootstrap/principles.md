@@ -60,7 +60,7 @@ For multi-step tasks, state a plan:
 2. [Step] → verify: [check]
 ```
 
-### 4a. Direct Tools Before Shell
+### 5. Direct Tools Before Shell
 
 For filesystem inspection, prefer Direct `read`, `grep`, `find`, and `ls` tool
 calls because their structured arguments make the intended path and operation
@@ -70,7 +70,7 @@ command can be handled; do not inspect its internals or retry a rejected Shell
 form unchanged. Follow the returned guidance and use a Direct tool or a simpler
 operation when advised.
 
-### 5. Verify Before Claiming
+### 6. Verify Before Claiming
 
 *Evidence before assertions, always.*
 
@@ -91,7 +91,7 @@ Before claiming any status:
 Never use "should", "probably", "seems to". Run the command. Read the output.
 Then claim the result.
 
-### 6. Keep Docs in Sync
+### 7. Keep Docs in Sync
 
 *Every code change must include its doc counterpart.*
 
@@ -102,7 +102,7 @@ Include doc changes in the same commit as code changes.
 
 **Test:** Would a new teammate be misled? Fix it.
 
-### 7. Declare What You Exclude
+### 8. Declare What You Exclude
 
 *Boundaries prevent scope creep. Write them down.*
 
@@ -127,7 +127,7 @@ earn its place with a specific reason and an explicit revisit condition.
 
 **Test:** Can a newcomer name what we chose NOT to build, and why?
 
-### 8. Centralize, Don't Scatter
+### 9. Centralize, Don't Scatter
 
 *One truth, one place. Duplication is the root of divergence.*
 
@@ -152,7 +152,7 @@ a scavenger hunt across the codebase.
 Many = refactor first. If you don't know which file to edit, the design is
 already scattered.
 
-### 9. Destructive Actions Need Explicit Intent
+### 10. Destructive Actions Need Explicit Intent
 
 *Irreversible operations happen only on the user's explicit request.*
 
@@ -163,7 +163,7 @@ already scattered.
   force-push, deletion), name the exact operation and confirm the user's
   intent — a fuzzy trigger word is not consent.
 
-### 10. Delegation Never Exceeds Your Own Authority
+### 11. Delegation Never Exceeds Your Own Authority
 
 *What you delegate is bounded by what you can do yourself.*
 
@@ -205,7 +205,7 @@ orient.
 
 ---
 
-## Quick Reference
+## Project Records
 
 ### Project Record Authority
 
@@ -266,6 +266,10 @@ Kind: `feature | bug | refactor | investigation | maintenance`. A Task Record co
 Records leave the register only via content transfer (durable content moves to its authority level) or abandonment (no durable content remains). Every terminal is reason-named and declares its destination; relocation and removal happen in the same change; references to records in code comments and docs are updated to the absorbing entry in the same change; Git retains history; IDs are never reused; no archive directory or tombstone files exist.
 
 `survey-context` reads only: `CONTEXT.md`, `docs/candidates.md`, `docs/task.md`, and `docs/task-*.md`, plus specific `D-xxx` entries in `docs/decisions.md` on demand when the task touches their scope — no legacy or type-specific artifact paths. A missing `docs/candidates.md` means no recorded Candidate Records, not an error.
+
+---
+
+## Quick Reference
 
 ### Temporary Resources
 

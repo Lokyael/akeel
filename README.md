@@ -74,7 +74,7 @@ Profile decisions are `allow`, `ask`, or `deny`. Path rules independently contro
 
 ### Command Semantics Overrides (`commands`)
 
-The `commands` section extends or adjusts Shell command semantics declaratively; built-in TypeScript adapters remain authoritative. Resolution order: `commands` definitions → `aliases` → built-in adapter → `reclassify`.
+The `commands` section extends or adjusts Shell command semantics declaratively; built-in TypeScript adapters remain authoritative. Resolution order: `commands` definitions → `aliases` → `commands` definitions (alias target) → built-in adapter → `reclassify`.
 
 ```yaml
 # 别名：让未知命令复用已知 adapter 的完整语义分析

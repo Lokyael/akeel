@@ -21,8 +21,8 @@ Every project goes through this process. "Simple" projects are where unexamined 
 1. **Explore project context** — read CONTEXT.md if it exists (Glossary, Architecture, Active Decisions, Negative Space), then read `docs/decisions.md` and `docs/task.md` if they exist, and recent commits
 2. **Ask clarifying questions** — one at a time, understand purpose/constraints/success criteria. Prefer multiple choice when possible. One question per message.
 3. **Propose 2-3 approaches** — with trade-offs and your recommendation. For interface-level design, apply Design Twice from codebase-design. Lead with your recommended option and explain why.
-4. **Present design** — in sections scaled to their complexity, get user approval after each section. Cover: architecture, components, data flow, error handling, testing, and Out of Scope (principles.md §7 format).
-5. **Record the design** — add the approved design to the current Task Record (`docs/task.md` or `docs/task-<topic>.md`). Include Out of Scope (per principles.md §7) and explicitly list any open questions that remain unresolved. Do not create a separate design file.
+4. **Present design** — in sections scaled to their complexity, get user approval after each section. Cover: architecture, components, data flow, error handling, testing, and Out of Scope (principles.md §8 format).
+5. **Record the design** — add the approved design to the current Task Record (`docs/task.md` or `docs/task-<topic>.md`). Include Out of Scope (per principles.md §8) and explicitly list any open questions that remain unresolved. Do not create a separate design file.
 6. **Work-item self-review** — quick check for placeholders, contradictions, and ambiguity. Fix inline.
 7. **User reviews the Task Record** — ask the user to review the design section before proceeding.
 

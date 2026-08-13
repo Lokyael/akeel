@@ -53,7 +53,7 @@ For multi-component systems, also log what enters and exits each boundary (per `
 
 If the bug area touches a library, framework, or dependency, check its
 upstream first — known issues, fixed releases, or community workarounds
-(per principles.md §5; use available web retrieval tools). Then
+(per principles.md §6; use available web retrieval tools). Then
 generate 3–5 ranked hypotheses about the likely area of the root cause.
 If only one comes to mind, force at least one
 alternative — the first plausible idea anchors.

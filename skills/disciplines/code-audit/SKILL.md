@@ -59,7 +59,7 @@ These checks serve both human reviewers and the agent's context-window readabili
 
 - [ ] Functions: 4–20 lines; split if longer — unless splitting would scatter a single cohesive concern
 - [ ] Files: ~300 lines target.  Above 350 is a **smell** — investigate, but don't dogmatically split.  Do NOT split if:
-  - the file guards a single concept and splitting would scatter it (§8 Centralize Don't Scatter)
+  - the file guards a single concept and splitting would scatter it (§9 Centralize Don't Scatter)
   - module-private state (WeakSet, closure) couples functions that would need to share exported internals after splitting
   - the "overhead" section (imports, re-exports, section banners) accounts for the excess and core logic is within budget
   When the above apply, the file's size is justified — the smell is acknowledged and the limit does not apply.  Above ~500 lines, reconsider whether the module itself is doing too many things, not just whether it can be split.
