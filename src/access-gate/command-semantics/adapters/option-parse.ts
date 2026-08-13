@@ -179,9 +179,9 @@ export function parseOptions(args: readonly ShellArg[], config: OptConfig): Pars
     const token = args[i]!;
     const val = token.value ?? "";
 
-    // ── `--` 之后全部位置参数 ──
+    // ── `--` 之后全部位置参数；裸 `-` 是 stdin 约定（工具自行解释），按位置参数处理 ──
     if (!afterDoubleDash && val === "--") { afterDoubleDash = true; i++; continue; }
-    if (afterDoubleDash || !val.startsWith("-")) {
+    if (afterDoubleDash || !val.startsWith("-") || val === "-") {
       // program-first：首个位置参数是程序（无 -e/-f 时），跳过；非首位置参数直接落位
       if (programPending && !sawPattern) { programPending = false; i++; continue; }
       programPending = false;
@@ -283,6 +283,12 @@ export function parseOptions(args: readonly ShellArg[], config: OptConfig): Pars
       }
       // 取值但 forms 不含 separated（equals/attached 未命中）→ 无法消费，保守 opaque
       if (config.opaqueOnUnknown) opaque = true;
+      i++;
+      continue;
+    }
+
+    // ── 数值短选项（-15、-250）：GNU/BSD 计数值惯例（head/tail 等），消费但不产生路径 intent ──
+    if (!val.startsWith("--") && /^-\d+$/.test(val)) {
       i++;
       continue;
     }

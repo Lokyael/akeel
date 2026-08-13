@@ -44,6 +44,9 @@ function matchOp(ops: string[], text: string, index: number): string | null {
 
 const CTRL_OPS = ["&&", "||", ";", "|", "&"];
 
+/** 行尾延续操作符：其后紧跟换行时，换行不构成命令分隔（bash 语义：a &&\nb 等价 a && b）。 */
+const LINE_CONTINUATION_OPS = new Set(["&&", "||", "|", "&"]);
+
 export function lex(text: string): { tokens: LexToken[]; unsafeSyntax: string | null } {
   if (text.length > LEXER_LIMITS.maxTokens * 20) return { tokens: [], unsafeSyntax: "input exceeds the lexer budget" };
   const tokens: LexToken[] = [];
@@ -86,11 +89,11 @@ export function lex(text: string): { tokens: LexToken[]; unsafeSyntax: string | 
     });
   };
 
-  const emitOperator = (op: string, start: number) => {
+  const emitOperator = (op: string, start: number, end?: number) => {
     tokens.push({
       kind: "operator",
       value: op,
-      span: { start, end: start + op.length },
+      span: { start, end: end ?? start + op.length },
       rawValue: op,
       quoted: false,
       dynamic: false,
@@ -160,8 +163,20 @@ export function lex(text: string): { tokens: LexToken[]; unsafeSyntax: string | 
     // 空白 → flush word
     if (/\s/.test(ch)) {
       flush(i);
+      const runStart = i;
       i++;
       while (i < text.length && /\s/.test(text[i]!)) i++;
+      // 换行判断基于整个空白 run：run 内含 \n/\r 即产分隔 token——
+      // 换行前的空格/制表符（尾随空白）不改变分隔语义，不能只看 run 首字符
+      const runText = text.slice(runStart, i);
+      if (/[\n\r]/.test(runText)) {
+        // 行尾延续：run 前 token 是 && || | &（延续）或重定向操作符（目标可跨行）时
+        // 不产分隔 token（bash 语义）；否则 newline 是命令分隔符
+        const last = tokens[tokens.length - 1];
+        const continues = last?.kind === "redirect"
+          || (last?.kind === "operator" && LINE_CONTINUATION_OPS.has(last.value));
+        if (!continues) emitOperator("newline", runStart, i);
+      }
       continue;
     }
 

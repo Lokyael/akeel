@@ -516,4 +516,40 @@
 - 测试目录镜像 src 子目录（tests 平铺 + 通配符是既有准则，D-042 不改）。
 - security/（threat-scan 单文件）与 util.ts（isRecord 单函数）合并：职责表达合理，维持现状。
 
-## D-043: 待创建
+## D-043: 访问控制职责边界与配置一致性原则（自定义 profile 不保证 + 复杂形态可拒绝 + write⇒read）
+
+**Status:** active
+
+**Decision:** 访问控制面确立三条约束/原则：
+
+1. **自定义特殊 profile 不在保证范围**：gate 的行为保证边界是内置 profile；用户自配 profile 的矛盾组合（如同一路径 `read=deny` 且 `write=allow`）产生的行为不在责任范围——gate 不为自定义配置长尾追责。
+2. **复杂命令可拒绝**：无法精确建模的形态编译期拒绝并引导拆解（heredoc/hereString 已如此；`unsupported-redirection` + split-supported-commands guidance 让 AI 拆成可识别的简单形态或 Direct 工具）。“尽量识别，但不是必要项”——识别不足时拒绝优先于猜测建模（fail-closed）。
+3. **write⇒read 一致性**：profile 配置的预期语义是“允许写入的路径应允许读取”（安全梯度：write 比 read 危险，能力层级上允许强能力蕴含允许弱能力；内置 profile 全部满足此性质）。矛盾配置（write 宽于 read）视为配置不一致。`<>`（O_RDWR 读写打开）在此原则下按 write 侧建模（stdout/stderr kind）——write 决策允许即覆盖读面，语义完整。
+
+**Why:**
+
+- 职责边界收敛：访问控制的目标是拦截未授权操作，不是对抗用户自相矛盾的配置；为矛盾组合付建模成本（双 intent/独立 kind）超出职责。
+- fail-closed 优先：识别不了就拒绝，由 AI 拆解（agent 可重试），而不是猜测语义（猜测 = 潜在漏判）。
+- write⇒read 是安全模型的自然梯度：能写就能读（写可破坏，读是弱能力）；内置 profile 已隐含此性质，显式化避免“为矛盾配置设计防御”的过度工程。
+
+**Impact:**
+
+- `<>` 重定向建模为 write 侧（`<>`→stdout、`2<>`→stderr）；只建模 read 会漏写侧（原缺陷），write 建模在 write⇒read 原则下覆盖双面。
+- 新形态处理顺序确立：识别 → 建模（write⇒read 下语义完整）→ 拒绝拆解；不再引入无法建模的中间状态。
+
+**Consequences:**
+
+- 新增 adapter/重定向形态时按上述顺序评估；拒绝路径必须携带拆解 guidance。
+- 自定义矛盾 profile 下 `<>` 的读侧行为不保证（配置责任）。
+
+**Rejected:**
+
+- `readwrite` 独立 kind + read+write 双 intent：为“read-deny + write-allow”矛盾配置付建模成本，职责外；且 verifier/coverage 对账需配套改动。
+- `readwrite` kind + 编译期拒绝：过度保守——write 建模在 write⇒read 原则下已语义完整，拒绝引入不必要的可用性损失（`<>` 需强制拆解）。
+- profile 验证层强制 write⇒read（矛盾配置报错）：与“不负责自定义 profile”裁定矛盾，配置校验强制超出职责。
+
+**Out of Scope:**
+
+- 自定义 profile 的配置一致性校验与矛盾组合的行为修正。
+
+## D-044: 待创建

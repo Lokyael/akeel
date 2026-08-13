@@ -123,3 +123,33 @@ test("symlink escapes are hard denied", () => {
     rmSync(outside, { recursive: true, force: true });
   }
 });
+
+test("home credential files are hard denied", () => {
+  const ctx = makeContext("pi-access-path-");
+  try {
+    const credentials = [".git-credentials", ".netrc", ".pypirc"];
+    // ~/.npmrc 刻意不拦：npm config 写路径依赖 keel-build 的 ~/** write=ask 承诺（gate-policy-matrix 锁定）
+    for (const file of credentials) {
+      const path = resolvePath(ctx.cwd, ctx.projectRoot, ctx.stagingDir, join(homedir(), file));
+      for (const operation of ["read", "list", "search", "write"] as const) {
+        const result = decidePath(path, profile(), operation, DEFAULT_BLOCKED_PATHS);
+        assert.equal(result.decision, "deny", `${file} ${operation}`);
+        assert.equal(result.hard, true, `${file} ${operation}`);
+      }
+    }
+    const ghHosts = resolvePath(ctx.cwd, ctx.projectRoot, ctx.stagingDir, join(homedir(), ".config", "gh", "hosts.yml"));
+    assert.equal(decidePath(ghHosts, profile(), "read", DEFAULT_BLOCKED_PATHS).hard, true);
+    // gh 配置目录整体 blocked（read/list/search/write 全操作）
+    for (const operation of ["read", "list", "search", "write"] as const) {
+      const gh = resolvePath(ctx.cwd, ctx.projectRoot, ctx.stagingDir, join(homedir(), ".config", "gh", "config.yml"));
+      assert.equal(decidePath(gh, profile(), operation, DEFAULT_BLOCKED_PATHS).hard, true, `${operation}`);
+    }
+    // **/ 形态：project 子目录的凭据文件同样硬拒（与 home 形态对称）
+    for (const file of [".git-credentials", ".netrc", ".pypirc"]) {
+      const nested = resolvePath(ctx.cwd, ctx.projectRoot, ctx.stagingDir, join("sub", file));
+      assert.equal(decidePath(nested, profile(), "read", DEFAULT_BLOCKED_PATHS).hard, true, `${file}`);
+    }
+  } finally {
+    ctx.cleanup();
+  }
+});

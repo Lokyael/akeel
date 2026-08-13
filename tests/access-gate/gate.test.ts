@@ -367,3 +367,32 @@ test("git config local write is blocked by .git protection", async () => {
   assert.equal(result.kind, "block");
   assert.equal(result.code, "blocked-path");
 });
+
+test("multi-line commands are separated and the second command is gated", async () => {
+  // 回归锁：修复前 `cat a.txt\nrm x` 被解析为单一 cat[inspect] → allow（rm 不可见）；
+  // 修复后两个命令，rm[modify] 触发审批 → Deny → block。
+  const result = await evaluateBash("cat a.txt\nrm x", profile(), "Deny");
+  assert.equal(result.kind, "block");
+  assert.equal(result.code, "user-denied");
+});
+
+test("multi-line commands with trailing whitespace before the newline are still gated", async () => {
+  // 回归锁：换行前有尾随空格/制表符时换行仍必须是分隔符（否则 rm 再次被首词带过）
+  const spaced = await evaluateBash("cat a.txt \nrm x", profile(), "Deny");
+  assert.equal(spaced.kind, "block");
+  const tabbed = await evaluateBash("cat a.txt\t\nrm x", profile(), "Deny");
+  assert.equal(tabbed.kind, "block");
+});
+
+test("multi-line inspect chain stays allowed command-by-command", async () => {
+  // 多行只读链不受影响：cat + wc 均为 inspect → allow。
+  const result = await evaluateBash("cat a.txt\nwc -l a.txt");
+  assert.deepEqual(result, { kind: "allow" });
+});
+
+test("<> open-readwrite redirect gates the write side", async () => {
+  // `<>` O_RDWR 按 write 侧建模（D-043 write⇒read 一致性：允许写即允许读）；
+  // 写意图必须受 PathPolicy 约束（project write=ask → 审批 → Deny → block）
+  const result = await evaluateBash("cat <> out.txt", profile(), "Deny");
+  assert.equal(result.kind, "block");
+});

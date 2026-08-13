@@ -166,6 +166,80 @@ test("lexer: backslash continuation (\\\\n)", () => {
   assert.equal(tokens[1]!.value, "hello");
 });
 
+test("lexer: newline separates commands", () => {
+  const { tokens } = lex("cat a.txt\nrm x");
+  const ops = tokens.filter((t) => t.kind === "operator").map((t) => t.value);
+  assert.deepEqual(ops, ["newline"]);
+});
+
+test("lexer: newline after && is a continuation, not a separator", () => {
+  const { tokens } = lex("a &&\nb");
+  assert.equal(tokens.some((t) => t.kind === "operator" && t.value === "newline"), false);
+});
+
+test("lexer: newline after | is a continuation, not a separator", () => {
+  const { tokens } = lex("a |\nb");
+  assert.equal(tokens.some((t) => t.kind === "operator" && t.value === "newline"), false);
+});
+
+test("lexer: newline after || is a continuation, not a separator", () => {
+  const { tokens } = lex("a ||\nb");
+  assert.equal(tokens.some((t) => t.kind === "operator" && t.value === "newline"), false);
+});
+
+test("lexer: newline after & is a continuation, not a separator", () => {
+  const { tokens } = lex("a &\nb");
+  assert.equal(tokens.some((t) => t.kind === "operator" && t.value === "newline"), false);
+});
+
+test("lexer: newline inside single quotes is a literal word character", () => {
+  const { tokens } = lex("echo 'a\nb'");
+  assert.equal(tokens.some((t) => t.kind === "operator" && t.value === "newline"), false);
+  assert.equal(tokens.length, 2);
+});
+
+test("lexer: newline after ; is still a separator", () => {
+  const { tokens } = lex("a ;\nb");
+  assert.equal(tokens.some((t) => t.kind === "operator" && t.value === "newline"), true);
+});
+
+test("lexer: newline inside double quotes is a literal word character", () => {
+  const { tokens } = lex('echo "a\nb"');
+  assert.equal(tokens.some((t) => t.kind === "operator" && t.value === "newline"), false);
+  assert.equal(tokens.length, 2);
+});
+
+test("lexer: newline after a redirect operator is a continuation (target may span lines)", () => {
+  const { tokens } = lex("echo hi >\n/tmp/x");
+  assert.equal(tokens.some((t) => t.kind === "operator" && t.value === "newline"), false);
+  assert.equal(tokens[3]!.value, "/tmp/x");
+});
+
+test("lexer: newline preceded by trailing whitespace still separates", () => {
+  // 回归锁：换行判断必须扫描整个空白 run（run 第一个字符是空格/制表符时换行不能被吞）
+  const { tokens } = lex("cat a.txt \nrm x");
+  assert.equal(tokens.filter((t) => t.kind === "operator" && t.value === "newline").length, 1);
+  const tab = lex("cat a.txt\t\nrm x");
+  assert.equal(tab.tokens.filter((t) => t.kind === "operator" && t.value === "newline").length, 1);
+  // 延续场景同样成立：&& 后有空格再换行仍是延续
+  const cont = lex("a && \nb");
+  assert.equal(cont.tokens.some((t) => t.kind === "operator" && t.value === "newline"), false);
+});
+
+test("lexer: leading newline is a separator before the first command", () => {
+  const { tokens } = lex("\nls");
+  assert.equal(tokens[0]!.kind, "operator");
+  assert.equal(tokens[0]!.value, "newline");
+  assert.equal(tokens[1]!.value, "ls");
+});
+
+test("lexer: consecutive blank lines collapse into one newline token", () => {
+  const { tokens } = lex("a\n\nb");
+  assert.equal(tokens.filter((t) => t.kind === "operator" && t.value === "newline").length, 1);
+  assert.equal(tokens[1]!.value, "newline");
+  assert.equal(tokens[2]!.value, "b");
+});
+
 test("lexer: empty input", () => {
   const { tokens } = lex("");
   assert.equal(tokens.length, 0);
@@ -490,4 +564,38 @@ test("lexer+parser: sed --in-place is args", () => {
   assert.equal(cmd.executable?.value, "sed");
   // args: --in-place, -e, 's/foo/bar/', file.txt
   assert.equal(cmd.args.length, 4);
+});
+
+test("parser: newline separates commands like a semicolon", () => {
+  const { program } = parse(lex("cat a.txt\nrm x").tokens);
+  assert.equal(program.commands.length, 2);
+  assert.equal(program.commands[0]!.executable?.value, "cat");
+  assert.equal(program.commands[0]!.args.length, 1);
+  assert.equal(program.commands[0]!.args[0]!.value, "a.txt");
+  assert.equal(program.commands[1]!.executable?.value, "rm");
+  assert.equal(program.commands[1]!.operatorBefore, "newline");
+});
+
+test("parser: newline continuation keeps && and pipeline semantics", () => {
+  const and = parse(lex("a &&\nb").tokens);
+  assert.equal(and.program.commands.length, 2);
+  assert.equal(and.program.commands[1]!.operatorBefore, "&&");
+  const pipe = parse(lex("a |\nb").tokens);
+  assert.equal(pipe.program.commands[1]!.operatorBefore, "|");
+});
+
+test("parser: <> open-readwrite redirect is modeled on the write side", () => {
+  const { program } = parse(lex("cat <> f.txt").tokens);
+  const cmd = program.commands[0]!;
+  assert.equal(cmd.redirections.length, 1);
+  assert.equal(cmd.redirections[0]!.kind, "stdout");
+  assert.equal(cmd.redirections[0]!.target?.value, "f.txt");
+});
+
+test("parser: 2<> open-readwrite redirect is modeled as stderr", () => {
+  const { program } = parse(lex("cat 2<> f.txt").tokens);
+  const cmd = program.commands[0]!;
+  assert.equal(cmd.redirections.length, 1);
+  assert.equal(cmd.redirections[0]!.kind, "stderr");
+  assert.equal(cmd.redirections[0]!.fd, 2);
 });
