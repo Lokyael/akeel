@@ -436,7 +436,7 @@
 - **opaqueOnUnknown 判据**：未知选项漏判后命令是否可能落入 shellPolicy 允许类（inspect）且具未建模破坏性/写行为——是则 true（fail-closed，第一层防线：fs/read/search/text-transform/date），否则 false（分类是大类 + catch-all 保守兜底，第二层 shellPolicy 兜底：build/package/python-tools/herdr/interpreters/git）。判据取代“选项面大小”的经验理由。
 - **收敛**：五套并行遍历（shared.ts 提取器家族、git 手写 finder/gitPathOpts/analyzeGitBranch、interpreters 内联 finder）全部删除，子命令提取收敛到 option-parse 输出投影（`semanticsFromRules` 吃 positional 数组；查表首词 = `positional[0]`）；`fullSubcommand` 保留（reclassify 含选项 raw 契约，D-024）。
 - **valueOpts → Opt(expression)**：覆盖层/适配器的取值选项列表提升为 Opt 声明时一律 `kind: "expression"`（只消费不产生 intent，行为零损失）；路径建模（如 `--manifest-path` 实为路径）另立决策，不在收敛中混入。
-- **class 调节原语**：Opt 增加 `upgradeTo: "modify"|"destroy"` / `downgradeTo: "inspect"`，引擎输出命中的调节集合并按风险优先（destroy > modify > inspect，fail-closed）给默认裁决，adapter 可覆盖；date `-s/--set`、search/text-transform 写选项升级、python-tools `--check/--fix`、git GIT_CLASSIFY upgrade/downgrade 全部声明化，删除四处手写 `consumed.some`/`hasFlag`/`flagHits`。
+- **class 调节原语**：Opt 增加 `upgradeTo: "modify"|"destroy"` / `downgradeTo: "inspect"`，引擎输出命中的调节集合并按风险优先（destroy > modify > inspect，fail-closed）给默认裁决，adapter 可覆盖；date `-s/--set`、search/text-transform 写选项升级、python-tools `--check/--fix`、git GIT_CLASSIFY upgrade/downgrade 全部声明化，删除手写 flag 检查。
 
 **Rejected:**
 
@@ -488,13 +488,13 @@
 
 **Decision:** `src/access-gate/` 完成三项结构统一：
 
-1. **gate/ 物理分层**：17 文件平铺改为两层 + 共享根——`gate/plan/`（编译器与验证：compiler-entry、shell/direct-tool compiler、preflight、access-plan-verifier 等）、`gate/decision/`（evaluate、decision-builder、render-decision）、根留（`types`/`decision-types`/`guidance-catalog`）。`gate/index.ts` 公共表面不变。
+1. **gate/ 物理分层**：17 文件平铺改为两层 + 共享根——`gate/plan/`（编译器与验证：compiler-entry、shell/direct-tool compiler、preflight、access-plan-verifier 等）、`gate/decision/`（evaluate、evaluate-request、decision-builder、render-decision）、根留（`host`/`decision-types`/`decision-code-catalog`）。`gate/index.ts` 公共表面不变。
 2. **目录 index 统一**：所有 access-gate 子目录补 `index.ts` 公共表面（profile/session/ui/command-semantics/shell-parse/security），src 内部跨目录引用统一走目录 index；测试保持深层引用（测实现是既有惯例）。
 3. **`command-semantics/interpreters.ts` → `interpreter-names.ts`**：消除与 `adapters/interpreters.ts` 的同名歧义（名单 vs adapter 职责）。
 
 **Why:**
 
-- D-022 的 Compiler/Kernel 分层此前只靠命名表达；物理分组让架构决策在目录中可见。分组按真实依赖设计：guidance-catalog 被三方共用，强拆 compiler/kernel/render 三层会制造循环依赖（虚假边界），故取 plan/decision 两层 + 共享根。
+- D-022 的 Compiler/Kernel 分层此前只靠命名表达；物理分组让架构决策在目录中可见。分组按真实依赖设计：共享根（`host`/`decision-types`/`decision-code-catalog`）被两层共用，强拆 compiler/kernel/render 三层会制造循环依赖（虚假边界），故取 plan/decision 两层 + 共享根。
 - 跨目录引用此前混用目录与深层路径，index 统一给出公共表面，规范新代码引用方式；interpreter 名单与 adapter 同名，改名消除维护者误删/误改风险。
 
 **Impact:**
@@ -504,11 +504,11 @@
 
 **Consequences:**
 
-- 新代码准则：跨目录引用走目录 index（AGENTS.md 目录速查记录）；测试可继续走深层实现路径。若未来 guidance-catalog/decision-types 依赖继续演化，重新评估共享根归属，不强行分层。
+- 新代码准则：跨目录引用走目录 index（AGENTS.md 目录速查记录）；测试可继续走深层实现路径。若未来共享根（`host`/`decision-types`/`decision-code-catalog`）依赖继续演化，重新评估共享根归属，不强行分层。
 
 **Rejected:**
 
-- gate 强行分 compiler/kernel/render 三组：guidance-catalog 与 decision-types 的三方使用造成跨组循环，物理边界与依赖图不符（虚假分层）。
+- gate 强行分 compiler/kernel/render 三组：共享根（`host`/`decision-types`/`decision-code-catalog`）被三组共用造成跨组循环，物理边界与依赖图不符（虚假分层）。
 - 删除既有 index 改全深层引用：与“目录边界单一入口”方向相反，且 path/gate/config 的 index 均被真实消费。
 
 **Out of Scope:**

@@ -63,7 +63,7 @@ export interface PlanCoverage {
   readonly cwdCandidateCount: number;
 }
 
-export interface ResourceUsage {
+interface ResourceUsage {
   readonly inputLength: number;
   readonly commandCount: number;
   readonly operationCount: number;

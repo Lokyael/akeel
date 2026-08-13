@@ -37,7 +37,7 @@ export interface ConfigOptionTable {
   defaultTarget: ConfigTarget;
 }
 
-export interface ConfigParseResult {
+interface ConfigParseResult {
   /** 显式层级目标（无显式层级时 null）。 */
   target: ConfigTarget | null;
   sawRead: boolean;

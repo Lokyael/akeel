@@ -14,14 +14,14 @@ export interface FooterSnapshot {
   extensionStatuses?: ReadonlyMap<string, string>;
 }
 
-export interface ProfileFooterSession {
+interface ProfileFooterSession {
   getCwd(): string;
   getSessionName(): string | undefined;
   getEntries(): readonly unknown[];
   buildContextEntries(): readonly unknown[];
 }
 
-export interface ProfileFooterData {
+interface ProfileFooterData {
   getGitBranch(): string | null;
   getExtensionStatuses?(): ReadonlyMap<string, string>;
   getAvailableProviderCount?(): number;
@@ -33,7 +33,7 @@ export interface ProfileFooterModel {
   reasoning?: boolean;
 }
 
-export interface ProfileFooterTheme {
+interface ProfileFooterTheme {
   fg(color: string, text: string): string;
 }
 
@@ -61,7 +61,7 @@ try {
 // 生产环境用宿主 pi-tui（grapheme/宽字符正确：CJK/emoji 按 2 列）；独立测试环境
 // 无 pi-tui（只随宿主 bundle 提供），fallback 到手写近似——与 NativeFooter 同模式。
 
-export interface WidthHelpers {
+interface WidthHelpers {
   /** 显示宽度：剥离 ANSI。宽字符（CJK/emoji）按 2 列计——pi-tui 生产路径；fallback 为 UTF-16 近似（测试环境，ASCII 内容正确）。 */
   visibleWidth(text: string): number;
   /** 按显示宽度截断，尾部追加省略符 "..."。 */

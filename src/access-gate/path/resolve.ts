@@ -2,7 +2,7 @@ import { existsSync, realpathSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, isAbsolute, join, normalize, relative, resolve } from "node:path";
 
-export type PathScope = "project" | "staging" | "external";
+type PathScope = "project" | "staging" | "external";
 
 export interface ResolvedPath {
   input: string;

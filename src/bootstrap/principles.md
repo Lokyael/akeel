@@ -152,6 +152,26 @@ a scavenger hunt across the codebase.
 Many = refactor first. If you don't know which file to edit, the design is
 already scattered.
 
+### 9. Destructive Actions Need Explicit Intent
+
+*Irreversible operations happen only on the user's explicit request.*
+
+- "Undo", "rollback", or "go back" is ambiguous — it may mean session
+  navigation or a small revert, not a large-scale recovery. Treat it as
+  navigation or a small change until the user says otherwise.
+- Before an irreversible command (`git reset --hard`, `checkout --`, `clean`,
+  force-push, deletion), name the exact operation and confirm the user's
+  intent — a fuzzy trigger word is not consent.
+
+### 10. Delegation Never Exceeds Your Own Authority
+
+*What you delegate is bounded by what you can do yourself.*
+
+- A subagent or delegated task has at most the permissions of your current
+  session — you can't delegate an operation your own Profile denies.
+- Never use delegation to route around a restriction; do the operation within
+  your own bounds or ask the user to approve it.
+
 ---
 
 ## Before You Say Yes

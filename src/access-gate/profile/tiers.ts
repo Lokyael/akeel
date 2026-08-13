@@ -10,7 +10,7 @@ export const SUBAGENT_CHILD_AGENT_ENV = "PI_SUBAGENT_CHILD_AGENT";
 /** 父会话档位号（"0"|"1"）env 传播；父侧算好，子代理零解析。 */
 export const PARENT_TIER_ENV = "PI_KEEL_PARENT_TIER";
 
-export const SUBAGENT_TIER_NUMBER: Record<SubagentTierName, 0 | 1> = { scratch: 0, project: 1 };
+const SUBAGENT_TIER_NUMBER: Record<SubagentTierName, 0 | 1> = { scratch: 0, project: 1 };
 
 /** 档位名枚举（validate.ts 引用，单一来源防加档漏改）。 */
 export const SUBAGENT_TIER_NAMES: readonly SubagentTierName[] = ["scratch", "project"];
@@ -21,7 +21,7 @@ export const SUBAGENT_TIER_PROFILE = {
 } as const satisfies Record<SubagentTierName, string>;
 
 /** 内置 agent→档位默认映射；未知 agent 回退 scratch。 */
-export const DEFAULT_SUBAGENT_TIERS: Readonly<Record<string, SubagentTierName>> = {
+const DEFAULT_SUBAGENT_TIERS: Readonly<Record<string, SubagentTierName>> = {
   worker: "project",
   delegate: "project",
   reviewer: "project",

@@ -53,7 +53,7 @@ export interface OptConfig {
   opaqueOnUnknown: boolean;
 }
 
-export interface ConsumedValue {
+interface ConsumedValue {
   option: string;
   value: string;
   kind: "file" | "expression";

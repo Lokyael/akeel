@@ -6,7 +6,7 @@ import type { CommandSemantics, CommandClass, Effect, PathIntent } from "../type
 /** 非真实位置的合成 span 哨兵（adapter 无法获得 token 位置的路径 intent 用）。 */
 export const SYNTHETIC_SPAN: SourceSpan = { start: 0, end: 0 };
 
-export interface MakeSemanticsOpts {
+interface MakeSemanticsOpts {
   reason: string;
   intents?: PathIntent[];
   effects?: readonly Effect[];
