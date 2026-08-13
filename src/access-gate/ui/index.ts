@@ -2,4 +2,5 @@
 
 export { profileStatus } from "./profile-status";
 export { installProfileFooter, disposeProfileFooter } from "./footer-install";
+export { thinkingLevelFromEntries } from "./profile-footer";
 export type { ProfileFooterHandle } from "./footer-install";

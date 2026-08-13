@@ -1,8 +1,8 @@
 // tests/access-gate/command-semantics-registry.test.ts
-// 注册表回退（registry.ts）：无 adapter 命令的分类、路径形式可执行文件、basename 归一化
+// registry.ts：注册表 fail-fast 守卫、无 adapter 命令回退分类、scopeKey 显式作用域键（D-024）
 
 import { defineAdapterTests } from "./helpers";
-import { buildCommandIndex } from "../../src/access-gate/command-semantics/registry";
+import { buildCommandIndex, scopeKey } from "../../src/access-gate/command-semantics/registry";
 import type { CommandAdapter, CommandSemantics } from "../../src/access-gate/command-semantics/types";
 import assert from "node:assert/strict";
 import test from "node:test";
@@ -41,3 +41,45 @@ defineAdapterTests("registry", [
   { cmd: "../bin/helper --help", name: "parent path-form helper classifies as execute", cls: "execute" },
   { cmd: "/bin/sed 's/x/y/' file.txt", name: "path form of other adapters resolves by basename", cls: "inspect", intents: [{ operation: "read", rawPath: "file.txt" }] },
 ]);
+
+// ─── scopeKey（D-024 显式作用域键：精确优先、最长前缀、./ 对称归一化）───
+
+test("scopeKey: 精确键命中裸名", () => {
+  assert.equal(scopeKey({ mytool: {} }, "mytool"), "mytool");
+});
+
+test("scopeKey: 精确键 ./ 归一化对称生效（键带 ./ / 名带 ./）", () => {
+  assert.equal(scopeKey({ "./bin/mytool": {} }, "bin/mytool"), "./bin/mytool");
+  assert.equal(scopeKey({ "bin/mytool": {} }, "./bin/mytool"), "bin/mytool");
+});
+
+test("scopeKey: 路径前缀键命中（键以 / 结尾）", () => {
+  assert.equal(scopeKey({ "bin/": {} }, "bin/scripts/deploy"), "bin/");
+});
+
+test("scopeKey: 最长路径前缀优先", () => {
+  assert.equal(scopeKey({ "bin/": {}, "bin/scripts/": {} }, "bin/scripts/deploy"), "bin/scripts/");
+});
+
+test("scopeKey: 前缀键不做裸名回退（名无 / 不参与前缀匹配）", () => {
+  assert.equal(scopeKey({ "bin/": {} }, "bin"), null);
+});
+
+test("scopeKey: 精确键优先于前缀键", () => {
+  assert.equal(scopeKey({ "bin/mytool": {}, "bin/": {} }, "bin/mytool"), "bin/mytool");
+});
+
+test("scopeKey: 前缀键 ./ 归一化对称生效", () => {
+  assert.equal(scopeKey({ "./bin/": {} }, "bin/scripts/deploy"), "./bin/");
+  assert.equal(scopeKey({ "bin/": {} }, "./bin/scripts/deploy"), "bin/");
+});
+
+test("scopeKey: 非真前缀不命中", () => {
+  assert.equal(scopeKey({ "bin/": {} }, "binx/tool"), null);
+});
+
+test("scopeKey: 未命中返回 null", () => {
+  assert.equal(scopeKey({ mytool: {} }, "other"), null);
+  assert.equal(scopeKey(undefined, "mytool"), null);
+  assert.equal(scopeKey({}, "mytool"), null);
+});

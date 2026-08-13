@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { fitLine, renderProfileFooter, selectWidthHelpers, type FooterSnapshot } from "../../src/access-gate/ui/profile-footer";
+import { fitLine, renderProfileFooter, selectWidthHelpers, thinkingLevelFromEntries, type FooterSnapshot } from "../../src/access-gate/ui/profile-footer";
 
 const snapshot: FooterSnapshot = {
   cwd: "~/workspace/pi-skills",
@@ -63,4 +63,23 @@ test("selectWidthHelpers: falls back to hand-rolled helpers when unavailable", (
   assert.equal(selectWidthHelpers(null).visibleWidth("a\u001b[2mb\u001b[0m"), 2);
   assert.equal(selectWidthHelpers({}).visibleWidth("abc"), 3);
   assert.equal(selectWidthHelpers({ visibleWidth: "not-a-fn" }).truncate("abcdef", 5), "ab...");
+});
+
+test("thinkingLevelFromEntries: 取最近一次 thinking_level_change", () => {
+  const entries = [
+    { type: "message", text: "hi" },
+    { type: "thinking_level_change", thinkingLevel: "low" },
+    { type: "thinking_level_change", thinkingLevel: "high" },
+  ];
+  assert.equal(thinkingLevelFromEntries(entries), "high");
+});
+
+test("thinkingLevelFromEntries: 无匹配返回 off", () => {
+  assert.equal(thinkingLevelFromEntries([]), "off");
+  assert.equal(thinkingLevelFromEntries([{ type: "message", text: "hi" }]), "off");
+});
+
+test("thinkingLevelFromEntries: 非字符串 level 与非法条目跳过", () => {
+  assert.equal(thinkingLevelFromEntries([{ type: "thinking_level_change", thinkingLevel: 3 }]), "off");
+  assert.equal(thinkingLevelFromEntries(["junk", { type: "thinking_level_change", thinkingLevel: "low" }]), "low");
 });

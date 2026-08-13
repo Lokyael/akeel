@@ -8,7 +8,7 @@ import type { ResolvedProfiles } from "./profile";
 import { displayName, PROFILE_PREFIX } from "./profile";
 import { findProjectRoot, createProfileState, type ProfileState } from "./session";
 import { applySubagentProfile, publishParentTier } from "./session";
-import { disposeProfileFooter, installProfileFooter, profileStatus, type ProfileFooterHandle } from "./ui";
+import { disposeProfileFooter, installProfileFooter, profileStatus, thinkingLevelFromEntries, type ProfileFooterHandle } from "./ui";
 
 export default function accessGate(pi: ExtensionAPI): void {
   let profiles: ResolvedProfiles | undefined;
@@ -67,17 +67,7 @@ export default function accessGate(pi: ExtensionAPI): void {
       ctx,
       () => requireState().state.getProfile(),
       () => ctx.model,
-      () => {
-        const entries = ctx.sessionManager?.buildContextEntries() ?? [];
-        for (let index = entries.length - 1; index >= 0; index--) {
-          const entry = entries[index];
-          if (entry && typeof entry === "object" && (entry as { type?: unknown }).type === "thinking_level_change") {
-            const level = (entry as { thinkingLevel?: unknown }).thinkingLevel;
-            if (typeof level === "string") return level;
-          }
-        }
-        return "off";
-      },
+      () => thinkingLevelFromEntries(ctx.sessionManager?.buildContextEntries() ?? []),
       () => ctx.getContextUsage?.(),
     );
     if (stagingDir) rmSync(stagingDir, { recursive: true, force: true });

@@ -174,6 +174,22 @@ function readUsage(entry: unknown): { input: number; output: number; cacheRead: 
   };
 }
 
+/**
+ * 从 context entries 反向提取最近一次 thinking level（footer 输入派生，UI 细节留在 ui 层）。
+ * 无匹配时返回 "off"（footer 渲染的空值约定）。
+ */
+export function thinkingLevelFromEntries(entries: readonly unknown[]): string {
+  for (let index = entries.length - 1; index >= 0; index--) {
+    const entry = entries[index];
+    if (!entry || typeof entry !== "object") continue;
+    const value = entry as Record<string, unknown>;
+    if (value.type !== "thinking_level_change") continue;
+    const level = value.thinkingLevel;
+    if (typeof level === "string") return level;
+  }
+  return "off";
+}
+
 function formatContext(usage: { percent: number | null; contextWindow: number } | undefined): string {
   if (!usage) return "";
   const percent = usage.percent === null ? "?" : `${usage.percent.toFixed(1)}%`;

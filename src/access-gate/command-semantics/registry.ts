@@ -121,8 +121,9 @@ function stripDotSlash(s: string): string {
  * - 不做隐式 basename 匹配——工具身份由用户声明定义，gate 不猜测哪个路径形式
  *   该被覆盖，basename 冲突由此结构性消除。
  * 返回命中的键；未命中返回 null。
+ * 导出供测试直接断言作用域键边界（精确/前缀优先级与 ./ 对称归一化，D-024）。
  */
-function scopeKey(table: Record<string, unknown> | undefined, name: string): string | null {
+export function scopeKey(table: Record<string, unknown> | undefined, name: string): string | null {
   if (!table) return null;
   const normalized = stripDotSlash(name);
   // 精确键：键与名均做 ./ 归一化后相等即命中（两侧对称，D-024）

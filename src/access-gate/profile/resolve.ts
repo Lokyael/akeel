@@ -1,7 +1,48 @@
-import { emptyPathPolicy, emptyShellPolicy, mergePathDefaults, mergePathRules, mergeShellPolicy } from "./merge";
+// profile 继承解析（D-017）：merge 函数是继承合并的内部实现，与解析概念同文件共存
 import { validateProfiles } from "./validate";
 import { PATH_OPERATION_VALUES } from "../domain";
-import type { PathRule, RawProfiles, ResolvedProfile, ResolvedProfiles, ShellPolicy, ValidationResult } from "./types";
+import type { PathDecisions, PathOperation, PathPolicy, PathRule, ProfileDecision, RawProfiles, ResolvedProfile, ResolvedProfiles, ShellPolicy, ValidationResult } from "./types";
+
+const DEFAULT_SHELL_POLICY: ShellPolicy = {
+  inspect: "deny",
+  modify: "deny",
+  execute: "deny",
+  destroy: "deny",
+  unknown: "deny",
+};
+const DEFAULT_PATH_DECISIONS = {
+  read: "deny",
+  list: "deny",
+  search: "deny",
+  write: "deny",
+} as const;
+
+function mergeShellPolicy(base: ShellPolicy, override: Partial<ShellPolicy>): ShellPolicy {
+  return { ...base, ...override };
+}
+
+function mergePathDefaults(base: Record<PathOperation, ProfileDecision>, override?: PathDecisions): Record<PathOperation, ProfileDecision> {
+  return { ...base, ...(override ?? {}) };
+}
+
+function mergePathRules(base: PathRule[], additions: readonly PathRule[]): PathRule[] {
+  // Child rules prepended; they shadow parent rules with the same path+operation via first-match.
+  return [
+    ...additions.map((rule) => ({ ...rule })),
+    ...base.map((rule) => ({ ...rule })),
+  ];
+}
+
+function emptyShellPolicy(): ShellPolicy {
+  return { ...DEFAULT_SHELL_POLICY };
+}
+
+function emptyPathPolicy(): PathPolicy {
+  return {
+    default: { ...DEFAULT_PATH_DECISIONS },
+    rules: [] as PathRule[],
+  };
+}
 
 function resolveOne(name: string, raw: RawProfiles, cache: Map<string, ResolvedProfile>, stack: string[]): ResolvedProfile {
   const cached = cache.get(name);
