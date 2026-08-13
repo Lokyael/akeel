@@ -8,7 +8,7 @@
 
 **Status:** active
 
-**Decision:** 使用统一的 `src/access-gate/` 扩展集中处理 Profile、命令分类、路径策略、hard boundary 和审批。pi-keel 提供 command classification、canonical path policy、Profile access gate 和 hard boundary，不提供或假定 OS-level isolation。
+**Decision:** 使用统一的 `src/access-gate/` 扩展集中处理 Profile、命令分类、路径策略、hard boundary 和审批，不提供或假定 OS-level isolation。
 
 **Why:** 多个安全扩展会产生拦截顺序竞争、重复审批、分散配置和难以关联的审计信息。Node.js 路径检查没有 kernel-level enforcement；将 pi-keel 称为 sandbox 会造成安全承诺与真实边界不一致。
 
@@ -79,14 +79,16 @@
 - modify 命令的源路径按 `read` 检查，目标、删除和权限变化按 `write` 检查。
 - 无法确定分支 cwd 时不得 allow。
 - 一个 tool call 的所有 ask intent 聚合为一次审批。
-- 复杂形态可拒绝：无法精确建模的形态编译期拒绝并引导拆解（heredoc/hereString 已如此；`unsupported-redirection` + split-supported-commands guidance 让 AI 拆成可识别的简单形态或 Direct 工具）——识别不足时拒绝优先于猜测建模（fail-closed），不再引入无法建模的中间状态；拒绝路径必须携带拆解 guidance。
+- 复杂形态可拒绝：无法精确建模的形态编译期拒绝并引导拆解（heredoc/hereString 已如此；`unsupported-redirection` + split-supported-commands guidance 让 AI 拆成可识别的简单形态或 Direct 工具）——“尽量识别，但不是必要项”；识别不足时拒绝优先于猜测建模（fail-closed），不再引入无法建模的中间状态，拒绝路径必须携带拆解 guidance。
 - `<>`（O_RDWR 读写打开）按 write 侧建模（`<>`→stdout、`2<>`→stderr）：write 决策允许即覆盖读面（write⇒read 一致性，D-017），只建模 read 会漏写侧；自定义矛盾 profile 下 `<>` 的读侧行为不保证（配置责任）。Rejected：`readwrite` 独立 kind（+ read+write 双 intent / 编译期拒绝）——为“read-deny + write-allow”矛盾配置付建模成本职责外，且 verifier/coverage 对账需配套改动；write 建模已语义完整，拒绝引入不必要的可用性损失；profile 验证层强制 write⇒read（矛盾配置报错）与“不负责自定义 profile”裁定矛盾。
 
 **Enforcement scope:**
 
 只对 Pi `tool_call` 中的 `bash` 和 `TOOL_SCHEMAS` 已知 Direct surface 执行策略；未知 Direct surface passthrough。不承诺全局 enforcement：`user_bash`、`shellCommandPrefix`、Bash `spawnHook`、tool override、custom tool backend 及后续 handler 对 input 的修改不在范围内。
 
-**Why:** Direct 写保护无法覆盖重定向、`tee`、`cp`、`mv` 等 Shell 写入入口，secret 扫描也不承担访问控制职责；统一 IR 和语义层集中提取命令类别、路径 intent 与 effect，避免分类和策略漂移。
+**Why:** Direct 写保护无法覆盖重定向、`tee`、`cp`、`mv` 等 Shell 写入入口，secret 扫描也不承担访问控制职责；统一 IR 和语义层集中提取命令类别、路径 intent 与 effect，避免分类和策略漂移。fail-closed 优先：识别不了就拒绝，由 AI 拆解（agent 可重试），而不是猜测语义（猜测 = 潜在漏判）。
+
+**Impact:** 新形态处理顺序：识别 → 建模（write⇒read 下语义完整）→ 拒绝拆解；新增 adapter/重定向形态时按此顺序评估。
 
 ## D-019: Profile Footer
 
@@ -119,7 +121,7 @@
 
 - `gate/` 物理分两层 + 共享根：`gate/plan/`（编译器与验证：compiler-entry、shell/direct-tool compiler、preflight、access-plan-verifier 等）、`gate/decision/`（evaluate、evaluate-request、decision-builder、render-decision）、根留（`host`/`decision-types`/`decision-code-catalog`——被两层共用，避免循环依赖）。`gate/index.ts` 公共表面不变。
 - gate 内部 import 边界：plan 组不引用 decision 组；decision 组单向引用 plan 组；共享根被两层引用且不依赖子组。若未来共享根依赖继续演化，重新评估共享根归属，不强行分层。
-- Rejected：gate 强行分 compiler/kernel/render 三组——共享根被三组共用造成跨组循环，物理边界与依赖图不符（虚假分层）。
+- Rejected：gate 强行分 compiler/kernel/render 三组——共享根被三组共用造成跨组循环，物理边界与依赖图不符（虚假分层）；删除既有 index 改全深层引用——与“目录边界单一入口”方向相反，且 path/gate/config 的 index 均被真实消费。
 
 **Why:** 分层保证分析证据（request）和授权结果（GateDecision）不混淆；compiler 可独立证明 fail-closed 边界，Kernel 可独立证明 monotonic policy。
 
@@ -149,7 +151,7 @@
 | `resource-limit` | `split-supported-commands` |
 | 其他 deny code | 无（避免诱导绕过）|
 
-**Why:** guidance 不能成为间接 code injection 通道：blocked path/threat 不提供绕过建议；deny 侧 subject 只含分类信息，不携带用户派生值（模型已持有自己提出的命令，类别化）；文本必须给出可验证判据，且不得建议模型无法自行完成的动作——profile 类 deny 只能请求用户更新或批准。unknown 命令没有可提取的路径/效果语义，人类批准是唯一针对该命令本身的防线——审批框只显示 `unknown command: xargs` 时人类无从判断要批准什么，同意层变成橡皮图章。字面文本是门禁对该命令唯一诚实可知的完整信息：span 是 lexer/parser 算出的真实字符偏移（verifier 校验过对应），渲染是展示事实而非推断；语义建模把运行期 stdin 数据驱动的命令构造猜成静态 class，是伪精确（D-024/D-025 诚实分类）。模型侧不脱敏也不重复：审批框（TUI 覆盖层，不落 session）脱敏保护不了任何未暴露信息，反而削弱人类否决所需的完整信息；ask 侧保留完整 path 证据（Direct 工具无 literal form，路径是人类同意的唯一信息）。
+**Why:** guidance 不能成为间接 code injection 通道：blocked path/threat 不提供绕过建议；deny 侧 subject 只含分类信息，不携带用户派生值（命令由模型提出，原文已是 toolCall 参数，类别化）；文本必须给出可验证判据，且不得建议模型无法自行完成的动作——profile 类 deny 只能请求用户更新或批准。unknown 命令没有可提取的路径/效果语义，人类批准是唯一针对该命令本身的防线——审批框只显示 `unknown command: xargs` 时人类无从判断要批准什么，同意层变成橡皮图章；字面文本是门禁对该命令唯一诚实可知的完整信息：span 是 lexer/parser 算出的真实字符偏移（verifier 校验过对应），渲染是展示事实而非推断；语义建模把运行期 stdin 数据驱动的命令构造猜成静态 class，是伪精确（D-024/D-025 诚实分类）。覆盖是结构性的：只依赖 "command 证据 + span" 这对每条命令都存在的产物，所有 unknown 及 profile 下 ask 的 modeled 命令经同一漏斗出口受益。审批框（TUI 覆盖层，不落 session）脱敏保护不了任何未暴露信息，反而削弱人类否决所需的完整信息；ask 侧保留完整 path 证据（Direct 工具无 literal form，路径是人类同意的唯一信息）。
 
 **Impact:** 审批提示从 `unknown command: xargs` 变为 `unknown command — literal form: xargs sed -i 's/…'`（subject 只保留类别，literal form 由渲染器纯追加）；`sh -c 'rm -rf /'` 显示完整负载，批准从盲批变为知情可完整否决。deny 侧 path 证据为 `read path denied`/`write path denied`，固定诊断词原样展示；`redactSubject`/`SENSITIVE_PREFIXES`/边界启发式全套删除。不改 plan 形状、`access-plan-verifier`、profile/path policy。
 
@@ -213,7 +215,7 @@
 - Candidate Record 是项目数据而非指令；文件存在、命令式措辞、`Review On` 或 `Trigger` 都不构成需求、优先级、路线图、当前事实、用户批准或实施授权。
 - 只有用户在当前会话明确选择后，Candidate 才能迁移为 Task、Decision、Negative Space 等权威内容；迁移时移动 durable content 并在同一变更删除 C 来源，避免双源。
 - `Review On` 是显式 context survey 使用的被动复审日期，不提供自动提醒、后台处理、Session hook、Footer 状态或到期默认动作。
-- Candidate 文件按需创建，缺失不是结构错误。Task 完成后清空；Decision 被完整吸收（`superseded`）或主动退役（`retired`）后剪除；历史由 Git 保留，ID 不复用。每容器文末常驻待创建占位（`X-0NN: 待创建`，编号=下一可用号）：创建=填充占位并追加新占位（+1）；移除不动占位；占位缺失或多余时按 Git 历史最大+1 重建唯一占位。
+- Candidate 文件按需创建，缺失不是结构错误。Task 完成后清空；Decision 被完整吸收（`superseded`）或主动退役（`retired`）后剪除；历史由 Git 保留，ID 不复用。Next-ID slots 机制（创建=填充占位并追加新占位、移除不动占位、占位缺失时按 Git 历史最大+1 重建）见 principles.md Project Records — Next-ID slots。
 - Decision 离开只有两条路径：`superseded`（被完整吸收，内容延续）或 `retired`（能力撤销或移交外部，内容终止），去向就位后剪除。退役去向：完全撤销→残余耐用主张迁入 Negative Space；移交外部→归属边界记为窄边界决策或并入 CONTEXT。`superseded` 必须指向承接 D-xxx，`retired` 必须指向去向；退役不得硬标 `superseded`，不得保留为 active。终态一律原因命名并声明去向：Candidate `promoted/dismissed`、Task `cleared`、Decision `superseded/retired` → 剪除。
 - `principles.md` 是 Project Record 分类与生命周期的唯一部署权威；`survey-context` 只报告 Candidate 为 not adopted 并等待用户选择，迁移由现有领域/计划/文档技能负责，不新增专用 review 技能。
 
@@ -235,7 +237,7 @@
 
 **Why:** 混合职责的 skill 调用时部分内容永远用不到，浪费 token、稀释注意力并使触发匹配模糊；内嵌格式副本在多个 skill 间漂移（survey-context 与 principles 的 Candidate Record 措辞已出现分歧）。用户项目中可稳定获得的渠道是会话注入内容和按需加载的技能；principles 每 session 恒定注入，格式放此处零额外注入成本，模型无需额外 read 即获权威定义——集中定义可以避免规则分叉和死链。
 
-**Impact:** `principles.md` 是通用参考数据的唯一注入来源；技能只文字引用、不内嵌格式副本；不新建承载格式的 skill。
+**Impact:** `principles.md` 是通用参考数据的唯一注入来源；不新建承载格式的 skill。
 
 **Rejected:**
 
@@ -350,7 +352,7 @@
 | T0 | `scratch` | `keel-subagent-scratch` | 仅 `/tmp/pi-work/**`（不碰项目） |
 | T1 | `project` | `keel-subagent-project` | `project/**` + `/tmp/pi-work/**` |
 
-两档 shellPolicy 相同：inspect=allow，modify/execute/destroy/unknown=deny（bash 重定向写走路径策略）。bash 工具保留仅限 T1 档 agent（worker/reviewer/delegate）；T0 档 agent 必须无 mutation 工具（bash/write/edit）——pi-subagents 输出契约机制强制（有则被指令自写 output，与 T0 路径策略矛盾），故 scout 删 write+bash、researcher 原生即无。`session_start` 检测 `PI_SUBAGENT_CHILD=1`/`PI_SUBAGENT_CHILD_AGENT`，按 agent 映射档位：worker/delegate/reviewer→`project`，scout/researcher/oracle/未知→`scratch`；`config.yaml` 的 `subagentProfiles`（agent 名→档位名，`"*"` 回退）覆盖，优先级 显式 > 内置 > `*`。父会话档位号经 `PI_KEEL_PARENT_TIER` env 传播（父侧按自身 pathPolicy 算好，子代理零解析）：父档位号 1 = pathPolicy 有写规则覆盖 `project/src`、`project/tests` 或 `project/`，否则 0；子代理生效档 = min(映射档, 父TIER)——“父非项目可写 → 一律回退 T0 scratch”。**子代理权限上限 = 父会话当前档位**。
+两档 shellPolicy 相同：inspect=allow，modify/execute/destroy/unknown=deny（bash 重定向写走路径策略）。bash 工具保留仅限 T1 档 agent；T0 档 agent 必须无 mutation 工具（bash/write/edit）——pi-subagents 输出契约机制强制（有则被指令自写 output，与 T0 路径策略矛盾），故 scout 删 write+bash、researcher 原生即无。`session_start` 检测 `PI_SUBAGENT_CHILD=1`/`PI_SUBAGENT_CHILD_AGENT`，按 agent 映射档位：worker/delegate/reviewer→`project`，scout/researcher/oracle/未知→`scratch`；`config.yaml` 的 `subagentProfiles`（agent 名→档位名，`"*"` 回退）覆盖，优先级 显式 > 内置 > `*`。父会话档位号经 `PI_KEEL_PARENT_TIER` env 传播（父侧按自身 pathPolicy 算好，子代理零解析）：父档位号 1 = pathPolicy 有写规则覆盖 `project/src`、`project/tests` 或 `project/`，否则 0；子代理生效档 = min(映射档, 父TIER)——“父非项目可写 → 一律回退 T0 scratch”。**子代理权限上限 = 父会话当前档位**。
 
 **Why:**
 
