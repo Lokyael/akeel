@@ -1,4 +1,3 @@
-// tests/access-gate/harness.ts
 // 共享 extension harness：pi/ctx/sessionManager/footer 构造，供 index 与子代理会话集成测试复用。
 
 import { mkdtempSync, rmSync } from "node:fs";

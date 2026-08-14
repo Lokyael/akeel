@@ -456,4 +456,25 @@
 - 覆盖层 subcommands 的 valueOptions 感知（独立表面，D-024）；如需可另立决策。
 - 更多可选 adapter 的准入（eslint/prettier/vitest 等 execute 工具不满足 token 级判据，维持 D-031 立场）。
 
-## D-044: 待创建
+## D-044: 测试组织镜像 src 分层
+
+**Status:** active
+
+**Decision:** `tests/access-gate/` 按 `src/access-gate/` 子目录镜像分层（`plan/`、`decision/`、`command-semantics/`、`shell-parse/`、`profile/`、`path/`、`config/`、`session/`、`ui/`，有测试的目录才物化——当前 `security/` 无测试故无镜像目录；根层留扩展入口集成测试）；`package.json` 组脚本用目录 glob（`tests/<dir>/*.test.ts`）而非文件枚举；共享测试工具按消费者集合拆分归属（表格驱动 DSL → `command-semantics/`，通用 fixtures → `shared/`，extension harness 留根层）。`npm test` 的 `**` glob 由 node test runner 自行展开（node ≥21，引号包裹）。
+
+**Why:** 平铺 40 个测试文件与 `src/` 的 10 个子目录是两张并行地图（模块→测试靠命名前缀猜）；`test:gate` 手写枚举 9 个文件，新增/改名内核测试必须同步编辑 `package.json`（shotgun surgery）；`helpers.ts` 混装 fixtures / 表格驱动 DSL / 编译器工具三责，且三者的消费者集合不相交（command-semantics 测试 vs gate/plan 测试），镜像后共享 helper 无处安放，拆分是镜像的必然推论。
+
+**Impact:** 新增测试放镜像路径（模块→测试同路径导航）；组脚本永久稳定（目录 glob 对文件增删不敏感）；`helpers.ts` 拆三后 DSL 演进不再牵动 gate 侧 fixtures。
+
+**Rejected:**
+
+- 平铺 + 重命名文件成共享前缀再 glob 化：为 glob 而命名，加 git 历史噪音，locality 零提升。
+- 删除全部组脚本只留全量：丢失开发迭代的快速反馈面（全量含 validate + tsc）。
+- 镜像只到 `gate/` 一层（plan/decision 并入）：组=目录严格对齐但丢失 D-022 物理分层的测试可见性。
+
+**Out of Scope:**
+
+- 测试内容重构（用例、断言、覆盖范围）；本决策只定组织与脚本形态。
+- 引入新测试框架；维持 node:test + tsx。
+
+## D-045: 待创建

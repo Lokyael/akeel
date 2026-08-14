@@ -25,7 +25,7 @@ skills/                 # skills：三目录按加载时机组织（D-005）
   foundations/          #   基础约束（evidence-first）
   disciplines/          #   工程纪律（TDD、代码审查、领域建模等）
   workflows/            #   工作流（survey-context、implement-work 等）
-tests/                  # dev：访问控制与扩展测试（npm test 入口）
+tests/                  # dev：访问控制与扩展测试（按 src/access-gate 镜像分层，npm test 入口）
 scripts/                # dev：validate-skills.ts 等校验脚本
 types/                  # dev：pi 宿主类型声明
 docs/                   # 项目文档：决策、任务、安全边界、溯源（见 CONTEXT.md）

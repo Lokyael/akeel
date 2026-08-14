@@ -56,6 +56,7 @@
 - [D-039 子代理档位制（pi-keel × pi-subagents）](docs/decisions.md#d-039-子代理档位制pi-keel--pi-subagents)
 - [D-040 命令语义分类与统一选项引擎](docs/decisions.md#d-040-命令语义分类与统一选项引擎)
 - [D-041 集中配置与可选工具建模（config.yaml + optionalAdapters）](docs/decisions.md#d-041-集中配置与可选工具建模configyaml--optionaladapters)
+- [D-044 测试组织镜像 src 分层](docs/decisions.md#d-044-测试组织镜像-src-分层)
 
 ## Negative Space
 
