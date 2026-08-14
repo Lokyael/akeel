@@ -460,7 +460,7 @@
 
 **Status:** active
 
-**Decision:** `tests/access-gate/` 按 `src/access-gate/` 子目录镜像分层（`plan/`、`decision/`、`command-semantics/`、`shell-parse/`、`profile/`、`path/`、`config/`、`session/`、`ui/`，有测试的目录才物化——当前 `security/` 无测试故无镜像目录；根层留扩展入口集成测试）；`package.json` 组脚本用目录 glob（`tests/<dir>/*.test.ts`）而非文件枚举；共享测试工具按消费者集合拆分归属（表格驱动 DSL → `command-semantics/`，通用 fixtures → `shared/`，extension harness 留根层）。`npm test` 的 `**` glob 由 node test runner 自行展开（node ≥21，引号包裹）。
+**Decision:** `tests/access-gate/` 按 `src/access-gate/` 子目录镜像分层（`plan/`、`decision/`、`command-semantics/`、`shell-parse/`、`profile/`、`path/`、`config/`、`session/`、`ui/`，有测试的目录才物化——当前 `security/` 无测试故无镜像目录；根层留扩展入口集成测试）；`package.json` 组脚本用目录 glob（`tests/<dir>/*.test.ts`）而非文件枚举；共享测试工具按消费者集合拆分归属（表格驱动 DSL → `command-semantics/`，通用 fixtures → `shared/`，extension harness 留根层）。文件粒度：超大测试文件可沿 src 概念边界拆分（shell-parse 已按 lexer/parser 二分），前提是有对齐边界且拆分不引入跨文件共享 setup；纯集成面大文件（command-overrides）保持单文件，体积是领域深度而非结构问题。`npm test` 的 `**` glob 由 node test runner 自行展开（node ≥21，引号包裹）。
 
 **Why:** 平铺 40 个测试文件与 `src/` 的 10 个子目录是两张并行地图（模块→测试靠命名前缀猜）；`test:gate` 手写枚举 9 个文件，新增/改名内核测试必须同步编辑 `package.json`（shotgun surgery）；`helpers.ts` 混装 fixtures / 表格驱动 DSL / 编译器工具三责，且三者的消费者集合不相交（command-semantics 测试 vs gate/plan 测试），镜像后共享 helper 无处安放，拆分是镜像的必然推论。
 
