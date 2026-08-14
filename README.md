@@ -130,7 +130,7 @@ Review the source of any third-party package before installing — Pi packages r
 
 ### Recommended environment variables
 
-Pi Keel itself reads no environment variables. The companion packages read their own configuration — set these in your shell profile, or equivalently in `~/.pi/pi-search.json` (environment variables take precedence):
+Pi Keel reads internal environment variables only — `PI_CODING_AGENT_DIR` (agent directory override, see Configuration) and sub-agent tier variables (`PI_SUBAGENT_CHILD`/`PI_SUBAGENT_CHILD_AGENT`/`PI_KEEL_PARENT_TIER`, see [D-039](docs/decisions.md#d-039-子代理档位制pi-keel--pi-subagents)). It reads no API keys. The companion packages read their own configuration — set these in your shell profile, or equivalently in `~/.pi/pi-search.json` (environment variables take precedence):
 
 | Variable | Package | Effect | Without it |
 |----------|---------|--------|------------|
