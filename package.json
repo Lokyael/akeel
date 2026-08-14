@@ -10,6 +10,7 @@
     "test:gate": "tsx --test \"tests/access-gate/gate/*.test.ts\" \"tests/access-gate/plan/*.test.ts\" \"tests/access-gate/decision/*.test.ts\"",
     "test:shell-parse": "tsx --test \"tests/access-gate/shell-parse/*.test.ts\"",
     "test:cmd-semantics": "tsx --test \"tests/access-gate/command-semantics/*.test.ts\" \"tests/access-gate/config/*.test.ts\"",
+    "test:session": "tsx --test \"tests/access-gate/session/*.test.ts\"",
     "test:index": "tsx --test tests/access-gate/index.test.ts",
     "test:footer": "tsx --test \"tests/access-gate/ui/*.test.ts\""
   },
