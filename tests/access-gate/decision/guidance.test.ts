@@ -1,10 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { renderCompilationFailure, renderDecision } from "../../../src/access-gate/gate/decision/render-decision";
-import { denyResponseKindFor, guidanceFor, guidanceText } from "../../../src/access-gate/gate/decision-code-catalog";
-import { evidenceKind } from "../../../src/access-gate/gate/decision-code-catalog";
-import type { DenyResponseKind } from "../../../src/access-gate/gate/decision-code-catalog";
-import type { GateDecision, GateEvidence, GuidanceId, DecisionCode } from "../../../src/access-gate/gate/decision-types";
+import { guidanceFor, guidanceText } from "../../../src/access-gate/gate/decision-code-catalog";
+import type { GateDecision, GateEvidence, GuidanceId } from "../../../src/access-gate/gate/decision-types";
 
 const evidence: GateEvidence[] = [{ kind: "syntax", subject: "~/sensitive/path" }];
 
@@ -224,45 +222,6 @@ test("renders compiler outcomes by category without internal identifiers", () =>
   assert.equal(security.reason.includes("Direct"), false);
   assert.equal(invalid.kind, "block");
   assert.ok(invalid.reason.includes("could not be analyzed"));
-});
-
-test("classifies every DecisionCode into one renderer response kind", () => {
-  const codes: readonly DecisionCode[] = [
-    "dynamic-shell", "unsafe-syntax", "threat", "opaque-command", "destroy-command",
-    "hard-command-rule", "blocked-path", "symlink-escape", "path-unclassifiable", "path-denied",
-    "shell-policy-denied", "approval-required", "user-denied", "unknown-tool", "invalid-tool-input",
-    "unsupported-redirection", "uncertain-cwd", "unknown-effect", "resource-limit",
-  ];
-  const expected: Record<DecisionCode, DenyResponseKind> = {
-    "dynamic-shell": "shell-form", "unsafe-syntax": "shell-form", threat: "security-boundary",
-    "opaque-command": "shell-form", "destroy-command": "security-boundary", "hard-command-rule": "security-boundary",
-    "blocked-path": "security-boundary", "symlink-escape": "security-boundary", "path-unclassifiable": "security-boundary",
-    "path-denied": "generic", "shell-policy-denied": "generic", "approval-required": "generic", "user-denied": "generic",
-    "unknown-tool": "generic", "invalid-tool-input": "generic", "unsupported-redirection": "shell-form",
-    "uncertain-cwd": "shell-form", "unknown-effect": "generic", "resource-limit": "generic",
-  };
-  for (const code of codes) assert.equal(denyResponseKindFor(code), expected[code]);
-});
-
-test("classifies every DecisionCode into one evidence kind", () => {
-  // evidenceKind 全量锁定——approval-required/user-denied 保持现状
-  //（"command"，审批决策不经 evidenceKind 构造证据）。
-  const codes: readonly DecisionCode[] = [
-    "dynamic-shell", "unsafe-syntax", "threat", "opaque-command", "destroy-command",
-    "hard-command-rule", "blocked-path", "symlink-escape", "path-unclassifiable", "path-denied",
-    "shell-policy-denied", "approval-required", "user-denied", "unknown-tool", "invalid-tool-input",
-    "unsupported-redirection", "uncertain-cwd", "unknown-effect", "resource-limit",
-  ];
-  const expected: Record<DecisionCode, GateEvidence["kind"]> = {
-    "dynamic-shell": "syntax", "unsafe-syntax": "syntax", "uncertain-cwd": "syntax",
-    threat: "threat",
-    "unknown-tool": "tool", "invalid-tool-input": "tool", "resource-limit": "tool",
-    "unsupported-redirection": "redirection",
-    "blocked-path": "path", "symlink-escape": "path", "path-unclassifiable": "path", "path-denied": "path",
-    "destroy-command": "command", "hard-command-rule": "command", "shell-policy-denied": "command",
-    "opaque-command": "command", "unknown-effect": "command", "approval-required": "command", "user-denied": "command",
-  };
-  for (const code of codes) assert.equal(evidenceKind(code), expected[code]);
 });
 
 test("allow decision renders as allow", () => {

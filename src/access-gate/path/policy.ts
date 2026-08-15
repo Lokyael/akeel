@@ -51,8 +51,8 @@ function selectedRule(policy: PathPolicy, path: ResolvedPath, operation: PathOpe
   return undefined;
 }
 
-/** 项目虚拟前缀（path/resolve 的 scope 命名）：project/** 即项目根下（D-039/H2 共用）。 */
-export const PROJECT_VIRTUAL_PREFIX = "project/" as const;
+/** 项目虚拟前缀（path/resolve 的 scope 命名）：project/** 即项目根下（L：仅内部消费，不导出）。 */
+const PROJECT_VIRTUAL_PREFIX = "project/" as const;
 
 /**
  * 父档位判定（D-039/H2）：profile 是否有写规则覆盖项目代码路径（src/tests/项目根）。

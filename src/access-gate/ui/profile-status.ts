@@ -1,9 +1,9 @@
 // access-gate/ui/profile-status.ts — /profile status 完整解析策略文本渲染（footer 安装见 footer-install.ts）
 
-import { displayName } from "../profile/defaults";
+import { displayName } from "../profile";
 import { COMMAND_CLASS_VALUES, PATH_OPERATION_VALUES } from "../domain";
-import type { ResolvedProfiles } from "../profile/types";
-import type { ProfileState } from "../session/profile-state";
+import type { ResolvedProfiles } from "../profile";
+import type { ProfileState } from "../session";
 
 export function profileStatus(state: ProfileState, profiles: ResolvedProfiles): string {
   const profile = state.getProfile();

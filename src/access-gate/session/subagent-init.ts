@@ -2,7 +2,6 @@
 // 把"档位如何生效"收敛为两个函数：applySubagentProfile（检测→映射→钳制→生效档）
 // 与 publishParentTier（父档位号传播）。env 参数化（默认 process.env）使其可独立测试。
 
-import type { ResolvedProfiles } from "../profile/types";
 import type { ProfileState } from "./profile-state";
 import {
   effectiveSubagentTier,
@@ -12,7 +11,8 @@ import {
   resolveSubagentTier,
   SUBAGENT_CHILD_AGENT_ENV,
   SUBAGENT_TIER_PROFILE,
-} from "../profile/tiers";
+  type ResolvedProfiles,
+} from "../profile";
 
 /**
  * 子代理会话初始化：pi-subagents env 检测 → 按 agent 映射档位 + 钳制

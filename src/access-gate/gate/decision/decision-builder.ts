@@ -1,4 +1,5 @@
 import { guidanceFor } from "../decision-code-catalog";
+import { APPROVAL_OPTIONS } from "../decision-types";
 import type {
   GateDecision,
   GateEvidence,
@@ -40,7 +41,7 @@ export function requireApproval(evidence: readonly GateEvidence[]): GateDecision
       code: "approval-required",
       scope: "tool-call",
       evidence,
-      options: ["Allow once", "Deny"],
+      options: APPROVAL_OPTIONS,
     },
   };
 }

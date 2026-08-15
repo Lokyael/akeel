@@ -2,6 +2,7 @@ import { bashCommandFromArgs, classifyTool, compileToolCall } from "../plan";
 import { evaluateRequest } from "./evaluate-request";
 import { renderCompilationFailure, renderDecision } from "./render-decision";
 import type { GateDecision } from "../decision-types";
+import { APPROVAL_OPTIONS } from "../decision-types";
 import type { GateResult, GateRuntime, ToolCallInput } from "../host";
 
 export async function evaluateToolCall(input: ToolCallInput, runtime: GateRuntime): Promise<GateResult> {
@@ -45,8 +46,9 @@ async function askOnce(runtime: GateRuntime, title: string, detail: string): Pro
       code: "approval-required",
     };
   }
-  const choice = await runtime.select(`${title}\n\n${clean(detail)}\n\nAllow this operation once?`, ["Allow once", "Deny"]);
-  return choice === "Allow once"
+  // 宿主契约是可变 string[]——展开 readonly 元组适配（K）
+  const choice = await runtime.select(`${title}\n\n${clean(detail)}\n\nAllow this operation once?`, [...APPROVAL_OPTIONS]);
+  return choice === APPROVAL_OPTIONS[0]
     ? { kind: "allow" }
     : {
         kind: "block",

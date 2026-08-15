@@ -42,11 +42,14 @@ export interface Guidance {
   readonly safety: "recheck";
 }
 
+/** 审批选项文字（K：单一来源，decision-builder/evaluate 共用，防文案双源）。 */
+export const APPROVAL_OPTIONS = ["Allow once", "Deny"] as const;
+
 interface ApprovalRequest {
   readonly code: "approval-required";
   readonly scope: "tool-call";
   readonly evidence: readonly GateEvidence[];
-  readonly options: readonly ["Allow once", "Deny"];
+  readonly options: typeof APPROVAL_OPTIONS;
 }
 
 export type GateDecision =

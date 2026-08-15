@@ -13,7 +13,7 @@ import {
   type WidthHelpers,
 } from "./footer-layout";
 import type { ResolvedProfile } from "../profile/types";
-import { displayName } from "../profile/defaults";
+import { displayName } from "../profile";
 
 export type { FooterSnapshot } from "./footer-layout";
 
