@@ -20,16 +20,7 @@ export const ANALYSIS_LIMITS = {
   maxEditEntries: 64,
 } as const;
 
-// ── closed-world registries（值同源于 domain.ts） ──
-export {
-  COMMAND_CLASS_SET as COMMAND_CLASSES,
-  EFFECT_SET as EFFECTS,
-  PATH_OPERATION_SET as PATH_OPERATIONS,
-  TOOL_SURFACE_SET as TOOL_SURFACES,
-} from "../../domain";
-
-// ── domain types（类型同源于 domain.ts） ──
-export type { CommandClass, Effect, PathOperation, PathSource, ToolSurface } from "../../domain";
+// ── domain 词汇（CommandClass 等）直连 domain.ts 单一来源，本模块不设别名墙（H1） ──
 
 export interface PathAccessOperation {
   readonly kind: "path";
@@ -94,24 +85,15 @@ export interface AccessPlanDraft {
   readonly inputLength: number;
 }
 
-export type CompilationCategory = "unsupported-form" | "security-block" | "invalid-request";
-
-export type SecurityCompilationCode =
-  | "threat"
-  | "hard-command-rule"
-  | "destroy-command"
-  | "blocked-path"
-  | "symlink-escape"
-  | "path-unclassifiable";
-
-export type InvalidCompilationCode = "unknown-tool" | "invalid-tool-input" | "resource-limit";
 export type CompilerDecisionCode = Exclude<DecisionCode, "path-denied" | "shell-policy-denied" | "approval-required" | "user-denied">;
-export type UnsupportedCompilationCode = Exclude<CompilerDecisionCode, SecurityCompilationCode | InvalidCompilationCode>;
 
-export type CompilationReject =
-  | { readonly kind: "reject"; readonly category: "security-block"; readonly code: SecurityCompilationCode; readonly evidence: readonly GateEvidence[] }
-  | { readonly kind: "reject"; readonly category: "invalid-request"; readonly code: InvalidCompilationCode; readonly evidence: readonly GateEvidence[] }
-  | { readonly kind: "reject"; readonly category: "unsupported-form"; readonly code: UnsupportedCompilationCode; readonly evidence: readonly GateEvidence[] };
+// CompilationCategory 已删除：分类概念收敛到 decision-code-catalog 的 DenyResponseKind 单一权威（C）。
+// CompilationReject 单形状：code 是唯一判别，响应分类由渲染侧经 denyResponseKindFor(code) 派生。
+export type CompilationReject = {
+  readonly kind: "reject";
+  readonly code: CompilerDecisionCode;
+  readonly evidence: readonly GateEvidence[];
+};
 
 export type CompilerDraftResult =
   | { readonly kind: "draft"; readonly draft: AccessPlanDraft }

@@ -2,6 +2,9 @@
 
 import assert from "node:assert/strict";
 import test from "node:test";
+import { mkdtempSync, mkdirSync, rmSync } from "node:fs";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
 import { lex } from "../../../src/access-gate/shell-parse/lexer";
 import { parse } from "../../../src/access-gate/shell-parse/parser";
 import { normalizeCommand } from "../../../src/access-gate/command-semantics/normalize";
@@ -99,6 +102,67 @@ test("control: simple command keeps initial cwd", () => {
   assert.equal(result.nodes.length, 1);
   assert.equal(result.nodes[0]!.effectiveCwd.cwd, "/project");
   assert.equal(result.nodes[0]!.effectiveCwd.certainty, "exact");
+});
+
+// ─── D-045：cd 目标存在性双候选建模 ───
+
+function cwdSet(result: ReturnType<typeof analyzeControlFlow>, index: number): string[] {
+  return result.nodes[index]!.effectiveCwd.candidates.map((c) => c.cwd);
+}
+
+test("control: cd to non-existent target with ; successor yields dual candidates (D-045)", () => {
+  const { program } = parse(lex("cd missing ; cat file").tokens);
+  const result = analyzeControlFlow(program, initialCwd("/project"));
+  assert.equal(result.opaque, false);
+  // 目标不存在且后继为 ; → 双候选 {目标, cd 前 cwd}，conservative
+  assert.equal(result.nodes[0]!.effectiveCwd.certainty, "conservative");
+  assert.deepEqual(cwdSet(result, 0), ["/project/missing", "/project"]);
+  // 后继命令沿用双候选（真实 cwd 侧保持复查）
+  assert.deepEqual(cwdSet(result, 1), ["/project/missing", "/project"]);
+});
+
+test("control: cd to non-existent target with && successor keeps single candidate (D-045)", () => {
+  const { program } = parse(lex("cd missing && cat file").tokens);
+  const result = analyzeControlFlow(program, initialCwd("/project"));
+  // && 短路：不虚构旧 cwd 分支，保持单候选（与既有行为一致，不产生幽灵询问）
+  assert.equal(result.nodes[0]!.effectiveCwd.certainty, "exact");
+  assert.deepEqual(cwdSet(result, 0), ["/project/missing"]);
+  assert.deepEqual(cwdSet(result, 1), ["/project/missing"]);
+});
+
+test("control: cd to existing directory with ; successor stays single exact candidate (D-045)", () => {
+  const root = mkdtempSync(join(tmpdir(), "pi-cflow-"));
+  try {
+    const sub = join(root, "sub");
+    mkdirSync(sub, { recursive: true });
+    const { program } = parse(lex("cd sub ; cat file").tokens);
+    const result = analyzeControlFlow(program, initialCwd(root));
+    assert.equal(result.opaque, false);
+    assert.equal(result.nodes[0]!.effectiveCwd.certainty, "exact");
+    assert.deepEqual(cwdSet(result, 0), [sub]);
+    assert.deepEqual(cwdSet(result, 1), [sub]);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("control: ; chain with distinct missing targets accumulates candidates with dedup (D-045)", () => {
+  const { program } = parse(lex("cd /a ; cd /b ; cat file").tokens);
+  const result = analyzeControlFlow(program, initialCwd("/project"));
+  // cmd1 后 {/a, /project}；cmd2 解析 /b 失败 → 失败分支并入 {/a, /project} → {/b, /a, /project}
+  assert.equal(result.nodes[2]!.effectiveCwd.certainty, "conservative");
+  assert.deepEqual(cwdSet(result, 2), ["/b", "/a", "/project"]);
+});
+
+test("control: resolveCdTarget reports exists for a real directory (D-045)", () => {
+  const root = mkdtempSync(join(tmpdir(), "pi-cflow-"));
+  try {
+    assert.equal(resolveCdTarget("sub", root).exists, false);
+    mkdirSync(join(root, "sub"), { recursive: true });
+    assert.deepEqual(resolveCdTarget("sub", root), { cwd: join(root, "sub"), exists: true });
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 });
 
 test("control: cd changes cwd for next command", () => {

@@ -63,9 +63,10 @@ function isDirectory(path: string): boolean {
 
 /**
  * 在给定 cwd 下解析 cd target。
- * 返回新的 cwd，或 null（目标不可用）。
+ * 返回绝对目标与存在性（基于分析时点，statSync）；
+ * 不存在时由调用方按后继操作符决定候选建模（D-045：; / newline → 双候选，&& → 单候选）。
  */
-export function resolveCdTarget(target: string, currentCwd: string): { cwd: string; exists: boolean } | null {
+export function resolveCdTarget(target: string, currentCwd: string): { cwd: string; exists: boolean } {
   if (target === "~") {
     const home = homedir();
     return { cwd: home, exists: isDirectory(home) };
@@ -122,20 +123,23 @@ export function analyzeControlFlow(
     let after = before;
 
     if (cdInfo.target) {
-      const targets = before.candidates
-        .map((candidate) => resolveCdTarget(cdInfo.target!, candidate.cwd))
-        .filter((resolved): resolved is { cwd: string; exists: boolean } => resolved !== null)
-        .map((resolved, index) => ({
-          cwd: resolved.cwd,
-          certainty: "exact" as const,
-          branch: `${i}:cd:${index}`,
-        }));
-      if (targets.length === 0) {
-        opaque = true;
-      } else {
-        effectiveCwd = stateFromCandidates(targets);
-        if (operator !== "|" && operator !== "&") after = effectiveCwd;
-      }
+      // D-045：目标存在性基于分析时点。存在 → 单候选（现状不变）；不存在且后继为
+      // ; / newline（cd 失败后命令仍在旧 cwd 执行）→ 双候选保守 {目标, cd 前 cwd}——
+      // 目标可能被前序命令创建（先建后 cd），也可能运行时失败；&& 短路时旧 cwd 分支不存在，不虚构。
+      const resolved = before.candidates.map((candidate) => resolveCdTarget(cdInfo.target!, candidate.cwd));
+      const targetCandidates = resolved.map((target, index) => ({
+        cwd: target.cwd,
+        certainty: "exact" as const,
+        branch: `${i}:cd:${index}`,
+      }));
+      const nextOp = program.commands[i + 1]?.operatorBefore;
+      const fallback =
+        (nextOp === ";" || nextOp === "newline") && resolved.some((r) => !r.exists)
+          ? before.candidates
+          : [];
+      // 候选集恒非空不变量：before.candidates 恒非空（初始候选 1，stateFromCandidates 保序去重非空）
+      effectiveCwd = stateFromCandidates([...targetCandidates, ...fallback]);
+      if (operator !== "|" && operator !== "&") after = effectiveCwd;
     } else if (cdInfo.opaque) {
       opaque = true;
     }

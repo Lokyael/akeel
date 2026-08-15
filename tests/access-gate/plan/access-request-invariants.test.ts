@@ -1,10 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { compileShellCall, compileDirectToolCall } from "../../../src/access-gate/gate";
-import { TOOL_SCHEMAS } from "../../../src/access-gate/gate/plan/tool-schemas";
-import { DIRECT_TOOL_SURFACES } from "../../../src/access-gate/domain";
-import { evaluateRequest } from "../../../src/access-gate/gate/decision/evaluate-request";
-import type { CompilerContext } from "../../../src/access-gate/gate/plan/request-builder";
+import { evaluateRequest } from "../../../src/access-gate/gate/decision";
+import type { CompilerContext } from "../../../src/access-gate/gate/plan";
 import type { GateDecision } from "../../../src/access-gate/gate/decision-types";
 import type { ResolvedProfile } from "../../../src/access-gate/profile/types";
 import { makeContext } from "../shared/fixtures";
@@ -25,12 +23,6 @@ function profile(): ResolvedProfile {
 function disposition(decision: GateDecision): string {
   return decision.disposition;
 }
-
-test("Direct tool surfaces stay in sync with the TOOL_SCHEMAS registry", () => {
-  // domain.ts 声明 DIRECT_TOOL_SURFACES 与 TOOL_SCHEMAS 键集一致；
-  // 新增 Direct 工具若只改一处，plan 的 source 校验会在运行时失效——此测试锁定该结构不变量。
-  assert.deepEqual(Object.keys(TOOL_SCHEMAS).sort(), [...DIRECT_TOOL_SURFACES].sort());
-});
 
 test("Shell grep and Direct grep produce equivalent search path operations", () => {
   const shell = context();
@@ -88,6 +80,25 @@ test("cwd candidates for cd || cmd preserve the original cwd", () => {
     const req = complete(compileShellCall({ ...env, command: "cd allowed || grep -rn pattern ." }));
     const search = req.operations.filter((o): o is typeof o & { kind: "path" } => o.kind === "path" && o.operation === "search");
     assert.equal(search[0]!.cwdCandidates.every((c: { cwd: string }) => c.cwd === env.cwd), true);
+  } finally { env.cleanup(); }
+});
+
+test("cd to a non-existent target with ; chaining re-checks the previous cwd (D-045)", () => {
+  const env = context();
+  try {
+    // 自定义 permissive profile：外部写 allow + project 写 ask——幻影单候选会漏检项目侧
+    const p: ResolvedProfile = {
+      name: "test", description: "test",
+      shellPolicy: { inspect: "allow", modify: "allow", execute: "deny", destroy: "deny", unknown: "deny" },
+      pathPolicy: {
+        default: { read: "allow", list: "allow", search: "allow", write: "allow" },
+        rules: [{ path: "project/**", write: "ask" }],
+      },
+    };
+    const req = complete(compileShellCall({ ...env, command: "cd missing ; touch x" }));
+    const dec = evaluateRequest(req, p);
+    // 双候选 {missing, env.cwd}：外部写 allow + 项目写 ask → ask（修复前：幻影单候选 → allow）
+    assert.equal(disposition(dec), "ask");
   } finally { env.cleanup(); }
 });
 

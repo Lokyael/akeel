@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { evaluateToolCall } from "../../../src/access-gate/gate/decision/evaluate";
+import { evaluateToolCall } from "../../../src/access-gate/gate";
 import type { GateRuntime } from "../../../src/access-gate/gate/host";
 import type { ResolvedProfile } from "../../../src/access-gate/profile/types";
 import { makeContext } from "../shared/fixtures";

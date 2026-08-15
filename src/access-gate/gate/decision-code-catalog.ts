@@ -2,22 +2,32 @@ import type { DecisionCode, GateEvidence, Guidance, GuidanceId } from "./decisio
 
 export type DenyResponseKind = "shell-form" | "security-boundary" | "generic";
 
-const SHELL_FORM_CODES = new Set<DecisionCode>([
-  "dynamic-shell",
-  "unsafe-syntax",
-  "opaque-command",
-  "unsupported-redirection",
-  "uncertain-cwd",
-]);
+// 响应分类全量表：新增 DecisionCode 忘配在此编译报错（fail-fast，与 EVIDENCE_KIND 同模式）。
+const DENY_RESPONSE_KIND: Readonly<Record<DecisionCode, DenyResponseKind>> = {
+  "dynamic-shell": "shell-form",
+  "unsafe-syntax": "shell-form",
+  "opaque-command": "shell-form",
+  "unsupported-redirection": "shell-form",
+  "uncertain-cwd": "shell-form",
+  threat: "security-boundary",
+  "blocked-path": "security-boundary",
+  "symlink-escape": "security-boundary",
+  "path-unclassifiable": "security-boundary",
+  "destroy-command": "security-boundary",
+  "hard-command-rule": "security-boundary",
+  "shell-policy-denied": "generic",
+  "path-denied": "generic",
+  "approval-required": "generic",
+  "user-denied": "generic",
+  "unknown-tool": "generic",
+  "invalid-tool-input": "generic",
+  "unknown-effect": "generic",
+  "resource-limit": "generic",
+};
 
-const SECURITY_BOUNDARY_CODES = new Set<DecisionCode>([
-  "threat",
-  "blocked-path",
-  "symlink-escape",
-  "path-unclassifiable",
-  "destroy-command",
-  "hard-command-rule",
-]);
+export function denyResponseKindFor(code: DecisionCode): DenyResponseKind {
+  return DENY_RESPONSE_KIND[code];
+}
 
 // ── evidence kind 映射（与 denyResponseKindFor 同模块相邻，共享 code 视图） ──
 // Record<DecisionCode, ...> 全量枚举：新增 DecisionCode 在此编译报错（fail-fast）。
@@ -48,12 +58,6 @@ const EVIDENCE_KIND: Readonly<Record<DecisionCode, GateEvidence["kind"]>> = {
 
 export function evidenceKind(code: DecisionCode): GateEvidence["kind"] {
   return EVIDENCE_KIND[code];
-}
-
-export function denyResponseKindFor(code: DecisionCode): DenyResponseKind {
-  if (SECURITY_BOUNDARY_CODES.has(code)) return "security-boundary";
-  if (SHELL_FORM_CODES.has(code)) return "shell-form";
-  return "generic";
 }
 
 const GUIDANCE_CATALOG: Readonly<Partial<Record<DecisionCode, readonly Guidance[]>>> = {

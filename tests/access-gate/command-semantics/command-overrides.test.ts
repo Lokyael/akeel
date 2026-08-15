@@ -551,6 +551,24 @@ commands:
   }
 });
 
+test("校验: commands 中无效 effects 抛出明确错误（F）", () => {
+  resetConfig();
+  const { cleanup } = setupProject(`
+commands:
+  badfx:
+    class: inspect
+    effects: [bogus]
+`);
+  try {
+    assert.throws(
+      () => analyzeSemantics(parseCmd("badfx arg")),
+      /invalid effect "bogus"/,
+    );
+  } finally {
+    cleanup();
+  }
+});
+
 test("校验: reclassify 中无效 class 抛出明确错误", () => {
   resetConfig();
   const { cleanup } = setupProject(`

@@ -79,8 +79,14 @@ export function resolvePath(cwd: string, projectRoot: string, stagingDir: string
   let canonicalCwd: string;
   let canonicalProject: string;
   let canonicalStaging: string;
+  // cwd 是分析时点假设（cd 目标可能由链内命令先建后 cd，D-045）：不存在时词法解析，
+  // 不硬拒——幻影 cwd 是合法分析候选而非垃圾输入；词法近似在目标存在时由 inspectTarget 的 realpath 兜底。
   try {
     canonicalCwd = canonical(cwd);
+  } catch {
+    canonicalCwd = resolve(cwd);
+  }
+  try {
     canonicalProject = canonical(projectRoot);
     canonicalStaging = canonical(stagingDir);
   } catch {

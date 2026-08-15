@@ -8,17 +8,19 @@ import type { ShellRedirectionNode, SourceSpan } from "../../shell-parse";
 import { runPreflight } from "./preflight";
 import {
   ANALYSIS_LIMITS,
+  type AccessOperation,
+  type CompilerDraftResult,
+  type PathAccessOperation,
+  type ShellCompilerInput,
+} from "./access-request-types";
+import {
   createPlanDraft,
   effectsFor,
   validateInputLength,
   pathOperation,
   reject,
   validateEffects,
-  type AccessOperation,
-  type CompilerDraftResult,
-  type PathAccessOperation,
-  type ShellCompilerInput,
-} from "./request-builder";
+} from "./builder";
 
 function redirectionOperation(
   redirection: ShellRedirectionNode,

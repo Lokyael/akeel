@@ -1,14 +1,11 @@
 import {
   ANALYSIS_LIMITS,
-  createPlanDraft,
-  isRecord,
-  pathOperation,
-  reject,
-  validateInputLength,
   type CompilerDraftResult,
   type DirectToolCompilerInput,
-  type ToolSurface,
-} from "./request-builder";
+} from "./access-request-types";
+import { createPlanDraft, pathOperation, reject, validateInputLength } from "./builder";
+import { isRecord } from "../../util";
+import type { ToolSurface } from "../../domain";
 import { TOOL_SCHEMAS, type ToolSchema } from "./tool-schemas";
 
 function validateEditEntries(edits: unknown): string | null {
@@ -59,7 +56,9 @@ function validateAgainstSchema(
 }
 
 export function compileDirectToolDraft(input: DirectToolCompilerInput): CompilerDraftResult {
-  const schema = TOOL_SCHEMAS[input.surface];
+  // G：TOOL_SCHEMAS 键集受 DirectToolSurface 编译约束；查表入口是任意字符串（tool 参数），
+  // 拓宽为 string 索引 + 运行时守卫（未知 surface → unknown-tool 拒绝，行为不变）。
+  const schema = (TOOL_SCHEMAS as Readonly<Record<string, ToolSchema>>)[input.surface];
   if (!schema) return reject("unknown-tool", input.surface);
   if (!isRecord(input.args)) return reject("invalid-tool-input", "Direct tool args must be a plain object");
 

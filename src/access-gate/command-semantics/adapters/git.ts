@@ -2,7 +2,7 @@
 
 import type { ShellCommandNode, ShellArg } from "../../shell-parse/types";
 import type { CommandAdapter, CommandSemantics, Effect, PathIntent } from "../types";
-import { makeSemantics, optionIntent, consumedFileIntents, SYNTHETIC_SPAN, semanticsFromRules, type RuleDef } from "./shared";
+import { makeSemantics, optionIntent, consumedFileIntents, positionalWords, SYNTHETIC_SPAN, semanticsFromRules, type RuleDef } from "./shared";
 import { parseOptions, type Opt } from "./option-parse";
 import { parseConfigOptions, type ConfigOptionTable, type ConfigTarget } from "./config-parse";
 
@@ -61,12 +61,12 @@ const GIT_CLASSIFY: readonly GitClassifyDef[] = [
   // F1: -o/--output（含附着 -oFILE）升级 modify + 写路径 intent（prefix 匹配，A2）
   { cmd: "archive", cls: "inspect", upgrade: { flags: [{ name: "-o", prefix: true }, { name: "--output", prefix: true }], to: "modify", reason: "write repository archive to file", paths: (args) => writeOutputPaths(args, ARCHIVE_OUTPUT_OPTS) }, reason: "create repository archive" },
   // ── modify ──
-  { cmd: "add", cls: "modify", paths: (args) => positionalArgs(args).map((a) => ({ op: "read" as const, value: a.value })), reason: "stage files" },
-  { cmd: "rm", cls: "modify", paths: (args) => positionalArgs(args).map((a) => ({ op: "write" as const, value: a.value })), reason: "remove tracked files" },
+  { cmd: "add", cls: "modify", paths: (args) => positionalWords(args, { dashIsOption: true }).map((a) => ({ op: "read" as const, value: a.value })), reason: "stage files" },
+  { cmd: "rm", cls: "modify", paths: (args) => positionalWords(args, { dashIsOption: true }).map((a) => ({ op: "write" as const, value: a.value })), reason: "remove tracked files" },
   { cmd: "commit", cls: "modify", reason: "record changes" },
   { cmd: "push", cls: "modify", upgrade: { flags: [{ name: "-f" }, { name: "--force", prefix: true }], to: "destroy", reason: "force push" }, reason: "push to remote" },
   { cmd: ["checkout", "switch"], cls: "modify", paths: (args) => { const idx = args.findIndex((a) => a.value === "--"); return idx >= 0 ? args.slice(idx + 1).map((a) => ({ op: "write" as const, value: a.value })) : []; }, reason: "switch branch/restore files" },
-  { cmd: "restore", cls: "modify", paths: (args) => positionalArgs(args).map((a) => ({ op: "write" as const, value: a.value })), reason: "restore files" },
+  { cmd: "restore", cls: "modify", paths: (args) => positionalWords(args, { dashIsOption: true }).map((a) => ({ op: "write" as const, value: a.value })), reason: "restore files" },
   { cmd: "merge", cls: "modify", reason: "merge branches" },
   { cmd: "rebase", cls: "modify", reason: "rebase commits" },
   { cmd: "tag", cls: "modify", reason: "create/list/delete tags" },
@@ -76,7 +76,7 @@ const GIT_CLASSIFY: readonly GitClassifyDef[] = [
   { cmd: "clone", cls: "modify", reason: "clone repository" },
   { cmd: "init", cls: "modify", reason: "initialize repository" },
   { cmd: "remote", cls: "modify", reason: "manage remotes" },
-  { cmd: "mv", cls: "modify", paths: (args) => positionalArgs(args).map((a) => ({ op: "write" as const, value: a.value })), reason: "move/rename tracked files" },
+  { cmd: "mv", cls: "modify", paths: (args) => positionalWords(args, { dashIsOption: true }).map((a) => ({ op: "write" as const, value: a.value })), reason: "move/rename tracked files" },
   { cmd: ["cherry-pick", "revert"], cls: "modify", reason: "apply commits" },
   { cmd: "apply", cls: "modify", reason: "apply patch" },
   { cmd: "gc", cls: "modify", reason: "garbage collect repository" },
@@ -134,7 +134,7 @@ const FORMAT_PATCH_OUTPUT_OPTS: readonly Opt[] = [
 
 /** git bundle create <file> 的 bundle 文件：create 之后的第一个位置参数（create 本身由 pattern 保证）。 */
 function bundleCreateFile(args: readonly ShellArg[]): { op: "write"; value: string }[] {
-  const pos = positionalArgs(args);
+  const pos = positionalWords(args, { dashIsOption: true });
   const file = pos[1];
   return file?.value ? [{ op: "write", value: file.value }] : [];
 }
@@ -240,18 +240,6 @@ function analyzeGitConfig(configArgs: readonly ShellArg[]): { cls: "inspect" | "
   }
   // 无法判定（如孤立层级选项）→ 保守 modify；有显式目标才给 intent
   return { cls: "modify", intents: r.target ? writeIntents(r.target) : [], opaque: r.sawUnknown };
-}
-
-function positionalArgs(args: readonly ShellArg[]): ShellArg[] {
-  const result: ShellArg[] = [];
-  let optionsDone = false;
-  for (const a of args) {
-    const val = a.value;
-    if (!optionsDone && val === "--") { optionsDone = true; continue; }
-    if (!optionsDone && val.startsWith("-")) continue;
-    result.push(a);
-  }
-  return result;
 }
 
 // ─── git branch 子命令：正向标志解析（单声明表 + 派生，T-059 后单源化） ───

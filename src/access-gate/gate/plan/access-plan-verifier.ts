@@ -3,28 +3,29 @@ import type { SourceSpan } from "../../shell-parse";
 import type {
   AccessOperation,
   CompleteAccessPlan,
-  PathOperation,
-  ToolSurface,
 } from "./access-request-types";
 import {
   ANALYSIS_LIMITS,
-  COMMAND_CLASSES,
   COMPILER_VERSION,
-  EFFECTS,
-  PATH_OPERATIONS,
   REQUEST_BRAND,
-  TOOL_SURFACES,
 } from "./access-request-types";
+import {
+  COMMAND_CLASS_SET,
+  EFFECT_SET,
+  PATH_OPERATION_SET,
+  TOOL_SURFACE_SET,
+} from "../../domain";
 import { PATH_SOURCE_SET } from "../../domain";
-import type { PathSource } from "../../domain";
-import { isRecord, uniqueCandidates } from "./request-builder";
+import type { PathOperation, PathSource, ToolSurface } from "../../domain";
+import { uniqueCandidates } from "./builder";
+import { isRecord } from "../../util";
 
 export function validateCompleteAccessPlan(
   value: unknown,
   issuedPlans: WeakSet<object>,
 ): value is CompleteAccessPlan {
   if (!isRecord(value) || (value as Record<PropertyKey, unknown>)[REQUEST_BRAND] !== true || !issuedPlans.has(value)) return false;
-  if (typeof value.source !== "string" || !TOOL_SURFACES.has(value.source as ToolSurface)
+  if (typeof value.source !== "string" || !TOOL_SURFACE_SET.has(value.source as ToolSurface)
     || typeof value.projectRoot !== "string" || typeof value.stagingDir !== "string"
     || value.compilerVersion !== COMPILER_VERSION) return false;
   if (!Array.isArray(value.operations) || !Array.isArray(value.cwdCandidates)) return false;
@@ -119,7 +120,7 @@ function isValidOperation(value: unknown): value is AccessOperation {
     return typeof value.input === "string"
       && value.input.length <= ANALYSIS_LIMITS.maxArgumentLength
       && typeof value.operation === "string"
-      && PATH_OPERATIONS.has(value.operation as PathOperation)
+      && PATH_OPERATION_SET.has(value.operation as PathOperation)
       && Array.isArray(value.cwdCandidates)
       && value.cwdCandidates.every(isCwdCandidate)
       && PATH_SOURCE_SET.has(value.source as PathSource)
@@ -129,9 +130,9 @@ function isValidOperation(value: unknown): value is AccessOperation {
     return (value.origin === "shell" || value.origin === "direct")
       && (value.executable === null || (typeof value.executable === "string" && value.executable.length <= ANALYSIS_LIMITS.maxArgumentLength))
       && typeof value.commandClass === "string"
-      && COMMAND_CLASSES.has(value.commandClass as CommandClass)
+      && COMMAND_CLASS_SET.has(value.commandClass as CommandClass)
       && Array.isArray(value.effects)
-      && value.effects.every((effect) => typeof effect === "string" && EFFECTS.has(effect as Effect));
+      && value.effects.every((effect) => typeof effect === "string" && EFFECT_SET.has(effect as Effect));
   }
   return false;
 }

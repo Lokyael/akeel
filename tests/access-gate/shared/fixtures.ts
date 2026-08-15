@@ -5,7 +5,7 @@ import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
-import type { CompilerContext } from "../../../src/access-gate/gate/plan/request-builder";
+import type { CompilerContext } from "../../../src/access-gate/gate/plan";
 import { resolveProfiles } from "../../../src/access-gate/profile/resolve";
 import type { ResolvedProfiles } from "../../../src/access-gate/profile/types";
 

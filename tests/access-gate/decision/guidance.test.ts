@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { renderCompilationFailure, renderDecision } from "../../../src/access-gate/gate/decision/render-decision";
 import { denyResponseKindFor, guidanceFor, guidanceText } from "../../../src/access-gate/gate/decision-code-catalog";
-import { evidenceKind } from "../../../src/access-gate/gate/plan/request-builder";
+import { evidenceKind } from "../../../src/access-gate/gate/decision-code-catalog";
 import type { DenyResponseKind } from "../../../src/access-gate/gate/decision-code-catalog";
 import type { GateDecision, GateEvidence, GuidanceId, DecisionCode } from "../../../src/access-gate/gate/decision-types";
 
@@ -202,19 +202,16 @@ test("renderer bounds evidence subject count and total reason length", () => {
 test("renders compiler outcomes by category without internal identifiers", () => {
   const unsupported = renderCompilationFailure({
     kind: "reject",
-    category: "unsupported-form",
     code: "dynamic-shell",
     evidence,
   });
   const security = renderCompilationFailure({
     kind: "reject",
-    category: "security-block",
     code: "threat",
     evidence: [{ kind: "threat", subject: "remote content" }],
   });
   const invalid = renderCompilationFailure({
     kind: "reject",
-    category: "invalid-request",
     code: "invalid-tool-input",
     evidence,
   });

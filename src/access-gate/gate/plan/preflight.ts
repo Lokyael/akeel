@@ -1,5 +1,6 @@
 import { scanThreats } from "../../security";
-import { reject, type CompilationReject } from "./request-builder";
+import { reject } from "./builder";
+import type { CompilationReject } from "./access-request-types";
 import type { ShellCommandNode, ShellProgram } from "../../shell-parse";
 import { canonicalExecutableName } from "../../command-semantics";
 import { HARD_RULE_INTERPRETERS } from "../../command-semantics";

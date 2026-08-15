@@ -1,5 +1,5 @@
 import { denyResponseKindFor, guidanceFor, guidanceText } from "../decision-code-catalog";
-import { ANALYSIS_LIMITS, type CompileResult } from "../plan/request-builder";
+import { ANALYSIS_LIMITS, type CompileResult } from "../plan";
 import type { GateDecision, Guidance } from "../decision-types";
 import type { GateResult } from "../host";
 import type { SourceSpan } from "../../shell-parse";
@@ -18,12 +18,14 @@ function renderGuidance(guidance: readonly Guidance[]): string {
 export function renderCompilationFailure(result: Extract<CompileResult, { kind: "reject" }>): GateResult {
   const head = result.evidence[0];
   const subject = head ? head.subject.slice(0, ANALYSIS_LIMITS.maxEvidenceSubjectLength) : "request denied";
-  const guidance = result.category === "unsupported-form" ? guidanceFor(result.code) : [];
+  // 响应分类单一权威：denyResponseKindFor（C：code 是唯一判别，不携带平行 category）
+  const responseKind = denyResponseKindFor(result.code);
+  const guidance = responseKind === "shell-form" ? guidanceFor(result.code) : [];
   let reason: string;
 
-  if (result.category === "security-block") {
+  if (responseKind === "security-boundary") {
     reason = SECURITY_BOUNDARY_DENY;
-  } else if (result.category === "unsupported-form") {
+  } else if (responseKind === "shell-form") {
     reason = SHELL_FORM_DENY_BASE;
     if (guidance.length > 0) reason += " " + renderGuidance(guidance);
   } else {

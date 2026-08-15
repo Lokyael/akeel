@@ -11,7 +11,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { compileShellCall } from "../../../src/access-gate/gate";
-import type { CompilerContext } from "../../../src/access-gate/gate/plan/request-builder";
+import type { CompilerContext } from "../../../src/access-gate/gate/plan";
 import { makeContext } from "../shared/fixtures";
 
 function env(): CompilerContext & { cleanup: () => void } {

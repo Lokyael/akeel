@@ -5,16 +5,16 @@ import { validateCompleteAccessPlan } from "./access-plan-verifier";
 import {
   COMPILER_VERSION,
   REQUEST_BRAND,
-} from "./access-request-types";
-import {
-  isRecord,
-  reject,
   type CompilerContext,
   type CompilerDraftResult,
   type CompileResult,
   type DirectToolCompilerInput,
   type ShellCompilerInput,
-} from "./request-builder";
+} from "./access-request-types";
+import {
+  reject,
+} from "./builder";
+import { isRecord } from "../../util";
 import type {
   AccessOperation,
   AccessPlanDraft,
@@ -65,6 +65,11 @@ export function isCompleteAccessPlan(value: unknown): value is CompleteAccessPla
   } catch {
     return false;
   }
+}
+
+/** 廉价身份检查（D-046）：brand + WeakSet 成员判定。kernel 消费边界用它；结构深验只在 seal + 公开 guard。 */
+export function hasPlanBrand(value: unknown): value is CompleteAccessPlan {
+  return isRecord(value) && value[REQUEST_BRAND] === true && ISSUED_PLANS.has(value);
 }
 
 function finalize(result: CompilerDraftResult): CompileResult {

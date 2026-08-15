@@ -1,7 +1,7 @@
 // 子代理档位（D-039）：T0 scratch / T1 project
 // 档位差异仅在 Direct 写面（读全盘、shell 轴两档一致）；钳制 = 生效档 min(映射档, 父TIER)。
 
-import { selectPathRule } from "../path/match";
+import { isProjectWritable } from "../path";
 import type { ResolvedProfile, SubagentTierName } from "./types";
 
 /** pi-subagents 子代理 env。 */
@@ -49,13 +49,9 @@ export function effectiveSubagentTier(mapped: SubagentTierName, parentTier: stri
   return SUBAGENT_TIER_NUMBER[mapped] <= parent ? mapped : "scratch";
 }
 
-/** 父档位号：1 = pathPolicy 存在 write=allow 规则覆盖项目代码路径（src/tests/项目根），否则 0。 */
+/** 父档位号：1 = pathPolicy 存在 write=allow 规则覆盖项目代码路径（H2：语义谓词，路径层单一来源）。 */
 export function parentTierOf(profile: ResolvedProfile): "0" | "1" {
-  const probes = ["project/src/probe.ts", "project/tests/probe.ts", "project/"];
-  const projectWritable = probes.some(
-    (probe) => selectPathRule(profile.pathPolicy.rules, probe, "write")?.write === "allow",
-  );
-  return projectWritable ? "1" : "0";
+  return isProjectWritable(profile) ? "1" : "0";
 }
 
 /** 子代理进程检测：PI_SUBAGENT_CHILD 存在且非空。 */

@@ -2,7 +2,7 @@
 
 import type { ShellCommandNode } from "../../shell-parse/types";
 import type { CommandAdapter, CommandSemantics } from "../types";
-import { makeSemantics, semanticsFromRules, type RuleDef } from "./shared";
+import { makeSemantics, semanticsFromRules, subcommandArgs, type RuleDef } from "./shared";
 import { parseOptions, type Opt } from "./option-parse";
 
 interface BuildToolConfig {
@@ -73,10 +73,8 @@ export const buildAdapter: CommandAdapter = {
     // 引擎投影：取值选项被消费，positional = 子命令 token（T-059）；
     // opaqueOnUnknown: false（D-040 判据：大类 + catch-all 保守兜底）
     const { positional } = parseOptions(node.args, { opts: config.opts ?? [], positional: "file", opaqueOnUnknown: false });
-    // 全选项输入（如 cargo --version）：用第一个选项作为子命令候选
-    const subcmdArgs = positional.length > 0
-      ? positional
-      : (node.args.length > 0 ? [{ value: node.args[0]!.value ?? "" }] : []);
+    // 全选项输入（如 cargo --version）：subcommandArgs 回退取首个 token（E）
+    const subcmdArgs = subcommandArgs(positional, node.args);
 
     const matched = semanticsFromRules(subcmdArgs, config.rules);
     if (matched) return matched;

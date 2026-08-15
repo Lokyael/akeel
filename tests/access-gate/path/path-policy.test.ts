@@ -153,3 +153,20 @@ test("home credential files are hard denied", () => {
     ctx.cleanup();
   }
 });
+
+test("resolvePath: non-existent cwd resolves lexically instead of hard-failing (D-045)", () => {
+  const ctx = makeContext("pi-path-phantom-");
+  try {
+    // 幻影 cwd（cd 目标分析时点不存在，先建后 cd 的假设候选）→ 词法解析 + classifiable，
+    // 不落 unclassifiable 硬拒——双候选评估依赖此行为
+    const phantom = join(ctx.cwd, "missing");
+    const resolved = resolvePath(phantom, ctx.projectRoot, ctx.stagingDir, "x");
+    assert.equal(resolved.classifiable, true);
+    assert.equal(resolved.scope, "project");
+    assert.equal(resolved.virtualPath, "project/missing/x");
+    // 词法落点走规则评估（project/** write ask → ask），而非 path-unclassifiable 硬拒
+    assert.equal(decidePath(resolved, profile(), "write").decision, "ask");
+  } finally {
+    ctx.cleanup();
+  }
+});

@@ -1,12 +1,9 @@
-import { decidePath, resolvePath } from "../../path";
-import { PATH_DENY_REASONS, type PathDenyReason } from "../../path/policy";
+import { decidePath, resolvePath, PATH_DENY_REASONS, type PathDenyReason, type PathDecision } from "../../path";
 import type { ResolvedProfile } from "../../profile";
-import { isCompleteAccessPlan } from "../plan/compiler-entry";
-import { ANALYSIS_LIMITS, type CommandAccessOperation, type CompleteAccessPlan, type PathAccessOperation } from "../plan/request-builder";
+import { hasPlanBrand, ANALYSIS_LIMITS, type CommandAccessOperation, type CompleteAccessPlan, type PathAccessOperation } from "../plan";
 import type { GateDecision, GateEvidence, HardDenyCode } from "../decision-types";
 import { hardDeny, profileDeny, requireApproval } from "./decision-builder";
 import type { Effect } from "../../command-semantics";
-import type { PathDecision } from "../../path";
 
 const EFFECT_POLICY_AXIS: Readonly<Record<Effect, "path" | "shell">> = {
   read: "path",
@@ -23,7 +20,8 @@ export function evaluateRequest(
   plan: CompleteAccessPlan,
   profile: ResolvedProfile,
 ): GateDecision {
-  if (!isCompleteAccessPlan(plan)) {
+  // D-046：品牌检查（O(1)）替代全量深验——plan 有效性已由 seal 边界验证，此处只验身份
+  if (!hasPlanBrand(plan)) {
     return hardDeny("invalid-tool-input", "plan is not a compiler-issued CompleteAccessPlan");
   }
 

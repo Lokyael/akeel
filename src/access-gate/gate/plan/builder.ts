@@ -1,57 +1,27 @@
+// access-gate/gate/plan/builder.ts — 编译器助手（plan 内部）
+// 跨目录消费者统一经 ../plan（目录 index）；本文件不承载 plan 类型再导出。
+
 import type { CommandClass, CwdCandidate, Effect } from "../../command-semantics";
 import type { SourceSpan } from "../../shell-parse";
-import { denyResponseKindFor, evidenceKind } from "../decision-code-catalog";
-
-export { isRecord } from "../../util";
-import type {
-  AccessOperation,
-  AccessPlanDraft,
-  CompilationCategory,
-  CompilationReject,
-  CompilerDecisionCode,
-  CompilerDraftResult,
-  InvalidCompilationCode,
-  PathAccessOperation,
-  PlanCoverage,
-  SecurityCompilationCode,
-  UnsupportedCompilationCode,
-  PathOperation,
-  PathSource,
-  ToolSurface,
-} from "./access-request-types";
+import { evidenceKind } from "../decision-code-catalog";
 import {
   ANALYSIS_LIMITS,
-  EFFECTS,
+  type AccessOperation,
+  type AccessPlanDraft,
+  type CompilationReject,
+  type CompilerDecisionCode,
+  type CompilerDraftResult,
+  type PathAccessOperation,
+  type PlanCoverage,
 } from "./access-request-types";
-
-// Re-export the public surface from the types module（类型再导出改为通配，删手工墙）。
-export { ANALYSIS_LIMITS } from "./access-request-types";
-export type * from "./access-request-types";
-// evidenceKind 单一来源在 decision-code-catalog，此处 re-export 保持 consumers 兼容。
-export { evidenceKind } from "../decision-code-catalog";
-
-// ── public api ──
+import { EFFECT_SET } from "../../domain";
+import type { PathOperation, PathSource, ToolSurface } from "../../domain";
 
 export function reject(code: CompilerDecisionCode, subject: string, span?: SourceSpan): CompilationReject {
-  const category = compilationCategoryFor(code);
+  // 响应分类（shell-form/security-boundary/generic）单一来源在 decision-code-catalog
+  // denyResponseKindFor；此处只存 code + evidence，渲染侧按 code 派生（C）。
   const evidence = [{ kind: evidenceKind(code), subject: String(subject).slice(0, ANALYSIS_LIMITS.maxEvidenceSubjectLength), span }] as const;
-  if (category === "security-block") {
-    return { kind: "reject", category, code: code as SecurityCompilationCode, evidence };
-  }
-  if (category === "invalid-request") {
-    return { kind: "reject", category, code: code as InvalidCompilationCode, evidence };
-  }
-  return { kind: "reject", category, code: code as UnsupportedCompilationCode, evidence };
-}
-
-// code → 类别单一来源：编译分类由渲染侧的 denyResponseKindFor 推导，
-// 两份平行的 code 列表合一；unknown-effect 从 unsupported-form 移入 invalid-request，
-// 与 kernel 侧（evaluate-request 的 hardDeny）响应一致。
-function compilationCategoryFor(code: CompilerDecisionCode): CompilationCategory {
-  const kind = denyResponseKindFor(code);
-  if (kind === "security-boundary") return "security-block";
-  if (kind === "shell-form") return "unsupported-form";
-  return "invalid-request";
+  return { kind: "reject", code, evidence };
 }
 
 function cwdCandidates(state: { cwd: string; candidates?: readonly CwdCandidate[] }): readonly CwdCandidate[] {
@@ -122,7 +92,7 @@ export function effectsFor(
 
 export function validateEffects(effects: readonly Effect[], span: SourceSpan): CompilationReject | null {
   for (const effect of effects) {
-    if (!EFFECTS.has(effect)) return reject("unknown-effect", effect, span);
+    if (!EFFECT_SET.has(effect)) return reject("unknown-effect", effect, span);
   }
   return null;
 }

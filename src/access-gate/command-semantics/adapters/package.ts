@@ -2,7 +2,7 @@
 
 import type { ShellArg, ShellCommandNode } from "../../shell-parse/types";
 import type { CommandAdapter, CommandSemantics, PathIntent } from "../types";
-import { makeSemantics, optionIntent, semanticsFromRules, type RuleDef } from "./shared";
+import { makeSemantics, optionIntent, semanticsFromRules, subcommandArgs, type RuleDef } from "./shared";
 import { parseOptions, type Opt } from "./option-parse";
 import { parseConfigOptions, type ConfigOptionTable } from "./config-parse";
 
@@ -101,10 +101,8 @@ export const packageAdapter: CommandAdapter = {
     // 引擎投影：取值选项被消费，positional = 子命令 token（T-059）；
     // opaqueOnUnknown: false（D-040 判据：大类 + catch-all 保守兜底）
     const { positional } = parseOptions(node.args, { opts: PKG_VALUE_OPTS, positional: "file", opaqueOnUnknown: false });
-    // 子命令 token（取值选项已消费）；npx 全选项输入（--version/--help）用首个选项作候选
-    const subcmdArgs = positional.length > 0
-      ? positional
-      : (name === "npx" && node.args.length > 0 ? [{ value: node.args[0]!.value ?? "" }] : []);
+    // 子命令 token（取值选项已消费）；全选项输入（npx --version 等）回退取首个 token（E）
+    const subcmdArgs = subcommandArgs(positional, node.args);
     const subcmd = subcmdArgs.map((a) => a.value).join(" ");
 
     // npm/pnpm config 写命令（set/delete/edit）→ modify + 配置目标 write intent；

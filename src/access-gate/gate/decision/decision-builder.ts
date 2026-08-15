@@ -5,7 +5,7 @@ import type {
   HardDenyCode,
   ProfileDenyCode,
 } from "../decision-types";
-import { evidenceKind } from "../plan/request-builder";
+import { evidenceKind } from "../decision-code-catalog";
 
 export function hardDeny(
   code: HardDenyCode,

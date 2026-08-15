@@ -1,20 +1,8 @@
-import { bashCommandFromArgs, compileToolCall } from "../plan/compiler-entry";
+import { bashCommandFromArgs, classifyTool, compileToolCall } from "../plan";
 import { evaluateRequest } from "./evaluate-request";
 import { renderCompilationFailure, renderDecision } from "./render-decision";
 import type { GateDecision } from "../decision-types";
 import type { GateResult, GateRuntime, ToolCallInput } from "../host";
-import type { GateCategory } from "../plan/categories";
-import { TOOL_SURFACE_SET } from "../../domain";
-import type { ToolSurface } from "../../domain";
-
-/**
- * 将 tool surface 映射到 gate 分类。不在管辖范围内的工具 = passthrough。
- * 管辖面以 domain 的 TOOL_SURFACE_SET 为单一来源；TOOL_SCHEMAS 只做 schema 查询。
- */
-export function classifyTool(surface: string): GateCategory {
-  if (!TOOL_SURFACE_SET.has(surface as ToolSurface)) return "passthrough";
-  return surface === "bash" ? "shell" : "filesystem";
-}
 
 export async function evaluateToolCall(input: ToolCallInput, runtime: GateRuntime): Promise<GateResult> {
   // 不在 gate 管辖范围内的工具 passthrough，不做任何拦截。

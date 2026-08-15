@@ -9,9 +9,8 @@
 import type { CommandClass, CommandSemantics } from "./types";
 import type { ShellArg } from "../shell-parse/types";
 import { basename } from "node:path";
-import { fullSubcommand, makeSemantics, SYNTHETIC_SPAN } from "./adapters/shared";
-import { parseOptions } from "./adapters/option-parse";
-import { COMMAND_CLASS_SET } from "../domain";
+import { firstWord, fullSubcommand, makeSemantics, SYNTHETIC_SPAN } from "./adapters/shared";
+import { COMMAND_CLASS_SET, EFFECT_SET } from "../domain";
 import { loadConfig } from "../config";
 import type { CommandDef, CommandOverrides, ReclassifyEntry } from "../config";
 import { getAgentDir } from "../agent-dir";
@@ -22,10 +21,18 @@ function validateCommandDef(name: string, def: CommandDef): void {
   if (!COMMAND_CLASS_SET.has(def.class)) {
     throw new Error(`config.yaml: ${name}: invalid class "${def.class}"`);
   }
+  if (def.effects && !def.effects.every((effect) => EFFECT_SET.has(effect))) {
+    const bad = def.effects.find((effect) => !EFFECT_SET.has(effect))!;
+    throw new Error(`config.yaml: ${name}: invalid effect "${bad}"`);
+  }
   if (def.subcommands) {
     for (const [sc, sub] of Object.entries(def.subcommands)) {
       if (!COMMAND_CLASS_SET.has(sub.class)) {
         throw new Error(`config.yaml: ${name}.${sc}: invalid class "${sub.class}"`);
+      }
+      if (sub.effects && !sub.effects.every((effect) => EFFECT_SET.has(effect))) {
+        const bad = sub.effects.find((effect) => !EFFECT_SET.has(effect))!;
+        throw new Error(`config.yaml: ${name}.${sc}: invalid effect "${bad}"`);
       }
     }
   }
@@ -85,8 +92,9 @@ export function applyCommandDef(
     });
   }
 
-  // 匹配子命令（首词；用户定义命令无 valueOptions 感知，D-024）
-  const subcmd = parseOptions(args, { opts: [], positional: "file", opaqueOnUnknown: false }).positional[0]?.value ?? "";
+  // 匹配子命令（首词；用户定义命令无 valueOptions 感知，D-024）。
+  // firstWord（raw 契约）替代整台引擎取 positional[0]（E）；`-` 按位置词、`--` 终止，与引擎语义一致。
+  const subcmd = firstWord(args, { dashIsOption: false });
   const match = def.subcommands[subcmd];
   if (match) {
     return makeSemantics(match.class, {

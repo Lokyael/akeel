@@ -1,5 +1,5 @@
 import type { Effect, CommandClass } from "../../command-semantics";
-import type { PathOperation } from "./request-builder";
+import type { DirectToolSurface, PathOperation } from "../../domain";
 
 // Centralized tool schema definitions — single source of truth for Direct tool
 // parameter validation.  Adding a new tool or parameter only requires a schema
@@ -18,7 +18,8 @@ export interface ToolSchema {
   readonly commandClass: CommandClass;
 }
 
-export const TOOL_SCHEMAS: Record<string, ToolSchema> = {
+// 键集受 DirectToolSurface 编译期约束（G）：增删 Direct 工具漏改 schema = 编译错误，无需运行时同步测试。
+export const TOOL_SCHEMAS: Record<DirectToolSurface, ToolSchema> = {
   read: {
     fields: {
       path:   { type: "string", required: true },

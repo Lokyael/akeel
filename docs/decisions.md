@@ -477,4 +477,46 @@
 - 测试内容重构（用例、断言、覆盖范围）；本决策只定组织与脚本形态。
 - 引入新测试框架；维持 node:test + tsx。
 
-## D-045: 待创建
+## D-045: cd 目标存在性与幻影 cwd 双候选建模
+
+**Status:** active
+
+**Decision:** 命令链内 cd 目标的存在性基于**分析时点**检查（`resolveCdTarget` 的 exists，statSync），并作为 cwd 候选建模的输入：目标存在 → 单候选（现状不变，certainty exact）；目标不存在且后继操作符为 `;`/`newline` → 候选集 = {目标} ∪ {cd 前 cwd}（certainty conservative）；目标不存在且后继为 `&&` → 保持单候选（`&&` 短路时旧 cwd 分支不存在，不虚构）。`resolveCdTarget` 移除永不触发的 null 联合，`filter` 接线 exists，`targets.length === 0 → opaque` 死分支删除（候选集恒非空不变量）。
+
+**Why:** 原实现计算 exists（statSync）后从未消费——目标不存在时幻影 cwd 以 exact 置信度成为后继命令路径检查的唯一锚点，真实 cwd（cd 失败后命令实际执行处）从评估中消失。且 resolvePath 对不存在的 cwd 抛 realpathSync 失败 → 整个路径操作落 unclassifiable 硬拒：`cd /nope ; touch x` 被 path-unclassifiable 拒绝（错误拒因——命令真实行为是对项目写，不是「路径不可分类」），规则差异化路径（docs/ 等）的评估落点也随之错误。exists 是设计源头就计算的安全信号，本次恢复其消费，并配套 resolvePath 的词法回退（分析时点不存在的 cwd 是合法假设候选，非垃圾输入）。
+
+**Impact:**
+
+- 行为收紧：`;`/`newline` 链中 cd 到不存在的目录 → 后续命令路径在目标与 cd 前 cwd 双候选下评估（真实 cwd 侧写入被复查）；`&&` 链行为不变。
+- `&&` 链对「不会运行的命令」的保守评估（过拒方向）为既有行为，保持不变。
+- `cd -`/`pushd`/多参数/动态 token 的 opaque 拒绝不变。
+- 新测试矩阵（约 7 条）锁定单/双候选切换、去重与 resolvePath 幻影 cwd 词法回退；既有 cd 断言全部存活（`&&` 后继保持单候选）。
+
+**Rejected:**
+
+- **严格拒绝（目标不存在 → opaque 整命令拒绝）**：误杀 `mkdir -p X && cd X && cmd` 合法形态（分析时 X 由链内命令创建）。拒绝。
+- **朴素双候选（无条件并入 pre-cd）**：`&&` 链产生幽灵询问（cd 失败短路的虚构分支）。拒绝。
+- **软丢弃（丢弃不存在目标只留旧 cwd）**：漏检「先建后 cd」时目标目录上的真实写（unsound）。拒绝。
+- **保持现状（删 fs 保留幻影单候选）**：不修幻影硬拒与真实 cwd 排除。拒绝。
+
+**Out of Scope:**
+
+- TOCTOU：存在性基于分析时点，执行前目标被外部删除/创建不在保证范围（与既有 TOCTOU 立场一致）。
+- `&&` 链「cd 失败则后继不评估」的精确短路建模：需前序命令写意图分析，过拒方向已可接受。
+- 候选集规模：连续 `;` 链不同不存在目标 → 候选增长受 ANALYSIS_LIMITS.maxCwdCandidates（256）约束，超限 fail-closed。
+
+## D-046: plan 验证收敛到 seal 边界（kernel 品牌检查）
+
+**Status:** active
+
+**Decision:** CompleteAccessPlan 的结构验证只在 seal 边界（compiler-entry finalize）运行一次；Policy Kernel（evaluate-request）改用 O(1) 品牌检查 hasPlanBrand（REQUEST_BRAND + ISSUED_PLANS WeakSet 成员），不再全量深验。validateCompleteAccessPlan 保留为公开 type guard 与测试 seam。
+
+**Why:** 每次受管辖 tool_call 原双重完整验证（seal + kernel 各一遍）；「拒绝未发行 plan」契约由 WeakSet 成员判定承载（结构复制丢失成员即拒绝），深验在 kernel 边界冗余——brand 模块私有、finalize 是唯一构造点、deep-freeze 阻断变更。
+
+**Impact:** 每受管辖 tool_call 少一次全量深验；copied-plan 拒绝契约不变（hasPlanBrand 含成员判定）；isCompleteAccessPlan 对外行为不变。
+
+**Rejected:** **保持双重验证（kernel 独立信任闸）**：防御线只对「未来绕过 compileToolCall 的构造路径」有效，而该路径需摸到模块私有 WeakSet，结构性不可达。拒绝。
+
+**Out of Scope:** verifier 拆分/裁剪；plan 类型形状变更。
+
+## D-047: 待创建
