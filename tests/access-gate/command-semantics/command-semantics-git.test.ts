@@ -6,6 +6,8 @@ defineAdapterTests("git", [
   { cmd: "git status", name: "status is inspect", cls: "inspect" },
   { cmd: "git rev-list --left-right --count origin/main...HEAD", name: "rev-list is inspect", cls: "inspect", opaque: false },
   { cmd: "git add src/file.ts", name: "add produces read intents", cls: "modify", intents: [{ operation: "read", rawPath: "src/file.ts" }] },
+  { cmd: "git add 'foo bar'.txt", name: "mixed-quote path decodes to clean rawPath (quote-split fix)", cls: "modify", intents: [{ operation: "read", rawPath: "foo bar.txt" }] },
+  { cmd: "git add \"weird\"name.ts", name: "double-quote prefix path decodes to clean rawPath", cls: "modify", intents: [{ operation: "read", rawPath: "weirdname.ts" }] },
   { cmd: "git rm --cached first.md second.md", name: "rm produces write intents for every path", cls: "modify", intents: [{ operation: "write", rawPath: "first.md" }, { operation: "write", rawPath: "second.md" }] },
   { cmd: "git checkout -- src/file.ts", name: "checkout -- writes path", cls: "modify", intents: [{ operation: "write", rawPath: "src/file.ts" }] },
   { cmd: "git clone https://example.test/repo", name: "clone is modify", cls: "modify" },

@@ -177,7 +177,7 @@ export function parseOptions(args: readonly ShellArg[], config: OptConfig): Pars
   let i = 0;
   while (i < args.length) {
     const token = args[i]!;
-    const val = token.value ?? "";
+    const val = token.value;
 
     // ── `--` 之后全部位置参数；裸 `-` 是 stdin 约定（工具自行解释），按位置参数处理 ──
     if (!afterDoubleDash && val === "--") { afterDoubleDash = true; i++; continue; }

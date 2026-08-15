@@ -11,13 +11,11 @@ import { lex } from "../../../src/access-gate/shell-parse/lexer";
 import { parse } from "../../../src/access-gate/shell-parse/parser";
 import { analyzeSemantics } from "../../../src/access-gate/command-semantics/registry";
 import { resetConfig } from "../../../src/access-gate/config";
-import type { CommandSemantics, SemanticContext } from "../../../src/access-gate/command-semantics/types";
-
-const CTX: SemanticContext = { projectRoot: "/p", stagingDir: "/s", cwd: "/p" };
+import type { CommandSemantics } from "../../../src/access-gate/command-semantics/types";
 
 function analyze(cmd: string): CommandSemantics {
   const { program } = parse(lex(cmd).tokens);
-  return analyzeSemantics(program.commands[0]!, CTX);
+  return analyzeSemantics(program.commands[0]!);
 }
 
 function setup(configYaml: string): { cleanup: () => void } {

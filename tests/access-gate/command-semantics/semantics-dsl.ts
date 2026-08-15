@@ -17,11 +17,7 @@ import type {
   CommandSemantics,
   Effect,
   PathIntent,
-  SemanticContext,
 } from "../../../src/access-gate/command-semantics/types";
-
-/** 语义断言上下文：与 access-gate 测试共享的固定 POSIX 工作区。 */
-const DEFAULT_CTX: SemanticContext = { projectRoot: "/p", stagingDir: "/s", cwd: "/p" };
 
 export interface SemCase {
   cmd: string | readonly string[];
@@ -30,21 +26,20 @@ export interface SemCase {
   opaque?: boolean;
   effects?: readonly Effect[];
   intents?: readonly Partial<PathIntent>[];
-  ctx?: SemanticContext;
-  analyze?: (cmd: string, ctx: SemanticContext) => CommandSemantics;
+  analyze?: (cmd: string) => CommandSemantics;
 }
 
 /** 默认分析入口：解析命令串并对首个命令节点做语义分析。 */
-function analyzeCommand(cmd: string, ctx: SemanticContext = DEFAULT_CTX): CommandSemantics {
+function analyzeCommand(cmd: string): CommandSemantics {
   const { program } = parse(lex(cmd).tokens);
-  return analyzeSemantics(program.commands[0]!, ctx);
+  return analyzeSemantics(program.commands[0]!);
 }
 
 /** normalize 解包后的分析入口（env/command 等 wrapper 用例）。 */
-export function analyzeNormalizedCommand(cmd: string, ctx: SemanticContext = DEFAULT_CTX): CommandSemantics {
+export function analyzeNormalizedCommand(cmd: string): CommandSemantics {
   const { program } = parse(lex(cmd).tokens);
   const norm = normalizeCommand(program.commands[0]!);
-  return analyzeSemantics(norm.command, ctx);
+  return analyzeSemantics(norm.command);
 }
 
 function describeIntent(i: PathIntent): string {
@@ -56,7 +51,7 @@ export function assertSemanticCase(c: SemCase): void {
   const analyze = c.analyze ?? analyzeCommand;
   const cmds = typeof c.cmd === "string" ? [c.cmd] : c.cmd;
   for (const cmd of cmds) {
-    const sem = analyze(cmd, c.ctx ?? DEFAULT_CTX);
+    const sem = analyze(cmd);
     const label = `[${c.name}] ${cmd}`;
     if (c.cls !== undefined) assert.equal(sem.commandClass, c.cls, `${label}: class`);
     if (c.opaque !== undefined) assert.equal(sem.opaque, c.opaque, `${label}: opaque`);
@@ -85,7 +80,7 @@ export function assertSemanticCase(c: SemCase): void {
 /** 按行注册 node:test 用例：每行独立 test，失败精确到行。 */
 export function defineSemanticTests(suite: {
   prefix: string;
-  analyze?: (cmd: string, ctx: SemanticContext) => CommandSemantics;
+  analyze?: (cmd: string) => CommandSemantics;
   cases: readonly SemCase[];
 }): void {
   for (const c of suite.cases) {

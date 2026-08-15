@@ -5,7 +5,7 @@
 // 制度化 D-040（值性质）与位置参数性质。
 
 import type { ShellCommandNode } from "../../shell-parse/types";
-import type { CommandAdapter, CommandSemantics, PathIntent, SemanticContext } from "../types";
+import type { CommandAdapter, CommandSemantics, PathIntent } from "../types";
 import { makeSemantics, consumedFileIntents } from "./shared";
 import { parseOptions, type Opt, type OptConfig } from "./option-parse";
 
@@ -65,7 +65,7 @@ const TEXT_CONFIG: Record<string, TextConfigEntry> = {
 
 export const textTransformAdapter: CommandAdapter = {
   names: Object.keys(TEXT_CONFIG),
-  analyze(node: ShellCommandNode, _context: SemanticContext): CommandSemantics {
+  analyze(node: ShellCommandNode): CommandSemantics {
     const name = node.executable?.value?.toLowerCase() ?? "";
     const entry = TEXT_CONFIG[name];
     if (!entry) return makeSemantics("unknown", { reason: `unknown text command: ${name}`, opaque: true });
@@ -76,7 +76,7 @@ export const textTransformAdapter: CommandAdapter = {
     const positionalOp = entry.inPlace && sawWrite ? "write" : "read";
     const positionalIntents: PathIntent[] = positional.map((arg) => ({
       operation: positionalOp,
-      rawPath: arg.value ?? "",
+      rawPath: arg.value,
       source: "argument" as const,
       span: arg.span,
       confidence: "exact" as const,

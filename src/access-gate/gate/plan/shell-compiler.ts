@@ -75,11 +75,7 @@ export function compileShellDraft(input: ShellCompilerInput): CompilerDraftResul
 
   for (const flowNode of flow.nodes) {
     const normalized = normalizeCommand(flowNode.node);
-    const semantics = analyzeSemantics(normalized.command, {
-      projectRoot: input.projectRoot,
-      stagingDir: input.stagingDir,
-      cwd: flowNode.effectiveCwd.cwd,
-    });
+    const semantics = analyzeSemantics(normalized.command);
     if (semantics.opaque) return reject("opaque-command", normalized.executable ?? "unknown command", flowNode.node.span);
     if (semantics.commandClass === "destroy") return reject("destroy-command", normalized.executable ?? "destroy command", flowNode.node.span);
 

@@ -9,7 +9,7 @@
 // 取值选项（--session/--remote/--remote-keybindings）被消费，不参与子命令提取。
 
 import type { ShellCommandNode } from "../../shell-parse/types";
-import type { CommandAdapter, CommandSemantics, SemanticContext } from "../types";
+import type { CommandAdapter, CommandSemantics } from "../types";
 import { makeSemantics } from "./shared";
 import { parseOptions, type Opt } from "./option-parse";
 
@@ -26,7 +26,7 @@ const READONLY_SUBCOMMANDS = new Set(["status", "api", "completion", "help"]);
 
 export const herdrAdapter: CommandAdapter = {
   names: ["herdr"],
-  analyze(node: ShellCommandNode, _context: SemanticContext): CommandSemantics {
+  analyze(node: ShellCommandNode): CommandSemantics {
     const args = [...node.args];
     const first = args[0]?.value ?? "";
     // 子命令首词（引擎投影：取值选项被消费，positional[0] = 首词）；

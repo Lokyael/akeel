@@ -9,7 +9,6 @@ import { lex } from "../../../src/access-gate/shell-parse/lexer";
 import { parse } from "../../../src/access-gate/shell-parse/parser";
 import { analyzeSemantics } from "../../../src/access-gate/command-semantics/registry";
 import { resetConfig } from "../../../src/access-gate/config";
-import type { SemanticContext } from "../../../src/access-gate/command-semantics/types";
 
 // ─── helpers ───
 
@@ -18,7 +17,7 @@ function parseCmd(input: string) {
   return program.commands[0]!;
 }
 
-function setupProject(overridesContent: string): { root: string; ctx: SemanticContext; cleanup: () => void } {
+function setupProject(overridesContent: string): { root: string; cleanup: () => void } {
   const parent = realpathSync(tmpdir());
   const root = mkdtempSync(join(parent, "pi-keel-overrides-project-"));
   const agentDir = mkdtempSync(join(parent, "pi-keel-overrides-agent-"));
@@ -29,11 +28,8 @@ function setupProject(overridesContent: string): { root: string; ctx: SemanticCo
   const previous = process.env.PI_CODING_AGENT_DIR;
   process.env.PI_CODING_AGENT_DIR = agentDir;
 
-  const ctx: SemanticContext = { projectRoot: root, stagingDir: join(root, "staging"), cwd: root };
-
   return {
     root,
-    ctx,
     cleanup: () => {
       resetConfig();
       if (previous === undefined) delete process.env.PI_CODING_AGENT_DIR;
@@ -44,20 +40,17 @@ function setupProject(overridesContent: string): { root: string; ctx: SemanticCo
   };
 }
 
-// 无 overrides 文件的默认上下文（缓存必须在测试前清理）
-const DEFAULT_CTX: SemanticContext = { projectRoot: "/tmp/pi-keel-test", stagingDir: "/tmp/pi-keel-test/staging", cwd: "/tmp/pi-keel-test" };
-
 // ─── aliases ───
 
 test("aliases: fd → find（search adapter 接管）", () => {
   resetConfig();
-  const { ctx: _ctx, cleanup } = setupProject(`
+  const { cleanup } = setupProject(`
 aliases:
   fd: find
 `);
   try {
     // fd . 应被 find adapter 识别，产生 search intent
-    const sem = analyzeSemantics(parseCmd("fd . -name '*.ts'"), _ctx);
+    const sem = analyzeSemantics(parseCmd("fd . -name '*.ts'"));
     assert.equal(sem.commandClass, "inspect");
     assert.ok(sem.intents.some((i) => i.operation === "search"), "应有 search intent");
     assert.equal(sem.intents[0]!.rawPath, ".");
@@ -68,12 +61,12 @@ aliases:
 
 test("aliases: bat → cat（read adapter 接管）", () => {
   resetConfig();
-  const { ctx: _ctx, cleanup } = setupProject(`
+  const { cleanup } = setupProject(`
 aliases:
   bat: cat
 `);
   try {
-    const sem = analyzeSemantics(parseCmd("bat file.txt"), _ctx);
+    const sem = analyzeSemantics(parseCmd("bat file.txt"));
     assert.equal(sem.commandClass, "inspect");
     assert.ok(sem.intents.some((i) => i.operation === "read"));
     assert.equal(sem.intents[0]!.rawPath, "file.txt");
@@ -84,12 +77,12 @@ aliases:
 
 test("aliases: 别名目标不存在 → unknown", () => {
   resetConfig();
-  const { ctx: _ctx, cleanup } = setupProject(`
+  const { cleanup } = setupProject(`
 aliases:
   nosuchtool: nosuchadapter
 `);
   try {
-    const sem = analyzeSemantics(parseCmd("nosuchtool arg"), _ctx);
+    const sem = analyzeSemantics(parseCmd("nosuchtool arg"));
     assert.equal(sem.commandClass, "unknown");
     assert.ok(sem.reason.includes("nosuchadapter"), `reason 应提到别名目标: ${sem.reason}`);
   } finally {
@@ -99,13 +92,13 @@ aliases:
 
 test("aliases: 路径前缀键覆盖目录内路径形式（含 ./ 归一化）", () => {
   resetConfig();
-  const { ctx: _ctx, cleanup } = setupProject(`
+  const { cleanup } = setupProject(`
 aliases:
   "bin/": cat
 `);
   try {
     // 键 "bin/" 经 ./ 归一化命中 "./bin/tool"（./ 无管理意义，不要求用户写 "./bin/" 键）
-    const sem = analyzeSemantics(parseCmd("./bin/tool file.txt"), _ctx);
+    const sem = analyzeSemantics(parseCmd("./bin/tool file.txt"));
     assert.equal(sem.commandClass, "inspect");
     assert.ok(sem.intents.some((i) => i.operation === "read"), "应有 read intent");
     assert.equal(sem.intents[0]!.rawPath, "file.txt");
@@ -116,14 +109,14 @@ aliases:
 
 test("aliases: 路径形式精确键优先于前缀键", () => {
   resetConfig();
-  const { ctx: _ctx, cleanup } = setupProject(`
+  const { cleanup } = setupProject(`
 aliases:
   "./bin/eslint": node
   "bin/": cat
 `);
   try {
     // 精确键（npm 本地 eslint → node）优先于前缀键（bin/ → cat）
-    const sem = analyzeSemantics(parseCmd("./bin/eslint --version"), _ctx);
+    const sem = analyzeSemantics(parseCmd("./bin/eslint --version"));
     assert.equal(sem.commandClass, "inspect");
     assert.ok(sem.reason.includes("version/help"), `精确键应优先（node 语义）: ${sem.reason}`);
   } finally {
@@ -133,14 +126,14 @@ aliases:
 
 test("aliases: 最长路径前缀键优先", () => {
   resetConfig();
-  const { ctx: _ctx, cleanup } = setupProject(`
+  const { cleanup } = setupProject(`
 aliases:
   "bin/": cat
   "./bin/scripts/": node
 `);
   try {
     // 项目 bin/scripts/ 目录用 node 语义，bin/ 其他工具用 cat 语义
-    const sem = analyzeSemantics(parseCmd("./bin/scripts/deploy --version"), _ctx);
+    const sem = analyzeSemantics(parseCmd("./bin/scripts/deploy --version"));
     assert.equal(sem.commandClass, "inspect");
     assert.ok(sem.reason.includes("version/help"), `最长前缀应优先（node 语义）: ${sem.reason}`);
   } finally {
@@ -150,13 +143,13 @@ aliases:
 
 test("aliases: 裸名键不再隐式覆盖路径形式（basename 冲突消除）", () => {
   resetConfig();
-  const { ctx: _ctx, cleanup } = setupProject(`
+  const { cleanup } = setupProject(`
 aliases:
   mytool: cat
 `);
   try {
     // 裸名键只作用于裸调用；路径形式默认 execute（D-031），不被隐式 basename 覆盖
-    const sem = analyzeSemantics(parseCmd("./bin/mytool run.ts"), _ctx);
+    const sem = analyzeSemantics(parseCmd("./bin/mytool run.ts"));
     assert.equal(sem.commandClass, "execute");
   } finally {
     cleanup();
@@ -165,12 +158,12 @@ aliases:
 
 test("aliases: 前缀键不误伤其他目录同名工具", () => {
   resetConfig();
-  const { ctx: _ctx, cleanup } = setupProject(`
+  const { cleanup } = setupProject(`
 aliases:
   "bin/": cat
 `);
   try {
-    const sem = analyzeSemantics(parseCmd("./vendor/mytool run.ts"), _ctx);
+    const sem = analyzeSemantics(parseCmd("./vendor/mytool run.ts"));
     assert.equal(sem.commandClass, "execute");
   } finally {
     cleanup();
@@ -179,12 +172,12 @@ aliases:
 
 test("aliases: 路径前缀键目标不存在 → unknown", () => {
   resetConfig();
-  const { ctx: _ctx, cleanup } = setupProject(`
+  const { cleanup } = setupProject(`
 aliases:
   "bin/": nosuchadapter
 `);
   try {
-    const sem = analyzeSemantics(parseCmd("./bin/nosuchtool arg"), _ctx);
+    const sem = analyzeSemantics(parseCmd("./bin/nosuchtool arg"));
     assert.equal(sem.commandClass, "unknown");
     assert.ok(sem.reason.includes("nosuchadapter"), `reason 应提到别名目标: ${sem.reason}`);
   } finally {
@@ -194,13 +187,13 @@ aliases:
 
 test("aliases: ./ 归一化对精确键同样生效（bin/eslint 命中 ./bin/eslint）", () => {
   resetConfig();
-  const { ctx: _ctx, cleanup } = setupProject(`
+  const { cleanup } = setupProject(`
 aliases:
   "bin/eslint": node
 `);
   try {
     // 与前缀键一致：精确键也归一化前导 ./，两侧对称
-    const sem = analyzeSemantics(parseCmd("./bin/eslint --version"), _ctx);
+    const sem = analyzeSemantics(parseCmd("./bin/eslint --version"));
     assert.equal(sem.commandClass, "inspect");
     assert.ok(sem.reason.includes("version/help"), `应命中精确键（node 语义）: ${sem.reason}`);
   } finally {
@@ -210,12 +203,12 @@ aliases:
 
 test("aliases: ./ 精确键与无 ./ 键等价（./bin/eslint 命中 bin/eslint）", () => {
   resetConfig();
-  const { ctx: _ctx, cleanup } = setupProject(`
+  const { cleanup } = setupProject(`
 aliases:
   "./bin/eslint": node
 `);
   try {
-    const sem = analyzeSemantics(parseCmd("bin/eslint --version"), _ctx);
+    const sem = analyzeSemantics(parseCmd("bin/eslint --version"));
     assert.equal(sem.commandClass, "inspect");
     assert.ok(sem.reason.includes("version/help"), `应命中精确键（node 语义）: ${sem.reason}`);
   } finally {
@@ -225,7 +218,7 @@ aliases:
 
 test("aliases: 别名目标为 commands 定义时链式解析", () => {
   resetConfig();
-  const { ctx: _ctx, cleanup } = setupProject(`
+  const { cleanup } = setupProject(`
 aliases:
   mytool: my-linter
 commands:
@@ -234,7 +227,7 @@ commands:
     effects: [read]
 `);
   try {
-    const sem = analyzeSemantics(parseCmd("mytool src/"), _ctx);
+    const sem = analyzeSemantics(parseCmd("mytool src/"));
     assert.equal(sem.commandClass, "inspect");
     assert.ok(sem.reason.includes("user-defined"), `应复用命令定义: ${sem.reason}`);
     assert.deepStrictEqual(sem.effects, ["read"]);
@@ -245,7 +238,7 @@ commands:
 
 test("aliases: 别名目标为别名时不链式解析（单步契约，D-024）", () => {
   resetConfig();
-  const { ctx: _ctx, cleanup } = setupProject(`
+  const { cleanup } = setupProject(`
 aliases:
   a: b
   b: cat
@@ -253,7 +246,7 @@ aliases:
   try {
     // 单步契约：a → b 后把 b 当作最终目标查 adapter（无 b adapter → unknown），
     // 不递归 b → cat——链式让语义需沿解析图追多跳才能确定，D-024 明确拒绝
-    const sem = analyzeSemantics(parseCmd("a --version"), _ctx);
+    const sem = analyzeSemantics(parseCmd("a --version"));
     assert.equal(sem.commandClass, "unknown");
     assert.ok(sem.reason.includes("aliased to b"), `reason 应说明单步目标: ${sem.reason}`);
   } finally {
@@ -263,19 +256,19 @@ aliases:
 
 test("aliases: 无 overrides 时不受影响", () => {
   resetConfig();
-  // DEFAULT_CTX 指向不存在的目录 → loadOverrides 找不到文件，回退到空配置
-  const sem = analyzeSemantics(parseCmd("git status"), DEFAULT_CTX);
+  // 无用户配置目录 → loadOverrides 找不到文件，回退到空配置
+  const sem = analyzeSemantics(parseCmd("git status"));
   assert.equal(sem.commandClass, "inspect");
   assert.ok(sem.reason.includes("show working tree"));
 });
 
 test("only the global pi-keel/config.yaml is read; no project config exists", () => {
   resetConfig();
-  const { ctx, cleanup } = setupProject("");
+  const { cleanup } = setupProject("");
   try {
     // setupProject 只写了全局 pi-keel/config.yaml（commands 段为空）；
     // 项目目录中没有配置文件，也不存在项目级读取路径。
-    const sem = analyzeSemantics(parseCmd("local-git status"), ctx);
+    const sem = analyzeSemantics(parseCmd("local-git status"));
     assert.equal(sem.commandClass, "unknown");
   } finally {
     cleanup();
@@ -286,14 +279,14 @@ test("only the global pi-keel/config.yaml is read; no project config exists", ()
 
 test("commands: 简单命令（无子命令）→ 使用 YAML 定义的 class", () => {
   resetConfig();
-  const { ctx, cleanup } = setupProject(`
+  const { cleanup } = setupProject(`
 commands:
   my-linter:
     class: inspect
     effects: [read]
 `);
   try {
-    const sem = analyzeSemantics(parseCmd("my-linter src/"), ctx);
+    const sem = analyzeSemantics(parseCmd("my-linter src/"));
     assert.equal(sem.commandClass, "inspect");
     assert.ok(sem.reason.includes("user-defined"));
     assert.deepStrictEqual(sem.effects, ["read"]);
@@ -304,14 +297,14 @@ commands:
 
 test("commands: 路径前缀键覆盖目录内命令定义（D-024 作用域）", () => {
   resetConfig();
-  const { ctx, cleanup } = setupProject(`
+  const { cleanup } = setupProject(`
 commands:
   "bin/":
     class: inspect
     effects: [read]
 `);
   try {
-    const sem = analyzeSemantics(parseCmd("./bin/tool src/"), ctx);
+    const sem = analyzeSemantics(parseCmd("./bin/tool src/"));
     assert.equal(sem.commandClass, "inspect");
     assert.ok(sem.reason.includes("user-defined"));
     assert.deepStrictEqual(sem.effects, ["read"]);
@@ -322,7 +315,7 @@ commands:
 
 test("commands: 带子命令定义 → 子命令匹配", () => {
   resetConfig();
-  const { ctx, cleanup } = setupProject(`
+  const { cleanup } = setupProject(`
 commands:
   docker:
     class: execute
@@ -333,11 +326,11 @@ commands:
       build: { class: execute, effects: [write, network] }
 `);
   try {
-    const ps = analyzeSemantics(parseCmd("docker ps"), ctx);
+    const ps = analyzeSemantics(parseCmd("docker ps"));
     assert.equal(ps.commandClass, "inspect");
     assert.ok(ps.reason.includes("ps"));
 
-    const build = analyzeSemantics(parseCmd("docker build ."), ctx);
+    const build = analyzeSemantics(parseCmd("docker build ."));
     assert.equal(build.commandClass, "execute");
     assert.ok(build.reason.includes("build"));
     assert.deepStrictEqual(build.effects, ["write", "network"]);
@@ -348,7 +341,7 @@ commands:
 
 test("commands: 子命令未匹配 → 基类 + opaque", () => {
   resetConfig();
-  const { ctx, cleanup } = setupProject(`
+  const { cleanup } = setupProject(`
 commands:
   docker:
     class: execute
@@ -357,7 +350,7 @@ commands:
       ps: { class: inspect, effects: [read] }
 `);
   try {
-    const sem = analyzeSemantics(parseCmd("docker unknown-cmd"), ctx);
+    const sem = analyzeSemantics(parseCmd("docker unknown-cmd"));
     assert.equal(sem.commandClass, "execute");
     assert.equal(sem.opaque, true);
     assert.ok(sem.reason.includes("unrecognized subcommand"));
@@ -368,7 +361,7 @@ commands:
 
 test("commands: 同名命令覆盖内置 adapter（用户定义优先）", () => {
   resetConfig();
-  const { ctx, cleanup } = setupProject(`
+  const { cleanup } = setupProject(`
 commands:
   git:
     class: inspect
@@ -376,7 +369,7 @@ commands:
 `);
   try {
     // 用户将 git 整体定义为 inspect — 应直接返回，不走 git adapter
-    const sem = analyzeSemantics(parseCmd("git push --force origin main"), ctx);
+    const sem = analyzeSemantics(parseCmd("git push --force origin main"));
     assert.equal(sem.commandClass, "inspect");
     assert.ok(sem.reason.includes("user-defined"));
   } finally {
@@ -388,7 +381,7 @@ commands:
 
 test("reclassify: 匹配 pattern 时覆盖分类", () => {
   resetConfig();
-  const { ctx, cleanup } = setupProject(`
+  const { cleanup } = setupProject(`
 reclassify:
   - command: git
     pattern: "branch -[dD]"
@@ -396,11 +389,11 @@ reclassify:
 `);
   try {
     // git branch（无 -d）不受影响
-    const list = analyzeSemantics(parseCmd("git branch"), ctx);
+    const list = analyzeSemantics(parseCmd("git branch"));
     assert.equal(list.commandClass, "inspect");
 
     // git branch -d → reclassify 为 destroy，且 opaque 已被清除
-    const del = analyzeSemantics(parseCmd("git branch -d old-branch"), ctx);
+    const del = analyzeSemantics(parseCmd("git branch -d old-branch"));
     assert.equal(del.commandClass, "destroy");
     assert.equal(del.opaque, false);
     assert.ok(del.reason.includes("reclassified to destroy"));
@@ -411,7 +404,7 @@ reclassify:
 
 test("reclassify: 路径形式按 basename 对齐 adapter 身份（/usr/local/bin/git → 应用规则）", () => {
   resetConfig();
-  const { ctx, cleanup } = setupProject(`
+  const { cleanup } = setupProject(`
 reclassify:
   - command: git
     pattern: "status"
@@ -420,7 +413,7 @@ reclassify:
   try {
     // adapter 已按 basename 识别命令身份（/usr/local/bin/git → git adapter），
     // reclassify 应对齐该身份，否则用户声明在路径形式下静默失效
-    const sem = analyzeSemantics(parseCmd("/usr/local/bin/git status"), ctx);
+    const sem = analyzeSemantics(parseCmd("/usr/local/bin/git status"));
     assert.equal(sem.commandClass, "modify");
     assert.ok(sem.reason.includes("reclassified"));
   } finally {
@@ -430,14 +423,14 @@ reclassify:
 
 test("reclassify: 不匹配时保留原分类", () => {
   resetConfig();
-  const { ctx, cleanup } = setupProject(`
+  const { cleanup } = setupProject(`
 reclassify:
   - command: git
     pattern: "branch -[dD]"
     class: destroy
 `);
   try {
-    const sem = analyzeSemantics(parseCmd("git status"), ctx);
+    const sem = analyzeSemantics(parseCmd("git status"));
     assert.equal(sem.commandClass, "inspect");
     assert.ok(!sem.reason.includes("reclassified"));
   } finally {
@@ -447,14 +440,14 @@ reclassify:
 
 test("reclassify: pattern 是无效正则时跳过", () => {
   resetConfig();
-  const { ctx, cleanup } = setupProject(`
+  const { cleanup } = setupProject(`
 reclassify:
   - command: git
     pattern: "[invalid"
     class: destroy
 `);
   try {
-    const sem = analyzeSemantics(parseCmd("git status"), ctx);
+    const sem = analyzeSemantics(parseCmd("git status"));
     assert.equal(sem.commandClass, "inspect");
   } finally {
     cleanup();
@@ -463,7 +456,7 @@ reclassify:
 
 test("reclassify: 只匹配指定命令名", () => {
   resetConfig();
-  const { ctx, cleanup } = setupProject(`
+  const { cleanup } = setupProject(`
 reclassify:
   - command: git
     pattern: "status"
@@ -471,7 +464,7 @@ reclassify:
 `);
   try {
     // cargo status 不应匹配 git 的 reclassify
-    const sem = analyzeSemantics(parseCmd("cargo status"), ctx);
+    const sem = analyzeSemantics(parseCmd("cargo status"));
     assert.notEqual(sem.commandClass, "execute");
   } finally {
     cleanup();
@@ -482,7 +475,7 @@ reclassify:
 
 test("组合: aliases + reclassify 同时生效", () => {
   resetConfig();
-  const { ctx, cleanup } = setupProject(`
+  const { cleanup } = setupProject(`
 aliases:
   g: git
 reclassify:
@@ -492,7 +485,7 @@ reclassify:
 `);
   try {
     // g → git（别名），然后 status 被 reclassify
-    const sem = analyzeSemantics(parseCmd("g status"), ctx);
+    const sem = analyzeSemantics(parseCmd("g status"));
     assert.equal(sem.commandClass, "execute");
   } finally {
     cleanup();
@@ -501,7 +494,7 @@ reclassify:
 
 test("组合: commands 定义优先于别名和内置", () => {
   resetConfig();
-  const { ctx, cleanup } = setupProject(`
+  const { cleanup } = setupProject(`
 aliases:
   g: git
 commands:
@@ -511,7 +504,7 @@ commands:
 `);
   try {
     // commands 中的 g 定义直接生效，不走 git adapter
-    const sem = analyzeSemantics(parseCmd("g push --force"), ctx);
+    const sem = analyzeSemantics(parseCmd("g push --force"));
     assert.equal(sem.commandClass, "inspect");
     assert.ok(sem.reason.includes("user-defined"));
   } finally {
@@ -521,7 +514,7 @@ commands:
 
 test("组合: 别名 + commands → commands 优先于别名", () => {
   resetConfig();
-  const { ctx, cleanup } = setupProject(`
+  const { cleanup } = setupProject(`
 aliases:
   g: git
 commands:
@@ -531,7 +524,7 @@ commands:
 `);
   try {
     // g 在 commands 中有定义 → 直接使用，不走别名 → git adapter
-    const sem = analyzeSemantics(parseCmd("g anything"), ctx);
+    const sem = analyzeSemantics(parseCmd("g anything"));
     assert.equal(sem.commandClass, "execute");
     assert.ok(sem.reason.includes("user-defined"), `reason: ${sem.reason}`);
   } finally {
@@ -543,14 +536,14 @@ commands:
 
 test("校验: commands 中无效 class 抛出明确错误", () => {
   resetConfig();
-  const { ctx, cleanup } = setupProject(`
+  const { cleanup } = setupProject(`
 commands:
   badtool:
     class: bogus
 `);
   try {
     assert.throws(
-      () => analyzeSemantics(parseCmd("badtool arg"), ctx),
+      () => analyzeSemantics(parseCmd("badtool arg")),
       /invalid class/,
     );
   } finally {
@@ -560,7 +553,7 @@ commands:
 
 test("校验: reclassify 中无效 class 抛出明确错误", () => {
   resetConfig();
-  const { ctx, cleanup } = setupProject(`
+  const { cleanup } = setupProject(`
 reclassify:
   - command: git
     pattern: "status"
@@ -568,7 +561,7 @@ reclassify:
 `);
   try {
     assert.throws(
-      () => analyzeSemantics(parseCmd("git status"), ctx),
+      () => analyzeSemantics(parseCmd("git status")),
       /invalid class/,
     );
   } finally {
@@ -578,7 +571,7 @@ reclassify:
 
 test("校验: subcommands 中无效 class 抛出明确错误", () => {
   resetConfig();
-  const { ctx, cleanup } = setupProject(`
+  const { cleanup } = setupProject(`
 commands:
   tool:
     class: execute
@@ -587,7 +580,7 @@ commands:
 `);
   try {
     assert.throws(
-      () => analyzeSemantics(parseCmd("tool x"), ctx),
+      () => analyzeSemantics(parseCmd("tool x")),
       /invalid class/,
     );
   } finally {
@@ -611,13 +604,13 @@ aliases:
   const agent2 = process.env.PI_CODING_AGENT_DIR;
   try {
     process.env.PI_CODING_AGENT_DIR = agent1;
-    const sem1 = analyzeSemantics(parseCmd("t1 status"), p1.ctx);
+    const sem1 = analyzeSemantics(parseCmd("t1 status"));
     assert.equal(sem1.commandClass, "inspect");
 
     process.env.PI_CODING_AGENT_DIR = agent2;
-    const sem2 = analyzeSemantics(parseCmd("t2 status"), p2.ctx);
+    const sem2 = analyzeSemantics(parseCmd("t2 status"));
     assert.equal(sem2.commandClass, "inspect");
-    const sem3 = analyzeSemantics(parseCmd("t1 status"), p2.ctx);
+    const sem3 = analyzeSemantics(parseCmd("t1 status"));
     assert.equal(sem3.commandClass, "unknown");
   } finally {
     p2.cleanup();
@@ -629,11 +622,11 @@ aliases:
 
 test("边界: 空 overrides 不影响正常分析", () => {
   resetConfig();
-  const { ctx, cleanup } = setupProject(`
+  const { cleanup } = setupProject(`
 # 只有注释，无实际内容
 `);
   try {
-    const sem = analyzeSemantics(parseCmd("git log"), ctx);
+    const sem = analyzeSemantics(parseCmd("git log"));
     assert.equal(sem.commandClass, "inspect");
   } finally {
     cleanup();
@@ -642,9 +635,9 @@ test("边界: 空 overrides 不影响正常分析", () => {
 
 test("边界: 无效 YAML 不崩溃，回退到空配置", () => {
   resetConfig();
-  const { ctx, cleanup } = setupProject(`{invalid: [::`);
+  const { cleanup } = setupProject(`{invalid: [::`);
   try {
-    const sem = analyzeSemantics(parseCmd("git log"), ctx);
+    const sem = analyzeSemantics(parseCmd("git log"));
     assert.equal(sem.commandClass, "inspect");
   } finally {
     cleanup();
@@ -655,14 +648,14 @@ test("边界: 无效 YAML 不崩溃，回退到空配置", () => {
 
 test("commands: 路径键优先于路径 fallback（用户定义直接生效）", () => {
   resetConfig();
-  const { ctx, cleanup } = setupProject(`
+  const { cleanup } = setupProject(`
 commands:
   ./deploy.sh:
     class: inspect
     effects: [read]
 `);
   try {
-    const sem = analyzeSemantics(parseCmd("./deploy.sh -x"), ctx);
+    const sem = analyzeSemantics(parseCmd("./deploy.sh -x"));
     assert.equal(sem.commandClass, "inspect", "user-defined path command must win over execute fallback");
     assert.ok(sem.reason.includes("user-defined"));
   } finally {
@@ -672,14 +665,14 @@ commands:
 
 test("reclassify: 可覆盖路径 fallback 的 execute", () => {
   resetConfig();
-  const { ctx, cleanup } = setupProject(`
+  const { cleanup } = setupProject(`
 reclassify:
   - command: ./node_modules/.bin/tsx
     pattern: run\\.ts
     class: inspect
 `);
   try {
-    const sem = analyzeSemantics(parseCmd("./node_modules/.bin/tsx run.ts"), ctx);
+    const sem = analyzeSemantics(parseCmd("./node_modules/.bin/tsx run.ts"));
     assert.equal(sem.commandClass, "inspect", "reclassify must override the path-form execute fallback");
     assert.equal(sem.opaque, false);
     assert.ok(sem.reason.includes("reclassified to inspect"));
@@ -690,12 +683,12 @@ reclassify:
 
 test("aliases: 仍先于 adapter/fallback 生效（裸名映射到已知 adapter）", () => {
   resetConfig();
-  const { ctx, cleanup } = setupProject(`
+  const { cleanup } = setupProject(`
 aliases:
   myinsp: ls
 `);
   try {
-    const sem = analyzeSemantics(parseCmd("myinsp /tmp"), ctx);
+    const sem = analyzeSemantics(parseCmd("myinsp /tmp"));
     assert.equal(sem.commandClass, "inspect", "alias to known adapter wins over unknown fallback");
   } finally {
     cleanup();

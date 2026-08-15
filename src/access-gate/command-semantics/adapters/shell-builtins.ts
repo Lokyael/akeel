@@ -13,7 +13,7 @@
 //   - "-" as the filename means stdin (no filesystem path to check).
 
 import type { ShellCommandNode, ShellArg } from "../../shell-parse/types";
-import type { CommandAdapter, CommandSemantics, PathIntent, SemanticContext } from "../types";
+import type { CommandAdapter, CommandSemantics, PathIntent } from "../types";
 import { makeSemantics } from "./shared";
 
 /**
@@ -50,7 +50,7 @@ function fileIntent(args: readonly ShellArg[], isDotCommand: boolean): PathInten
 
 export const shellBuiltinsAdapter: CommandAdapter = {
   names: ["source", "."],
-  analyze(node: ShellCommandNode, _context: SemanticContext): CommandSemantics {
+  analyze(node: ShellCommandNode): CommandSemantics {
     const name = node.executable?.value?.toLowerCase() ?? "";
     const isDot = name === ".";
     const intent = fileIntent(node.args, isDot);

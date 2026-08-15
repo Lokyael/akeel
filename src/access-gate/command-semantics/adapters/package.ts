@@ -1,7 +1,7 @@
 // 包管理器命令 — npm, pnpm, yarn 的语义
 
 import type { ShellArg, ShellCommandNode } from "../../shell-parse/types";
-import type { CommandAdapter, CommandSemantics, PathIntent, SemanticContext } from "../types";
+import type { CommandAdapter, CommandSemantics, PathIntent } from "../types";
 import { makeSemantics, optionIntent, semanticsFromRules, type RuleDef } from "./shared";
 import { parseOptions, type Opt } from "./option-parse";
 import { parseConfigOptions, type ConfigOptionTable } from "./config-parse";
@@ -93,7 +93,7 @@ function analyzePkgConfig(rest: readonly ShellArg[]): { cls: "modify"; intents: 
 
 export const packageAdapter: CommandAdapter = {
   names: Object.keys(PKG_RULES),
-  analyze(node: ShellCommandNode, _context: SemanticContext): CommandSemantics {
+  analyze(node: ShellCommandNode): CommandSemantics {
     const name = node.executable?.value?.toLowerCase() ?? "";
     const rules = PKG_RULES[name];
     if (!rules) return makeSemantics("unknown", { reason: `unknown package manager: ${name}`, opaque: true });
@@ -105,7 +105,7 @@ export const packageAdapter: CommandAdapter = {
     const subcmdArgs = positional.length > 0
       ? positional
       : (name === "npx" && node.args.length > 0 ? [{ value: node.args[0]!.value ?? "" }] : []);
-    const subcmd = subcmdArgs.map((a) => a.value ?? "").join(" ");
+    const subcmd = subcmdArgs.map((a) => a.value).join(" ");
 
     // npm/pnpm config 写命令（set/delete/edit）→ modify + 配置目标 write intent；
     // get/list/未知交回规则循环（yarn config 不在范围，维持 modify 无 intent）。

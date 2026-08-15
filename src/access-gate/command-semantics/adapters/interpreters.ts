@@ -1,7 +1,7 @@
 // script interpreter commands -- python, python3, node, ruby, perl
 
 import type { ShellCommandNode } from "../../shell-parse/types";
-import type { CommandAdapter, CommandSemantics, SemanticContext } from "../types";
+import type { CommandAdapter, CommandSemantics } from "../types";
 import { makeSemantics } from "./shared";
 import { parseOptions, type Opt } from "./option-parse";
 import { LANGUAGE_RUNTIMES } from "../interpreter-names";
@@ -18,7 +18,7 @@ const INFO_OPTS: readonly Opt[] = [
 
 export const interpreterAdapter: CommandAdapter = {
   names: [...LANGUAGE_RUNTIMES],
-  analyze(node: ShellCommandNode, _context: SemanticContext): CommandSemantics {
+  analyze(node: ShellCommandNode): CommandSemantics {
     const name = node.executable?.value?.toLowerCase() ?? "";
     const { flags } = parseOptions(node.args, { opts: INFO_OPTS, positional: "file", opaqueOnUnknown: false });
     const isInfo = flags.some((f) => f === "--version" || f === "-V" || f === "-v" || f === "--help");

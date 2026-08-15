@@ -5,7 +5,7 @@
 // （B4 收紧）；高频 flag（cp -r、rm -rf、mkdir -p 等）已建模避免日常过拒。
 
 import type { ShellCommandNode, ShellArg } from "../../shell-parse/types";
-import type { CommandAdapter, CommandSemantics, Effect, PathIntent, SemanticContext } from "../types";
+import type { CommandAdapter, CommandSemantics, Effect, PathIntent } from "../types";
 import { makeSemantics, SYNTHETIC_SPAN } from "./shared";
 import { parseOptions, type Opt } from "./option-parse";
 
@@ -14,13 +14,13 @@ import { parseOptions, type Opt } from "./option-parse";
 function copyLikePaths(args: readonly ShellArg[], consumed: ReadonlyArray<{ option: string; value: string }>, srcOp: "read" | "write"): { op: "read" | "write"; value: string }[] {
   const targetDir = consumed.find((c) => c.option === "-t" || c.option === "--target-directory")?.value;
   if (targetDir) {
-    return [...args.map((a) => ({ op: srcOp, value: a.value ?? "" })), { op: "write", value: targetDir }];
+    return [...args.map((a) => ({ op: srcOp, value: a.value })), { op: "write", value: targetDir }];
   }
   if (args.length < 2) return [];
   const last = args[args.length - 1]!;
   return [
-    ...args.slice(0, -1).map((a) => ({ op: srcOp, value: a.value ?? "" })),
-    { op: "write", value: last.value ?? "" },
+    ...args.slice(0, -1).map((a) => ({ op: srcOp, value: a.value })),
+    { op: "write", value: last.value },
   ];
 }
 
@@ -41,13 +41,13 @@ function referenceAwareFiles(
   skipFirstPositional: boolean,
 ): { op: "read" | "write"; value: string }[] {
   const ref = consumed.find((c) => refOptions.includes(c.option))?.value;
-  const writes = args.slice(skipFirstPositional && !ref ? 1 : 0).map((a) => ({ op: "write" as const, value: a.value ?? "" }));
+  const writes = args.slice(skipFirstPositional && !ref ? 1 : 0).map((a) => ({ op: "write" as const, value: a.value }));
   return ref ? [{ op: "read" as const, value: ref }, ...writes] : writes;
 }
 
 /** 位置参数全为写目标（rm/mkdir/tee/rmdir/shred 共用）：无选项值、无参考文件语义的命令族。 */
 function writeAllArgs(args: readonly ShellArg[]): { op: "write"; value: string }[] {
-  return args.map((a) => ({ op: "write" as const, value: a.value ?? "" }));
+  return args.map((a) => ({ op: "write" as const, value: a.value }));
 }
 
 const FILESYSTEM_CMDS: Record<string, {
@@ -174,7 +174,7 @@ const FILESYSTEM_CMDS: Record<string, {
     // -d/--directory（mkdir 模式）时位置参数全是目录创建目标
     paths: (args, consumed, flags) => {
       if (flags?.includes("-d") || flags?.includes("--directory")) {
-        return args.map((a) => ({ op: "write" as const, value: a.value ?? "" }));
+        return args.map((a) => ({ op: "write" as const, value: a.value }));
       }
       return copyLikePaths(args, consumed, "read");
     },
@@ -204,7 +204,7 @@ const FILESYSTEM_CMDS: Record<string, {
     paths: (args) => {
       const out: { op: "read" | "write"; value: string }[] = [];
       for (const a of args) {
-        const v = a.value ?? "";
+        const v = a.value;
         if (v.startsWith("of=")) out.push({ op: "write", value: v.slice(3) });
         else if (v.startsWith("if=")) out.push({ op: "read", value: v.slice(3) });
       }
@@ -228,7 +228,7 @@ const FILESYSTEM_CMDS: Record<string, {
 
 export const filesystemAdapter: CommandAdapter = {
   names: Object.keys(FILESYSTEM_CMDS),
-  analyze(node: ShellCommandNode, _context: SemanticContext): CommandSemantics {
+  analyze(node: ShellCommandNode): CommandSemantics {
     const name = node.executable?.value?.toLowerCase() ?? "";
     const def = FILESYSTEM_CMDS[name];
     if (!def) return makeSemantics("unknown", { reason: `unknown filesystem command: ${name}`, opaque: true });

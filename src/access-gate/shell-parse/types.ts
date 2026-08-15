@@ -10,7 +10,8 @@ export interface SourceSpan {
 
 export interface ShellArg {
   raw: string;
-  value: string | null;
+  /** 解码后的词值（lexer 单点产出；bash 词义：引号剥离 + 转义解析）。 */
+  value: string;
   quoted: boolean;
   dynamic: boolean;
   span: SourceSpan;
@@ -38,7 +39,7 @@ export interface ShellCommandNode {
   envAssignments: readonly ShellArg[];
   wrapper: readonly ShellArg[];
   /** wrapper 的 positional 参数（如 timeout <duration>）：parser 消费不入 args，仅保留供 token 级扫描（D-037）。 */
-  wrapperArgs: readonly ShellArg[];
+  wrapperPositionals: readonly ShellArg[];
   executable: ShellArg | null;
   args: readonly ShellArg[];
   redirections: readonly ShellRedirectionNode[];

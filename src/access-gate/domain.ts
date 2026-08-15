@@ -34,7 +34,7 @@ export const EFFECT_SET: ReadonlySet<Effect> = new Set(EFFECT_VALUES);
 
 // ─── 路径意图来源 ───
 
-export const PATH_SOURCE_VALUES = ["argument", "option", "redirection", "cwd", "wrapper"] as const;
+export const PATH_SOURCE_VALUES = ["argument", "option", "redirection", "cwd"] as const;
 export type PathSource = (typeof PATH_SOURCE_VALUES)[number];
 export const PATH_SOURCE_SET: ReadonlySet<PathSource> = new Set(PATH_SOURCE_VALUES);
 

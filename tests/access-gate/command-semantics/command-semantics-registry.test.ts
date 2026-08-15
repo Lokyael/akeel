@@ -11,7 +11,6 @@ function stubAdapter(names: string[]): CommandAdapter {
     commandClass: "unknown",
     effects: [],
     intents: [],
-    hardRule: null,
     opaque: false,
     reason: "stub",
   };

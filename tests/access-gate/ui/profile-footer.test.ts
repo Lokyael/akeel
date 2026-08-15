@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { fitLine, renderProfileFooter, selectWidthHelpers, thinkingLevelFromEntries, type FooterSnapshot } from "../../../src/access-gate/ui/profile-footer";
+import { fallbackWidthHelpers, fitLine, renderProfileFooter, thinkingLevelFromEntries, type FooterSnapshot } from "../../../src/access-gate/ui/footer-layout";
+import { selectWidthHelpers } from "../../../src/access-gate/ui/profile-footer";
 
 const snapshot: FooterSnapshot = {
   cwd: "~/workspace/pi-skills",
@@ -16,7 +17,7 @@ const snapshot: FooterSnapshot = {
 };
 
 test("renders the complete bottom UI as exactly two lines", () => {
-  const lines = renderProfileFooter(snapshot, 120);
+  const lines = renderProfileFooter(snapshot, 120, fallbackWidthHelpers());
 
   assert.equal(lines.length, 2);
   assert.match(lines[0]!, /develop$/);
@@ -26,7 +27,7 @@ test("renders the complete bottom UI as exactly two lines", () => {
 });
 
 test("right-aligns Profile after stripping ANSI styling codes from width calculations", () => {
-  const line = fitLine("location", "\u001b[2mdevelop\u001b[0m", 40);
+  const line = fitLine("location", "\u001b[2mdevelop\u001b[0m", 40, fallbackWidthHelpers());
 
   assert.equal(line.length, 40 + 8);
   assert.equal(line.endsWith("\u001b[2mdevelop\u001b[0m"), true);
@@ -34,7 +35,7 @@ test("right-aligns Profile after stripping ANSI styling codes from width calcula
 });
 
 test("truncates both rows without allowing content to overlap", () => {
-  const lines = renderProfileFooter(snapshot, 48);
+  const lines = renderProfileFooter(snapshot, 48, fallbackWidthHelpers());
 
   assert.equal(lines.length, 2);
   for (const line of lines) assert.ok(line.length <= 48);

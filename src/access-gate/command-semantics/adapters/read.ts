@@ -4,7 +4,7 @@
 // opaqueOnUnknown: true（B4 收紧）；高频 flag（wc -l、head -n、diff -u 等）已建模。
 
 import type { ShellCommandNode, ShellArg } from "../../shell-parse/types";
-import type { CommandAdapter, CommandSemantics, PathIntent, SemanticContext } from "../types";
+import type { CommandAdapter, CommandSemantics, PathIntent } from "../types";
 import { makeSemantics } from "./shared";
 import { parseOptions, type Opt } from "./option-parse";
 
@@ -61,13 +61,13 @@ const READ_CONFIG: Record<string, readonly Opt[]> = {
 
 /** "-" 是 stdin，不算文件。 */
 function fileArgs(args: readonly ShellArg[]): ShellArg[] {
-  return args.filter((arg) => (arg.value ?? "") !== "-");
+  return args.filter((arg) => (arg.value) !== "-");
 }
 
 function readIntents(args: readonly ShellArg[]): PathIntent[] {
   return fileArgs(args).map((arg) => ({
     operation: "read" as const,
-    rawPath: arg.value ?? "",
+    rawPath: arg.value,
     source: "argument" as const,
     span: arg.span,
     confidence: "exact" as const,
@@ -76,7 +76,7 @@ function readIntents(args: readonly ShellArg[]): PathIntent[] {
 
 export const readAdapter: CommandAdapter = {
   names: Object.keys(READ_CONFIG),
-  analyze(node: ShellCommandNode, _context: SemanticContext): CommandSemantics {
+  analyze(node: ShellCommandNode): CommandSemantics {
     const name = node.executable?.value?.toLowerCase() ?? "";
     const opts = READ_CONFIG[name];
     if (!opts) return makeSemantics("unknown", { reason: `unknown read command: ${name}`, opaque: true });

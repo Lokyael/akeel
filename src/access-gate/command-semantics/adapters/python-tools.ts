@@ -13,7 +13,7 @@
 // write-on-cwd fallback; inspect tools are gated by shellPolicy.inspect.
 
 import type { ShellCommandNode } from "../../shell-parse/types";
-import type { CommandAdapter, CommandSemantics, SemanticContext } from "../types";
+import type { CommandAdapter, CommandSemantics } from "../types";
 import { makeSemantics } from "./shared";
 import { parseOptions, type Opt } from "./option-parse";
 
@@ -105,7 +105,7 @@ function adjustOpts(def: PyToolDef): Opt[] {
 
 export const pythonToolsAdapter: CommandAdapter = {
   names: Object.keys(PY_TOOLS),
-  analyze(node: ShellCommandNode, _context: SemanticContext): CommandSemantics {
+  analyze(node: ShellCommandNode): CommandSemantics {
     const name = node.executable?.value?.toLowerCase() ?? "";
     const def = PY_TOOLS[name];
     if (!def) return makeSemantics("unknown", { reason: `unknown python tool: ${name}`, opaque: true });

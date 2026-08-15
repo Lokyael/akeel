@@ -6,7 +6,7 @@
 // -exec 族 → consumeUntil；选项值 token 天然不参与 flags（F2 根因消除）。
 
 import type { ShellCommandNode, ShellArg } from "../../shell-parse/types";
-import type { CommandAdapter, CommandSemantics, PathIntent, SemanticContext } from "../types";
+import type { CommandAdapter, CommandSemantics, PathIntent } from "../types";
 import { makeSemantics, consumedFileIntents, SYNTHETIC_SPAN } from "./shared";
 import { parseOptions, type Opt, type OptConfig } from "./option-parse";
 
@@ -121,7 +121,7 @@ function rootIntent(operation: "search" | "list" | "read", rawPath: string, span
 
 export const searchAdapter: CommandAdapter = {
   names: Object.keys(SEARCH_CONFIG),
-  analyze(node: ShellCommandNode, _context: SemanticContext): CommandSemantics {
+  analyze(node: ShellCommandNode): CommandSemantics {
     const name = node.executable?.value?.toLowerCase() ?? "";
     const config = SEARCH_CONFIG[name];
     if (!config) return makeSemantics("unknown", { reason: `unknown search command: ${name}`, opaque: true });
@@ -148,7 +148,7 @@ export const searchAdapter: CommandAdapter = {
 
     // 对于需要递归标记的命令，没有递归标记时不产生搜索 intent：非递归 grep 读取文件参数
     if (config.needsRecursiveFlag && !isRecursive) {
-      const readIntents: PathIntent[] = rootArgs.map((arg) => rootIntent("read", arg.value ?? "", arg.span));
+      const readIntents: PathIntent[] = rootArgs.map((arg) => rootIntent("read", arg.value, arg.span));
       return makeSemantics(config.class, {
         reason: config.reason,
         // 类别固定顺序：pattern 文件（-f read）在前、文件参数在后（与既有测试契约一致）
@@ -159,7 +159,7 @@ export const searchAdapter: CommandAdapter = {
 
     const pathOperation = config.operation ?? "search";
     const rootIntents: PathIntent[] = rootArgs.length > 0
-      ? rootArgs.map((arg) => rootIntent(pathOperation, arg.value ?? "", arg.span))
+      ? rootArgs.map((arg) => rootIntent(pathOperation, arg.value, arg.span))
       : [rootIntent(pathOperation, config.defaultRoot, SYNTHETIC_SPAN)];
 
     // 破坏性/写选项（-delete/-exec/-o/-fprint…，T-059/B1：声明 upgradeTo: modify）→ 升级 modify

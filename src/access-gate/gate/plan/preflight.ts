@@ -10,7 +10,7 @@ import { HARD_RULE_INTERPRETERS } from "../../command-semantics";
 //   - download → && → execute（下载后执行）
 //   - eval 远程内容
 // 匹配基于 parse 后的命令结构（executable/args/操作符），而非原始文本：
-//   - 引号拆分（s'h'、pyth'on3、ev'al）经 shellWord 拼接规范化后不再逃逸；
+//   - 引号拆分（s'h'、pyth'on3、ev'al）在 lexer 词义层即解码归一，不再逃逸；
 //   - 注释与字符串字面量不产生执行结构，不再误报。
 // 解释器名单与 interpreter adapter 同源（interpreters.ts）：
 // 语言运行时自动进入硬规则集，tsx 由此被拦截（curl | tsx）。
@@ -18,30 +18,19 @@ import { HARD_RULE_INTERPRETERS } from "../../command-semantics";
 
 const DOWNLOADERS = new Set(["curl", "wget"]);
 
-/** shell 词规范化：剥离引号（' " 在字面值中不构成词的一部分）与反斜杠转义。 */
-function shellWord(raw: string | null | undefined): string | null {
+/** 归一化 executable 为解释器名（basename + 版本/别名映射）；非解释器返回 null。
+ * executable 的 value 已是 lexer 解码后的词值——引号拆分（s'h' → sh）在词义层
+ * 即归一，不再需要 shellWord 二次规范化（词义单点，D-037 后）。
+ * undefined 来自可选链（node.executable?.value）。 */
+function interpreterName(raw: string | undefined): string | null {
   if (!raw) return null;
-  let out = "";
-  for (let i = 0; i < raw.length; i++) {
-    const ch = raw[i]!;
-    if (ch === "\\" && i + 1 < raw.length) { out += raw[i + 1]!; i++; continue; }
-    if (ch === "'" || ch === '"') continue;
-    out += ch;
-  }
-  return out;
-}
-
-/** 归一化 executable 为解释器名（basename + 版本/别名映射）；非解释器返回 null。 */
-function interpreterName(raw: string | null | undefined): string | null {
-  const normalized = shellWord(raw);
-  if (!normalized) return null;
-  const base = normalized.includes("/") ? normalized.slice(normalized.lastIndexOf("/") + 1) : normalized;
+  const base = raw.includes("/") ? raw.slice(raw.lastIndexOf("/") + 1) : raw;
   const canonical = canonicalExecutableName(base);
   return HARD_RULE_INTERPRETERS.has(canonical) ? canonical : null;
 }
 
 function commandName(node: ShellCommandNode): string | null {
-  return shellWord(node.executable?.value)?.toLowerCase() ?? null;
+  return node.executable?.value?.toLowerCase() ?? null;
 }
 
 function isDownloader(node: ShellCommandNode): boolean {
@@ -56,7 +45,7 @@ function downloadPipesStdout(node: ShellCommandNode): boolean {
   if (name === "curl") return true;
   // wget -O - / -O- 分离或附着形式；其它 -O FILE 落到文件不进入管道
   return node.args.some((arg, i) => {
-    const v = arg.value ?? "";
+    const v = arg.value;
     return (v === "-O" && i + 1 < node.args.length && (node.args[i + 1]!.value ?? "") === "-")
       || (v.startsWith("-O") && v.endsWith("-") && v.length > 2);
   });
@@ -67,7 +56,7 @@ function downloadWritesFile(node: ShellCommandNode): boolean {
   const flag = commandName(node) === "curl" ? "-o" : "-O";
   const long = commandName(node) === "curl" ? "--output" : "--output-document";
   return node.args.some((arg, i) => {
-    const v = arg.value ?? "";
+    const v = arg.value;
     if (v === flag) {
       const next = i + 1 < node.args.length ? node.args[i + 1]!.value ?? "" : "";
       return next !== "" && next !== "-";
@@ -126,7 +115,7 @@ function evalRemoteContent(program: ShellProgram): string | null {
     // 命令替换形态（$() 或反引号）内含下载器才算远程内容执行；
     // 纯本地字符串（eval 'echo curl'）不拦，与原 \beval\s+"\?\$\?\( 语义一致
     if (node.args.some((arg) =>
-      /\$\([^)]*\b(?:curl|wget)\b|`[^`]*\b(?:curl|wget)\b/i.test(arg.value ?? ""))) {
+      /\$\([^)]*\b(?:curl|wget)\b|`[^`]*\b(?:curl|wget)\b/i.test(arg.value))) {
       return "eval-remote-content";
     }
   }
@@ -160,11 +149,11 @@ function threatScan(program: ShellProgram): string | null {
     .flatMap((node) => [
       ...node.envAssignments,
       ...node.wrapper,
-      ...node.wrapperArgs,
+      ...node.wrapperPositionals,
       node.executable,
       ...node.args,
     ])
-    .flatMap((arg) => (arg ? [arg.value ?? arg.raw] : []))
+    .flatMap((arg) => (arg ? [arg.value] : []))
     .join(" ");
   return scanThreats(text);
 }

@@ -1,7 +1,7 @@
 // Git 命令语义
 
 import type { ShellCommandNode, ShellArg } from "../../shell-parse/types";
-import type { CommandAdapter, CommandSemantics, Effect, PathIntent, SemanticContext } from "../types";
+import type { CommandAdapter, CommandSemantics, Effect, PathIntent } from "../types";
 import { makeSemantics, optionIntent, consumedFileIntents, SYNTHETIC_SPAN, semanticsFromRules, type RuleDef } from "./shared";
 import { parseOptions, type Opt } from "./option-parse";
 import { parseConfigOptions, type ConfigOptionTable, type ConfigTarget } from "./config-parse";
@@ -61,12 +61,12 @@ const GIT_CLASSIFY: readonly GitClassifyDef[] = [
   // F1: -o/--output（含附着 -oFILE）升级 modify + 写路径 intent（prefix 匹配，A2）
   { cmd: "archive", cls: "inspect", upgrade: { flags: [{ name: "-o", prefix: true }, { name: "--output", prefix: true }], to: "modify", reason: "write repository archive to file", paths: (args) => writeOutputPaths(args, ARCHIVE_OUTPUT_OPTS) }, reason: "create repository archive" },
   // ── modify ──
-  { cmd: "add", cls: "modify", paths: (args) => positionalArgs(args).map((a) => ({ op: "read" as const, value: a.value ?? "" })), reason: "stage files" },
-  { cmd: "rm", cls: "modify", paths: (args) => positionalArgs(args).map((a) => ({ op: "write" as const, value: a.value ?? "" })), reason: "remove tracked files" },
+  { cmd: "add", cls: "modify", paths: (args) => positionalArgs(args).map((a) => ({ op: "read" as const, value: a.value })), reason: "stage files" },
+  { cmd: "rm", cls: "modify", paths: (args) => positionalArgs(args).map((a) => ({ op: "write" as const, value: a.value })), reason: "remove tracked files" },
   { cmd: "commit", cls: "modify", reason: "record changes" },
   { cmd: "push", cls: "modify", upgrade: { flags: [{ name: "-f" }, { name: "--force", prefix: true }], to: "destroy", reason: "force push" }, reason: "push to remote" },
-  { cmd: ["checkout", "switch"], cls: "modify", paths: (args) => { const idx = args.findIndex((a) => a.value === "--"); return idx >= 0 ? args.slice(idx + 1).map((a) => ({ op: "write" as const, value: a.value ?? "" })) : []; }, reason: "switch branch/restore files" },
-  { cmd: "restore", cls: "modify", paths: (args) => positionalArgs(args).map((a) => ({ op: "write" as const, value: a.value ?? "" })), reason: "restore files" },
+  { cmd: ["checkout", "switch"], cls: "modify", paths: (args) => { const idx = args.findIndex((a) => a.value === "--"); return idx >= 0 ? args.slice(idx + 1).map((a) => ({ op: "write" as const, value: a.value })) : []; }, reason: "switch branch/restore files" },
+  { cmd: "restore", cls: "modify", paths: (args) => positionalArgs(args).map((a) => ({ op: "write" as const, value: a.value })), reason: "restore files" },
   { cmd: "merge", cls: "modify", reason: "merge branches" },
   { cmd: "rebase", cls: "modify", reason: "rebase commits" },
   { cmd: "tag", cls: "modify", reason: "create/list/delete tags" },
@@ -76,7 +76,7 @@ const GIT_CLASSIFY: readonly GitClassifyDef[] = [
   { cmd: "clone", cls: "modify", reason: "clone repository" },
   { cmd: "init", cls: "modify", reason: "initialize repository" },
   { cmd: "remote", cls: "modify", reason: "manage remotes" },
-  { cmd: "mv", cls: "modify", paths: (args) => positionalArgs(args).map((a) => ({ op: "write" as const, value: a.value ?? "" })), reason: "move/rename tracked files" },
+  { cmd: "mv", cls: "modify", paths: (args) => positionalArgs(args).map((a) => ({ op: "write" as const, value: a.value })), reason: "move/rename tracked files" },
   { cmd: ["cherry-pick", "revert"], cls: "modify", reason: "apply commits" },
   { cmd: "apply", cls: "modify", reason: "apply patch" },
   { cmd: "gc", cls: "modify", reason: "garbage collect repository" },
@@ -246,7 +246,7 @@ function positionalArgs(args: readonly ShellArg[]): ShellArg[] {
   const result: ShellArg[] = [];
   let optionsDone = false;
   for (const a of args) {
-    const val = a.value ?? "";
+    const val = a.value;
     if (!optionsDone && val === "--") { optionsDone = true; continue; }
     if (!optionsDone && val.startsWith("-")) continue;
     result.push(a);
@@ -254,44 +254,57 @@ function positionalArgs(args: readonly ShellArg[]): ShellArg[] {
   return result;
 }
 
-// ─── git branch 子命令：正向标志解析（T-059：BRANCH_OPTS 声明 + 引擎 flags 输出） ───
+// ─── git branch 子命令：正向标志解析（单声明表 + 派生，T-059 后单源化） ───
 // 分类优先级（保守）：delete > force > move > upstream > copy > list/plain。
+// 引擎 opts 与分类组从同一表派生：BRANCH_OPTS 的 group 标签是唯一来源，
+// BRANCH_GROUPS（优先级有序）与 BRANCH_CLASS（组→分类+理由）为纯投影——
+// 增删 flag 只改一处声明，引擎消费与分类永不失步。
 // 纯列表标志即使带位置参数（过滤模式）仍为 inspect。
 
-const BRANCH_OPTS: readonly Opt[] = [
-  { names: ["-d", "-D", "--delete"], kind: "flag" },
-  { names: ["-f", "--force"], kind: "flag" },
-  { names: ["-m", "-M", "--move", "--rename"], kind: "flag" },
-  { names: ["--set-upstream-to"], kind: "flag", forms: ["equals"] },
-  { names: ["--track", "--unset-upstream"], kind: "flag" },
-  { names: ["-c", "-C", "--copy"], kind: "flag" },
-  { names: ["-a", "--all", "-r", "--remotes", "-v", "-vv", "--verbose", "--list", "--merged", "--no-merged", "--contains", "--no-contains"], kind: "flag" },
+type BranchGroup = "delete" | "force" | "move" | "upstream" | "copy" | "list";
+
+const BRANCH_OPTS: readonly (Opt & { group: BranchGroup })[] = [
+  { names: ["-d", "-D", "--delete"], kind: "flag", group: "delete" },
+  { names: ["-f", "--force"], kind: "flag", group: "force" },
+  { names: ["-m", "-M", "--move", "--rename"], kind: "flag", group: "move" },
+  { names: ["--set-upstream-to"], kind: "flag", forms: ["equals"], group: "upstream" },
+  { names: ["--track", "--unset-upstream"], kind: "flag", group: "upstream" },
+  { names: ["-c", "-C", "--copy"], kind: "flag", group: "copy" },
+  { names: ["-a", "--all", "-r", "--remotes", "-v", "-vv", "--verbose", "--list", "--merged", "--no-merged", "--contains", "--no-contains"], kind: "flag", group: "list" },
 ];
 
-const BRANCH_FLAG_SETS = {
-  delete: new Set(["-d", "-D", "--delete"]),
-  force: new Set(["-f", "--force"]),
-  move: new Set(["-m", "-M", "--move", "--rename"]),
-  upstream: new Set(["--set-upstream-to", "--track", "--unset-upstream"]),
-  copy: new Set(["-c", "-C", "--copy"]),
-  list: new Set(["-a", "--all", "-r", "--remotes", "-v", "-vv", "--verbose", "--list", "--merged", "--no-merged", "--contains", "--no-contains"]),
+/** 分类优先级（fail-closed 序）：组名 → 引擎 flags 名集合（从 BRANCH_OPTS 派生，单源）。 */
+const BRANCH_GROUPS: readonly { group: BranchGroup; names: ReadonlySet<string> }[] = ([
+  "delete", "force", "move", "upstream", "copy", "list",
+] as const).map((group) => ({
+  group,
+  names: new Set(BRANCH_OPTS.filter((opt) => opt.group === group).flatMap((opt) => opt.names)),
+}));
+
+/** 组 → 分类 + 理由（单源投影；与 GIT_CLASSIFY 的 reason 风格一致）。 */
+const BRANCH_CLASS: Readonly<Record<BranchGroup, { cls: GitClass; reason: string }>> = {
+  delete: { cls: "destroy", reason: "delete branch" },
+  force: { cls: "modify", reason: "force create/move branch" },
+  move: { cls: "modify", reason: "rename branch" },
+  upstream: { cls: "modify", reason: "set/change branch upstream" },
+  copy: { cls: "modify", reason: "copy branch" },
+  list: { cls: "inspect", reason: "list branches" },
 };
 
 function analyzeGitBranch(subArgs: readonly ShellArg[]): CommandSemantics {
   // 引擎 flags 输出（T-059）：-d/-m 等分离 flag、--set-upstream-to= 等号形式统一识别
   const { flags } = parseOptions(subArgs, { opts: BRANCH_OPTS, positional: "file", opaqueOnUnknown: false });
   const flagSet = new Set(flags);
-  const has = (set: Set<string>) => [...set].some((flag) => flagSet.has(flag));
   const positionals = subArgs.filter((a) => {
-    const v = a.value ?? "";
+    const v = a.value;
     return v !== "--" && !v.startsWith("-");
   }).length;
-  if (has(BRANCH_FLAG_SETS.delete)) return makeSemantics("destroy", { reason: "delete branch" });
-  if (has(BRANCH_FLAG_SETS.force)) return makeSemantics("modify", { reason: "force create/move branch" });
-  if (has(BRANCH_FLAG_SETS.move)) return makeSemantics("modify", { reason: "rename branch" });
-  if (has(BRANCH_FLAG_SETS.upstream)) return makeSemantics("modify", { reason: "set/change branch upstream" });
-  if (has(BRANCH_FLAG_SETS.copy)) return makeSemantics("modify", { reason: "copy branch" });
-  if (has(BRANCH_FLAG_SETS.list)) return makeSemantics("inspect", { reason: "list branches" });
+  for (const { group, names } of BRANCH_GROUPS) {
+    if ([...names].some((flag) => flagSet.has(flag))) {
+      const classified = BRANCH_CLASS[group];
+      return makeSemantics(classified.cls, { reason: classified.reason });
+    }
+  }
   if (positionals > 0) return makeSemantics("modify", { reason: "create/move branch" });
   return makeSemantics("inspect", { reason: "list branches" });
 }
@@ -348,7 +361,7 @@ const GIT_SUBCOMMAND_PARSERS: ReadonlyMap<string, GitSubcommandParser> = new Map
 
 export const gitAdapter: CommandAdapter = {
   names: ["git"],
-  analyze(node: ShellCommandNode, _context: SemanticContext): CommandSemantics {
+  analyze(node: ShellCommandNode): CommandSemantics {
     // 主流程经引擎定位子命令词（T-059）：-C/-c/--git-dir/--work-tree 被消费，
     // positional[0] = 子命令词（ShellArg 引用）；全局路径选项 → list intent。
     // subArgs 取子命令词之后的原始 args 切片——引擎只用于定位，子命令 flag
@@ -359,13 +372,13 @@ export const gitAdapter: CommandAdapter = {
     const subcmdArg = positional[0];
     const subcmd = subcmdArg?.value ?? "";
     if (!subcmdArg) {
-      return makeSemantics("unknown", { reason: `unrecognized git command: ${node.args.map((a) => a.value ?? "").join(" ") || "(none)"}`, opaque: true });
+      return makeSemantics("unknown", { reason: `unrecognized git command: ${node.args.map((a) => a.value).join(" ") || "(none)"}`, opaque: true });
     }
     const subArgs = node.args.slice(node.args.indexOf(subcmdArg) + 1);
-    const subArgsValues = subArgs.map((a) => a.value ?? "");
+    const subArgsValues = subArgs.map((a) => a.value);
 
     // 专用子命令解析器（config/branch/stash/bundle 复杂族）；未命中走 GIT_CLASSIFY 表
-    const firstWord = subcmdArg.value ?? "";
+    const firstWord = subcmdArg.value;
     const parser = GIT_SUBCOMMAND_PARSERS.get(firstWord);
     if (parser) return parser(subArgs, pathIntents);
 

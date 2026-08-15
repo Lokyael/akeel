@@ -317,7 +317,7 @@
 
 **Status:** active
 
-**Decision:** `shell-parse/parser.ts` 在 wrapper-args 状态下识别嵌套 wrapper 并入栈；wrapper 的 positional 参数（`timeout <duration>`）由 parser 消费后保留在 `node.wrapperArgs` 供 token 级扫描，`node.args` 只含真实命令参数。`ShellCommandNode.executable` 只承载真正要运行的命令，**永不可能是 wrapper**。`normalize.ts` 退化为纯出栈：循环弹出 wrapper 链与 wrapperArgs，删除 `promotion`/`guessExecutable`/`removeFromArgs`/unwrap slice 逻辑/`MAX_UNWRAP_DEPTH`。
+**Decision:** `shell-parse/parser.ts` 在 wrapper-args 状态下识别嵌套 wrapper 并入栈；wrapper 的 positional 参数（`timeout <duration>`）由 parser 消费后保留在 `node.wrapperPositionals` 供 token 级扫描，`node.args` 只含真实命令参数。`ShellCommandNode.executable` 只承载真正要运行的命令，**永不可能是 wrapper**。`normalize.ts` 退化为纯出栈：循环弹出 wrapper 链与 wrapperPositionals，删除 `promotion`/`guessExecutable`/`removeFromArgs`/unwrap slice 逻辑/`MAX_UNWRAP_DEPTH`。
 
 **Why:**
 
@@ -326,7 +326,7 @@
 
 **Impact:**
 
-- 解析后 `node.args` 只含真实命令参数；wrapper positional 保留在 `node.wrapperArgs`，threatScan 的 token 覆盖不变（时长槽由 wrapperArgs 扫描，防威胁词藏匿）。
+- 解析后 `node.args` 只含真实命令参数；wrapper positional 保留在 `node.wrapperPositionals`，threatScan 的 token 覆盖不变（时长槽由 wrapperPositionals 扫描，防威胁词藏匿）。
 - preflight 硬规则对嵌套 wrapper 形态按构造闭合（实证绕过形态由 PASS 变拦截）；`analyzeCd` 正确追踪嵌套 wrapper 下的 cd（fail-closed 方向）。
 - 深嵌套统一正确；既有单层 wrapper 行为零变化。
 

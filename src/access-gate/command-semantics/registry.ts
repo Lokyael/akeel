@@ -3,7 +3,7 @@
 import { basename } from "node:path";
 
 import type { ShellCommandNode } from "../shell-parse/types";
-import type { CommandAdapter, CommandSemantics, SemanticContext } from "./types";
+import type { CommandAdapter, CommandSemantics } from "./types";
 import { filesystemAdapter } from "./adapters/filesystem";
 import { textTransformAdapter } from "./adapters/text-transform";
 import { searchAdapter } from "./adapters/search";
@@ -150,7 +150,6 @@ export function scopeKey(table: Record<string, unknown> | undefined, name: strin
 
 export function analyzeSemantics(
   node: ShellCommandNode,
-  context: SemanticContext,
 ): CommandSemantics {
   const name = node.executable?.value?.toLowerCase() ?? "";
   const ov = loadOverrides();
@@ -195,7 +194,7 @@ export function analyzeSemantics(
     ? { ...node, executable: aliasNode(node.executable, key) }
     : node;
 
-  const result = adapter.analyze(lookupNode, context);
+  const result = adapter.analyze(lookupNode);
 
   // 4. reclassify 覆盖（匹配原始名和解析后名称）
   if (ov.reclassify && ov.reclassify.length > 0) {

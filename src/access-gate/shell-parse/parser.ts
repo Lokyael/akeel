@@ -1,5 +1,8 @@
 // shell-parse/parser.ts — 受限 Shell 解析器
 // 消费 LexToken[] 流，输出 ShellProgram
+// 结构：resolvePreamble（命令前导：env/wrapper 链/executable，D-037 契约单点）
+//     + tryParseRedirect（重定向唯一 owner：fd 数字邻接折叠在内，主循环不再跳过）
+//     + parseCommandGroup（编排：preamble + 重定向/参数循环）
 
 import type { LexToken } from "./lexer";
 import type {
@@ -41,37 +44,42 @@ function redirectKind(op: string, fd: number | null, target: string | null): Red
   return "stdout";
 }
 
-// ─── 辅助：重定向解析 ───
+// ─── 辅助：重定向解析（唯一 owner） ───
 
 /**
  * Try to parse a redirect at tokens[i]. Returns the redirection node and new
  * index, or null if the token is not a redirect.
+ *
+ * fd 数字邻接（2>err）折叠在此单点：数字 word + 相邻（span 紧邻）redirect 一体
+ * 消费为带 fd 的重定向——数字 word 永不落入 args，主循环无需独立跳过分支。
+ * 两种入口：tokens[i] 是 redirect（无 fd 前缀），或 tokens[i] 是 fd 前缀数字 word。
  */
 function tryParseRedirect(
   tokens: LexToken[],
   i: number,
 ): { redirection: ShellRedirectionNode; newIndex: number } | null {
-  const tok = tokens[i]!;
-  if (tok.kind !== "redirect") return null;
-
-  const next = i + 1 < tokens.length ? tokens[i + 1] : null;
+  let opTok: LexToken;
   let fd: number | null = null;
-  const op = tok.value;
+  let j = i;
 
-  // detect fd prefix (e.g. 2>)
-  if (i > 0
-    && tokens[i - 1]?.kind === "word"
-    && ALL_DIGITS.test(tokens[i - 1]!.value)
-    && tokens[i - 1]!.span.end === tok.span.start) {
-    fd = Number(tokens[i - 1]!.value);
+  if (tokens[i]?.kind === "redirect") {
+    opTok = tokens[i]!;
+  } else if (isFdPrefixAt(tokens, i)) {
+    // fd 前缀（2>）：数字 word + 相邻 redirect 一体消费（原始文本判定——
+    // 引号内数字（'2'>f）是参数而非 fd 前缀，bash 要求 fd 数字未引用）
+    fd = Number(tokens[i]!.value);
+    j = i + 1;
+    opTok = tokens[j]!;
+  } else {
+    return null;
   }
 
   // heredoc / here-string 与文件重定向同样取下一个 word 作为目标；无目标则只消费自身
   let target: ShellArg | null = null;
-  if (next?.kind === "word") { target = wordToArg(next); i += 2; }
-  else { i += 1; }
+  let newIndex = j + 1;
+  if (tokens[j + 1]?.kind === "word") { target = wordToArg(tokens[j + 1]!); newIndex = j + 2; }
 
-  const kind = redirectKind(op, fd, target?.value ?? null);
+  const kind = redirectKind(opTok.value, fd, target?.value ?? null);
   if (fd === null) {
     if (kind === "stdin" || kind === "heredoc" || kind === "hereString") fd = 0;
     else if (kind === "stderr" || kind === "stderrAppend") fd = 2;
@@ -83,10 +91,114 @@ function tryParseRedirect(
       kind,
       fd,
       target,
-      span: { start: tok.span.start, end: target ? target.span.end : tok.span.end },
+      span: { start: opTok.span.start, end: target ? target.span.end : opTok.span.end },
     },
-    newIndex: i,
+    newIndex,
   };
+}
+
+/** tokens[i] 是否为 fd 数字前缀（未引用数字 word + 相邻 redirect），preamble 遇此即止。
+ * 以原始文本（raw）判定：引号内数字（'2'）不是 fd 前缀（bash 语义），
+ * 转义数字（\2）同样不是——raw 保留引号与转义，解码 value 会误判。 */
+function isFdPrefixAt(tokens: LexToken[], i: number): boolean {
+  return tokens[i]?.kind === "word"
+    && ALL_DIGITS.test(tokens[i]!.raw)
+    && tokens[i + 1]?.kind === "redirect"
+    && tokens[i]!.span.end === tokens[i + 1]!.span.start;
+}
+
+// ─── 命令前导解析（D-037 wrapper 契约单点） ───
+
+interface Preamble {
+  envAssignments: ShellArg[];
+  /** wrapper 链（嵌套入栈顺序；executable 永不承载 wrapper，D-037）。 */
+  wrapper: ShellArg[];
+  /** wrapper 的 positional 参数（如 timeout <duration>）：parser 消费不入 args，仅保留供 token 级扫描（D-037）。 */
+  wrapperPositionals: ShellArg[];
+  executable: ShellArg | null;
+  /** 前导结束后的首个 token 索引（重定向或命令参数区起点）。 */
+  index: number;
+}
+
+/**
+ * 解析命令前导：env assignment（preamble 态）、wrapper 链（wrapper-args 态：
+ * 选项跳过 / env / skip 计数 positional / 嵌套 wrapper）、executable。
+ * 遇重定向（含 fd 前缀）即止——executable 永不在此后设置（与既有语义一致：
+ * 重定向把剩余词推进 args 态，executable 保持 null）。
+ */
+function resolvePreamble(tokens: LexToken[]): Preamble {
+  let state: "preamble" | "wrapper-args" = "preamble";
+  const envAssignments: ShellArg[] = [];
+  const wrapper: ShellArg[] = [];
+  const wrapperPositionals: ShellArg[] = [];
+  let executable: ShellArg | null = null;
+  let wrapperSkipRemaining = 0;
+  let i = 0;
+
+  while (i < tokens.length) {
+    // 重定向（含 fd 前缀）：停止前导解析，executable 不再设置
+    if (tokens[i]!.kind === "redirect" || isFdPrefixAt(tokens, i)) break;
+    if (tokens[i]!.kind !== "word") { i++; continue; }
+
+    const arg = wordToArg(tokens[i]!);
+    // env 赋值判定以原始文本为准（bash：赋值名必须未引用）——`FOO='bar'` 是赋值，
+    // `'FOO=bar'` 是命令名（词义解码后两者同形，raw 保留引号可区分）
+    const isEnvAssign = /^[A-Za-z_][A-Za-z0-9_]*=/.test(tokens[i]!.raw);
+
+    if (state === "preamble" && isEnvAssign) {
+      envAssignments.push(arg);
+      i++;
+      continue;
+    }
+    if (state === "preamble") {
+      const cmd = tokens[i]!.value.toLowerCase();
+      if (WRAPPER_CMDS_SET.has(cmd)) {
+        wrapper.push(arg);
+        state = "wrapper-args";
+        wrapperSkipRemaining = WRAPPER_POS_SKIP[arg.value] ?? 0;
+        i++;
+        continue;
+      }
+      // 非 wrapper —— 是 executable
+      executable = arg;
+      i++;
+      break;
+    }
+
+    // state === "wrapper-args"
+    if (isEnvAssign) {
+      envAssignments.push(arg);
+      i++;
+      continue;
+    }
+    if (tokens[i]!.value.startsWith("-")) {
+      // wrapper option — skip
+      i++;
+      continue;
+    }
+    // 某些 wrapper 有固定 positional 参数（如 timeout <duration>）：
+    // parser 消费不入 args——args 只含真实命令参数（D-037）；token 保留在
+    // wrapperPositionals 供 threatScan 扫描（时长槽不能成为威胁扫描盲区）
+    if (wrapperSkipRemaining > 0) {
+      wrapperPositionals.push(arg);
+      wrapperSkipRemaining--;
+      i++;
+      continue;
+    }
+    // 嵌套 wrapper 继续入栈——executable 永不承载 wrapper（D-037）
+    if (WRAPPER_CMDS_SET.has(tokens[i]!.value.toLowerCase())) {
+      wrapper.push(arg);
+      wrapperSkipRemaining = WRAPPER_POS_SKIP[arg.value] ?? 0;
+      i++;
+      continue;
+    }
+    // first non-wrapper, non-option after wrapper = executable
+    executable = arg;
+    i++;
+    break;
+  }
+
+  return { envAssignments, wrapper, wrapperPositionals, executable, index: i };
 }
 
 // ─── 主解析函数 ───
@@ -151,128 +263,38 @@ export function parse(tokens: LexToken[]): { program: ShellProgram; error: strin
   };
 }
 
+/**
+ * 解析单个命令组：前导（env/wrapper/executable，resolvePreamble）+
+ * 重定向与参数循环。重定向在任意位置由 tryParseRedirect 单一消费；其余 word 落 args。
+ */
 function parseCommandGroup(tokens: LexToken[]): Omit<ShellCommandNode, "operatorBefore"> | null {
-  // 状态机：
-  // preamble     = 命令前导（env assignment / wrapper / executable 判定）
-  // wrapper-args = wrapper 参数区（选项 / env assignment / wrapper positional / 嵌套 wrapper / executable）
-  // args         = 已进入命令参数区
-  let state: "preamble" | "wrapper-args" | "args" = "preamble";
-
-  const envAssignments: ShellArg[] = [];
-  const wrapper: ShellArg[] = [];
-  const wrapperArgs: ShellArg[] = [];
-  let executable: ShellArg | null = null;
+  const preamble = resolvePreamble(tokens);
+  const { envAssignments, wrapper, wrapperPositionals, executable } = preamble;
   const args: ShellArg[] = [];
   const redirections: ShellRedirectionNode[] = [];
 
-  let i = 0;
-  let wrapperSkipRemaining = 0;
-
+  let i = preamble.index;
   while (i < tokens.length) {
-    const tok = tokens[i]!;
-
-    // An adjacent numeric token belongs to the redirect, not command args.
-    if (tok.kind === "word"
-      && i + 1 < tokens.length
-      && tokens[i + 1]?.kind === "redirect"
-      && ALL_DIGITS.test(tok.value)
-      && tok.span.end === tokens[i + 1]!.span.start) {
-      i++;
-      continue;
-    }
-
-    // ── 处理重定向 ──
     const redirect = tryParseRedirect(tokens, i);
     if (redirect) {
-      state = "args";
       redirections.push(redirect.redirection);
       i = redirect.newIndex;
       continue;
     }
-
-    // ── 处理 word token ──
-    if (tok.kind === "word") {
-      const arg = wordToArg(tok);
-      const isEnvAssign = /^[A-Za-z_][A-Za-z0-9_]*=/.test(tok.value);
-
-      if (state === "preamble" && isEnvAssign) {
-        envAssignments.push(arg);
-        i++;
-        continue;
-      }
-
-      if (state === "preamble") {
-        const cmd = tok.value.toLowerCase();
-        if (WRAPPER_CMDS_SET.has(cmd)) {
-          wrapper.push(arg);
-          state = "wrapper-args";
-          wrapperSkipRemaining = WRAPPER_POS_SKIP[arg.value ?? ""] ?? 0;
-          i++;
-          continue;
-        }
-        // not a wrapper — it's the executable
-        executable = arg;
-        state = "args";
-        i++;
-        continue;
-      }
-
-      if (state === "wrapper-args") {
-        // wrapper arguments (options or env assignments)
-        if (isEnvAssign) {
-          envAssignments.push(arg);
-          i++;
-          continue;
-        }
-        if (tok.value.startsWith("-")) {
-          // wrapper option — skip
-          i++;
-          continue;
-        }
-        // 某些 wrapper 有固定 positional 参数（如 timeout <duration>）：
-        // parser 消费不入 args——args 只含真实命令参数（D-037）；token 保留在
-        // wrapperArgs 供 threatScan 扫描（时长槽不能成为威胁扫描盲区）
-        if (wrapperSkipRemaining > 0) {
-          wrapperArgs.push(arg);
-          wrapperSkipRemaining--;
-          i++;
-          continue;
-        }
-        // 嵌套 wrapper 继续入栈——executable 永不承载 wrapper（D-037）
-        if (WRAPPER_CMDS_SET.has(tok.value.toLowerCase())) {
-          wrapper.push(arg);
-          wrapperSkipRemaining = WRAPPER_POS_SKIP[arg.value ?? ""] ?? 0;
-          i++;
-          continue;
-        }
-        // first non-wrapper, non-option after wrapper = executable
-        executable = arg;
-        state = "args";
-        i++;
-        continue;
-      }
-
-      if (state === "args") {
-        args.push(arg);
-        state = "args";
-        i++;
-        continue;
-      }
+    if (tokens[i]?.kind === "word") {
+      args.push(wordToArg(tokens[i]!));
     }
-
-    // fallback
     i++;
   }
 
-  const allTokens = tokens;
-  const span: SourceSpan = allTokens.length > 0
-    ? { start: allTokens[0]!.span.start, end: allTokens[allTokens.length - 1]!.span.end }
+  const span: SourceSpan = tokens.length > 0
+    ? { start: tokens[0]!.span.start, end: tokens[tokens.length - 1]!.span.end }
     : { start: 0, end: 0 };
 
   return {
     envAssignments,
     wrapper,
-    wrapperArgs,
+    wrapperPositionals,
     executable,
     args,
     redirections,
@@ -281,30 +303,13 @@ function parseCommandGroup(tokens: LexToken[]): Omit<ShellCommandNode, "operator
 }
 
 function wordToArg(tok: LexToken): ShellArg {
-  // 解析引号
-  let value: string | null;
-  let quoted = tok.quoted;
-
-  if (tok.value.startsWith("'") && tok.value.endsWith("'") && tok.value.length >= 2) {
-    value = tok.value.slice(1, -1);
-    quoted = true;
-  } else if (tok.value.startsWith('"') && tok.value.endsWith('"') && tok.value.length >= 2) {
-    value = tok.value.slice(1, -1);
-    quoted = true;
-  } else {
-    value = tok.value;
-  }
-
-  // 动态 token 判断：信任 lexer 的 dynamic 标记。
-  // lexer 已正确处理：未引用字符中的动态模式 + 双引号内的 $ 和 `。
-  // 单引号内的所有字符（包括 $ `）都是字面量，dynamic 保持 false。
-  const dynamic = tok.dynamic;
-
+  // 词值已在 lexer 解码（bash 词义：引号剥离 + 转义解析，词义单点）；
+  // 此处直通字段映射，不再二次解析引号（D-037 后 lexer 拥有区域状态机）。
   return {
-    raw: tok.rawValue,
-    value,
-    quoted,
-    dynamic,
+    raw: tok.raw,
+    value: tok.value,
+    quoted: tok.quoted,
+    dynamic: tok.dynamic,
     span: tok.span,
   };
 }

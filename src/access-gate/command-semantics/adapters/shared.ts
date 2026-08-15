@@ -10,7 +10,6 @@ interface MakeSemanticsOpts {
   reason: string;
   intents?: PathIntent[];
   effects?: readonly Effect[];
-  hardRule?: string | null;
   opaque?: boolean;
 }
 
@@ -93,7 +92,6 @@ export function makeSemantics(
     commandClass: cls,
     effects: opts.effects ?? defaultEffects(cls),
     intents: opts.intents ?? [],
-    hardRule: opts.hardRule ?? null,
     opaque: opts.opaque ?? false,
     reason: opts.reason,
   };
@@ -119,7 +117,7 @@ export function semanticsFromRules(
   positional: ReadonlyArray<{ readonly value?: string | null }>,
   rules: readonly RuleDef[],
 ): CommandSemantics | null {
-  const subcmd = positional.map((a) => a.value ?? "").join(" ");
+  const subcmd = positional.map((a) => a.value).join(" ");
   for (const def of rules) {
     if (def.pattern(subcmd)) {
       return makeSemantics(def.cls, {

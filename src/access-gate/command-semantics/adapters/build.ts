@@ -1,7 +1,7 @@
 // 构建工具命令 — cargo, go, make 的语义
 
 import type { ShellCommandNode } from "../../shell-parse/types";
-import type { CommandAdapter, CommandSemantics, SemanticContext } from "../types";
+import type { CommandAdapter, CommandSemantics } from "../types";
 import { makeSemantics, semanticsFromRules, type RuleDef } from "./shared";
 import { parseOptions, type Opt } from "./option-parse";
 
@@ -65,7 +65,7 @@ const BUILD_CONFIG: Record<string, BuildToolConfig> = {
 
 export const buildAdapter: CommandAdapter = {
   names: Object.keys(BUILD_CONFIG),
-  analyze(node: ShellCommandNode, _context: SemanticContext): CommandSemantics {
+  analyze(node: ShellCommandNode): CommandSemantics {
     const name = node.executable?.value?.toLowerCase() ?? "";
     const config = BUILD_CONFIG[name];
     if (!config) return makeSemantics("unknown", { reason: `unknown build tool: ${name}`, opaque: true });

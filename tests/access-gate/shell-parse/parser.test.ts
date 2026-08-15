@@ -69,6 +69,69 @@ test("parser: preserves a spaced numeric argument before redirect", () => {
   assert.equal(cmd.redirections[0]!.fd, 1);
 });
 
+test("parser: fd-prefix redirect before any executable leaves executable null (preamble corner)", () => {
+  const { program } = parseInput("2> err.txt cmd");
+  const cmd = program.commands[0]!;
+  assert.equal(cmd.executable, null);
+  assert.deepEqual(cmd.args.map((arg) => arg.value), ["cmd"]);
+  assert.equal(cmd.redirections[0]!.kind, "stderr");
+  assert.equal(cmd.redirections[0]!.fd, 2);
+});
+
+test("parser: redirect before any executable leaves executable null (preamble corner)", () => {
+  const { program } = parseInput("> out.txt cmd");
+  const cmd = program.commands[0]!;
+  assert.equal(cmd.executable, null);
+  assert.deepEqual(cmd.args.map((arg) => arg.value), ["cmd"]);
+  assert.equal(cmd.redirections[0]!.kind, "stdout");
+});
+
+test("parser: env assignment then fd-prefix redirect keeps env and null executable", () => {
+  const { program } = parseInput("FOO=1 2> err.txt cmd");
+  const cmd = program.commands[0]!;
+  assert.equal(cmd.executable, null);
+  assert.deepEqual(cmd.envAssignments.map((arg) => arg.value), ["FOO=1"]);
+  assert.deepEqual(cmd.args.map((arg) => arg.value), ["cmd"]);
+  assert.equal(cmd.redirections[0]!.fd, 2);
+});
+
+test("parser: wrapper positional then fd-prefix redirect keeps wrapper chain and null executable", () => {
+  const { program } = parseInput("timeout 5 2> err.txt cmd");
+  const cmd = program.commands[0]!;
+  assert.equal(cmd.executable, null);
+  assert.deepEqual(cmd.wrapper.map((arg) => arg.value), ["timeout"]);
+  assert.deepEqual(cmd.wrapperPositionals.map((arg) => arg.value), ["5"]);
+  assert.deepEqual(cmd.args.map((arg) => arg.value), ["cmd"]);
+  assert.equal(cmd.redirections[0]!.fd, 2);
+});
+
+test("parser: quoted digit before redirect is an argument, not an fd prefix (bash fidelity)", () => {
+  const { program } = parseInput("echo '2'>f");
+  const cmd = program.commands[0]!;
+  assert.equal(cmd.executable?.value, "echo");
+  assert.deepEqual(cmd.args.map((arg) => arg.value), ["2"]);
+  assert.equal(cmd.redirections[0]!.kind, "stdout");
+  assert.equal(cmd.redirections[0]!.fd, 1);
+  const { program: p2 } = parseInput("'2'>f cmd");
+  const c2 = p2.commands[0]!;
+  assert.equal(c2.executable?.value, "2");
+  assert.deepEqual(c2.args.map((arg) => arg.value), ["cmd"]);
+  assert.equal(c2.redirections[0]!.fd, 1);
+});
+
+test("parser: quoted env-assignment word is a command name, not an env assignment (bash fidelity)", () => {
+  const { program } = parseInput("'FOO=bar' cmd");
+  const cmd = program.commands[0]!;
+  assert.equal(cmd.executable?.value, "FOO=bar");
+  assert.equal(cmd.envAssignments.length, 0);
+  assert.deepEqual(cmd.args.map((arg) => arg.value), ["cmd"]);
+  // 赋值名未引用时仍识别为 env 赋值（含引号值部分）
+  const { program: p2 } = parseInput("FOO='bar' cmd");
+  const c2 = p2.commands[0]!;
+  assert.equal(c2.executable?.value, "cmd");
+  assert.deepEqual(c2.envAssignments.map((arg) => arg.value), ["FOO=bar"]);
+});
+
 test("parser: stdin redirection", () => {
   const { program } = parseInput("sort < in.txt");
   const cmd = program.commands[0]!;
@@ -166,9 +229,9 @@ test("parser: nested wrapper chain (timeout env)", () => {
   assert.equal(cmd.executable?.value, "rm");
   assert.equal(cmd.args.length, 1);
   assert.equal(cmd.args[0]!.value, "file");
-  // wrapper positional 保留在 wrapperArgs（供 token 级扫描），不入 args
-  assert.equal(cmd.wrapperArgs.length, 1);
-  assert.equal(cmd.wrapperArgs[0]!.value, "5");
+  // wrapper positional 保留在 wrapperPositionals（供 token 级扫描），不入 args
+  assert.equal(cmd.wrapperPositionals.length, 1);
+  assert.equal(cmd.wrapperPositionals[0]!.value, "5");
 });
 
 test("parser: nested wrapper with env option and assignments", () => {

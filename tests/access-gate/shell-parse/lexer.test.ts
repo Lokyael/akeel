@@ -24,7 +24,7 @@ test("lexer: tracks source spans", () => {
 test("lexer: quoted word span covers quotes in place (no indexOf backfill drift)", () => {
   // 引号内含空格的词：raw 含引号，span 必须覆盖原文中的引号位置（T-059/B3）
   const { tokens } = lex('echo "a b" c');
-  assert.equal(tokens[1]!.rawValue, '"a b"');
+  assert.equal(tokens[1]!.raw, '"a b"');
   assert.equal(tokens[1]!.span.start, 5);
   assert.equal(tokens[1]!.span.end, 10);
   assert.equal(tokens[2]!.span.start, 11);
@@ -107,19 +107,53 @@ test("lexer: here-string (<<<)", () => {
   const { tokens } = lex("cat <<< \"hello world\"");
   assert.equal(tokens[1]!.kind, "redirect");
   assert.equal(tokens[1]!.value, "<<<");
-  assert.equal(tokens[2]!.value, '"hello world"');
+  assert.equal(tokens[2]!.value, "hello world");
+  assert.equal(tokens[2]!.raw, '"hello world"');
 });
 
-test("lexer: single-quoted strings", () => {
+test("lexer: single-quoted strings decode value, keep raw", () => {
   const { tokens } = lex("echo 'hello world'");
-  assert.equal(tokens[1]!.value, "'hello world'");
+  assert.equal(tokens[1]!.value, "hello world");
+  assert.equal(tokens[1]!.raw, "'hello world'");
   assert.equal(tokens[1]!.quoted, true);
 });
 
-test("lexer: double-quoted strings", () => {
+test("lexer: double-quoted strings decode value, keep raw", () => {
   const { tokens } = lex('echo "hello world"');
-  assert.equal(tokens[1]!.value, '"hello world"');
+  assert.equal(tokens[1]!.value, "hello world");
+  assert.equal(tokens[1]!.raw, '"hello world"');
   assert.equal(tokens[1]!.quoted, true);
+});
+
+test("lexer: mixed-quote words decode across regions (quote-split fix)", () => {
+  const { tokens } = lex("git add 'foo'bar");
+  assert.equal(tokens[2]!.value, "foobar");
+  assert.equal(tokens[2]!.raw, "'foo'bar");
+  const { tokens: t2 } = lex("echo 'it''s'");
+  assert.equal(t2[1]!.value, "its");
+  const { tokens: t3 } = lex('echo "a"b\'c\'');
+  assert.equal(t3[1]!.value, "abc");
+  const { tokens: t4 } = lex("echo 'a b'.txt");
+  assert.equal(t4[1]!.value, "a b.txt");
+});
+
+test("lexer: double-quoted escaped dollar stays literal and non-dynamic", () => {
+  const { tokens } = lex('echo "\\$x"');
+  assert.equal(tokens[1]!.value, "$x");
+  assert.equal(tokens[1]!.dynamic, false);
+});
+
+test("lexer: single-quote region keeps backslashes literal (regex safety)", () => {
+  const { tokens } = lex("sed 's/\\/x//'");
+  assert.equal(tokens[1]!.value, "s/\\/x//");
+});
+
+test("lexer: unquoted backslash escapes decode (bash word semantics)", () => {
+  const { tokens } = lex("echo foo\\bar");
+  assert.equal(tokens[1]!.value, "foobar");
+  assert.equal(tokens[1]!.raw, "foo\\bar");
+  const { tokens: t2 } = lex("git checkout feature\\ branch");
+  assert.equal(t2[2]!.value, "feature branch");
 });
 
 test("lexer: unquoted wildcards are dynamic", () => {

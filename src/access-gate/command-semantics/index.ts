@@ -9,7 +9,6 @@ export { LANGUAGE_RUNTIMES, HARD_RULE_INTERPRETERS } from "./interpreter-names";
 export { canonicalExecutableName } from "./adapters/shared";
 export type {
   CommandSemantics,
-  SemanticContext,
   CommandAdapter,
   PathIntent,
   CwdCandidate,

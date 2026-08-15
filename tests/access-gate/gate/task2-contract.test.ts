@@ -158,8 +158,8 @@ test("preserves destructive and permission effects in command semantics", () => 
   try {
     const rm = parse(lex("rm file").tokens).program.commands[0]!;
     const chmod = parse(lex("chmod 600 file").tokens).program.commands[0]!;
-    const rmSemantics = analyzeSemantics(rm, env);
-    const chmodSemantics = analyzeSemantics(chmod, env);
+    const rmSemantics = analyzeSemantics(rm);
+    const chmodSemantics = analyzeSemantics(chmod);
     assert.ok(rmSemantics.effects.includes("delete"));
     assert.ok(chmodSemantics.effects.includes("permissionChange"));
   } finally {

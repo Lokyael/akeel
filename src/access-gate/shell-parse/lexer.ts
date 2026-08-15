@@ -2,6 +2,11 @@
 // 输入：shell command string
 // 输出：LexToken[] 扁平 token 流，带 source span
 // 不依赖 command rules 或 Profile
+//
+// 词值（LexToken.value）在此解码为 bash 词义（引号剥离 + 转义解析）——引号区域
+// 状态机所在处即解码所在处，parser/preflight 不再二次解析引号（词义单点，D-037 后）。
+// raw 保留原文（含引号与转义），供展示/原始文本需要。dynamic 仍基于 raw 计算
+// （转义 glob \* 的 dynamic 判定是已知边界，保持既有语义不变）。
 
 const LEXER_LIMITS = {
   maxTokens: 4_096,
@@ -11,18 +16,22 @@ type LexTokenKind = "word" | "operator" | "redirect" | "heredoc-body";
 
 export interface LexToken {
   kind: LexTokenKind;
+  /** 解码后的词值（引号剥离、转义解析）；操作符/重定向 token 为操作符文本。 */
   value: string;
+  /** 原始字符（含引号与转义）。 */
+  raw: string;
   span: { start: number; end: number };
-  rawValue: string;
   quoted: boolean;
   dynamic: boolean;
 }
 
 /**
  * lexer 内部状态：每个 word 独立追踪引用状态。
+ * raw 与 value 双累加器：value 增量解码（区域感知），flush 时直接产出。
  */
 interface WordBuilder {
-  raw: string;              // 原始字符（含引号）
+  raw: string;              // 原始字符（含引号与转义）
+  value: string;            // 解码后的词值（引号剥离 + 转义解析）
   start: number;            // 首个字符在原文中的位置（T-059/B3：扫描时直记 span）
   hadQuote: boolean;        // word 内出现过引号
   hadDynamicInDouble: boolean;  // $ 或 ` 出现在双引号内（触发命令替换）
@@ -47,13 +56,16 @@ const CTRL_OPS = ["&&", "||", ";", "|", "&"];
 /** 行尾延续操作符：其后紧跟换行时，换行不构成命令分隔（bash 语义：a &&\nb 等价 a && b）。 */
 const LINE_CONTINUATION_OPS = new Set(["&&", "||", "|", "&"]);
 
+/** 双引号内反斜杠转义集（bash：仅 $ ` " \ 换行 被转义，其余保留反斜杠）。 */
+const DOUBLE_QUOTE_ESCAPES = /[$`"\\\n]/;
+
 export function lex(text: string): { tokens: LexToken[]; unsafeSyntax: string | null } {
   if (text.length > LEXER_LIMITS.maxTokens * 20) return { tokens: [], unsafeSyntax: "input exceeds the lexer budget" };
   const tokens: LexToken[] = [];
   let unsafeSyntax: string | null = null;
 
   // 当前 word
-  let wb: WordBuilder = { raw: "", start: 0, hadQuote: false, hadDynamicInDouble: false };
+  let wb: WordBuilder = { raw: "", value: "", start: 0, hadQuote: false, hadDynamicInDouble: false };
   let inSingle = false;
   let inDouble = false;
 
@@ -65,13 +77,13 @@ export function lex(text: string): { tokens: LexToken[]; unsafeSyntax: string | 
     const dynamic = (!quoted && [...wb.raw].some(isDynamic)) || wb.hadDynamicInDouble;
     tokens.push({
       kind: "word",
-      value: wb.raw,
+      value: wb.value,
+      raw: wb.raw,
       span: { start: wb.start, end },
-      rawValue: wb.raw,
       quoted,
       dynamic,
     });
-    wb = { raw: "", start: 0, hadQuote: false, hadDynamicInDouble: false };
+    wb = { raw: "", value: "", start: 0, hadQuote: false, hadDynamicInDouble: false };
   };
 
   const beginWord = (at: number) => {
@@ -82,8 +94,8 @@ export function lex(text: string): { tokens: LexToken[]; unsafeSyntax: string | 
     tokens.push({
       kind: "redirect",
       value: op,
+      raw: op,
       span: { start, end: start + op.length },
-      rawValue: op,
       quoted: false,
       dynamic: false,
     });
@@ -93,8 +105,8 @@ export function lex(text: string): { tokens: LexToken[]; unsafeSyntax: string | 
     tokens.push({
       kind: "operator",
       value: op,
+      raw: op,
       span: { start, end: end ?? start + op.length },
-      rawValue: op,
       quoted: false,
       dynamic: false,
     });
@@ -137,15 +149,18 @@ export function lex(text: string): { tokens: LexToken[]; unsafeSyntax: string | 
 
     // ── 在引用中：直接追加（含双引号内的转义）──
     if (inSingle) {
+      // 单引号字面区：字符原样进 raw 与 value（含反斜杠与 $——正则/sed 依赖字面性）
       wb.raw += ch;
+      wb.value += ch;
       i++;
       continue;
     }
     if (inDouble) {
       // 反斜杠转义：跳过下一个字符（"\$" → 字面量 "$"）
-      if (ch === "\\" && i + 1 < text.length && /[$`"\\\n]/.test(text[i + 1]!)) {
+      if (ch === "\\" && i + 1 < text.length && DOUBLE_QUOTE_ESCAPES.test(text[i + 1]!)) {
         wb.raw += ch;
         wb.raw += text[i + 1]!;
+        wb.value += text[i + 1]!;
         i += 2;
         continue;
       }
@@ -154,11 +169,21 @@ export function lex(text: string): { tokens: LexToken[]; unsafeSyntax: string | 
         wb.hadDynamicInDouble = true;
       }
       wb.raw += ch;
+      wb.value += ch;
       i++;
       continue;
     }
 
     // ── 以下仅在未引用时 ──
+
+    // 未引用反斜杠转义：\x → 字面 x（bash 词义；\n 换行延续已在顶部处理）
+    if (ch === "\\" && i + 1 < text.length) {
+      wb.raw += ch;
+      wb.raw += text[i + 1]!;
+      wb.value += text[i + 1]!;
+      i += 2;
+      continue;
+    }
 
     // 空白 → flush word
     if (/\s/.test(ch)) {
@@ -201,6 +226,7 @@ export function lex(text: string): { tokens: LexToken[]; unsafeSyntax: string | 
     // 普通字符
     beginWord(i);
     wb.raw += ch;
+    wb.value += ch;
     i++;
   }
 

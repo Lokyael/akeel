@@ -5,11 +5,10 @@ import { defineSemanticTests } from "./semantics-dsl";
 import { lex } from "../../../src/access-gate/shell-parse/lexer";
 import { parse } from "../../../src/access-gate/shell-parse/parser";
 import { herdrAdapter } from "../../../src/access-gate/command-semantics/adapters/herdr";
-import type { SemanticContext } from "../../../src/access-gate/command-semantics/types";
 
-function analyzeHerdr(cmd: string, ctx: SemanticContext) {
+function analyzeHerdr(cmd: string) {
   const { program } = parse(lex(cmd).tokens);
-  return herdrAdapter.analyze(program.commands[0]!, ctx);
+  return herdrAdapter.analyze(program.commands[0]!);
 }
 
 defineSemanticTests({

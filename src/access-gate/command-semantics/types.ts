@@ -32,27 +32,17 @@ export interface CommandSemantics {
   commandClass: CommandClass;
   effects: readonly Effect[];
   intents: readonly PathIntent[];
-  hardRule: string | null;
   opaque: boolean;
   reason: string;
 }
 
-// ─── 语义注册表上下文 ───
-// 当前所有 adapter 均不消费（analyze 签名保留它作为预留接口，T-059/B2）：
-// 供未来需要项目上下文（相对路径解析、staging 判定）的 adapter 接入；
-// shell-compiler 仍构造并传入，避免签名反复横跳。
-
-export interface SemanticContext {
-  projectRoot: string;
-  stagingDir: string;
-  cwd: string;
-}
-
 // ─── Adapter 接口 ───
+// analyze 单参（node）：adapter 是纯声明表 + 语义映射，无项目上下文依赖；
+// 未来某 adapter 确需项目上下文（相对路径解析等）时再加参数（跨目录 index 单点签名变更）。
 
 export interface CommandAdapter {
   names: readonly string[];
-  analyze(node: ShellCommandNode, context: SemanticContext): CommandSemantics;
+  analyze(node: ShellCommandNode): CommandSemantics;
 }
 
 // ─── NormalizedCommand（wrapper 解包后） ───
