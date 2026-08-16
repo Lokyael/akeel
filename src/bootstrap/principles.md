@@ -149,8 +149,20 @@ The system accumulates invisible inconsistencies; every future change becomes
 a scavenger hunt across the codebase.
 
 **Test:** To change a behavior, do you edit one file or many? One = correct.
-Many = refactor first. If you don't know which file to edit, the design is
-already scattered.
+Many = a proposal signal (below) — report it; refactoring happens only with
+user approval. If you don't know which file to edit, the design is already
+scattered.
+
+**Proposal signals** — when editing hits one of these, report it in one line
+with evidence:
+- **Shotgun surgery**: one behavior change needs many file edits (3+) and no
+  module clearly owns it — the Test above.
+- **Untestable interface**: can't test through the public interface without
+  adding test-only methods (per codebase-design).
+
+Not for one-offs or user-declared off-limits; urgent fixes defer the report
+to task close. Whole-system signals (deletion test, locality) are for
+/skill:improve-architecture, not mid-task.
 
 ### 10. Destructive Actions Need Explicit Intent
 
