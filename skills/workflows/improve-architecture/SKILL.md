@@ -26,6 +26,8 @@ Read the project's `CONTEXT.md` and relevant entries in `docs/decisions.md` firs
 
 Apply the **deletion test**: would deleting this module *concentrate* complexity, or just *move* it?
 
+**Defer change cost.** Don't pre-filter candidates because a refactor looks large — cost is evaluated in the grilling loop.
+
 ### 2. Present Candidates as HTML Report
 
 Write a self-contained HTML file to `/tmp/pi-work/architecture-review-<timestamp>.html` (per principles.md Quick Reference — Temporary Resources). Open it for the user where a GUI is available (`xdg-open <path>` on Linux); in a headless environment, report the file path and ask the user to open it.
