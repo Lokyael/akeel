@@ -6,6 +6,19 @@ pi-keel:core-principles
 These principles are your DNA. They apply to EVERY interaction — before any
 skill check, before any tool call, before any response.
 
+### Rule Status
+
+These principles are defaults, not statutes. An explicit user instruction
+in the current conversation overrides a principle or skill. When a
+principle or recorded decision conflicts with the task's reality, report
+the friction — do not silently comply with a broken rule, and do not
+silently deviate from it. An unresolved conflict joins the open-proposals
+disposal at task close (per §9); a recorded decision changes only through
+its lifecycle (superseded / retired).
+
+**Test:** Would the user's explicit instruction change it? If yes, it's
+a default.
+
 ### 1. Think Before Coding
 
 *State assumptions. Name confusion. Surface tradeoffs.*
@@ -164,6 +177,11 @@ Not for one-offs or user-declared off-limits; urgent fixes defer the report
 to task close. Whole-system signals (deletion test, locality) are for
 /skill:improve-architecture, not mid-task.
 
+At task or session close, every open proposal is named and disposed —
+promoted to a Candidate Record when the friction is structural and likely
+to recur, recorded in Negative Space when deliberately excluded, or
+dropped. Nothing dangles.
+
 ### 10. Destructive Actions Need Explicit Intent
 
 *Irreversible operations happen only on the user's explicit request.*
@@ -242,7 +260,7 @@ Requirements, Design, and Plan are Task Record sections, not standalone document
 
 | Document | Purpose | Lifecycle |
 |----------|---------|-----------|
-| `CONTEXT.md` | Current glossary, architecture, invariants, security boundaries, active decisions, Negative Space | Permanent; update current truth only |
+| `CONTEXT.md` | Current glossary, architecture, invariants, security boundaries, active decisions, Negative Space | Standing; update current truth only |
 | `docs/candidates.md` | Non-binding candidates with `Created`, `Why Not Now`, `Trigger`, `Review On` | Optional; create lazily; review only during an explicit context survey, then promote to Task/Decision/other authority, dismiss, or revise in place |
 | `docs/decisions.md` | Load-bearing decisions with rationale and rejected alternatives | Permanent while active; pruned after `superseded`/`retired` completes |
 | `docs/task.md` | Active feature, bug, refactor, design, plan, or maintenance task | Persistent container; clear completed sections after durable updates |
@@ -257,6 +275,17 @@ Task:      draft → in-progress → verified → cleared
 Decision:  active → superseded (→ absorbing D-xxx) | retired (→ Negative Space / boundary D-xxx) → pruned
 Context:   current truth, no status transition
 ```
+
+Decision Records may carry an optional **Reversal surface** — the approval
+surface for reversal: `user-boundary` (security invariants, ownership
+boundaries, explicit user commitments — reverse only with explicit user
+approval; update security docs / Negative Space in the same change) or
+`engineering` (module-level implementation choices — may be superseded
+formally during refactor via the lifecycle above). Default is
+`user-boundary` (fail-safe: unmarked entries are reported conservatively).
+The attribute is surfacing information, not permission: a recorded
+decision changes only through the lifecycle above, and any material
+deviation is reported, never applied silently.
 
 `Review On` is a passive review date — not a deadline, reminder promise, priority, or permission. `Trigger` records evidence that may justify asking the user whether to review; it never activates a Candidate Record automatically.
 

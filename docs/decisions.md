@@ -2,7 +2,7 @@
 
 本文集中记录 pi-keel 的长期架构、工程和安全决策。每条只保留当前结论、理由、必要替代方案和影响；被完整吸收（`superseded`）或主动退役（`retired`）的条目从寄存器剪除，历史由 Git 保留（规则见 [D-028](#d-028-统一-project-record-模型)）。
 
-**条目模板**：每条的段落顺序固定为 `Status` → `Decision`（可选规格子节紧随其后，如 `Rules`/`Security invariants`/`Guidance mapping`/`Enforcement scope`/`格式`/`延伸`）→ `Why` → `Impact` → `Rejected` → `Out of Scope`；无内容的段落省略，不留空标题。
+**条目模板**：每条的段落顺序固定为 `Status` → `Decision`（可选规格子节紧随其后，如 `Rules`/`Security invariants`/`Guidance mapping`/`Enforcement scope`/`格式`/`延伸`）→ `Why` → `Impact` → `Rejected` → `Out of Scope`；无内容的段落省略，不留空标题。可选 `Reversal surface` 元数据行紧跟 `Status`（值 `user-boundary`/`engineering`，缺省 `user-boundary`；语义见 principles.md Project Records — Record Lifecycle）。
 
 ## D-002: 统一 Access Gate 与用户态边界
 
@@ -519,4 +519,24 @@
 
 **Out of Scope:** verifier 拆分/裁剪；plan 类型形状变更。
 
-## D-047: 待创建
+## D-047: 原则优先级与 Reversal surface 申报属性
+
+**Status:** active
+**Reversal surface:** engineering
+
+**Decision:** 恒注入原则面新增 `Rule Status` 规则：原则是默认值而非不可改法律，显式用户指令覆盖原则与 skill；原则或已记录决策与任务冲突时必须报告（不静默遵守、不静默违反），未决冲突并入任务关闭时的 open-proposals 处置（principles.md §9），已记录决策只经生命周期（supersede/retire）变更。Decision Record 新增可选元数据 `Reversal surface`：`user-boundary`（安全不变量、归属边界、用户承诺——逆转须用户显式批准，并在同一变更更新安全文档/Negative Space）或 `engineering`（模块内取舍——随模块重构正式 supersede，不静默偏离）；缺省 `user-boundary`；语义单一来源为 principles.md Project Records — Record Lifecycle。`CONTEXT.md` 生命周期措辞从 Permanent 调整为 Standing（更新语义不变）。现有 D 条目不批量背填属性，触达时补。
+
+**Why:** 恒注入面全祈使 + "DNA/EVERY interaction" 框架且无"用户指令 > 原则"的显式优先级句（文件底部优先级句只管 skills），模型面对原则冲突时没有显式出口，只能盲从或违规——"把一切当铁律、忽视自迭代"的根源是框架缺优先级与报告出口，不是缺分级表。铁律与可改的区分按强制面天然存在（代码 hard deny 无法违反 / 用户中介决策 / 注入原则可覆盖），正确分级是机制分层 + 上报信息，而非逐条贴标签——贴标签迫使模型自裁权威，误标不对称（安全规则标软是真实危害，软规则标铁律阻塞进化）。Reversal surface 是上报信息（改动时申报谁有权批准）非许可（不授权模型自行改 D-xxx），D-028 权威规则不变；缺省 user-boundary 是 fail-safe 方向（未标注即保守申报）。
+
+**Impact:** 恒注入面新增 Rule Status 与 Reversal surface 定义，随包分发到所有用户项目（属全局提示词改动约定审计范围）；decisions.md 模板头注明可选属性行位置；survey-context 按需读 D-xxx 时可区分申报类别；任务触碰 user-boundary 决策时向用户申报而非静默偏离；现有条目未标注时按 user-boundary 对待。
+
+**Rejected:**
+
+- **两级决策寄存器**（铁律册 + 工程册）：双源漂移，模型自裁权威，与 D-028 单寄存器生命周期冲突。
+- **逐原则/逐决策贴强度标签**：恒定注入 token 税；误标方向不对称；D-030 已基于 C-003 拒绝 token 层说服。
+- **对 Reversal surface 做自动化结构校验**：正则可伪造；违背 C-003 结构检查只限可操作面（validate-skills 锚点存活类）的先例。
+- **现有 D 条目批量背填属性**：一次性大 diff + doc-sync churn；缺省 user-boundary 已 fail-safe，触达时补即可。
+
+**Out of Scope:** access-gate/enforcement 层任何改动（纯提示词与记录面）；为申报属性新增专用 skill 或路由；原则逐条强度分级（Rule Status 是全局优先级 + 报告出口，非 per-rule 强度表）。
+
+## D-048: 待创建
