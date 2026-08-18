@@ -9,7 +9,7 @@ import { parseOptions, type Opt } from "./option-parse";
 
 interface BuildToolConfig {
   rules: RuleDef[];
-  /** 取值选项（值非路径，kind: expression，T-059）——值被消费，不参与子命令提取。 */
+  /** 取值选项（值非路径，kind: expression，D-040）——值被消费，不参与子命令提取。 */
   opts?: readonly Opt[];
 }
 
@@ -72,7 +72,7 @@ export const buildAdapter: CommandAdapter = {
     const config = BUILD_CONFIG[name];
     if (!config) return makeSemantics("unknown", { reason: `unknown build tool: ${name}`, opaque: true });
 
-    // 引擎投影：取值选项被消费，positional = 子命令 token（T-059）；
+    // 引擎投影：取值选项被消费，positional = 子命令 token（D-040）；
     // opaqueOnUnknown: false（D-040 判据：大类 + catch-all 保守兜底）
     const { positional } = parseOptions(node.args, { opts: config.opts ?? [], positional: "file", opaqueOnUnknown: false });
     // 全选项输入（如 cargo --version）：subcommandArgs 回退取首个 token（E）

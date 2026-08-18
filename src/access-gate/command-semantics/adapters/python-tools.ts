@@ -22,9 +22,9 @@ import { parseOptions, type Opt } from "./option-parse";
 interface PyToolDef {
   cls: "inspect" | "modify" | "execute";
   subcommands?: Record<string, { cls: "inspect" | "modify" | "execute"; reason: string }>;
-  /** Flags that downgrade modify → inspect (e.g. --check, --diff)；声明为 downgradeTo: "inspect"（T-059/B1）。 */
+  /** Flags that downgrade modify → inspect (e.g. --check, --diff)；声明为 downgradeTo: "inspect"（D-040）。 */
   inspectFlags?: string[];
-  /** Flags that upgrade inspect → modify (e.g. --fix)；声明为 upgradeTo: "modify"（T-059/B1）。 */
+  /** Flags that upgrade inspect → modify (e.g. --fix)；声明为 upgradeTo: "modify"（D-040）。 */
   modifyFlags?: string[];
   reason: string;
 }
@@ -82,7 +82,7 @@ const PY_TOOLS: Record<string, PyToolDef> = {
 // ─── option parsing ───
 
 /**
- * Common Python tool options that take a following value token（值非路径，kind: expression，T-059）。
+ * Common Python tool options that take a following value token（值非路径，kind: expression，D-040）。
  * Not exhaustive — missing an option just means its value might be treated
  * as an unknown subcommand, which falls back to the tool's default class.
  * This is safe: it's a false-negative classification, not a security bypass.
@@ -93,7 +93,7 @@ const VALUE_OPTS: readonly Opt[] = [
   { names: ["-k", "--maxfail", "--tb", "-n", "--numprocesses", "--dist", "--timeout"], kind: "expression", forms: ["separated", "equals"] },
 ];
 
-/** 工具级 class 调节 Opt 表（T-059/B1）：inspectFlags → downgradeTo inspect、modifyFlags → upgradeTo modify。 */
+/** 工具级 class 调节 Opt 表（D-040）：inspectFlags → downgradeTo inspect、modifyFlags → upgradeTo modify。 */
 function adjustOpts(def: PyToolDef): Opt[] {
   const opts: Opt[] = [];
   if (def.inspectFlags) opts.push({ names: def.inspectFlags, kind: "flag", downgradeTo: "inspect" });
@@ -111,7 +111,7 @@ export const pythonToolsAdapter: CommandAdapter = {
     if (!def) return makeSemantics("unknown", { reason: `unknown python tool: ${name}`, opaque: true });
 
     // 引擎投影：取值选项被消费，positional[0] = 子命令首词；
-    // classAdjust 由工具级调节 flag 声明驱动（T-059/B1，替代 hasFlag 手写扫描）
+    // classAdjust 由工具级调节 flag 声明驱动（D-040，替代 hasFlag 手写扫描）
     const { positional, classAdjust } = parseOptions(node.args, {
       opts: [...VALUE_OPTS, ...adjustOpts(def)],
       positional: "file",

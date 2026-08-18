@@ -90,7 +90,7 @@ const GIT_CLASSIFY: readonly GitClassifyDef[] = [
 ];
 
 /**
- * git 全局选项（T-059）：主流程经引擎提取子命令与路径意图。
+ * git 全局选项（D-040）：主流程经引擎提取子命令与路径意图。
  * -C <dir>（file，separated）、-c <key=val>（expression，separated，值非路径）、
  * --git-dir=<dir>（file，equals）、--work-tree=<dir>（file，equals）。
  * opaqueOnUnknown: false —— git 选项面开放（D-040 判据：大类 + catch-all 兜底）。
@@ -248,7 +248,7 @@ function analyzeGitConfig(configArgs: readonly ShellArg[]): { cls: "inspect" | "
   return { cls: "modify", intents: r.target ? writeIntents(r.target) : [], opaque: r.sawUnknown };
 }
 
-// ─── git branch 子命令：正向标志解析（单声明表 + 派生，T-059 后单源化） ───
+// ─── git branch 子命令：正向标志解析（单声明表 + 派生，D-040 单源化） ───
 // 分类优先级（保守）：delete > force > move > upstream > copy > list/plain。
 // 引擎 opts 与分类组从同一表派生：BRANCH_OPTS 的 group 标签是唯一来源，
 // BRANCH_GROUPS（优先级有序）与 BRANCH_CLASS（组→分类+理由）为纯投影——
@@ -286,7 +286,7 @@ const BRANCH_CLASS: Readonly<Record<BranchGroup, { cls: GitClass; reason: string
 };
 
 function analyzeGitBranch(subArgs: readonly ShellArg[]): CommandSemantics {
-  // 引擎 flags 输出（T-059）：-d/-m 等分离 flag、--set-upstream-to= 等号形式统一识别
+  // 引擎 flags 输出（D-040）：-d/-m 等分离 flag、--set-upstream-to= 等号形式统一识别
   const { flags } = parseOptions(subArgs, { opts: BRANCH_OPTS, positional: "file", opaqueOnUnknown: false });
   const flagSet = new Set(flags);
   const positionals = subArgs.filter((a) => {
@@ -303,7 +303,7 @@ function analyzeGitBranch(subArgs: readonly ShellArg[]): CommandSemantics {
   return makeSemantics("inspect", { reason: "list branches" });
 }
 
-// ─── stash/bundle：规则表化（T-059） ───
+// ─── stash/bundle：规则表化（D-040） ───
 // 前缀模式（semanticsFromRules 吃 positional 数组）：与 package/build 同构。
 // stash 未命中 → 保守 modify（bare stash / 带消息 stash 均改动工作树，F4）。
 // bundle 未命中 → unknown opaque（catch-all，semanticsFromRules 自动 opaque）。
@@ -321,7 +321,7 @@ const BUNDLE_RULES: readonly RuleDef[] = [
 ];
 
 // 专用子命令解析器注册表：复杂子命令族（config/branch/stash/bundle）走专用解析，
-// GIT_CLASSIFY 表兜底。全部 token 级；接口统一 (subArgs, pathIntents)（T-059，删 tokens）。
+// GIT_CLASSIFY 表兜底。全部 token 级；接口统一 (subArgs, pathIntents)（D-040，删 tokens）。
 type GitSubcommandParser = (subArgs: readonly ShellArg[], pathIntents: PathIntent[]) => CommandSemantics;
 
 const GIT_SUBCOMMAND_PARSERS: ReadonlyMap<string, GitSubcommandParser> = new Map([
@@ -356,7 +356,7 @@ const GIT_SUBCOMMAND_PARSERS: ReadonlyMap<string, GitSubcommandParser> = new Map
 export const gitAdapter: CommandAdapter = {
   names: ["git"],
   analyze(node: ShellCommandNode): CommandSemantics {
-    // 主流程经引擎定位子命令词（T-059）：-C/-c/--git-dir/--work-tree 被消费，
+    // 主流程经引擎定位子命令词（D-040）：-C/-c/--git-dir/--work-tree 被消费，
     // positional[0] = 子命令词（ShellArg 引用）；全局路径选项 → list intent。
     // subArgs 取子命令词之后的原始 args 切片——引擎只用于定位，子命令 flag
     // （--force/-n 等）必须原样保留供 GIT_CLASSIFY 调节与子命令 parser 检测

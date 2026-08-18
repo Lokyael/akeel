@@ -1,6 +1,6 @@
 // option-parse 引擎直接契约测试（其余经 adapter 测试间接覆盖）。
 // 锁定：值消费（separated/equals/attached/suffix）、`--`、组合簇、program-first、
-// opaque 策略、class 调节原语（T-059/B1）、前缀重叠校验（B）、consumeUntil 校验（E）。
+// opaque 策略、class 调节原语、前缀重叠校验、consumeUntil 校验（D-040）。
 
 import test from "node:test";
 import assert from "node:assert/strict";

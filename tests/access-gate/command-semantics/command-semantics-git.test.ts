@@ -137,6 +137,6 @@ defineAdapterTests("git", [
     name: "fetch, pull, clone, remote carry the network effect",
     effects: ["network"],
   },
-  // T-059 有意行为变化：`--` 在子命令前时引擎视其后为位置参数（旧 finder 遇 -- 直接 unknown）
+  // D-040 有意行为变化：`--` 在子命令前时引擎视其后为位置参数（旧 finder 遇 -- 直接 unknown）
   { cmd: "git -- status", name: "-- before subcommand is treated as positional separator", cls: "inspect" },
 ]);

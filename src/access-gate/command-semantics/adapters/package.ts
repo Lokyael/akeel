@@ -42,7 +42,7 @@ function buildPkgRules(cmd: string): RuleDef[] {
   return rules;
 }
 
-// 取值选项：选项之后的下一个 token 是值而非子命令（值非路径，kind: expression，T-059）。
+// 取值选项：选项之后的下一个 token 是值而非子命令（值非路径，kind: expression，D-040）。
 // 不穷举，未覆盖的选项导致 unknown（安全降级）。
 const PKG_VALUE_OPTS: readonly Opt[] = [
   { names: ["--prefix", "--registry", "--cache", "--userconfig", "--globalconfig", "--cafile", "--cert", "--key", "--proxy", "--https-proxy", "--noproxy", "--scope", "--tag", "--workspace", "--dir", "--filter", "--cwd"], kind: "expression", forms: ["separated", "equals"] },
@@ -101,7 +101,7 @@ export const packageAdapter: CommandAdapter = {
     const rules = PKG_RULES[name];
     if (!rules) return makeSemantics("unknown", { reason: `unknown package manager: ${name}`, opaque: true });
 
-    // 引擎投影：取值选项被消费，positional = 子命令 token（T-059）；
+    // 引擎投影：取值选项被消费，positional = 子命令 token（D-040）；
     // opaqueOnUnknown: false（D-040 判据：大类 + catch-all 保守兜底）
     const { positional } = parseOptions(node.args, { opts: PKG_VALUE_OPTS, positional: "file", opaqueOnUnknown: false });
     // 子命令 token（取值选项已消费）；全选项输入（npx --version 等）回退取首个 token（E）
@@ -111,7 +111,7 @@ export const packageAdapter: CommandAdapter = {
     // npm/pnpm config 写命令（set/delete/edit）→ modify + 配置目标 write intent；
     // get/list/未知交回规则循环（yarn config 不在范围，维持 modify 无 intent）。
     // config rest 取原始 args 切片（--userconfig 等目标选项不能被顶层 PKG_VALUE_OPTS
-    // 消费——由 analyzePkgConfig 的 ConfigOptionTable 自己解析，T-059）。
+    // 消费——由 analyzePkgConfig 的 ConfigOptionTable 自己解析，D-040）。
     if (name !== "yarn" && subcmd.startsWith("config")) {
       const configIdx = positional.length > 0 ? node.args.indexOf(positional[0]!) : -1;
       const rest = configIdx >= 0 ? node.args.slice(configIdx + 1) : [];

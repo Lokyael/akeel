@@ -11,7 +11,7 @@
 
 import type { ShellArg, SourceSpan } from "../../shell-parse/types";
 
-/** class 调节目标（T-059/B1）：选项命中后对命令分类的升降级。引擎内部类型，
+/** class 调节目标（D-040）：选项命中后对命令分类的升降级。引擎内部类型，
  * 消费方通过 ParseResult.classAdjust 读取（无需显式引用）。 */
 type ClassAdjust = "destroy" | "modify" | "inspect";
 
@@ -36,11 +36,11 @@ export interface Opt {
   /** 提供程序/模式（-e/-f）：命中后位置参数起点左移（program-first 失效）。 */
   isPattern?: boolean;
   /** 消费到终止符（-exec → ["+", ";"]）；区内 token 标记 consumed，不参与 flags/positional。
-   * 必须携带 operation: "write"（T-059/E，防静默漏检——见 validateOpts）。 */
+   * 必须携带 operation: "write"（D-040，防静默漏检——见 validateOpts）。 */
   consumeUntil?: readonly string[];
-  /** class 调节（T-059/B1）：命中后升级命令分类（date -s → modify；git push -f → destroy）。 */
+  /** class 调节（D-040）：命中后升级命令分类（date -s → modify；git push -f → destroy）。 */
   upgradeTo?: "modify" | "destroy";
-  /** class 调节（T-059/B1）：命中后降级命令分类（black --check → inspect）。 */
+  /** class 调节（D-040）：命中后降级命令分类（black --check → inspect）。 */
   downgradeTo?: "inspect";
 }
 
@@ -73,11 +73,11 @@ export interface ParseResult {
   sawWrite: boolean;
   /** 未知选项（按 opaqueOnUnknown 裁决；含未知 cluster 字符，统一 text-transform 语义）。 */
   opaque: boolean;
-  /** class 调节（T-059/B1）：命中的最高风险调节（destroy > modify > inspect）；未命中 null。 */
+  /** class 调节（D-040）：命中的最高风险调节（destroy > modify > inspect）；未命中 null。 */
   classAdjust: ClassAdjust | null;
 }
 
-// ── 索引 + 校验（按 opts 数组引用缓存，T-059/A） ──
+// ── 索引 + 校验（按 opts 数组引用缓存，D-040） ──
 // opts 均为模块级常量（引用稳定），WeakMap 缓存消除每命令每次的索引重建与重复校验。
 
 interface OptIndex {

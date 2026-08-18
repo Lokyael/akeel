@@ -163,7 +163,7 @@ export const searchAdapter: CommandAdapter = {
       ? rootArgs.map((arg) => rootIntent(pathOperation, arg.value, arg.span))
       : [rootIntent(pathOperation, config.defaultRoot, SYNTHETIC_SPAN)];
 
-    // 破坏性/写选项（-delete/-exec/-o/-fprint…，T-059/B1：声明 upgradeTo: modify）→ 升级 modify
+    // 破坏性/写选项（-delete/-exec/-o/-fprint…，D-040：声明 upgradeTo: modify）→ 升级 modify
     const cls = classAdjust === "modify" ? "modify" : config.class;
 
     // 类别固定顺序（既有契约）：pattern 文件（-f read）→ 搜索根 → 输出文件（-fprint/-o write，从 fileIntents 去重）

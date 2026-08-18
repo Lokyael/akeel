@@ -32,7 +32,7 @@ export interface LexToken {
 interface WordBuilder {
   raw: string;              // 原始字符（含引号与转义）
   value: string;            // 解码后的词值（引号剥离 + 转义解析）
-  start: number;            // 首个字符在原文中的位置（T-059/B3：扫描时直记 span）
+  start: number;            // 首个字符在原文中的位置（D-040：扫描时直记 span）
   hadQuote: boolean;        // word 内出现过引号
   hadDynamicInDouble: boolean;  // $ 或 ` 出现在双引号内（触发命令替换）
 }

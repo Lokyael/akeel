@@ -22,7 +22,7 @@ test("lexer: tracks source spans", () => {
 });
 
 test("lexer: quoted word span covers quotes in place (no indexOf backfill drift)", () => {
-  // 引号内含空格的词：raw 含引号，span 必须覆盖原文中的引号位置（T-059/B3）
+  // 引号内含空格的词：raw 含引号，span 必须覆盖原文中的引号位置（D-040）
   const { tokens } = lex('echo "a b" c');
   assert.equal(tokens[1]!.raw, '"a b"');
   assert.equal(tokens[1]!.span.start, 5);

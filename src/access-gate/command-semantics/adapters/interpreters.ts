@@ -8,7 +8,7 @@ import { LANGUAGE_RUNTIMES } from "../interpreter-names";
 
 /**
  * 解释器信息选项（--version/-V/-v/--help）→ inspect；其余任何形态（脚本、-e/-c 代码、
- * stdin）→ execute。选项遍历由引擎承担（T-059 步骤 4）：flags 输出直接判断，
+ * stdin）→ execute。选项遍历由引擎承担（D-040）：flags 输出直接判断，
  * 不再用内联 finder + fallback 把信息选项当子命令候选（那是引擎缺席时的替代品）。
  * opaqueOnUnknown: false —— 解释器选项面开放，未知选项静默（执行脚本语义不变）。
  */

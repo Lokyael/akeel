@@ -83,7 +83,7 @@ export const textTransformAdapter: CommandAdapter = {
       confidence: "exact" as const,
     }));
 
-    // 写意图（-o/--output 或 in-place -i，T-059/B1：声明 upgradeTo: modify）→ 升级 modify
+    // 写意图（-o/--output 或 in-place -i，D-040：声明 upgradeTo: modify）→ 升级 modify
     const fileIntents = consumedFileIntents(consumed);
     const hasWrite = classAdjust === "modify";
     const cls: "inspect" | "modify" | "unknown" = hasWrite ? "modify" : entry.class;

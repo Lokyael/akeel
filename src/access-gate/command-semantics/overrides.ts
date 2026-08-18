@@ -28,7 +28,7 @@ export function commandOverridesFor(agentDir = getAgentDir()): CommandOverrides 
 }
 
 // ─── 应用覆盖 ───
-// 子命令提取：commands 分发用引擎 positional[0]（首词，T-059）；reclassify pattern 用
+// 子命令提取：commands 分发用引擎 positional[0]（首词，D-040）；reclassify pattern 用
 // fullSubcommand（含选项尾部，raw 契约，D-024）。known 局限（取值选项值不跳过）见 args.ts/D-024。
 
 /**

@@ -13,7 +13,7 @@ import type { CommandAdapter, CommandSemantics } from "../types";
 import { makeSemantics } from "../semantics";
 import { parseOptions, type Opt } from "./option-parse";
 
-/** 取值选项（值非路径，kind: expression，T-059）：值被消费，不参与子命令提取（--session <name>、--remote <target> 等启动器形式）。 */
+/** 取值选项（值非路径，kind: expression，D-040）：值被消费，不参与子命令提取（--session <name>、--remote <target> 等启动器形式）。 */
 const VALUE_OPTS: readonly Opt[] = [
   { names: ["--session", "--remote", "--remote-keybindings"], kind: "expression", forms: ["separated", "equals"] },
 ];
