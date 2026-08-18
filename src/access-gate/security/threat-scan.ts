@@ -15,7 +15,7 @@
  * 检索/提及该词的命令（F1，gate 无法检索自身 pattern）。
  */
 
-const THREAT_PATTERNS: Array<{ pattern: RegExp; id: string }> = [
+const THREAT_PATTERNS = [
   { pattern: /ignore\s+(previous|all|above|prior)\s+instructions/i, id: "prompt_injection" },
   { pattern: /you\s+are\s+now\s+/i, id: "role_hijack" },
   { pattern: /do\s+not\s+tell\s+the\s+user/i, id: "deception_hide" },
@@ -24,13 +24,19 @@ const THREAT_PATTERNS: Array<{ pattern: RegExp; id: string }> = [
   { pattern: /curl\s+[^\n]*\$\{?\w*(KEY|TOKEN|SECRET|PASSWORD|CREDENTIAL|API)/i, id: "exfil_curl" },
   { pattern: /wget\s+[^\n]*\$\{?\w*(KEY|TOKEN|SECRET|PASSWORD|CREDENTIAL|API)/i, id: "exfil_wget" },
   { pattern: /cat\s+[^\n]*(\.env|credentials|\.netrc|\.pgpass|\.npmrc|\.pypirc)/i, id: "read_secrets" },
-];
+] as const satisfies ReadonlyArray<{ pattern: RegExp; id: string }>;
+
+/** 威胁模式 id 封闭联合（D：模式表导出 + 类型化，镜像测试可枚举覆盖）。 */
+export type ThreatId = (typeof THREAT_PATTERNS)[number]["id"];
+
+/** 威胁模式表（导出供镜像测试做结构性覆盖守卫：新增模式必须配正样例）。 */
+export { THREAT_PATTERNS };
 
 /**
  * Scan token-level command text for threat patterns (prompt injection / data exfiltration).
  * Returns the first matched threat ID, or null.
  */
-export function scanThreats(text: string): string | null {
+export function scanThreats(text: string): ThreatId | null {
   for (const { pattern, id } of THREAT_PATTERNS) {
     if (pattern.test(text)) {
       return id;
