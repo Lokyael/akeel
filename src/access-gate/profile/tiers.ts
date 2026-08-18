@@ -16,7 +16,8 @@ const SUBAGENT_TIER_NUMBER: Record<SubagentTierName, 0 | 1> = { scratch: 0, proj
 export const SUBAGENT_TIER_NAMES: readonly SubagentTierName[] = ["scratch", "project"];
 
 export const SUBAGENT_TIER_PROFILE = {
-  scratch: "keel-subagent-scratch",
+  // T0 scratch 复用主档 keel-explore（explore 已含 /tmp/pi-work 写规则，D-049）
+  scratch: "keel-explore",
   project: "keel-subagent-project",
 } as const satisfies Record<SubagentTierName, string>;
 

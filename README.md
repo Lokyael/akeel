@@ -52,7 +52,7 @@ profiles:
       execute: ask
 
 subagentProfiles:
-  worker: project
+  worker: project   # scratch → keel-explore；project → keel-subagent-project（D-039）
 
 commands:
   aliases:

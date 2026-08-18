@@ -258,7 +258,7 @@
 
 **Why:** 同一操作（运行本地二进制）此前因拼写不同落入不同 Profile 决策——`npx tsx` 为 execute（plan deny/build allow），`./node_modules/.bin/tsx` 为 unknown（plan ask）——spelling-based 分类偏差。含 `/` 的裸词在 POSIX 下即文件路径，“运行二进制”是事实而非假设；裸名可能是 alias/函数/PATH 工具，静态分析无法确定语义，`unknown`→ask 是诚实分类与同意层，语义扩充权留给 D-024。
 
-**Impact:** 脚本执行三形态（`npx tsx foo.ts`、`./node_modules/.bin/tsx foo.ts`、裸名 `tsx foo.ts`）全为 execute：keel-plan deny、keel-code/query/develop ask、keel-build allow；裸名无 adapter 命令保持 unknown（keel-plan ask）。版本探测有意不对称：`npx tsx --version` 为 execute（npx 语义＝下载+运行包），本地解释器 `tsx --version`/`./node_modules/.bin/tsx --version` 为 inspect（与 node/python 同规则）——门禁建模命令本身而非目标包。唯一放宽点是 keel-build（路径二进制 ask→allow，与 full-trust 语义一致）；keel-plan 对本地脚本收紧为 deny，符合其“execute 命令一律拒绝”意图。爆炸半径封闭（`analyzeSemantics` 唯一调用方 `shell-compiler.ts`）；不新增 path intent、不触碰 hard boundary、D-024 覆盖层优先级不变。
+**Impact:** 脚本执行三形态（`npx tsx foo.ts`、`./node_modules/.bin/tsx foo.ts`、裸名 `tsx foo.ts`）全为 execute：keel-plan deny、keel-develop ask、keel-build allow；裸名无 adapter 命令保持 unknown（keel-plan ask）。版本探测有意不对称：`npx tsx --version` 为 execute（npx 语义＝下载+运行包），本地解释器 `tsx --version`/`./node_modules/.bin/tsx --version` 为 inspect（与 node/python 同规则）——门禁建模命令本身而非目标包。唯一放宽点是 keel-build（路径二进制 ask→allow，与 full-trust 语义一致）；keel-plan 对本地脚本收紧为 deny，符合其“execute 命令一律拒绝”意图。爆炸半径封闭（`analyzeSemantics` 唯一调用方 `shell-compiler.ts`）；不新增 path intent、不触碰 hard boundary、D-024 覆盖层优先级不变。
 
 **Rejected:**
 
@@ -349,7 +349,7 @@
 
 | 档位 | 档位名 | profile | Direct 写面 |
 |---|---|---|---|
-| T0 | `scratch` | `keel-subagent-scratch` | 仅 `/tmp/pi-work/**`（不碰项目） |
+| T0 | `scratch` | `keel-explore`（复用主档） | 仅 `/tmp/pi-work/**`（不碰项目） |
 | T1 | `project` | `keel-subagent-project` | `project/**` + `/tmp/pi-work/**` |
 
 两档 shellPolicy 相同：inspect=allow，modify/execute/destroy/unknown=deny（bash 重定向写走路径策略）。bash 工具保留仅限 T1 档 agent；T0 档 agent 必须无 mutation 工具（bash/write/edit）——pi-subagents 输出契约机制强制（有则被指令自写 output，与 T0 路径策略矛盾），故 scout 删 write+bash、researcher 原生即无。`session_start` 检测 `PI_SUBAGENT_CHILD=1`/`PI_SUBAGENT_CHILD_AGENT`，按 agent 映射档位：worker/delegate/reviewer→`project`，scout/researcher/oracle/未知→`scratch`；`config.yaml` 的 `subagentProfiles`（agent 名→档位名，`"*"` 回退）覆盖，优先级 显式 > 内置 > `*`。父会话档位号经 `PI_KEEL_PARENT_TIER` env 传播（父侧按自身 pathPolicy 算好，子代理零解析）：父档位号 1 = pathPolicy 有写规则覆盖 `project/src`、`project/tests` 或 `project/`，否则 0；子代理生效档 = min(映射档, 父TIER)——“父非项目可写 → 一律回退 T0 scratch”。**子代理权限上限 = 父会话当前档位**。
@@ -362,10 +362,10 @@
 
 **Impact:**
 
-- 两个内置 profile（T0/T1，shell+path 双轴）；`subagentProfiles` 覆盖键；`session_start` env 检测初始化；`PI_KEEL_PARENT_TIER` 传播 + 生效档 = min(映射档, 父TIER)。
+- 子代理 profile：T1 内置（`keel-subagent-project`）+ T0 复用主档 `keel-explore`（explore 含 `/tmp/pi-work/**` 写规则，D-049；shell+path 双轴）；`subagentProfiles` 覆盖键；`session_start` env 检测初始化；`PI_KEEL_PARENT_TIER` 传播 + 生效档 = min(映射档, 父TIER)。
 - 用户侧配置：scout overrides 删 write+bash（剩只读集）；researcher 原生无 mutation 工具不动。
 - 子代理内审核零设施：无 ask、无模型仲裁、无审计记录；deny + guidance → 经 `contact_supervisor` 升级 → 父会话人审（裁决 + git diff 后 commit）。
-- 操作规则：委派实现工作需父会话处于项目可写档（keel-code/keel-subagent-project/自定义可写档）；默认 keel-plan 下委派 = 子代理 T0 scratch。
+- 操作规则：委派实现工作需父会话处于项目可写档（keel-develop/keel-subagent-project/自定义可写档）；默认 keel-plan 下委派 = 子代理 T0 scratch。
 - 未装 pi-subagents 时（env 缺失）零行为变化；env 缺失 fail-closed 回退 T0 scratch。
 - `git.ts` 附带修复 `branch -m/-M` 分类缺口（子代理 deny 姿态下可被利用）。
 
@@ -567,4 +567,25 @@
 - glob 性能的进一步量化（编译已摊销，量级非灾难）。
 - config 热重载。
 
-## D-049: 待创建
+## D-049: 内置 Profile 集合收敛（移除 keel-code/keel-query/keel-subagent-scratch）
+
+**Status:** active
+**Reversal surface:** engineering
+
+**Decision:** 内置 profile 从 9 个收敛为 6 个：移除 `keel-code`（仅写 `project/src/**`、`project/tests/**` 的代码编辑档）、`keel-query`（项目写 ask 的审批中档）与 `keel-subagent-scratch`（T0）。
+
+- `keel-query` 合并进 `keel-develop`：develop 改 `extends: [keel-plan]`，显式补 `execute: ask` 与 `project/** write: allow`，resolve 结果与改前完全一致（原 query 的 `project/** write: ask` 规则本就因首匹配被 develop 的 allow 规则 shadow，是死规则）。
+- `keel-subagent-scratch` 合并进 `keel-explore`：explore 增加 `/tmp/pi-work/**` 写规则后与 T0 解析完全一致（实现前验证）；T0 档位映射改为 `keel-explore`，T1 改 `extends: [keel-explore]` 后解析不变；plan/develop 自带的重叠 `/tmp/pi-work` 规则删除——scratch 规则单一来源在 explore。
+
+**Why:** `keel-code` 零实际使用（仓库内无任何运行时引用，只有测试自引用），且语义残缺——真实代码编辑必然触碰 `package.json`/`tsconfig.json` 等项目根配置文件，该档只允许写 src/tests，无法承载“写代码”这一实际用途；真实代码编辑由 `keel-develop`（项目全写）覆盖。结构上它是 `keel-read` 的未用分支，无任何 profile extends 它，删除不改变继承拓扑。`keel-query` 同样零运行时引用，且 ask-first 是“审批哲学”而非能力档——选择 develop 即接受项目写，需要“写前全审”的用户自配 profile（配方：`extends: [keel-plan]` + `project/** write: ask` + `execute: ask`）比内置默认档位更适合表达该偏好。`keel-subagent-scratch` 解析后 = explore + 一条 `/tmp/pi-work` 写规则，是重复档；explore 作为主档的“纯只读”承诺（writes denied）没有安全相关性——`/tmp/pi-work` 是 pi-keel 自有 scratch 约定目录（非用户数据、ephemeral），其余可写档（plan/develop/build）本就全带此规则。合并后主链梯子每级严格递增：read（零写）→ explore（+scratch）→ plan（+docs）→ develop（+项目写）→ build（全信任）。
+
+**Impact:** `/profile` 可选项 9→6（主链 5：read/explore/plan/develop/build + T1 `keel-subagent-project`）；子代理 T0 复用 explore（footer 显示 explore）；既有配置若 `extends: [keel-code]`/`keel-query`/`keel-subagent-scratch` 将解析失败并 fail-closed 到 `keel-read`（三档均无任何文档化使用，爆炸半径为零）；安全梯度与其余档位语义不变（plan/develop/build 逐项 resolve 验证相同）。
+
+**Rejected:**
+
+- **移除 keel-explore**：read-anywhere + scratch 默认需内联进 plan 与 T1 两处，造成配置重复，且失去“全盘只读”主档位。
+- **把 explore 的写面放宽到 `/tmp/**`**：共享目录任意路径写有 symlink/交叉用户风险；合并只用 pi-keel 自有约定 `/tmp/pi-work/**`（build 的 `/tmp/**` 是另一档语义，不受影响）。
+- **合并 keel-develop 与 keel-build**：build 的 modify/execute allow 是全信任语义，与 develop 的 ask 是安全梯度实质差异；合并会让 develop 默认允许执行，是危险默认。
+- **程序化合成子代理档位**：把 T0/T1 从 profile 数据改为运行时合成，增加运行时复杂度并失去配置层可测试性（D-039）；本次用“复用主档”而非合成，避免该代价。
+
+## D-050: 待创建

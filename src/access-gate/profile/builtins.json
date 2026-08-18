@@ -18,28 +18,14 @@
       }
     },
 
-    "keel-code": {
-      "description": "Read projectRoot; write src/, tests/, and /tmp/pi-work/. Inspect Shell commands are allowed; modify, execute, and unknown commands require approval.",
+    "keel-explore": {
+      "description": "Read and search anywhere on the filesystem. Literal inspect Shell commands are allowed; writes are limited to the /tmp/pi-work/ scratch area.",
       "extends": ["keel-read"],
-      "shellPolicy": {
-        "modify": "ask",
-        "execute": "ask",
-        "unknown": "ask"
-      },
       "pathPolicy": {
+        "default": { "read": "allow", "list": "allow", "search": "allow", "write": "deny" },
         "rules": [
-          { "path": "project/src/**", "write": "allow" },
-          { "path": "project/tests/**", "write": "allow" },
           { "path": "/tmp/pi-work/**", "read": "allow", "list": "allow", "search": "allow", "write": "allow" }
         ]
-      }
-    },
-
-    "keel-explore": {
-      "description": "Read and search anywhere on the filesystem. Literal inspect Shell commands are allowed; writes are denied.",
-      "extends": ["keel-read"],
-      "pathPolicy": {
-        "default": { "read": "allow", "list": "allow", "search": "allow", "write": "deny" }
       }
     },
 
@@ -54,28 +40,14 @@
       "pathPolicy": {
         "rules": [
           { "path": "project/docs/**", "write": "allow" },
-          { "path": "project/CONTEXT.md", "write": "allow" },
-          { "path": "/tmp/pi-work/**", "read": "allow", "list": "allow", "search": "allow", "write": "allow" }
-        ]
-      }
-    },
-
-    "keel-query": {
-      "description": "Read anywhere; ask before project writes and modify, execute, or unknown Shell commands.",
-      "extends": ["keel-plan"],
-      "shellPolicy": {
-        "execute": "ask"
-      },
-      "pathPolicy": {
-        "rules": [
-          { "path": "project/**", "write": "ask" }
+          { "path": "project/CONTEXT.md", "write": "allow" }
         ]
       }
     },
 
     "keel-develop": {
-      "description": "Read and write project files freely; modify, execute, and unknown Shell commands still require approval.",
-      "extends": ["keel-query"],
+      "description": "Read anywhere and write project files freely; modify, execute, and unknown Shell commands still require approval.",
+      "extends": ["keel-plan"],
       "shellPolicy": {
         "execute": "ask"
       },
@@ -101,25 +73,9 @@
       }
     },
 
-    "keel-subagent-scratch": {
-      "description": "Sub-agent tier T0: read anywhere; write only /tmp/pi-work/. Inspect Shell commands only.",
-      "extends": ["keel-explore"],
-      "shellPolicy": {
-        "modify": "deny",
-        "execute": "deny",
-        "destroy": "deny",
-        "unknown": "deny"
-      },
-      "pathPolicy": {
-        "rules": [
-          { "path": "/tmp/pi-work/**", "read": "allow", "list": "allow", "search": "allow", "write": "allow" }
-        ]
-      }
-    },
-
     "keel-subagent-project": {
       "description": "Sub-agent tier T1: read anywhere; write project/** and /tmp/pi-work/. Inspect Shell commands only.",
-      "extends": ["keel-subagent-scratch"],
+      "extends": ["keel-explore"],
       "pathPolicy": {
         "rules": [
           { "path": "project/**", "write": "allow" }

@@ -80,9 +80,9 @@ test("renders the active Profile in a two-line Footer and refreshes after switch
     assert.equal(lines.length, 2);
     assert.match(lines[0]!, /plan$/);
     assert.doesNotMatch(lines[0]!, /Profile:/);
-    await harness.commands.get("profile")!("query", harness.ctx);
+    await harness.commands.get("profile")!("develop", harness.ctx);
     lines = footer.render(120);
-    assert.match(lines[0]!, /query$/);
+    assert.match(lines[0]!, /develop$/);
     assert.ok(harness.getRenderRequests() > 0);
   } finally {
     cleanup();

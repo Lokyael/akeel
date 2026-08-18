@@ -30,7 +30,7 @@ test("subagent worker with missing parent tier falls back to scratch (fail-close
     const { harness, cleanup } = startSession();
     try {
       await harness.handlers.get("session_start")!(undefined, harness.ctx);
-      assert.match(firstLine(harness), /subagent-scratch/);
+      assert.match(firstLine(harness), /explore/);
     } finally {
       cleanup();
     }
@@ -42,7 +42,7 @@ test("subagent worker with parent tier 0 is clamped to scratch", async () => {
     const { harness, cleanup } = startSession();
     try {
       await harness.handlers.get("session_start")!(undefined, harness.ctx);
-      assert.match(firstLine(harness), /subagent-scratch/);
+      assert.match(firstLine(harness), /explore/);
     } finally {
       cleanup();
     }
@@ -54,7 +54,7 @@ test("subagent scout stays scratch even with parent tier 1", async () => {
     const { harness, cleanup } = startSession();
     try {
       await harness.handlers.get("session_start")!(undefined, harness.ctx);
-      assert.match(firstLine(harness), /subagent-scratch/);
+      assert.match(firstLine(harness), /explore/);
     } finally {
       cleanup();
     }
@@ -71,7 +71,7 @@ test("subagentProfiles override maps worker to scratch", async () => {
     const { harness, cleanup } = startSession();
     try {
       await harness.handlers.get("session_start")!(undefined, harness.ctx);
-      assert.match(firstLine(harness), /subagent-scratch/);
+      assert.match(firstLine(harness), /explore/);
     } finally {
       cleanup();
     }
@@ -100,9 +100,9 @@ test("/profile switch updates the published parent tier", async () => {
     try {
       await harness.handlers.get("session_start")!(undefined, harness.ctx);
       assert.equal(process.env[PARENT_TIER_ENV], "0");
-      await harness.commands.get("profile")!("code", harness.ctx);
+      await harness.commands.get("profile")!("develop", harness.ctx);
       assert.equal(process.env[PARENT_TIER_ENV], "1");
-      assert.match(firstLine(harness), /code$/);
+      assert.match(firstLine(harness), /develop$/);
     } finally {
       cleanup();
     }

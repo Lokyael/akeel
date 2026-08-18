@@ -24,28 +24,9 @@ test("keel-read: project-only reads, no writes, literal inspect Shell commands a
   assert.equal(p.pathPolicy.rules[0]?.path, "project/**");
 });
 
-// ── branch 1: project-scoped coding ──
-
-test("keel-code: inherits read's shellPolicy, overrides modify/execute/unknown to ask", () => {
-  const p = profiles().profiles["keel-code"];
-  // inspect: inherited from read (allow)
-  assert.equal(p.shellPolicy.inspect, "allow");
-  // overridden
-  assert.equal(p.shellPolicy.modify, "ask");
-  assert.equal(p.shellPolicy.execute, "ask");
-  assert.equal(p.shellPolicy.unknown, "ask");
-  // destroy: inherited from read (deny)
-  assert.equal(p.shellPolicy.destroy, "deny");
-  // path defaults: inherited from read (all deny)
-  assert.equal(p.pathPolicy.default.write, "deny");
-  // rules: code's src+test+tmp prepended before read's project/**
-  assert.equal(p.pathPolicy.rules[0]?.path, "project/src/**");
-  assert.equal(p.pathPolicy.rules[0]?.write, "allow");
-});
-
 // ── branch 2 root: filesystem-wide reads ──
 
-test("keel-explore: inherits read's shellPolicy, overrides path defaults to allow reads everywhere", () => {
+test("keel-explore: inherits read's shellPolicy, overrides path defaults to allow reads everywhere, adds pi-work scratch writes", () => {
   const p = profiles().profiles["keel-explore"];
   // shell: inherited from read (no explicit shellPolicy in explore)
   assert.equal(p.shellPolicy.inspect, "allow");
@@ -56,6 +37,9 @@ test("keel-explore: inherits read's shellPolicy, overrides path defaults to allo
   // path defaults: overrides read's deny→allow for read/list/search
   assert.equal(p.pathPolicy.default.read, "allow");
   assert.equal(p.pathPolicy.default.write, "deny");
+  // scratch rule: explore doubles as sub-agent tier T0 (D-049)
+  assert.equal(p.pathPolicy.rules[0]?.path, "/tmp/pi-work/**");
+  assert.equal(p.pathPolicy.rules[0]?.write, "allow");
 });
 
 // ── branch 2: planning ──
@@ -74,34 +58,20 @@ test("keel-plan: inherits explore's defaults, adds docs writes, execute denied",
   assert.ok(paths.includes("project/CONTEXT.md"));
 });
 
-// ── branch 2: cautious full access ──
-
-test("keel-query: inherits plan, explicitly allows execute with approval, adds project-wide writes requiring approval", () => {
-  const p = profiles().profiles["keel-query"];
-  // shell: execute explicitly overrides plan's deny with ask
-  assert.equal(p.shellPolicy.modify, "ask");
-  assert.equal(p.shellPolicy.execute, "ask");
-  // path defaults: inherited from plan (from explore)
-  assert.equal(p.pathPolicy.default.read, "allow");
-  // rules: query's project/** prepended first (prepend merge)
-  assert.equal(p.pathPolicy.rules[0]?.path, "project/**");
-  assert.equal(p.pathPolicy.rules[0]?.write, "ask");
-});
-
 // ── branch 2: productive full access ──
 
-test("keel-develop: inherits query, explicitly keeps execute approval, overrides write ask→allow", () => {
+test("keel-develop: inherits plan, explicitly keeps execute approval, overrides write deny→allow", () => {
   const p = profiles().profiles["keel-develop"];
   // inspect: inherited from plan (allow)
   assert.equal(p.shellPolicy.inspect, "allow");
   // modify: inherited, remains ask — but write path is allow via pathPolicy
   assert.equal(p.shellPolicy.modify, "ask");
-  // execute: explicitly inherited as ask from query, not plan's deny
+  // execute: explicitly overrides plan's deny with ask
   // Regression guard: interpreters and build tools still require approval.
   assert.equal(p.shellPolicy.execute, "ask");
   assert.equal(p.shellPolicy.unknown, "ask");
   assert.equal(p.shellPolicy.destroy, "deny");
-  // rules: develop's project/** {write:allow} prepended, shadowing query's {write:ask}
+  // rules: develop's project/** {write:allow} prepended before plan's docs/CONTEXT rules
   assert.equal(p.pathPolicy.rules[0]?.path, "project/**");
   assert.equal(p.pathPolicy.rules[0]?.write, "allow");
 });
@@ -136,9 +106,9 @@ test("chain: all profiles have distinct descriptions", () => {
   assert.equal(new Set(descriptions).size, names.length);
 });
 
-test("chain: only read, explore, and sub-agent tiers deny all commands", () => {
+test("chain: only read, explore, and sub-agent project deny all commands", () => {
   for (const [name, p] of Object.entries(profiles().profiles)) {
-    if (name === "keel-read" || name === "keel-explore" || name === "keel-subagent-scratch" || name === "keel-subagent-project") {
+    if (name === "keel-read" || name === "keel-explore" || name === "keel-subagent-project") {
       assert.equal(p.shellPolicy.modify, "deny", `${name}: should deny modify`);
       assert.equal(p.shellPolicy.execute, "deny", `${name}: should deny execute`);
     } else {

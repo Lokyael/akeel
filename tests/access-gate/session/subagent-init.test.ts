@@ -27,21 +27,21 @@ test("applySubagentProfile clamps worker to scratch on missing parent tier (fail
   const state = makeState();
   const env = makeEnv({ [SUBAGENT_CHILD_ENV]: "1", [SUBAGENT_CHILD_AGENT_ENV]: "worker" });
   applySubagentProfile(profiles, state, env);
-  assert.equal(state.getName(), "keel-subagent-scratch");
+  assert.equal(state.getName(), "keel-explore");
 });
 
 test("applySubagentProfile clamps worker to scratch on parent tier 0", () => {
   const state = makeState();
   const env = makeEnv({ [SUBAGENT_CHILD_ENV]: "1", [SUBAGENT_CHILD_AGENT_ENV]: "worker", [PARENT_TIER_ENV]: "0" });
   applySubagentProfile(profiles, state, env);
-  assert.equal(state.getName(), "keel-subagent-scratch");
+  assert.equal(state.getName(), "keel-explore");
 });
 
 test("applySubagentProfile keeps scout at scratch even with parent tier 1", () => {
   const state = makeState();
   const env = makeEnv({ [SUBAGENT_CHILD_ENV]: "1", [SUBAGENT_CHILD_AGENT_ENV]: "scout", [PARENT_TIER_ENV]: "1" });
   applySubagentProfile(profiles, state, env);
-  assert.equal(state.getName(), "keel-subagent-scratch");
+  assert.equal(state.getName(), "keel-explore");
 });
 
 test("applySubagentProfile honors subagentProfiles override (worker to scratch)", () => {
@@ -50,7 +50,7 @@ test("applySubagentProfile honors subagentProfiles override (worker to scratch)"
   const state = makeState(overridden);
   const env = makeEnv({ [SUBAGENT_CHILD_ENV]: "1", [SUBAGENT_CHILD_AGENT_ENV]: "worker", [PARENT_TIER_ENV]: "1" });
   applySubagentProfile(overridden, state, env);
-  assert.equal(state.getName(), "keel-subagent-scratch");
+  assert.equal(state.getName(), "keel-explore");
 });
 
 test("applySubagentProfile leaves the state untouched for a non-subagent env", () => {
@@ -73,7 +73,7 @@ test("applySubagentProfile skips when the tier profile is missing", () => {
 test("publishParentTier writes 1 for a project-writable profile", () => {
   const env = makeEnv();
   const state = makeState();
-  state.set("keel-code");
+  state.set("keel-develop");
   publishParentTier(state, env);
   assert.equal(env[PARENT_TIER_ENV], "1");
 });

@@ -20,7 +20,7 @@
 - **Prompt Surface**：与 LLM 交互的提示词面，按注入方式分层——`principles.md`（恒定注入）、`skills/`（按需加载）、access-gate guidance（失败路径）。
 - **Skill Single Responsibility**：每个 skill 单一职责、调用时内容全量被使用；触发场景互斥的 skill 保持独立，不合并（D-030）。
 - **Single Source of Format**：格式/规则只在 `principles.md` 参考节（Quick Reference / Project Records）定义一次，技能只文字引用不内嵌副本（D-030）。
-- **子代理档位（tier）**：pi-subagents 子代理会话的权限档位，共两档——T0 `scratch`（`keel-subagent-scratch`，写仅 `/tmp/pi-work/**`）与 T1 `project`（`keel-subagent-project`，写 `project/**` + scratch）；读均全盘、shell 轴两档一致（inspect-only），差异只在 Direct 写面。机制与细节见 Architecture 与 D-039。
+- **子代理档位（tier）**：pi-subagents 子代理会话的权限档位，共两档——T0 `scratch`（复用主档 `keel-explore`，写仅 `/tmp/pi-work/**`）与 T1 `project`（`keel-subagent-project`，写 `project/**` + scratch）；读均全盘、shell 轴两档一致（inspect-only），差异只在 Direct 写面。机制与细节见 Architecture 与 D-039。
 - **subagentProfiles 映射**：`config.yaml`（集中配置，D-041）可选顶层键，agent 名→档位名（`scratch`/`project`，`"*"` 回退），优先级 显式 > 内置默认 > `*`（D-039）。
 - **父档位钳制**：父会话档位号（1=项目可写档，否则 0）经 `PI_KEEL_PARENT_TIER`（`"0"`/`"1"`）env 传播，父侧算好、子代理零解析；子代理生效档 = min(映射档, 父TIER)——子代理权限上限 = 父会话当前档位（D-039）。
 
@@ -65,6 +65,7 @@
 - [D-046 plan 验证收敛到 seal 边界（kernel 品牌检查）](docs/decisions.md#d-046-plan-验证收敛到-seal-边界kernel-品牌检查)
 - [D-047 原则优先级与 Reversal surface 申报属性](docs/decisions.md#d-047-原则优先级与-reversal-surface-申报属性)
 - [D-048 类语义模型收编 domain、glob 编译边界与 config 加载即校验](docs/decisions.md#d-048-类语义模型收编-domainglob-编译边界与-config-加载即校验)
+- [D-049 内置 Profile 集合收敛（移除 keel-code/keel-query/keel-subagent-scratch）](docs/decisions.md#d-049-内置-profile-集合收敛移除-keel-codekeel-querykeel-subagent-scratch)
 
 ## Negative Space
 

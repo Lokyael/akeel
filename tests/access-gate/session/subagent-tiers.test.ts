@@ -57,19 +57,16 @@ test("effective tier is min(mapped, parent tier)", () => {
 
 test("parent tier: project-writable profiles are 1, others 0", () => {
   const profiles = builtinProfiles();
-  assert.equal(parentTierOf(profiles.profiles["keel-code"]!), "1");
   assert.equal(parentTierOf(profiles.profiles["keel-develop"]!), "1");
   assert.equal(parentTierOf(profiles.profiles["keel-subagent-project"]!), "1");
   assert.equal(parentTierOf(profiles.profiles["keel-build"]!), "1");
   assert.equal(parentTierOf(profiles.profiles["keel-plan"]!), "0");
-  assert.equal(parentTierOf(profiles.profiles["keel-query"]!), "0");
   assert.equal(parentTierOf(profiles.profiles["keel-read"]!), "0");
   assert.equal(parentTierOf(profiles.profiles["keel-explore"]!), "0");
-  assert.equal(parentTierOf(profiles.profiles["keel-subagent-scratch"]!), "0");
 });
 
 test("tier resolves to builtin profile name", () => {
-  assert.equal(SUBAGENT_TIER_PROFILE.scratch, "keel-subagent-scratch");
+  assert.equal(SUBAGENT_TIER_PROFILE.scratch, "keel-explore");
   assert.equal(SUBAGENT_TIER_PROFILE.project, "keel-subagent-project");
 });
 
