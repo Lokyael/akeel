@@ -43,7 +43,8 @@ function validateCommandDef(name: string, def: CommandDef): string | null {
 
 /** 校验 commands 段（commands 与 reclassify 的 class 合法性）。返回错误消息或 null。 */
 function validateCommands(configPath: string, commands: NonNullable<KeelConfig["commands"]>): string | null {
-  if (commands.commands) {    for (const [name, def] of Object.entries(commands.commands)) {
+  if (commands.commands) {
+    for (const [name, def] of Object.entries(commands.commands)) {
       const err = validateCommandDef(name, def);
       if (err) return `${configPath}: commands.${name}: ${err}`;
     }

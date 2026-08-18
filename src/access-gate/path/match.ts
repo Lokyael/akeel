@@ -10,16 +10,7 @@ export interface CompiledRule {
   readonly glob: CompiledGlob;
 }
 
-/** 首条对 (path, operation) 命中的规则（first-match 语义）。 */
-export function firstRuleFor(
-  rules: readonly PathRule[],
-  path: string,
-  operation: PathOperation,
-): PathRule | undefined {
-  return rules.find((rule) => rule[operation] !== undefined && globMatches(compileGlob(rule.path), path));
-}
-
-/** 预编译规则集（供 compilePathPolicyOnce 使用；每条 rule.path 编译一次）。 */
+/** 预编译规则集（供 compileRulesOnce 使用；每条 rule.path 编译一次）。 */
 export function compileRules(rules: readonly PathRule[]): readonly CompiledRule[] {
   return rules.map((rule) => ({ rule, glob: compileGlob(rule.path) }));
 }

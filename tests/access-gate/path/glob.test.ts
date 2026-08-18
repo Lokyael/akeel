@@ -54,6 +54,14 @@ test("glob: middle globstar matches zero or more segments", () => {
   assert.ok(!match("project/**/.env", "project/x/.env.dist")); // 末尾需 .env
 });
 
+test("glob: consecutive globstars collapse to one (idempotent)", () => {
+  // a/**/**/b 与 a/**/b 语义等价（** 可匹配空段）——信息安全边界锁定
+  assert.ok(match("a/**/**/b", "a/b"));
+  assert.ok(match("a/**/**/b", "a/x/b"));
+  assert.ok(match("a/**/**/b", "a/x/y/b"));
+  assert.ok(!match("a/**/**/b", "a/b/c")); // 需以 b 结尾
+});
+
 // ─── globstar 结尾 `a/**`（匹配自身及其下全部） ───
 
 test("glob: trailing globstar matches self and descendants", () => {
