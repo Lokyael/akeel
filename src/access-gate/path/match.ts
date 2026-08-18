@@ -1,6 +1,6 @@
-// access-gate/path/match.ts — 编译制品的规则/阻断匹配（深化 C）
-// 依赖 glob.ts 的 ComplileGlob；规则集经 compilePathPolicyOnce 一次编译（WeakMap 记忆化），
-// 判定为纯查找。改名族：selectPathRule → firstRuleFor。
+// access-gate/path/match.ts — 编译制品的规则匹配（深化 C）
+// 依赖 glob.ts 的 CompiledGlob；规则集经 compileRulesOnce 一次编译（WeakMap 记忆化），
+// 判定为纯查找。规则匹配走编译制品路径（compileRules/firstCompiledRule）。
 import { compileGlob, globMatches, type CompiledGlob } from "./glob";
 import type { PathOperation, PathRule } from "../profile/types";
 
