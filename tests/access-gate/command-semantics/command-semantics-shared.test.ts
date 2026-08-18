@@ -3,7 +3,7 @@
 
 import assert from "node:assert/strict";
 import test from "node:test";
-import { firstWord, positionalWords, subcommandArgs } from "../../../src/access-gate/command-semantics/adapters/shared";
+import { firstWord, positionalWords, subcommandArgs } from "../../../src/access-gate/command-semantics/args";
 
 const arg = (value: string) => ({ value });
 

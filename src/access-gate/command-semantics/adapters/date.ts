@@ -8,7 +8,8 @@
 
 import type { ShellCommandNode } from "../../shell-parse/types";
 import type { CommandAdapter, CommandSemantics, PathIntent } from "../types";
-import { makeSemantics, consumedFileIntents } from "./shared";
+import { makeSemantics } from "../semantics";
+import { consumedFileIntents } from "../intent";
 import { parseOptions, type Opt } from "./option-parse";
 
 const DATE_OPTS: Opt[] = [

@@ -6,7 +6,8 @@
 
 import type { ShellCommandNode, ShellArg } from "../../shell-parse/types";
 import type { CommandAdapter, CommandSemantics, Effect, PathIntent } from "../types";
-import { makeSemantics, SYNTHETIC_SPAN } from "./shared";
+import { makeSemantics } from "../semantics";
+import { SYNTHETIC_SPAN } from "../intent";
 import { parseOptions, type Opt } from "./option-parse";
 
 // cp/mv/ln/install 共享路径语义：位置参数是源（cp/ln/install read、mv write），

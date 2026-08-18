@@ -7,7 +7,8 @@
 
 import type { ShellCommandNode, ShellArg } from "../../shell-parse/types";
 import type { CommandAdapter, CommandSemantics, PathIntent } from "../types";
-import { makeSemantics, consumedFileIntents, SYNTHETIC_SPAN } from "./shared";
+import { makeSemantics } from "../semantics";
+import { consumedFileIntents, SYNTHETIC_SPAN } from "../intent";
 import { parseOptions, type Opt, type OptConfig } from "./option-parse";
 
 // ─── find：值（测试表达式，非路径）/ 输出文件（write）/ 破坏性 / 运算符 / 常见 flag ───

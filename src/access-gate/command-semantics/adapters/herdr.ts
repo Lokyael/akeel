@@ -10,7 +10,7 @@
 
 import type { ShellCommandNode } from "../../shell-parse/types";
 import type { CommandAdapter, CommandSemantics } from "../types";
-import { makeSemantics } from "./shared";
+import { makeSemantics } from "../semantics";
 import { parseOptions, type Opt } from "./option-parse";
 
 /** 取值选项（值非路径，kind: expression，T-059）：值被消费，不参与子命令提取（--session <name>、--remote <target> 等启动器形式）。 */

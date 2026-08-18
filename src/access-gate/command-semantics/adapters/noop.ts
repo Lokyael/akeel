@@ -2,7 +2,7 @@
 
 import type { ShellCommandNode } from "../../shell-parse/types";
 import type { CommandAdapter, CommandSemantics } from "../types";
-import { makeSemantics } from "./shared";
+import { makeSemantics } from "../semantics";
 
 const NAMES = ["true", "false", ":", "echo", "printf"];
 

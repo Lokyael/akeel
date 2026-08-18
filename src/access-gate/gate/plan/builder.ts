@@ -14,7 +14,7 @@ import {
   type PathAccessOperation,
   type PlanCoverage,
 } from "./access-request-types";
-import { EFFECT_SET } from "../../domain";
+import { EFFECT_SET, COMMAND_CLASS_EFFECTS, WRITE_SIDE_EFFECTS } from "../../domain";
 import type { PathOperation, PathSource, ToolSurface } from "../../domain";
 
 export function reject(code: CompilerDecisionCode, subject: string, span?: SourceSpan): CompilationReject {
@@ -83,8 +83,11 @@ export function effectsFor(
   const result = new Set<Effect>(effects);
   for (const intent of intents) result.add(intent.operation === "list" ? "read" : intent.operation);
   if (hasRedirection) result.add("write");
-  if (commandClass === "destroy" || commandClass === "execute") result.add("execute");
-  if (commandClass === "modify" && !["write", "delete", "permissionChange"].some((effect) => result.has(effect as Effect))) {
+  // 守卫查类语义模型（A）：requires = plan 完整性不变量——destroy/execute 必须带 execute
+  //（shell 轴），modify 必须至少一个写面 effect（path 轴写检查）。与 verifier 证明侧同表。
+  const requirement = COMMAND_CLASS_EFFECTS[commandClass].requires;
+  if (requirement.includes("execute")) result.add("execute");
+  if (requirement.includes("write-side") && ![...result].some((effect) => WRITE_SIDE_EFFECTS.includes(effect as Effect))) {
     result.add("write");
   }
   return [...result];

@@ -14,7 +14,7 @@
 
 import type { ShellCommandNode, ShellArg } from "../../shell-parse/types";
 import type { CommandAdapter, CommandSemantics, PathIntent } from "../types";
-import { makeSemantics } from "./shared";
+import { makeSemantics } from "../semantics";
 
 /**
  * Extract the file argument from source/. commands.

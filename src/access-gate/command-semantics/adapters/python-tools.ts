@@ -14,7 +14,7 @@
 
 import type { ShellCommandNode } from "../../shell-parse/types";
 import type { CommandAdapter, CommandSemantics } from "../types";
-import { makeSemantics } from "./shared";
+import { makeSemantics } from "../semantics";
 import { parseOptions, type Opt } from "./option-parse";
 
 // ─── config types ───

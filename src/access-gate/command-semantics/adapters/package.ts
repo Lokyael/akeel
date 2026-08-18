@@ -2,7 +2,10 @@
 
 import type { ShellArg, ShellCommandNode } from "../../shell-parse/types";
 import type { CommandAdapter, CommandSemantics, PathIntent } from "../types";
-import { makeSemantics, optionIntent, semanticsFromRules, subcommandArgs, type RuleDef } from "./shared";
+import { makeSemantics } from "../semantics";
+import { optionIntent } from "../intent";
+import { semanticsFromRules, type RuleDef } from "../rules";
+import { subcommandArgs } from "../args";
 import { parseOptions, type Opt } from "./option-parse";
 import { parseConfigOptions, type ConfigOptionTable } from "./config-parse";
 

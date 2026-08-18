@@ -9,7 +9,9 @@
 import type { CommandClass, CommandSemantics } from "./types";
 import type { ShellArg } from "../shell-parse/types";
 import { basename } from "node:path";
-import { firstWord, fullSubcommand, makeSemantics, SYNTHETIC_SPAN } from "./adapters/shared";
+import { firstWord, fullSubcommand } from "./args";
+import { makeSemantics } from "./semantics";
+import { SYNTHETIC_SPAN } from "./intent";
 import { COMMAND_CLASS_SET, EFFECT_SET } from "../domain";
 import { loadConfig } from "../config";
 import type { CommandDef, CommandOverrides, ReclassifyEntry } from "../config";

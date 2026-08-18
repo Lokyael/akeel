@@ -6,7 +6,7 @@ export { analyzeCd, analyzeControlFlow, initialCwd } from "./control-flow";
 export type { CdInfo, ControlFlowAnalysis } from "./control-flow";
 export { normalizeCommand } from "./normalize";
 export { LANGUAGE_RUNTIMES, HARD_RULE_INTERPRETERS } from "./interpreter-names";
-export { canonicalExecutableName } from "./adapters/shared";
+export { canonicalExecutableName } from "./naming";
 export type {
   CommandSemantics,
   CommandAdapter,

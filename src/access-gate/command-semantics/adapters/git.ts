@@ -2,7 +2,11 @@
 
 import type { ShellCommandNode, ShellArg } from "../../shell-parse/types";
 import type { CommandAdapter, CommandSemantics, Effect, PathIntent } from "../types";
-import { makeSemantics, optionIntent, consumedFileIntents, positionalWords, SYNTHETIC_SPAN, semanticsFromRules, type RuleDef } from "./shared";
+import { makeSemantics } from "../semantics";
+import { optionIntent, consumedFileIntents, SYNTHETIC_SPAN } from "../intent";
+import { positionalWords } from "../args";
+import { semanticsFromRules, type RuleDef } from "../rules";
+import { COMMAND_CLASS_EFFECTS } from "../../domain";
 import { parseOptions, type Opt } from "./option-parse";
 import { parseConfigOptions, type ConfigOptionTable, type ConfigTarget } from "./config-parse";
 
@@ -140,7 +144,9 @@ function bundleCreateFile(args: readonly ShellArg[]): { op: "write"; value: stri
 }
 
 function gitEffects(cls: GitClass, first: string): readonly Effect[] {
-  const effects = new Set<Effect>(cls === "inspect" ? ["read"] : cls === "destroy" ? ["execute"] : ["write"]);
+  // 核心查类语义模型（A）：git 的 cls 是 CommandClass 子集（inspect/modify/destroy），
+  // base 由 COMMAND_CLASS_EFFECTS 单一来源；本函数只保留 git 增量（delete/network）。
+  const effects = new Set<Effect>(COMMAND_CLASS_EFFECTS[cls].defaults);
   if (first === "rm") effects.add("delete");
   if (["fetch", "pull", "push", "clone", "remote", "ls-remote", "submodule"].includes(first)) effects.add("network");
   return [...effects];

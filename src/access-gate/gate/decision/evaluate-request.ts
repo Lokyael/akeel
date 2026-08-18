@@ -3,18 +3,9 @@ import type { ResolvedProfile } from "../../profile";
 import { hasPlanBrand, ANALYSIS_LIMITS, type CommandAccessOperation, type CompleteAccessPlan, type PathAccessOperation } from "../plan";
 import type { GateDecision, GateEvidence, HardDenyCode } from "../decision-types";
 import { hardDeny, profileDeny, requireApproval } from "./decision-builder";
-import type { Effect } from "../../command-semantics";
+import { EFFECT_AXIS } from "../../domain";
 
-const EFFECT_POLICY_AXIS: Readonly<Record<Effect, "path" | "shell">> = {
-  read: "path",
-  search: "path",
-  write: "path",
-  delete: "path",
-  permissionChange: "path",
-  cwdChange: "path",
-  execute: "shell",
-  network: "shell",
-};
+const EFFECT_POLICY_AXIS = EFFECT_AXIS; // 别名：kernel 轴检查单一来源在 domain（A），此处仅引用不另建平行表
 
 export function evaluateRequest(
   plan: CompleteAccessPlan,

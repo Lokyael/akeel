@@ -11,9 +11,11 @@ import {
 } from "./access-request-types";
 import {
   COMMAND_CLASS_SET,
+  COMMAND_CLASS_EFFECTS,
   EFFECT_SET,
   PATH_OPERATION_SET,
   TOOL_SURFACE_SET,
+  WRITE_SIDE_EFFECTS,
 } from "../../domain";
 import { PATH_SOURCE_SET } from "../../domain";
 import type { PathOperation, PathSource, ToolSurface } from "../../domain";
@@ -132,8 +134,19 @@ function isValidOperation(value: unknown): value is AccessOperation {
       && typeof value.commandClass === "string"
       && COMMAND_CLASS_SET.has(value.commandClass as CommandClass)
       && Array.isArray(value.effects)
-      && value.effects.every((effect) => typeof effect === "string" && EFFECT_SET.has(effect as Effect));
+      && value.effects.every((effect) => typeof effect === "string" && EFFECT_SET.has(effect as Effect))
+      // F/A：requires 证明侧——effects 必须覆盖类的 effect 覆盖要求（构造侧 effectsFor 已保证，
+      // 此处 seal 边界复核，防未来编译器改动破坏完整性；失败走 finalize 的 invalid-tool-input）。
+      && satisfiesClassRequirement(value.effects as Effect[], value.commandClass as CommandClass);
   }
   return false;
+}
+
+/** requires 存在性语义：write-face = 至少一个 WRITE_SIDE_EFFECTS 成员；execute = 必须含 execute。 */
+function satisfiesClassRequirement(effects: readonly Effect[], commandClass: CommandClass): boolean {
+  const requirement = COMMAND_CLASS_EFFECTS[commandClass].requires;
+  if (requirement.includes("execute") && !effects.includes("execute")) return false;
+  if (requirement.includes("write-side") && !effects.some((effect) => WRITE_SIDE_EFFECTS.includes(effect))) return false;
+  return true;
 }
 

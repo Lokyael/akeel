@@ -2,7 +2,9 @@
 
 import type { ShellCommandNode } from "../../shell-parse/types";
 import type { CommandAdapter, CommandSemantics } from "../types";
-import { makeSemantics, semanticsFromRules, subcommandArgs, type RuleDef } from "./shared";
+import { makeSemantics } from "../semantics";
+import { semanticsFromRules, type RuleDef } from "../rules";
+import { subcommandArgs } from "../args";
 import { parseOptions, type Opt } from "./option-parse";
 
 interface BuildToolConfig {

@@ -17,7 +17,8 @@ import { shellBuiltinsAdapter } from "./adapters/shell-builtins";
 import { pythonToolsAdapter } from "./adapters/python-tools";
 import { dateAdapter } from "./adapters/date";
 import { herdrAdapter } from "./adapters/herdr";
-import { makeSemantics, canonicalExecutableName } from "./adapters/shared";
+import { makeSemantics } from "./semantics";
+import { canonicalExecutableName } from "./naming";
 import {
   loadOverrides,
   applyCommandDef,

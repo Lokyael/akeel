@@ -6,7 +6,8 @@
 
 import type { ShellCommandNode } from "../../shell-parse/types";
 import type { CommandAdapter, CommandSemantics, PathIntent } from "../types";
-import { makeSemantics, consumedFileIntents } from "./shared";
+import { makeSemantics } from "../semantics";
+import { consumedFileIntents } from "../intent";
 import { parseOptions, type Opt, type OptConfig } from "./option-parse";
 
 /** 命令级配置：选项 schema + 位置参数性质 + 未知选项策略（text-transform：未知 → opaque）。 */
