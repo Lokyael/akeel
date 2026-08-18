@@ -5,6 +5,7 @@
 // （aliases / commands / reclassify）归一为扩展语义并应用。
 //
 // 配置来源：$PI_CODING_AGENT_DIR/pi-keel/config.yaml，默认 ~/.pi/agent/pi-keel/config.yaml。
+// 语义校验已在 config 层加载期完成（B），此处只读取已校验结果，不再自校验。
 
 import type { CommandClass, CommandSemantics } from "./types";
 import type { ShellArg } from "../shell-parse/types";
@@ -12,65 +13,18 @@ import { basename } from "node:path";
 import { firstWord, fullSubcommand } from "./args";
 import { makeSemantics } from "./semantics";
 import { SYNTHETIC_SPAN } from "./intent";
-import { COMMAND_CLASS_SET, EFFECT_SET } from "../domain";
 import { loadConfig } from "../config";
 import type { CommandDef, CommandOverrides, ReclassifyEntry } from "../config";
 import { getAgentDir } from "../agent-dir";
 
-// ─── 运行时校验 ───
-
-function validateCommandDef(name: string, def: CommandDef): void {
-  if (!COMMAND_CLASS_SET.has(def.class)) {
-    throw new Error(`config.yaml: ${name}: invalid class "${def.class}"`);
-  }
-  if (def.effects && !def.effects.every((effect) => EFFECT_SET.has(effect))) {
-    const bad = def.effects.find((effect) => !EFFECT_SET.has(effect))!;
-    throw new Error(`config.yaml: ${name}: invalid effect "${bad}"`);
-  }
-  if (def.subcommands) {
-    for (const [sc, sub] of Object.entries(def.subcommands)) {
-      if (!COMMAND_CLASS_SET.has(sub.class)) {
-        throw new Error(`config.yaml: ${name}.${sc}: invalid class "${sub.class}"`);
-      }
-      if (sub.effects && !sub.effects.every((effect) => EFFECT_SET.has(effect))) {
-        const bad = sub.effects.find((effect) => !EFFECT_SET.has(effect))!;
-        throw new Error(`config.yaml: ${name}.${sc}: invalid effect "${bad}"`);
-      }
-    }
-  }
-}
-
 // ─── 加载 ───
 
-/** 记忆已校验的 commands 对象（引用来自 loadConfig 缓存，同一 agentDir 稳定；
- * 配置变化重新加载后是新对象，自动重新校验；无需显式 reset 联动）。 */
-const _validated = new WeakSet<CommandOverrides>();
-
-/** 返回 config.yaml 的 commands 段；无配置/无该段时返回空覆盖。 */
-export function loadOverrides(agentDir = getAgentDir()): CommandOverrides {
+/** 返回 config.yaml 的 commands 段；无配置/无该段时返回空覆盖。
+ * 已校验：config 层加载期完成语义校验（B），损坏配置 fail-closed，不会在此抛错。 */
+export function commandOverridesFor(agentDir = getAgentDir()): CommandOverrides {
   const loaded = loadConfig(agentDir);
   if (loaded.kind !== "ok") return {};
-  const commands = loaded.value.commands;
-  if (!commands) return {};
-
-  // 已校验对象直接返回（避免每次命令分析重复校验，原 _cache 语义，D-041）
-  if (_validated.has(commands)) return commands;
-
-  // 运行时校验 class 字段（commands 和 reclassify）
-  if (commands.commands) {
-    for (const [name, def] of Object.entries(commands.commands)) {
-      validateCommandDef(name, def);
-    }
-  }
-  if (commands.reclassify) {
-    for (const rule of commands.reclassify) {
-      if (!COMMAND_CLASS_SET.has(rule.class)) {
-        throw new Error(`config.yaml: reclassify[${rule.command}]: invalid class "${rule.class}"`);
-      }
-    }
-  }
-  _validated.add(commands);
-  return commands;
+  return loaded.value.commands ?? {};
 }
 
 // ─── 应用覆盖 ───

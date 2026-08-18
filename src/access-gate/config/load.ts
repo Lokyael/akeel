@@ -6,7 +6,8 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { parse as parseYaml } from "yaml";
 import { getAgentDir } from "../agent-dir";
-import type { KeelConfig } from "./types";
+import { COMMAND_CLASS_SET, EFFECT_SET } from "../domain";
+import type { CommandDef, KeelConfig } from "./types";
 
 /** 加载结果：none（无用户配置）/ ok（解析成功）/ error（损坏，fail-closed 由调用方降级）。 */
 export type ConfigLoad =
@@ -15,6 +16,47 @@ export type ConfigLoad =
   | { kind: "error"; message: string };
 
 const _cache = new Map<string, ConfigLoad>();
+
+/**
+ * 语义校验 commands 段（B：加载即校验边界）。
+ * 原位于 overrides（消费方分析时抛）；前移至 config 加载期，损坏配置在 session 启动
+ * 经 loadProfiles 的 error 路径 report + fail-closed，而非命令分析时未捕获 throw。
+ * 返回 null 表示通过，否则是错误消息。
+ */
+function validateCommandDef(name: string, def: CommandDef): string | null {
+  if (!COMMAND_CLASS_SET.has(def.class)) return `invalid class "${def.class}"`;
+  if (def.effects && !def.effects.every((effect) => EFFECT_SET.has(effect))) {
+    const bad = def.effects.find((effect) => !EFFECT_SET.has(effect))!;
+    return `invalid effect "${bad}"`;
+  }
+  if (def.subcommands) {
+    for (const [sc, sub] of Object.entries(def.subcommands)) {
+      if (!COMMAND_CLASS_SET.has(sub.class)) return `${name}.${sc}: invalid class "${sub.class}"`;
+      if (sub.effects && !sub.effects.every((effect) => EFFECT_SET.has(effect))) {
+        const bad = sub.effects.find((effect) => !EFFECT_SET.has(effect))!;
+        return `${name}.${sc}: invalid effect "${bad}"`;
+      }
+    }
+  }
+  return null;
+}
+
+/** 校验 commands 段（commands 与 reclassify 的 class 合法性）。返回错误消息或 null。 */
+function validateCommands(configPath: string, commands: NonNullable<KeelConfig["commands"]>): string | null {
+  if (commands.commands) {    for (const [name, def] of Object.entries(commands.commands)) {
+      const err = validateCommandDef(name, def);
+      if (err) return `${configPath}: commands.${name}: ${err}`;
+    }
+  }
+  if (commands.reclassify) {
+    for (const rule of commands.reclassify) {
+      if (!COMMAND_CLASS_SET.has(rule.class)) {
+        return `${configPath}: reclassify[${rule.command}]: invalid class "${rule.class}"`;
+      }
+    }
+  }
+  return null;
+}
 
 export function loadConfig(agentDir = getAgentDir()): ConfigLoad {
   const cached = _cache.get(agentDir);
@@ -55,12 +97,23 @@ export function loadConfig(agentDir = getAgentDir()): ConfigLoad {
     }
   }
 
+  // B：加载即校验——commands 语义（class/effect/reclassify）在首次解析时验证，
+  // 损坏配置立即 fail-closed，不等命令分析时触发。
+  if (cfg.commands != null) {
+    const commandErr = validateCommands(configPath, cfg.commands);
+    if (commandErr) {
+      console.error(`pi-keel: ${commandErr}`);
+      _cache.set(agentDir, { kind: "error", message: commandErr });
+      return { kind: "error", message: commandErr };
+    }
+  }
+
   const result: ConfigLoad = { kind: "ok", value: cfg };
   _cache.set(agentDir, result);
   return result;
 }
 
 /** 仅用于测试：重置加载缓存。 */
-export function resetConfig(): void {
+export function resetConfigCache(): void {
   _cache.clear();
 }

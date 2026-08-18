@@ -8,7 +8,7 @@ import test from "node:test";
 import { lex } from "../../../src/access-gate/shell-parse/lexer";
 import { parse } from "../../../src/access-gate/shell-parse/parser";
 import { analyzeSemantics } from "../../../src/access-gate/command-semantics/registry";
-import { resetConfig } from "../../../src/access-gate/config";
+import { loadConfig, resetConfigCache } from "../../../src/access-gate/config";
 
 // ─── helpers ───
 
@@ -31,7 +31,7 @@ function setupProject(overridesContent: string): { root: string; cleanup: () => 
   return {
     root,
     cleanup: () => {
-      resetConfig();
+      resetConfigCache();
       if (previous === undefined) delete process.env.PI_CODING_AGENT_DIR;
       else process.env.PI_CODING_AGENT_DIR = previous;
       rmSync(root, { recursive: true, force: true });
@@ -43,7 +43,7 @@ function setupProject(overridesContent: string): { root: string; cleanup: () => 
 // ─── aliases ───
 
 test("aliases: fd → find（search adapter 接管）", () => {
-  resetConfig();
+  resetConfigCache();
   const { cleanup } = setupProject(`
 aliases:
   fd: find
@@ -60,7 +60,7 @@ aliases:
 });
 
 test("aliases: bat → cat（read adapter 接管）", () => {
-  resetConfig();
+  resetConfigCache();
   const { cleanup } = setupProject(`
 aliases:
   bat: cat
@@ -76,7 +76,7 @@ aliases:
 });
 
 test("aliases: 别名目标不存在 → unknown", () => {
-  resetConfig();
+  resetConfigCache();
   const { cleanup } = setupProject(`
 aliases:
   nosuchtool: nosuchadapter
@@ -91,7 +91,7 @@ aliases:
 });
 
 test("aliases: 路径前缀键覆盖目录内路径形式（含 ./ 归一化）", () => {
-  resetConfig();
+  resetConfigCache();
   const { cleanup } = setupProject(`
 aliases:
   "bin/": cat
@@ -108,7 +108,7 @@ aliases:
 });
 
 test("aliases: 路径形式精确键优先于前缀键", () => {
-  resetConfig();
+  resetConfigCache();
   const { cleanup } = setupProject(`
 aliases:
   "./bin/eslint": node
@@ -125,7 +125,7 @@ aliases:
 });
 
 test("aliases: 最长路径前缀键优先", () => {
-  resetConfig();
+  resetConfigCache();
   const { cleanup } = setupProject(`
 aliases:
   "bin/": cat
@@ -142,7 +142,7 @@ aliases:
 });
 
 test("aliases: 裸名键不再隐式覆盖路径形式（basename 冲突消除）", () => {
-  resetConfig();
+  resetConfigCache();
   const { cleanup } = setupProject(`
 aliases:
   mytool: cat
@@ -157,7 +157,7 @@ aliases:
 });
 
 test("aliases: 前缀键不误伤其他目录同名工具", () => {
-  resetConfig();
+  resetConfigCache();
   const { cleanup } = setupProject(`
 aliases:
   "bin/": cat
@@ -171,7 +171,7 @@ aliases:
 });
 
 test("aliases: 路径前缀键目标不存在 → unknown", () => {
-  resetConfig();
+  resetConfigCache();
   const { cleanup } = setupProject(`
 aliases:
   "bin/": nosuchadapter
@@ -186,7 +186,7 @@ aliases:
 });
 
 test("aliases: ./ 归一化对精确键同样生效（bin/eslint 命中 ./bin/eslint）", () => {
-  resetConfig();
+  resetConfigCache();
   const { cleanup } = setupProject(`
 aliases:
   "bin/eslint": node
@@ -202,7 +202,7 @@ aliases:
 });
 
 test("aliases: ./ 精确键与无 ./ 键等价（./bin/eslint 命中 bin/eslint）", () => {
-  resetConfig();
+  resetConfigCache();
   const { cleanup } = setupProject(`
 aliases:
   "./bin/eslint": node
@@ -217,7 +217,7 @@ aliases:
 });
 
 test("aliases: 别名目标为 commands 定义时链式解析", () => {
-  resetConfig();
+  resetConfigCache();
   const { cleanup } = setupProject(`
 aliases:
   mytool: my-linter
@@ -237,7 +237,7 @@ commands:
 });
 
 test("aliases: 别名目标为别名时不链式解析（单步契约，D-024）", () => {
-  resetConfig();
+  resetConfigCache();
   const { cleanup } = setupProject(`
 aliases:
   a: b
@@ -255,7 +255,7 @@ aliases:
 });
 
 test("aliases: 无 overrides 时不受影响", () => {
-  resetConfig();
+  resetConfigCache();
   // 无用户配置目录 → loadOverrides 找不到文件，回退到空配置
   const sem = analyzeSemantics(parseCmd("git status"));
   assert.equal(sem.commandClass, "inspect");
@@ -263,7 +263,7 @@ test("aliases: 无 overrides 时不受影响", () => {
 });
 
 test("only the global pi-keel/config.yaml is read; no project config exists", () => {
-  resetConfig();
+  resetConfigCache();
   const { cleanup } = setupProject("");
   try {
     // setupProject 只写了全局 pi-keel/config.yaml（commands 段为空）；
@@ -278,7 +278,7 @@ test("only the global pi-keel/config.yaml is read; no project config exists", ()
 // ─── commands ───
 
 test("commands: 简单命令（无子命令）→ 使用 YAML 定义的 class", () => {
-  resetConfig();
+  resetConfigCache();
   const { cleanup } = setupProject(`
 commands:
   my-linter:
@@ -296,7 +296,7 @@ commands:
 });
 
 test("commands: 路径前缀键覆盖目录内命令定义（D-024 作用域）", () => {
-  resetConfig();
+  resetConfigCache();
   const { cleanup } = setupProject(`
 commands:
   "bin/":
@@ -314,7 +314,7 @@ commands:
 });
 
 test("commands: 带子命令定义 → 子命令匹配", () => {
-  resetConfig();
+  resetConfigCache();
   const { cleanup } = setupProject(`
 commands:
   docker:
@@ -340,7 +340,7 @@ commands:
 });
 
 test("commands: 子命令未匹配 → 基类 + opaque", () => {
-  resetConfig();
+  resetConfigCache();
   const { cleanup } = setupProject(`
 commands:
   docker:
@@ -360,7 +360,7 @@ commands:
 });
 
 test("commands: 同名命令覆盖内置 adapter（用户定义优先）", () => {
-  resetConfig();
+  resetConfigCache();
   const { cleanup } = setupProject(`
 commands:
   git:
@@ -380,7 +380,7 @@ commands:
 // ─── reclassify ───
 
 test("reclassify: 匹配 pattern 时覆盖分类", () => {
-  resetConfig();
+  resetConfigCache();
   const { cleanup } = setupProject(`
 reclassify:
   - command: git
@@ -403,7 +403,7 @@ reclassify:
 });
 
 test("reclassify: 路径形式按 basename 对齐 adapter 身份（/usr/local/bin/git → 应用规则）", () => {
-  resetConfig();
+  resetConfigCache();
   const { cleanup } = setupProject(`
 reclassify:
   - command: git
@@ -422,7 +422,7 @@ reclassify:
 });
 
 test("reclassify: 不匹配时保留原分类", () => {
-  resetConfig();
+  resetConfigCache();
   const { cleanup } = setupProject(`
 reclassify:
   - command: git
@@ -439,7 +439,7 @@ reclassify:
 });
 
 test("reclassify: pattern 是无效正则时跳过", () => {
-  resetConfig();
+  resetConfigCache();
   const { cleanup } = setupProject(`
 reclassify:
   - command: git
@@ -455,7 +455,7 @@ reclassify:
 });
 
 test("reclassify: 只匹配指定命令名", () => {
-  resetConfig();
+  resetConfigCache();
   const { cleanup } = setupProject(`
 reclassify:
   - command: git
@@ -474,7 +474,7 @@ reclassify:
 // ─── 组合 ───
 
 test("组合: aliases + reclassify 同时生效", () => {
-  resetConfig();
+  resetConfigCache();
   const { cleanup } = setupProject(`
 aliases:
   g: git
@@ -493,7 +493,7 @@ reclassify:
 });
 
 test("组合: commands 定义优先于别名和内置", () => {
-  resetConfig();
+  resetConfigCache();
   const { cleanup } = setupProject(`
 aliases:
   g: git
@@ -513,7 +513,7 @@ commands:
 });
 
 test("组合: 别名 + commands → commands 优先于别名", () => {
-  resetConfig();
+  resetConfigCache();
   const { cleanup } = setupProject(`
 aliases:
   g: git
@@ -532,27 +532,26 @@ commands:
   }
 });
 
-// ─── 运行时校验 ───
+// ─── 加载期校验（B：从分析时 throw 前移至 config 加载 fail-closed） ───
 
-test("校验: commands 中无效 class 抛出明确错误", () => {
-  resetConfig();
+test("校验: commands 中无效 class → loadConfig error（加载期）", () => {
+  resetConfigCache();
   const { cleanup } = setupProject(`
 commands:
   badtool:
     class: bogus
 `);
   try {
-    assert.throws(
-      () => analyzeSemantics(parseCmd("badtool arg")),
-      /invalid class/,
-    );
+    const loaded = loadConfig(process.env.PI_CODING_AGENT_DIR);
+    assert.equal(loaded.kind, "error");
+    if (loaded.kind === "error") assert.match(loaded.message, /badclass|badtool/);
   } finally {
     cleanup();
   }
 });
 
-test("校验: commands 中无效 effects 抛出明确错误（F）", () => {
-  resetConfig();
+test("校验: commands 中无效 effects → loadConfig error（加载期）", () => {
+  resetConfigCache();
   const { cleanup } = setupProject(`
 commands:
   badfx:
@@ -560,17 +559,16 @@ commands:
     effects: [bogus]
 `);
   try {
-    assert.throws(
-      () => analyzeSemantics(parseCmd("badfx arg")),
-      /invalid effect "bogus"/,
-    );
+    const loaded = loadConfig(process.env.PI_CODING_AGENT_DIR);
+    assert.equal(loaded.kind, "error");
+    if (loaded.kind === "error") assert.match(loaded.message, /invalid effect "bogus"/);
   } finally {
     cleanup();
   }
 });
 
-test("校验: reclassify 中无效 class 抛出明确错误", () => {
-  resetConfig();
+test("校验: reclassify 中无效 class → loadConfig error（加载期）", () => {
+  resetConfigCache();
   const { cleanup } = setupProject(`
 reclassify:
   - command: git
@@ -578,17 +576,16 @@ reclassify:
     class: bogus
 `);
   try {
-    assert.throws(
-      () => analyzeSemantics(parseCmd("git status")),
-      /invalid class/,
-    );
+    const loaded = loadConfig(process.env.PI_CODING_AGENT_DIR);
+    assert.equal(loaded.kind, "error");
+    if (loaded.kind === "error") assert.match(loaded.message, /invalid class/);
   } finally {
     cleanup();
   }
 });
 
-test("校验: subcommands 中无效 class 抛出明确错误", () => {
-  resetConfig();
+test("校验: subcommands 中无效 class → loadConfig error（加载期）", () => {
+  resetConfigCache();
   const { cleanup } = setupProject(`
 commands:
   tool:
@@ -597,10 +594,25 @@ commands:
       x: { class: badclass }
 `);
   try {
-    assert.throws(
-      () => analyzeSemantics(parseCmd("tool x")),
-      /invalid class/,
-    );
+    const loaded = loadConfig(process.env.PI_CODING_AGENT_DIR);
+    assert.equal(loaded.kind, "error");
+    if (loaded.kind === "error") assert.match(loaded.message, /badclass|invalid class/);
+  } finally {
+    cleanup();
+  }
+});
+
+// 加载期 fail-closed 后，分析不抛异常——命令分析遇到损坏配置安全回退（不崩门禁）。
+test("校验: 加载期校验后 analyzeSemantics 不再抛（fail-closed 而非 crash）", () => {
+  resetConfigCache();
+  const { cleanup } = setupProject(`
+commands:
+  badtool:
+    class: bogus
+`);
+  try {
+    const sem = analyzeSemantics(parseCmd("git log"));
+    assert.equal(sem.commandClass, "inspect"); // 损坏配置 fail-closed，命令分析正常走内置
   } finally {
     cleanup();
   }
@@ -609,7 +621,7 @@ commands:
 // ─── 缓存隔离 ───
 
 test("缓存: 不同 global agentDir 加载不同的 overrides", () => {
-  resetConfig();
+  resetConfigCache();
   const p1 = setupProject(`
 aliases:
   t1: git
@@ -639,7 +651,7 @@ aliases:
 // ─── 边界 ───
 
 test("边界: 空 overrides 不影响正常分析", () => {
-  resetConfig();
+  resetConfigCache();
   const { cleanup } = setupProject(`
 # 只有注释，无实际内容
 `);
@@ -652,7 +664,7 @@ test("边界: 空 overrides 不影响正常分析", () => {
 });
 
 test("边界: 无效 YAML 不崩溃，回退到空配置", () => {
-  resetConfig();
+  resetConfigCache();
   const { cleanup } = setupProject(`{invalid: [::`);
   try {
     const sem = analyzeSemantics(parseCmd("git log"));
@@ -665,7 +677,7 @@ test("边界: 无效 YAML 不崩溃，回退到空配置", () => {
 // ─── 路径 fallback 与覆盖层优先级 ───
 
 test("commands: 路径键优先于路径 fallback（用户定义直接生效）", () => {
-  resetConfig();
+  resetConfigCache();
   const { cleanup } = setupProject(`
 commands:
   ./deploy.sh:
@@ -682,7 +694,7 @@ commands:
 });
 
 test("reclassify: 可覆盖路径 fallback 的 execute", () => {
-  resetConfig();
+  resetConfigCache();
   const { cleanup } = setupProject(`
 reclassify:
   - command: ./node_modules/.bin/tsx
@@ -700,7 +712,7 @@ reclassify:
 });
 
 test("aliases: 仍先于 adapter/fallback 生效（裸名映射到已知 adapter）", () => {
-  resetConfig();
+  resetConfigCache();
   const { cleanup } = setupProject(`
 aliases:
   myinsp: ls

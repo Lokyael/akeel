@@ -59,3 +59,16 @@ test("invalid global profiles fail closed to keel-read", () => {
     rmSync(agentDir, { recursive: true, force: true });
   }
 });
+
+test("invalid commands semantics also fail closed to keel-read (B), not crash on analysis", () => {
+  const agentDir = mkdtempSync(join(tmpdir(), "pi-access-agent-"));
+  try {
+    mkdirSync(join(agentDir, "pi-keel"), { recursive: true });
+    // 损坏 commands 段（class: bogus）→ config 层加载期校验 error → profile fail-closed
+    writeFileSync(join(agentDir, "pi-keel", "config.yaml"), "commands:\n  commands:\n    badtool:\n      class: bogus\n");
+
+    assert.equal(loadProfiles({ agentDir }).defaultProfile, "keel-read");
+  } finally {
+    rmSync(agentDir, { recursive: true, force: true });
+  }
+});

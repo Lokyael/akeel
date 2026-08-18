@@ -20,7 +20,7 @@ import { herdrAdapter } from "./adapters/herdr";
 import { makeSemantics } from "./semantics";
 import { canonicalExecutableName } from "./naming";
 import {
-  loadOverrides,
+  commandOverridesFor,
   applyCommandDef,
   applyReclassify,
   aliasNode,
@@ -153,7 +153,7 @@ export function analyzeSemantics(
   node: ShellCommandNode,
 ): CommandSemantics {
   const name = node.executable?.value?.toLowerCase() ?? "";
-  const ov = loadOverrides();
+  const ov = commandOverridesFor();
 
   // 1. 用户定义的完整命令（精确 + 路径前缀作用域，D-024）
   const commandKey = scopeKey(ov.commands, name);

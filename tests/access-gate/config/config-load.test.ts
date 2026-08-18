@@ -5,7 +5,7 @@ import test from "node:test";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { loadConfig, resetConfig, type ConfigLoad } from "../../../src/access-gate/config";
+import { loadConfig, resetConfigCache, type ConfigLoad } from "../../../src/access-gate/config";
 
 function agentDir(): { dir: string; cleanup: () => void } {
   const dir = mkdtempSync(join(tmpdir(), "pi-keel-config-"));
@@ -26,7 +26,7 @@ function captureError<T>(fn: () => T): { value: T; messages: string[] } {
 }
 
 test("loads a complete config.yaml with all sections", () => {
-  resetConfig();
+  resetConfigCache();
   const { dir, cleanup } = agentDir();
   try {
     writeFileSync(join(dir, "pi-keel", "config.yaml"), [
@@ -63,7 +63,7 @@ test("loads a complete config.yaml with all sections", () => {
 });
 
 test("missing config file returns none", () => {
-  resetConfig();
+  resetConfigCache();
   const { dir, cleanup } = agentDir();
   try {
     assert.equal(loadConfig(dir).kind, "none");
@@ -73,7 +73,7 @@ test("missing config file returns none", () => {
 });
 
 test("invalid YAML reports an error", () => {
-  resetConfig();
+  resetConfigCache();
   const { dir, cleanup } = agentDir();
   try {
     writeFileSync(join(dir, "pi-keel", "config.yaml"), "{ bad yaml: [unclosed");
@@ -87,7 +87,7 @@ test("invalid YAML reports an error", () => {
 });
 
 test("optionalAdapters must be a list of names", () => {
-  resetConfig();
+  resetConfigCache();
   const { dir, cleanup } = agentDir();
   try {
     writeFileSync(join(dir, "pi-keel", "config.yaml"), "optionalAdapters: not-a-list\n");
@@ -95,6 +95,35 @@ test("optionalAdapters must be a list of names", () => {
     const { messages } = captureError(() => { result = loadConfig(dir); });
     assert.equal(result!.kind, "error");
     assert.ok(messages.some((m) => m.includes("optionalAdapters must be a list")), `expected error, got: ${messages.join(" | ")}`);
+  } finally {
+    cleanup();
+  }
+});
+
+// B：加载即校验——commands 语义损坏在加载期报错并 fail-closed（不再等命令分析时抛）。
+
+test("commands: invalid class fails at load (B)", () => {
+  resetConfigCache();
+  const { dir, cleanup } = agentDir();
+  try {
+    writeFileSync(join(dir, "pi-keel", "config.yaml"), "commands:\n  commands:\n    badtool:\n      class: bogus\n");
+    let result: ConfigLoad | undefined;
+    const { messages } = captureError(() => { result = loadConfig(dir); });
+    assert.equal(result!.kind, "error");
+    if (result!.kind === "error") assert.match(result!.message, /invalid class/);
+    assert.ok(messages.some((m) => m.includes("invalid class")), `expected error, got: ${messages.join(" | ")}`);
+  } finally {
+    cleanup();
+  }
+});
+
+test("commands: valid class passes load (B 反例)", () => {
+  resetConfigCache();
+  const { dir, cleanup } = agentDir();
+  try {
+    writeFileSync(join(dir, "pi-keel", "config.yaml"), "commands:\n  commands:\n    ok:\n      class: inspect\n      effects: [read]\n");
+    const result = loadConfig(dir);
+    assert.equal(result.kind, "ok");
   } finally {
     cleanup();
   }

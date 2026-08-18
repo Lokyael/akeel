@@ -10,7 +10,7 @@ import { tmpdir } from "node:os";
 import { lex } from "../../../src/access-gate/shell-parse/lexer";
 import { parse } from "../../../src/access-gate/shell-parse/parser";
 import { analyzeSemantics } from "../../../src/access-gate/command-semantics/registry";
-import { resetConfig } from "../../../src/access-gate/config";
+import { resetConfigCache } from "../../../src/access-gate/config";
 import type { CommandSemantics } from "../../../src/access-gate/command-semantics/types";
 
 function analyze(cmd: string): CommandSemantics {
@@ -27,7 +27,7 @@ function setup(configYaml: string): { cleanup: () => void } {
   process.env.PI_CODING_AGENT_DIR = agentDir;
   return {
     cleanup: () => {
-      resetConfig();
+      resetConfigCache();
       if (previous === undefined) delete process.env.PI_CODING_AGENT_DIR;
       else process.env.PI_CODING_AGENT_DIR = previous;
       rmSync(parent, { recursive: true, force: true });
@@ -47,7 +47,7 @@ function captureError<T>(fn: () => T): { value: T; messages: string[] } {
 }
 
 test("optional adapters are not loaded by default (bare herdr stays unknown)", () => {
-  resetConfig();
+  resetConfigCache();
   const { cleanup } = setup(""); // 空 config.yaml
   try {
     const sem = analyze("herdr agent list");
@@ -58,7 +58,7 @@ test("optional adapters are not loaded by default (bare herdr stays unknown)", (
 });
 
 test("enabling herdr registers token-level semantics", () => {
-  resetConfig();
+  resetConfigCache();
   const { cleanup } = setup("optionalAdapters:\n  - herdr\n");
   try {
     assert.equal(analyze("herdr agent list").commandClass, "execute");
@@ -73,7 +73,7 @@ test("enabling herdr registers token-level semantics", () => {
 });
 
 test("enabling herdr does not change unrelated commands", () => {
-  resetConfig();
+  resetConfigCache();
   const { cleanup } = setup("optionalAdapters:\n  - herdr\n");
   try {
     assert.equal(analyze("git status").commandClass, "inspect");
@@ -84,7 +84,7 @@ test("enabling herdr does not change unrelated commands", () => {
 });
 
 test("user commands section still overrides an enabled optional adapter", () => {
-  resetConfig();
+  resetConfigCache();
   const { cleanup } = setup([
     "commands:",
     "  commands:",
@@ -104,7 +104,7 @@ test("user commands section still overrides an enabled optional adapter", () => 
 });
 
 test("unknown optional adapter name reports loudly and loads nothing (fail-closed)", () => {
-  resetConfig();
+  resetConfigCache();
   const { cleanup } = setup("optionalAdapters:\n  - nosuchadapter\n  - herdr\n");
   try {
     const { value, messages } = captureError(() => analyze("herdr agent list"));
