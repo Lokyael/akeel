@@ -37,4 +37,14 @@
 - **Trigger:** 未来 kernel 出现按 effect 决策的真实需求，或 plan 体积成为可测性能问题。
 - **Review On:** 2027-02-17
 
-## C-013: 待创建
+## C-013: 子代理基础设施在 Bun 运行时不可用（node:v8.createHook 未实现）
+
+- **Created:** 2026-08-17
+- **Domain:** pi-subagents 子代理编排层 / 宿主运行时（非 pi-keel 仓库代码）
+- **Why Not Now:** pi 的 subagent async workflow runtime 跑在内嵌 Bun 上，初始化时调用 Node 兼容层 `node:v8.createHook`——`NotImplementedError: node:v8 createHook is not yet implemented in Bun`（at internal:shared + blob bundle）。该 API 用于 async resource / GC / Promise 生命周期内省，Bun 兼容层尚未实现。因此本环境中 `subagent` 派发不可用（起 worker 即失败），影响「parallel Axes 独立子代理审查」类工作流。仓库本身构建/测试/审查不受影响（shell Node v24 下 `npm test` 875 全绿）；这是宿主运行时能力缺口，非 pi-keel 代码缺陷。
+- **Evidence:** 环境——shell `node --version` = v24.18.1；`bun --version` 无（未安装）；但 workflow runtime 为 Bun（blob bundle）→ 证明是 pi 宿主内嵌 Bun 而非用户 shell。报错堆栈：`NotImplementedError ... at node:v8:4:22 createHook ... at blob:... workflow runtime`。已受影响的场景：本会话 code-review 尝试用两个独立子代理（standards 轴 + requirements 轴）并行派发，均以该错误失败，改为手动两轴独立执行。
+- **Workaround（现用）:** 不用 subagent 派发，由父会话手动完成独立两轴审查（先各自整理再聚合，不合并两轴结论）；已用该方式完成 code-review，证据来自完整 diff + 全源码读取 + 全测试实跑。
+- **Trigger（何时可解决）:** ① pi 宿主切换到 Node 运行时（若配置支持）；② Bun 补 `node:v8.createHook`（上游进度，非本项目可控）；③ 用户环境确认后，于允许的运行时下重跑并行子代理审查。
+- **Review On:** 2027-02-17
+
+## C-014: 待创建
