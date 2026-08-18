@@ -30,4 +30,11 @@
 - **Trigger:** 出现 pi-guard + pi-keel 双重拦截的用户报告。
 - **Review On:** 2027-02-09
 
-## C-012: 待创建
+## C-012: shell effects 不裁剪（D-048a 关联）
+
+- **Created:** 2026-08-17
+- **Why Not Now:** shell 命令的 effects 在 kernel 无直接决策消费（D-022 已记录「effects 只在 Direct-origin 被消费」），但它们是 D-022「effect 被安全解释」安全不变量的承载体、plan 完整性/审计数据、以及 50+ 测试断言锁定的语义提取契约。裁剪会让领域知识（如 git rm→delete）无处安放（deletion test 平移失败）；惰性视图违背 sealed 不可变 plan（deep-freeze/D-046 品牌化）。已由 D-048a 的 requires 证明侧强化（effects 覆盖其类要求获 seal 边界运行时证明）。
+- **Trigger:** 未来 kernel 出现按 effect 决策的真实需求，或 plan 体积成为可测性能问题。
+- **Review On:** 2027-02-17
+
+## C-013: 待创建

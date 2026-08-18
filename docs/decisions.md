@@ -539,4 +539,32 @@
 
 **Out of Scope:** access-gate/enforcement 层任何改动（纯提示词与记录面）；为申报属性新增专用 skill 或路由；原则逐条强度分级（Rule Status 是全局优先级 + 报告出口，非 per-rule 强度表）。
 
-## D-048: 待创建
+## D-048: 类语义模型收编 domain、glob 编译边界与 config 加载即校验
+
+**Status:** active
+**Reversal surface:** engineering
+
+**Decision:** 三处结构收编（architecture deepening #6）：
+
+- **A（类语义模型收编 domain）**：类→基础 effect 蕴含（原散落于 `shared.defaultEffects` / `git.gitEffects` / `builder.effectsFor` 三处）合并进 `domain.ts` 的 `COMMAND_CLASS_EFFECTS`（`defaults`/`requires` 双视图）；effect 轴（`EFFECT_AXIS`）与写面集合（`WRITE_SIDE_EFFECTS`）同收 domain，kernel 原 `EFFECT_POLICY_AXIS` 引用之。`requires` 是 plan 完整性不变量（非 kernel 分支依赖——D-022 已记录 shell effects 只被 Direct 消费），构造侧（`effectsFor` 守卫）与证明侧（`access-plan-verifier` seal 边界复核 effects 覆盖 require）双查表——D-022「effect 被安全解释」承诺获运行时证明。`shared.ts` 消解，原语（semantics/args/intent/rules/naming）按职责上升 command-semantics 层，修正核心层依赖 adapter 内部文件的依赖倒置。
+- **glob 语言 globstar 修正 + 编译边界**：`path/glob.ts` 定义 `*` 单段（不跨 `/`）、`**` 跨段含零段（`a/**/b` 匹配 `a/b`）、`/**` 结尾匹配自身及子——`compileGlob` 一次编译、`globMatches` 多次匹配；编译边界落在 path 层 WeakMap 记忆化（`compileBlockedOnce`/`compileRulesOnce` 按引用缓存），判定纯查找零编译。glob 编译无安全契约，故不采用「编译进 ResolvedProfile」的 seal 式落点（避免配置数据混入运行时资产 + fixtures 全量迁移）。通配符语言成独立可测模块（`pathMatches`→`globMatches`/`selectPathRule`→`firstRuleFor`/`candidates`→`identityForms` 改名）。
+- **config 加载即校验**：commands 段语义校验（class/effect/reclassify）从 overrides 消费方「命令分析时 throw」前移至 `config.loadConfig` 加载期——损坏配置立即 fail-closed（error），走 `loadProfiles` 既有的 error→failClosed-to-keel-read 路径，不再让损坏配置在受管辖 tool_call 中途未捕获。删除 overrides `_validated` 第三层缓存；`loadOverrides`→`commandOverridesFor`、`resetConfig`→`resetConfigCache` 命名修正。
+
+**Why:** 类→effect 蕴含与 effect 轴是封闭世界领域知识，三处实现是单一来源缺口（新增 effect/类需多处记忆同步）；安全相关语义值得运行时证明而非仅构造侧自证。通配符原实现 `*`→`.*` 跨段超宽匹配、`**` 非零段漏配 `a/**/b` 的 `a/b`——glob 语言无定义、无直接测试。config 惰性校验把损坏配置的爆炸点推迟到命令分析，profile 层已有 fail-closed 呈现路径却未复用。
+
+**Impact:** 类知识一处定义（编译期 fail-fast）；D-022「effect 安全解释」从设计承诺升级为可验证不变量。glob star/globstar 语义修正（行为变更，用 blocked 全量矩阵回归证明覆盖面不减）；通配符语言可直接测试。损坏 commands 从「分析时炸」→「启动 fail-closed」（行为变更，翻转 4 条 assert.throws 测试 + 新端到端覆盖）。`npm test` 全量 + validate-docs/skills 通过。
+
+**Rejected:**
+
+- **effects 裁剪/惰性视图**：shell effects 是 D-022 完整性载体 + 大量测试契约；惰性违背 sealed 不可变 plan（deletion test 平移失败）。
+- **配置编译进 ResolvedProfile（seal 式落点）**：ResolvedProfile 是配置数据，混入运行时资产破坏 D-041 数据/制品分离；glob 编译无安全契约，编译期报错收益落空，fixtures 全量迁移成本高。
+- **glob `*` 保留跨段（超宽）语义**：与 globstar 约定不符，`a/*` 误配 `a/x/y`。
+- **commands 校验留在 overrides（维持分析时 throw）**：损坏配置在门禁调用中途炸，未复用 profile 已有 fail-closed 路径。
+
+**Out of Scope:**
+
+- shell effects 的进一步裁剪/排序（候选 F 挂起，见 C-012）。
+- glob 性能的进一步量化（编译已摊销，量级非灾难）。
+- config 热重载。
+
+## D-049: 待创建
