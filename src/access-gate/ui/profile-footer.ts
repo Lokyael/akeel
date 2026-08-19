@@ -116,7 +116,7 @@ export function createProfileFooter(
         },
         sessionManager: session,
         getContextUsage: contextUsage,
-        modelRuntime: { isUsingOAuth: () => false },
+        modelRuntime: { isUsingOAuth: () => false, isUsingSubscription: () => false },
       }, footerData)
     : undefined;
   nativeFooter?.setAutoCompactEnabled?.(true);
