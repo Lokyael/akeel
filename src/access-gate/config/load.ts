@@ -88,15 +88,6 @@ export function loadConfig(agentDir = getAgentDir()): ConfigLoad {
   }
 
   const cfg = raw as KeelConfig;
-  if (cfg.optionalAdapters !== undefined) {
-    const valid = Array.isArray(cfg.optionalAdapters) && cfg.optionalAdapters.every((n) => typeof n === "string");
-    if (!valid) {
-      const message = `pi-keel: ${configPath}: optionalAdapters must be a list of adapter names`;
-      console.error(message);
-      _cache.set(agentDir, { kind: "error", message });
-      return { kind: "error", message };
-    }
-  }
 
   // B：加载即校验——commands 语义（class/effect/reclassify）在首次解析时验证，
   // 损坏配置立即 fail-closed，不等命令分析时触发。

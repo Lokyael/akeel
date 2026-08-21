@@ -44,8 +44,6 @@ test("loads a complete config.yaml with all sections", () => {
       "    docker:",
       "      class: execute",
       "      effects: [execute, network]",
-      "optionalAdapters:",
-      "  - herdr",
       "",
     ].join("\n"));
     const result = loadConfig(dir);
@@ -56,7 +54,6 @@ test("loads a complete config.yaml with all sections", () => {
     assert.equal(result.value.subagentProfiles!["worker"], "project");
     assert.equal(result.value.commands!.aliases!["fd"], "find");
     assert.equal(result.value.commands!.commands!["docker"].class, "execute");
-    assert.deepEqual(result.value.optionalAdapters, ["herdr"]);
   } finally {
     cleanup();
   }
@@ -81,20 +78,6 @@ test("invalid YAML reports an error", () => {
     const { messages } = captureError(() => { result = loadConfig(dir); });
     assert.equal(result!.kind, "error");
     assert.ok(messages.some((m) => m.includes("failed to load")), `expected parse error, got: ${messages.join(" | ")}`);
-  } finally {
-    cleanup();
-  }
-});
-
-test("optionalAdapters must be a list of names", () => {
-  resetConfigCache();
-  const { dir, cleanup } = agentDir();
-  try {
-    writeFileSync(join(dir, "pi-keel", "config.yaml"), "optionalAdapters: not-a-list\n");
-    let result: ConfigLoad | undefined;
-    const { messages } = captureError(() => { result = loadConfig(dir); });
-    assert.equal(result!.kind, "error");
-    assert.ok(messages.some((m) => m.includes("optionalAdapters must be a list")), `expected error, got: ${messages.join(" | ")}`);
   } finally {
     cleanup();
   }

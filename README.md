@@ -35,7 +35,7 @@ Hard threats, unsafe Shell syntax, symlink escapes, and blocked paths always den
 
 ## Configuration
 
-All user configuration — Profiles, Shell command semantics, and optional tool modeling — is centralized in a single file:
+All user configuration — Profiles and Shell command semantics — is centralized in a single file:
 
 ```text
 ~/.pi/agent/pi-keel/config.yaml        # $PI_CODING_AGENT_DIR replaces ~/.pi/agent
@@ -61,9 +61,6 @@ commands:
     docker:
       class: execute
       effects: [execute, network]
-
-optionalAdapters:
-  - herdr
 ```
 
 Profile decisions are `allow`, `ask`, or `deny`. Path rules independently control `read`, `list`, `search`, and `write`; patterns match virtual (`project/**`), absolute (e.g. `/tmp/**`), or home-relative (`~/...`) forms. Hard-blocked secret paths under `~/` (`.ssh`, `.aws`, `.gnupg`, `.kube`, `.docker/config.json`, `.config/gcloud`) stay hard-denied regardless of rules.
@@ -92,19 +89,6 @@ reclassify:
 
 Alias keys are explicit-scope: bare name, full path, or path prefix. `reclassify` patterns are regexes matched against the subcommand string. See [D-024](docs/decisions.md#d-024-命令覆盖层) for the design and known limitations.
 
-### Optional Tool Modeling (`optionalAdapters`)
-
-Token-level modeling for a few tools that are **not loaded by default**; list them under `optionalAdapters` to enable. This keeps the default adapter set closed and predictable. Enabling an unknown name fails closed — a loud error is reported and no optional adapters are loaded.
-
-Shipped adapter — `herdr` (terminal workspace manager, https://herdr.dev):
-
-```yaml
-optionalAdapters:
-  - herdr
-```
-
-With `herdr` enabled, `herdr status` classifies as `inspect`, control subcommands (`agent`, `pane`, `workspace`, …) as `execute`, and `herdr update` as `execute` with a network effect; `--session`/`--remote` option values are consumed correctly. Without it, `herdr` keeps the default fallback (bare-name unknown / path-form execute). Pairs with the herdr agent skill registered at `~/.pi/agent/skills/herdr`. See [D-041](docs/decisions.md#d-041-集中配置与可选工具建模configyaml--optionaladapters) for the centralized-config design.
-
 ## Companion Packages
 
 Recommended third-party packages that pair well with Pi Keel:
@@ -113,17 +97,10 @@ Recommended third-party packages that pair well with Pi Keel:
 |---------|--------|--------------|
 | pi-subagents | `npm:pi-subagents` | Sub-agent delegation: parallel tasks, chains, async runs, and supervisor review. Children load Pi Keel's gate automatically (ambient extensions), and Pi Keel manages sub-agent permissions via tiered sub-agent Profiles (see [D-039](docs/decisions.md#d-039-子代理档位制pi-keel--pi-subagents)) |
 | pi-search | `npm:@heyhuynhgiabuu/pi-search` | Research tools for the agent: web search, code search, library docs, repo Q&A, URL fetching, and Firecrawl scraping/crawling |
-| herdr | `https://herdr.dev` | Terminal workspace manager for coding agents: persistent panes, tabs, and workspaces, agent lifecycle control, and background terminals that keep running after a session ends |
 
 ```bash
 pi install npm:pi-subagents
 pi install npm:@heyhuynhgiabuu/pi-search
-```
-
-Herdr is a standalone binary rather than a Pi package; install it with its own installer:
-
-```bash
-curl -fsSL https://herdr.dev/install.sh | sh
 ```
 
 Review the source of any third-party package before installing — Pi packages run with full system access.

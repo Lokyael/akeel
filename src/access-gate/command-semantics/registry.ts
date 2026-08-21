@@ -16,7 +16,6 @@ import { interpreterAdapter } from "./adapters/interpreters";
 import { shellBuiltinsAdapter } from "./adapters/shell-builtins";
 import { pythonToolsAdapter } from "./adapters/python-tools";
 import { dateAdapter } from "./adapters/date";
-import { herdrAdapter } from "./adapters/herdr";
 import { makeSemantics } from "./semantics";
 import { canonicalExecutableName } from "./naming";
 import {
@@ -25,8 +24,6 @@ import {
   applyReclassify,
   aliasNode,
 } from "./overrides";
-import { loadConfig } from "../config";
-import { getAgentDir } from "../agent-dir";
 
 // 核心 adapter（始终注册，封闭集合，D-031）
 const CORE_ADAPTERS: CommandAdapter[] = [
@@ -44,14 +41,7 @@ const CORE_ADAPTERS: CommandAdapter[] = [
   dateAdapter,
 ];
 
-// 可选工具建模（D-041）：随包分发但默认不加载，用户在 config.yaml 的
-// optionalAdapters 显式启用后才注册。惰性 factory：未启用不实例化。
-const OPTIONAL_ADAPTERS: Readonly<Record<string, () => CommandAdapter>> = {
-  herdr: () => herdrAdapter,
-};
-
-/** 注册 adapter 到索引；同名重复注册是结构错误——fail-fast 防止静默覆盖。
- * 单一实现：buildCommandIndex 与 optionalCommandIndex 共用，守卫语义单点定义。 */
+/** 注册 adapter 到索引；同名重复注册是结构错误——fail-fast 防止静默覆盖。 */
 function registerAdapter(index: Map<string, CommandAdapter>, adapter: CommandAdapter): void {
   for (const name of adapter.names) {
     if (index.has(name)) throw new Error(`duplicate command registration: ${name}`);
@@ -70,36 +60,6 @@ const CORE_INDEX = buildCommandIndex(CORE_ADAPTERS);
 
 // 导出供测试验证 fail-fast 守卫（结构性不变量的直接断言）
 export { buildCommandIndex };
-
-/**
- * 已启用可选 adapter 的完整索引（core + optional）。按启用名集合缓存。
- * 未知启用名 → 响亮报错且整段 fail-closed（不加载任何 optional），与 profiles 损坏同模式。
- */
-let _optionalIndex: { key: string; index: ReadonlyMap<string, CommandAdapter> } | null = null;
-
-function optionalCommandIndex(agentDir: string): ReadonlyMap<string, CommandAdapter> {
-  const loaded = loadConfig(agentDir);
-  const enabled = loaded.kind === "ok" ? (loaded.value.optionalAdapters ?? []) : [];
-  const key = enabled.join(",");
-  if (_optionalIndex && _optionalIndex.key === key) return _optionalIndex.index;
-
-  const index = new Map(CORE_INDEX);
-  for (const name of enabled) {
-    const factory = OPTIONAL_ADAPTERS[name];
-    if (!factory) {
-      console.error(
-        `pi-keel: config optionalAdapters: unknown adapter "${name}" ` +
-        `(known: ${Object.keys(OPTIONAL_ADAPTERS).join(", ")}); no optional adapters loaded`,
-      );
-      _optionalIndex = { key, index: new Map(CORE_INDEX) };
-      return _optionalIndex.index;
-    }
-    const adapter = factory();
-    registerAdapter(index, adapter);
-  }
-  _optionalIndex = { key, index };
-  return index;
-}
 
 /**
  * 将 executable 归一化为索引键：
@@ -173,9 +133,9 @@ export function analyzeSemantics(
     }
   }
 
-  // 3. 内置 + 已启用可选 adapter 查找（executable 按 basename/版本归一）
+  // 3. 内置 adapter 查找（executable 按 basename/版本归一）
   const key = indexKey(resolvedName);
-  const adapter = optionalCommandIndex(getAgentDir()).get(key);
+  const adapter = CORE_INDEX.get(key);
 
   if (!adapter) {
     // 路径形式（含 "/"）本质是运行本地二进制 → execute；裸名保持 unknown（可能为

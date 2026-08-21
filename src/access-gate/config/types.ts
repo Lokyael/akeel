@@ -1,6 +1,6 @@
 // access-gate/config/types.ts — 集中用户配置 schema（D-041）
 // pi-keel 所有用户配置集中在 ~/.pi/agent/pi-keel/config.yaml；
-// 本文件定义其顶层结构（profile 段、命令覆盖段、可选工具建模段）。
+// 本文件定义其顶层结构（profile 段与命令覆盖段）。
 
 import type { CommandClass, Effect } from "../domain";
 
@@ -35,6 +35,4 @@ export interface KeelConfig {
   subagentProfiles?: Record<string, string>;
   /** 命令语义覆盖段（D-024）。 */
   commands?: CommandOverrides;
-  /** 随包分发的可选工具建模（如 herdr），默认不加载；显式列出名字才注册（D-041）。 */
-  optionalAdapters?: string[];
 }

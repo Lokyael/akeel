@@ -400,7 +400,7 @@
 
 **延伸（T-059，D-040 补记）：**
 
-- **opaqueOnUnknown 判据**：未知选项漏判后命令是否可能落入 shellPolicy 允许类（inspect）且具未建模破坏性/写行为——是则 true（fail-closed，第一层防线：fs/read/search/text-transform/date），否则 false（分类是大类 + catch-all 保守兜底，第二层 shellPolicy 兜底：build/package/python-tools/herdr/interpreters/git）。判据取代“选项面大小”的经验理由。
+- **opaqueOnUnknown 判据**：未知选项漏判后命令是否可能落入 shellPolicy 允许类（inspect）且具未建模破坏性/写行为——是则 true（fail-closed，第一层防线：fs/read/search/text-transform/date），否则 false（分类是大类 + catch-all 保守兜底，第二层 shellPolicy 兜底：build/package/python-tools/interpreters/git）。判据取代“选项面大小”的经验理由。
 - **收敛**：子命令提取统一走 option-parse 输出投影——`semanticsFromRules` 吃 positional 数组（查表首词 = `positional[0]`）；git 经引擎定位子命令，复杂子命令族（config/branch/stash/bundle）入 `GIT_SUBCOMMAND_PARSERS` 注册表，`GIT_CLASSIFY` 表兜底；`fullSubcommand` 保留（reclassify 含选项 raw 契约，D-024）。
 - **valueOpts → Opt(expression)**：覆盖层/适配器的取值选项列表提升为 Opt 声明时一律 `kind: "expression"`（只消费不产生 intent，行为零损失）；路径建模（如 `--manifest-path` 实为路径）另立决策，不在收敛中混入。
 - **class 调节原语**：Opt 增加 `upgradeTo: "modify"|"destroy"` / `downgradeTo: "inspect"`，引擎输出命中的调节集合并按风险优先（destroy > modify > inspect，fail-closed）给默认裁决，adapter 可覆盖；date `-s/--set`、search/text-transform 写选项升级、python-tools `--check/--fix`、git GIT_CLASSIFY upgrade/downgrade 全部声明化，删除手写 flag 检查。
@@ -426,35 +426,27 @@
 - overrides 层 reclassify 的字符串 pattern 迁移到 token 级（用户 YAML 兼容性，D-024）。
 - `git stash --help` 类分类修正（过拒方向，fail-safe，未立项）。
 
-## D-041: 集中配置与可选工具建模（config.yaml + optionalAdapters）
+## D-041: 集中配置（config.yaml）
 
 **Status:** active
 
-**Decision:** 所有 pi-keel 用户配置集中到唯一文件 `~/.pi/agent/pi-keel/config.yaml`（`PI_CODING_AGENT_DIR` 可改变 agent 目录）：顶层为 `defaultProfile`/`profiles`/`subagentProfiles`（原 profiles.json，D-018/D-039）、`commands`（原 command-overrides.yaml，D-024）与新增 `optionalAdapters`。旧 `profiles.json`/`command-overrides.yaml` 已废弃且不兼容：config.yaml 是唯一配置来源，旧文件不再读取。
+**Decision:** 所有 pi-keel 用户配置集中到唯一文件 `~/.pi/agent/pi-keel/config.yaml`（`PI_CODING_AGENT_DIR` 可改变 agent 目录）：顶层为 `defaultProfile`/`profiles`/`subagentProfiles`（原 profiles.json，D-018/D-039）与 `commands`（原 command-overrides.yaml，D-024）。旧 `profiles.json`/`command-overrides.yaml` 已废弃且不兼容：config.yaml 是唯一配置来源，旧文件不再读取。
 
-可选工具建模（`optionalAdapters`）：随包分发 token 级 adapter（首个：herdr），**默认不加载**，用户显式列出名字才注册到语义注册表（与 core 同层，用户 `commands` 定义仍优先）。未知启用名 → 响亮报错且整段 fail-closed，与 profiles 损坏同模式。
-
-**Why:** 配置分散在两个文件、两个读取点、两份错误处理，且覆盖层 subcommands 存在已知局限（`firstSubcommand` 不跳过取值选项的值，D-024：`herdr --session dev status` 会把 `dev` 当子命令 → opaque 硬拒）。集中单一文件统一 schema 与错误报告；可选建模给“有限制地建模”合规位置——adapter 质量（token 级）优于声明式，默认不加载保留 D-031 的内置封闭性（core 集合不变，既有用户零行为变化），启用动作即用户语义声明（D-024）。
+**Why:** 配置分散在两个文件、两个读取点、两份错误处理；集中单一文件统一 schema 与错误报告，同时保留命令覆盖层对用户本地工具语义的显式扩展能力。
 
 **Impact:**
 
 - `src/access-gate/config/` 是唯一配置加载入口（缓存 + 顶层结构校验）；profile/load 与 overrides 改为消费集中配置。
-- registry 增加可选索引：`optionalCommandIndex` 按启用名集合缓存，未启用时行为与旧版完全一致（herdr 裸名 unknown / 路径形式 execute）。
 - 错误消息统一为 `pi-keel: ...` 前缀；解析失败/结构非法时响亮报错并 fail-closed 降级。
-- herdr adapter 建模：信息/`status`/`api`/`completion`/`help` → inspect；控制子命令 → execute；`update` → execute + network；取值选项被消费（覆盖层做不到；完整规格见 README optionalAdapters 段）。
 - 配置以 config.yaml 为唯一来源；旧 profiles.json/command-overrides.yaml 废弃，不兼容读取。
-- optional adapter 准入门槛（防 whack-a-mole）：(1) 默认不加载；(2) 建模必须 token 级完整（覆盖层表达不了的才有资格）；(3) 语义可机械分类（稳定文档化 CLI）；(4) 随包测试全绿。
+- 工具语义的扩展入口是 `commands`/`aliases`/`reclassify`；pi-keel 不再分发或加载可选工具 adapter。
 
-**Rejected:**
-
-- 修订 D-031 开放内置层：core 封闭集合是架构分界，为任意裸名 execute 工具开口即 whack-a-mole；可选建模以“默认不加载 + 显式启用”达成同样目的而不破坏封闭性。
-- 仅靠覆盖层 subcommands 建模 herdr：取值选项消费做不到，`--session dev status` 会 opaque 硬拒（D-024 已知局限）。
-- 兼容读取旧 profiles.json/command-overrides.yaml：双源真理违背集中单一入口原则，且保留旧文件让配置位置分裂。
+**Rejected:** 兼容读取旧 profiles.json/command-overrides.yaml：双源真理违背集中单一入口原则，且保留旧文件让配置位置分裂。
 
 **Out of Scope:**
 
-- 覆盖层 subcommands 的 valueOptions 感知（独立表面，D-024）；如需可另立决策。
-- 更多可选 adapter 的准入（eslint/prettier/vitest 等 execute 工具不满足 token 级判据，维持 D-031 立场）。
+- 命令覆盖层的语义范围与优先级，继续由 D-024 定义。
+- 任意外部工具的内置语义建模；若未来需要，应先建立独立决策并提供完整的 token 级测试。
 
 ## D-044: 测试组织镜像 src 分层
 
@@ -588,4 +580,24 @@
 - **合并 keel-develop 与 keel-build**：build 的 modify/execute allow 是全信任语义，与 develop 的 ask 是安全梯度实质差异；合并会让 develop 默认允许执行，是危险默认。
 - **程序化合成子代理档位**：把 T0/T1 从 profile 数据改为运行时合成，增加运行时复杂度并失去配置层可测试性（D-039）；本次用“复用主档”而非合成，避免该代价。
 
-## D-050: 待创建
+## D-050: 移除可选工具 adapter 支持
+
+**Status:** active
+**Reversal surface:** engineering
+
+**Decision:** pi-keel 不再分发或加载 optional adapter，也不再提供 `optionalAdapters` 配置字段。未被核心 adapter 或用户 `commands` 覆盖层建模的裸名命令保持 `unknown`；路径形式的未建模可执行文件仍按 D-031 分类为 `execute`。
+
+**Why:** 唯一的 optional adapter 是外部工具的专用建模，增加配置面、注册表分支、测试和文档维护成本，但不属于 pi-keel 的核心访问策略。移除后核心 adapter 集合重新成为唯一内置语义来源，用户仍可通过 `commands`/`aliases`/`reclassify` 显式扩展本地命令语义。
+
+**Impact:**
+
+- `command-semantics/registry.ts` 只构建核心 adapter 索引。
+- `config.yaml` 的顶层 schema 只保留 Profile、子代理档位和 `commands` 段。
+- 旧 optional adapter 配置不再激活任何工具；兼容回归保持裸名命令的 `unknown` 分类。
+- README、CONTEXT、测试和第三方 companion 文案不再描述该工具或其安装方式。
+
+**Rejected:** 保留一个通用 optional adapter 框架但不附带实现：没有当前消费者，仍保留配置和注册表复杂度；未来新增工具应基于明确需求重新设计，而不是保留空扩展点。
+
+**Out of Scope:** 用户 `commands` 覆盖层的能力和优先级不变；本决策不禁止用户自行在其配置中为任意命令声明语义。
+
+## D-051: 待创建
