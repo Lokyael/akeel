@@ -154,6 +154,29 @@ test("home credential files are hard denied", () => {
   }
 });
 
+test("pi host auth.json is hard denied; settings/sessions stay governable (D-051)", () => {
+  const ctx = makeContext("pi-access-path-");
+  try {
+    // keel-explore 系默认读放行（供应商配置/会话分析场景）
+    const open = profile();
+    open.pathPolicy.default = { read: "allow", list: "allow", search: "allow", write: "deny" };
+    const auth = resolvePath(ctx.cwd, ctx.projectRoot, ctx.stagingDir, join(homedir(), ".pi", "agent", "auth.json"));
+    for (const operation of ["read", "list", "search", "write"] as const) {
+      assert.equal(decidePath(auth, open, operation, DEFAULT_BLOCKED_PATHS).hard, true, `${operation}`);
+    }
+    // 回归：settings/sessions 不被误伤为硬拒，读按 profile 放行
+    for (const target of [join(homedir(), ".pi", "agent", "settings.json"), join(homedir(), ".pi", "agent", "sessions", "x.jsonl")]) {
+      const governable = resolvePath(ctx.cwd, ctx.projectRoot, ctx.stagingDir, target);
+      assert.equal(governable.scope, "external", target);
+      const read = decidePath(governable, open, "read", DEFAULT_BLOCKED_PATHS);
+      assert.equal(read.hard, false, target);
+      assert.equal(read.decision, "allow", target);
+    }
+  } finally {
+    ctx.cleanup();
+  }
+});
+
 test("resolvePath: non-existent cwd resolves lexically instead of hard-failing (D-045)", () => {
   const ctx = makeContext("pi-path-phantom-");
   try {

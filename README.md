@@ -63,7 +63,7 @@ commands:
       effects: [execute, network]
 ```
 
-Profile decisions are `allow`, `ask`, or `deny`. Path rules independently control `read`, `list`, `search`, and `write`; patterns match virtual (`project/**`), absolute (e.g. `/tmp/**`), or home-relative (`~/...`) forms. Hard-blocked secret paths under `~/` (`.ssh`, `.aws`, `.gnupg`, `.kube`, `.docker/config.json`, `.config/gcloud`) stay hard-denied regardless of rules.
+Profile decisions are `allow`, `ask`, or `deny`. Path rules independently control `read`, `list`, `search`, and `write`; patterns match virtual (`project/**`), absolute (e.g. `/tmp/**`), or home-relative (`~/...`) forms. Hard-blocked secret paths under `~/` (`.ssh`, `.aws`, `.gnupg`, `.kube`, `.docker/config.json`, `.config/gcloud`, `.pi/agent/auth.json`) stay hard-denied regardless of rules.
 
 ### Command Semantics Overrides (`commands`)
 

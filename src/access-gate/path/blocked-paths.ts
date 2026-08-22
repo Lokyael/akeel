@@ -27,6 +27,8 @@ export const DEFAULT_BLOCKED_PATHS = [
   "~/.netrc",
   "~/.pypirc",
   "~/.config/gh/**",
+  // pi host 认证凭据：/auth 流程独占管理，agent 无合法场景（其余 .pi 内容保留 profile 治理，D-051）
+  "~/.pi/agent/auth.json",
   "**/.git-credentials",
   "**/.netrc",
   "**/.pypirc",

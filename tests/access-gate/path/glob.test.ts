@@ -109,6 +109,7 @@ test("blocked matrix: representative hits per pattern (coverage not reduced)", (
     ["~/.netrc", "~/.netrc"],
     ["~/.pypirc", "~/.pypirc"],
     ["~/.config/gh/**", "~/.config/gh/hosts.yml"],
+    ["~/.pi/agent/auth.json", "~/.pi/agent/auth.json"],
     ["**/.git-credentials", ".git-credentials"],
     ["**/.git-credentials", "a/.git-credentials"],
     ["**/.netrc", ".netrc"],

@@ -600,4 +600,19 @@
 
 **Out of Scope:** 用户 `commands` 覆盖层的能力和优先级不变；本决策不禁止用户自行在其配置中为任意命令声明语义。
 
-## D-051: 待创建
+## D-051: pi host 凭据文件边界（auth.json）
+
+**Status:** active
+**Reversal surface:** user-boundary
+
+**Decision:** 将 `~/.pi/agent/auth.json`（pi host 的 Credentials 文件，存 API keys / OAuth tokens）加入 `DEFAULT_BLOCKED_PATHS`，read/list/search/write 四操作一律 hard deny。`~/.pi/agent` 下其余文件（`settings.json`、`sessions/**`、`models-store.json`）不进 blocked 清单，继续由 PathPolicy 治理。
+
+**Why:** auth.json 是 pi 目录中唯一“纯凭据、无合法 agent 场景”的文件——凭据注册由 host 的 `/auth`/`/login` 流程独占管理；agent 帮助配置供应商写的是 `settings.json`/`models-store.json` 的 provider 配置，分析会话读的是 `sessions/`，均不触碰 auth.json。整棵 `~/.pi/**` 硬拒会封死供应商配置与会话分析两个合法场景，与既有清单“home 凭据目录整树硬拒”的形态不同——本决策按最小面只拦唯一无合法 agent 场景的凭据文件。
+
+**Impact:** `cat`/Direct `read` 等对 `~/.pi/agent/auth.json` 一律 hard deny；`settings.json`、`sessions/**`、`models-store.json` 保持 profile 规则治理（读按默认、写按规则；keel-build 的 `~/** write=ask` 仍覆盖 provider 配置写审批）。
+
+**Rejected:** 整棵 `~/.pi/**` 硬拒（误伤 settings/sessions 合法场景）；`~/.pi/agent/auth*` glob（覆盖 auth.json.bak 等变体，超出当前最小面——变体文件出现时按本决策模式追加）。
+
+**Out of Scope:** `models-store.json` 可能内嵌 provider `apiKey`（中间态）不硬拒，由 profile 写规则治理；若未来需收紧单独评估。
+
+## D-052: 待创建

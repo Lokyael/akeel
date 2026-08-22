@@ -67,6 +67,7 @@
 - [D-048 类语义模型收编 domain、glob 编译边界与 config 加载即校验](docs/decisions.md#d-048-类语义模型收编-domainglob-编译边界与-config-加载即校验)
 - [D-049 内置 Profile 集合收敛（移除 keel-code/keel-query/keel-subagent-scratch）](docs/decisions.md#d-049-内置-profile-集合收敛移除-keel-codekeel-querykeel-subagent-scratch)
 - [D-050 移除可选工具 adapter 支持](docs/decisions.md#d-050-移除可选工具-adapter-支持)
+- [D-051 pi host 凭据文件边界（auth.json）](docs/decisions.md#d-051-pi-host-凭据文件边界authjson)
 
 ## Negative Space
 
