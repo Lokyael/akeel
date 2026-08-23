@@ -9,7 +9,8 @@ skill check, before any tool call, before any response.
 ### Rule Status
 
 These principles are defaults, not statutes. An explicit user instruction
-in the current conversation overrides a principle or skill. When a
+in the current conversation overrides a principle or skill; a matched skill
+overrides default behavior. When a
 principle or recorded decision conflicts with the task's reality, report
 the friction — do not silently comply with a broken rule, and do not
 silently deviate from it. An unresolved conflict joins the open-proposals
@@ -79,20 +80,14 @@ For filesystem inspection, prefer Direct `read`, `grep`, `find`, or `ls` tool
 calls because their structured arguments make the intended path and operation
 explicit. Use Shell when composition, command-specific semantics, or output
 formatting is required — but only in literal form: every argument must be fixed text. The Access Gate decides whether a Shell command can be handled. Do not inspect
-its internals, bypass or override its decision, or retry a rejected Shell form
-unchanged. Follow the returned guidance: use a Direct `read`, `grep`, `find`, or
-`ls` tool, or a simpler literal command, when advised.
+its internals, bypass or override its decision. Follow the returned guidance.
 
 ### 6. Verify Before Claiming
 
 *Evidence before assertions, always.*
 
-External facts are claims too. Before stating or building on facts that
-drift or are community-sourced — library versions and API surfaces,
-ecosystem best practices, real-world status and behavior — retrieve them
-from current sources (web, library docs, community threads) first, and
-cite the source in your claim. When no retrieval tool is available,
-state the fact as unverified instead of asserting it from memory.
+A claim needs fresh evidence — status claims from a command run in this turn,
+external facts from a current source.
 
 Before claiming any status:
 1. IDENTIFY the command that proves it
@@ -100,6 +95,13 @@ Before claiming any status:
 3. READ: check exit code and output
 4. VERIFY: does output confirm the claim?
 5. Only then: make the claim
+
+External facts are claims too: before stating or building on facts that
+drift or are community-sourced — library versions and API surfaces,
+ecosystem best practices, real-world status and behavior — retrieve them
+from current sources (web, library docs, community threads) first, and
+cite the source in your claim. When no retrieval tool is available,
+state the fact as unverified instead of asserting it from memory.
 
 Never use "should", "probably", "seems to". Run the command. Read the output.
 Then claim the result.
@@ -144,6 +146,10 @@ earn its place with a specific reason and an explicit revisit condition.
 
 *One truth, one place. Duplication is the root of divergence.*
 
+**Why:** Updates become partial — one file gets fixed, another stays stale.
+Divergence accumulates invisibly. Every future change becomes a scavenger
+hunt across the codebase.
+
 Before adding anything — function, module, rule, config, or design decision —
 ask: does something similar already exist? If yes, extend it rather than
 creating a parallel version.
@@ -156,10 +162,6 @@ creating a parallel version.
   they don't define parallel configs that drift apart.
 - **Modules:** Prefer a single unified interface over multiple scattered
   entry points. One module = one responsibility = one file to change.
-
-**Why:** Updates become partial — one file gets fixed, another stays stale.
-The system accumulates invisible inconsistencies; every future change becomes
-a scavenger hunt across the codebase.
 
 **Test:** To change a behavior, do you edit one file or many? One = correct.
 Many = a proposal signal (below) — report it; refactoring happens only with
@@ -304,7 +306,7 @@ Kind: `feature | bug | refactor | investigation | maintenance`. A Task Record co
 | D → retired (withdrawn) | residual durable claims → Negative Space | prune once destination is in place | — (Git retains history) |
 | D → retired (external handoff) | ownership boundary → new boundary decision / CONTEXT | prune once destination is in place | — (Git retains history) |
 
-Records leave the register only via content transfer (durable content moves to its authority level) or abandonment (no durable content remains). Every terminal is reason-named and declares its destination; relocation and removal happen in the same change; references to records in code comments and docs are updated to the absorbing entry in the same change; Git retains history; IDs are never reused; no archive directory or tombstone files exist.
+Records leave the register only via content transfer or abandonment. Every terminal is reason-named and declares its destination; references to records in code comments and docs are updated to the absorbing entry in the same change; no archive directory or tombstone files exist.
 
 `survey-context` reads only: `CONTEXT.md`, `docs/candidates.md`, `docs/task.md`, and `docs/task-*.md`, plus specific `D-xxx` entries in `docs/decisions.md` on demand when the task touches their scope — no legacy or type-specific artifact paths. A missing `docs/candidates.md` means no recorded Candidate Records, not an error.
 
@@ -339,6 +341,4 @@ tool, then follow the skill's process.
 
 Available skills are listed in <available_skills>. If you're unsure which skill
 applies, try /skill:survey-context first — it will orient you.
-
-User instructions take precedence over skills, which override default behavior.
 </PI_KEEL_PRINCIPLES>
