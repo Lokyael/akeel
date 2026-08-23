@@ -27,6 +27,7 @@
 ## Architecture
 
 - `src/bootstrap/` 在 Session 启动和 compaction 后注入工程原则。
+- Prompt Surface（D-030/D-053）：恒定注入仅 `principles.md`（唯一 `context` 注入点）；profile 数据（`ResolvedProfile`/config/builtins/活动 profile 名）永不进入 LLM 上下文（注入消息 / tool description / system prompt 三面皆无），模型可见的 profile 相关文本只有失败路径静态 guidance（`profile-restriction`）；活动 profile 切换不改变注入内容。
 - `src/access-gate/` 统一处理用户全局 Profile、Shell IR、命令语义、路径策略、Gate、Session 状态和 Footer。
 - 子代理会话（pi-subagents `--mode json -p` 子进程，默认加载全局扩展）在 `session_start` 检测 `PI_SUBAGENT_CHILD`/`PI_SUBAGENT_CHILD_AGENT`，按 `subagentProfiles` 映射（优先级 显式 > 内置默认 > `*`）初始化为子代理档位（T0 `scratch`/T1 `project`）。T0 档 agent 必须无 mutation 工具（bash/write/edit）——pi-subagents 输出契约机制强制（有则被指令自写 output 与 T0 路径策略矛盾），scout 删 write+bash、researcher 原生即无。父会话档位号（1=项目可写档，否则 0）由父侧按自身 pathPolicy 算好，经 `PI_KEEL_PARENT_TIER` env 传播、子代理零解析；生效档 = min(映射档, 父TIER)——两档下即"父非项目可写 → 一律回退 T0 scratch"——子代理权限上限 = 父会话当前档位（D-039）。
 - `shell-parse/` 输出受限 Shell IR；词值（引号剥离 + 转义解析）在 lexer 单点解码（bash 词义），`ShellArg.value` 为解码词值、`raw` 保留原文。`command-semantics/` 提取命令类别、路径意图、效果和 cwd 转换，用户全局 `pi-keel/config.yaml` 的 `commands` 段是 Shell 命令语义扩展入口（D-024/D-041）。wrapper 链由 parser 单一拥有（`resolvePreamble` 单点解析）——`executable` 永不承载 wrapper，wrapper positional 消费后保留在 `wrapperPositionals` 供 token 级扫描，normalize 纯出栈（D-037）。换行是命令分隔符（等价 `;`）；`&&`/`||`/`|`/`&` 与重定向操作符后紧跟的换行为行尾延续，不产分隔（bash 语义）。
@@ -69,6 +70,7 @@
 - [D-050 移除可选工具 adapter 支持](docs/decisions.md#d-050-移除可选工具-adapter-支持)
 - [D-051 pi host 凭据文件边界（auth.json）](docs/decisions.md#d-051-pi-host-凭据文件边界authjson)
 - [D-052 git clone 显式目标目录提取](docs/decisions.md#d-052-git-clone-显式目标目录提取)
+- [D-053 Profile 数据零注入（LLM 上下文隔离）](docs/decisions.md#d-053-profile-数据零注入llm-上下文隔离)
 
 ## Negative Space
 

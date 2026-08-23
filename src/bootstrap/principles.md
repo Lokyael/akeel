@@ -75,13 +75,13 @@ For multi-step tasks, state a plan:
 
 ### 5. Direct Tools Before Shell
 
-For filesystem inspection, prefer Direct `read`, `grep`, `find`, and `ls` tool
+For filesystem inspection, prefer Direct `read`, `grep`, `find`, or `ls` tool
 calls because their structured arguments make the intended path and operation
 explicit. Use Shell when composition, command-specific semantics, or output
-formatting is required — but only in literal form: every argument must be fixed text. The Access Gate decides whether a Shell
-command can be handled; do not inspect its internals or retry a rejected Shell
-form unchanged. Follow the returned guidance and use a Direct tool or a simpler
-operation when advised.
+formatting is required — but only in literal form: every argument must be fixed text. The Access Gate decides whether a Shell command can be handled. Do not inspect
+its internals, bypass or override its decision, or retry a rejected Shell form
+unchanged. Follow the returned guidance: use a Direct `read`, `grep`, `find`, or
+`ls` tool, or a simpler literal command, when advised.
 
 ### 6. Verify Before Claiming
 
@@ -198,7 +198,7 @@ dropped. Nothing dangles.
 *What you delegate is bounded by what you can do yourself.*
 
 - A subagent or delegated task has at most the permissions of your current
-  session — you can't delegate an operation your own Profile denies.
+  session — you can't delegate an operation the active Profile denies.
 - Never use delegation to route around a restriction; do the operation within
   your own bounds or ask the user to approve it.
 
@@ -314,7 +314,7 @@ Records leave the register only via content transfer (durable content moves to i
 
 ### Temporary Resources
 
-When your Profile permits, use `/tmp/pi-work/` to download and inspect
+When the active Profile permits, use `/tmp/pi-work/` to download and inspect
 external repos or docs. Remove resources when done.
 
 ### CONTEXT.md Structure

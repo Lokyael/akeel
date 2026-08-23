@@ -637,4 +637,26 @@
 
 **Out of Scope:** 本地仓库源（`<repo>` 为本地路径时）的 read intent——与本次误拒无关，且需 URL 启发式；其读压力由既有分类级 shellPolicy 覆盖。
 
-## D-053: 待创建
+## D-053: Profile 数据零注入（LLM 上下文隔离）
+
+**Status:** active
+**Reversal surface:** engineering
+
+**Decision:** profile 机制的任何数据——`ResolvedProfile`、集中配置、builtins、活动 profile 名——永不进入 LLM 上下文：不注入 context 消息、不修改 tool schema/description、不进 system prompt。活动 profile（`/profile` 切换）不改变任何注入内容；恒定注入文本只依赖静态文件（`principles.md`）。模型感知 profile 的唯一渠道是失败路径的静态 guidance（`profile-restriction`），且该 guidance 只给可行行动路径（ask the user to update the Profile），不描述机制、不提示实际不存在的操作通道。
+
+**Rules:**
+
+- 模型在任何配置、任何活动 profile 下都观察不到 profile 数据文本（注入消息 / tool description / system prompt 三面皆无）。
+- 恒定注入面保持唯一：`src/bootstrap/index.ts` 是唯一 `context` 注入点；access-gate 只经失败路径产出静态 guidance。
+- guidance 与实现一致：profile deny（`shell-policy-denied`/`path-denied`）无逐次批准（allow-once 仅存在于 ask 流），故 guidance 不出现 "approve the operation" 类描述。
+- 未来任何"让模型可见活动 profile 或 profile 规则"的需求必须经本决策生命周期（superseded/retired）显式变更。
+
+**Why:** profile 是 gate 的确定性计算输入而非提示词素材。把规则翻译进上下文会诱导模型自行判断权限、绕过 gate 消费结果，带来行为漂移、token 税与安全稀释；失败路径 guidance 是唯一必要的模型可见面，只在拒绝时给出可行行动路径（D-023）。
+
+**Impact:** 恒定注入内容与活动 profile 无关；模型在会话中不可见 profile 名与规则；新增注入面即违反本决策，由校验脚本与测试承载防回归。
+
+**Rejected:** profile 感知的动态注入裁剪（注入内容随 `/profile` 切换变化——行为随运行时状态漂移）；在恒定层注入 "Active profile: X"（token 税 + 诱导模型自行判定规则）；把 profile 描述文本放进 tool description（恒定成本扩大）。
+
+**Out of Scope:** 失败路径 block reason（静态 guidance + category-only subject）本身属于模型可见面，不在"数据注入"之列；TUI（footer、`/profile status`）面向人类用户，不属 LLM 上下文。
+
+## D-054: 待创建
