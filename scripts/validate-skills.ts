@@ -6,6 +6,9 @@
  *   2. Directory name matches frontmatter "name"
  *   3. description length ≤ 1024 chars
  *   4. SKILL.md line count ≤ 200 (warning only)
+ *   5. /skill: body references must never invoke user-invoked skills (D-036)
+ *
+ * 规则行为测试迁出至 tests/validate-skills.test.ts（node:test）。
  */
 
 import { readFileSync, readdirSync, existsSync, statSync } from "node:fs";
@@ -23,7 +26,7 @@ interface FrontmatterResult {
   error?: string;
 }
 
-interface SkillMeta {
+export interface SkillMeta {
   /** Directory name (e.g. "codebase-design") */
   dirName: string;
   /** Layer: foundations, disciplines, or workflows */
@@ -115,7 +118,7 @@ function collectSkills(): SkillMeta[] {
 
 // ─── Checks ───
 
-interface CheckResult {
+export interface CheckResult {
   pass: boolean;
   warnings: string[];
   errors: string[];
@@ -130,7 +133,7 @@ function checkFrontmatter(skill: SkillMeta): CheckResult {
   };
 }
 
-function checkDescriptionConvention(skill: SkillMeta): CheckResult {
+export function checkDescriptionConvention(skill: SkillMeta): CheckResult {
   const errors: string[] = [];
   const warnings: string[] = [];
 
@@ -231,6 +234,38 @@ function checkExternalUrls(skill: SkillMeta): CheckResult {
   return { pass: true, warnings, errors: [] };
 }
 
+// ─── /skill: 交叉引用检查：user-invoked 目标只能以用户指令形式出现 ───
+// D-036 将 workflows 分为手动调用（disable-model-invocation）与模型调用。
+// 手动调用的 skill 只能由用户发起；另一技能正文若用祈使式（hand off to /
+// invoke / run / call）引用它，模型执行时该调用不可达且静默失败——mattpocock
+// 上游同型缺陷（2026-08-15 修复）。正确形态是把动作明确交给用户
+// （"tell the user to run /skill:..."）。含 user/human/them 用户面向措辞的行、
+// 描述性提及（when running /skill:X）与自身描述自我引用一律放行。
+
+const USER_INVOKED_IMPERATIVE = /(?:hand off to|invoke|run|call the skills? tool with|call)\s*$/i;
+
+export function checkUserInvokedReferences(skill: SkillMeta, registry: Map<string, SkillMeta>): CheckResult {
+  const errors: string[] = [];
+  const lines = skill.content.split(/\r?\n/);
+  for (const [index, line] of lines.entries()) {
+    for (const match of line.matchAll(/\/skill:([a-z0-9-]+)/g)) {
+      const target = registry.get(match[1]!);
+      if (!target || !target.disableModelInvocation) continue;
+      // 自身描述中的自我引用（user-invoked 约定 "Use /skill:<name>"）不是交叉调用
+      if (target.dirName === skill.dirName) continue;
+      // 用户面向措辞：动作交给用户（"tell the user to run ..."），不是模型调用
+      if (/\b(?:user|human|them)\b/i.test(line)) continue;
+      // 祈使式引导紧贴提及（行尾锚定，剥离开场反引号）→ 违规
+      if (USER_INVOKED_IMPERATIVE.test(line.slice(0, match.index!).replace(/[`\s]+$/, ""))) {
+        errors.push(
+          `\`/skill:${match[1]}\` is user-invoked (disable-model-invocation) — a skill body cannot invoke it; phrase the hand-off as an instruction for the user (e.g. "tell the user to run /skill:${match[1]}"). Line ${index + 1}: "${line.trim().slice(0, 80)}"`
+        );
+      }
+    }
+  }
+  return { pass: errors.length === 0, warnings: [], errors };
+}
+
 // ─── principles.md 锚点存在性校验 ───
 // 技能引用 principles.md 锚点（D-030 单一来源的引用机制），锚点被删除/改名会让引用静默失效：
 //   - "per principles.md Quick Reference — Record Lifecycle" → Quick Reference 下的 ### 标题
@@ -240,7 +275,7 @@ function checkExternalUrls(skill: SkillMeta): CheckResult {
 
 const PRINCIPLES_FILE = join(SKILLS_ROOT, "..", "src", "bootstrap", "principles.md");
 
-interface PrinciplesAnchors {
+export interface PrinciplesAnchors {
   /** Quick Reference 与 Project Records 两节的 ### 锚点（S4b 拆节后合并收集）。 */
   anchorSections: Set<string>;
   /** 编号标题（§N → 标题文本）；值仅作可读性参考，解析只用键。 */
@@ -248,7 +283,7 @@ interface PrinciplesAnchors {
   bold: Set<string>;
 }
 
-function loadPrinciplesAnchors(): PrinciplesAnchors {
+export function loadPrinciplesAnchors(): PrinciplesAnchors {
   const anchors: PrinciplesAnchors = { anchorSections: new Set(), sections: new Set(), bold: new Set() };
   const content = readFileSync(PRINCIPLES_FILE, "utf-8");
   let inAnchorSection = false;
@@ -304,7 +339,7 @@ function extractPrinciplesRefs(content: string): PrinciplesRef[] {
   return refs;
 }
 
-function checkPrinciplesRefs(skill: SkillMeta, anchors: PrinciplesAnchors): CheckResult {
+export function checkPrinciplesRefs(skill: SkillMeta, anchors: PrinciplesAnchors): CheckResult {
   const errors: string[] = [];
   for (const ref of extractPrinciplesRefs(skill.content)) {
     let found = false;
@@ -329,113 +364,12 @@ function checkPrinciplesRefs(skill: SkillMeta, anchors: PrinciplesAnchors): Chec
   return { pass: errors.length === 0, warnings: [], errors };
 }
 
-// ─── Self-check: 锚点规则必须拒绝不存在的引用，同时放行真实引用 ───
-
-function selfCheckPrinciplesAnchorRule(anchors: PrinciplesAnchors): void {
-  const violating: SkillMeta = {
-    dirName: "sample",
-    layer: "workflows",
-    frontmatterError: undefined,
-    name: "sample",
-    description: "sample",
-    disableModelInvocation: false,
-    content: [
-      "per principles.md Quick Reference — Record Lifecycle",
-      "per principles.md Project Records — Record Lifecycle",
-      "per principles.md Project\nRecords — Also-Not-Real", // 折行引用必须被提取并拒绝（锁折行提取）
-      "per principles.md §7",
-      "per principles.md Quick Reference — This-Anchor-Does-Not-Exist",
-      "per principles.md Project Records — Also-Not-Real",
-      "per principles.md §99",
-    ].join("\n"),
-    lineCount: 4,
-  };
-  const result = checkPrinciplesRefs(violating, anchors);
-  const fired = result.errors.filter((e) => e.includes("This-Anchor-Does-Not-Exist") || e.includes("Also-Not-Real") || e.includes("§99")).length;
-  const falsePositive = result.errors.some((e) => e.includes("Record Lifecycle") || e.includes("§7"));
-  if (fired < 5 || falsePositive) {
-    console.error(
-      `❌ Self-check FAILED: principles anchor rule did not behave correctly (fired=${fired}, falsePositive=${falsePositive}). Fix the rule or the self-check.`
-    );
-    process.exit(1);
-  }
-}
-
-// ─── Self-check: the manual-invocation rule must actually reject violations ───
-
-function selfCheckManualInvocationRule(): void {
-  const violating: SkillMeta = {
-    dirName: "sample",
-    layer: "workflows",
-    frontmatterError: undefined,
-    name: "sample",
-    description: "Compact the conversation when the user asks for a handoff.",
-    disableModelInvocation: true,
-    content: "",
-    lineCount: 1,
-  };
-  // Boundary sample: the phrase is present mid-string but NOT a prefix. The rule must
-  // reject it too — otherwise a regression from startsWith to includes would silently
-  // pass (real files satisfy both, so positive validation cannot catch the relaxation).
-  const midString: SkillMeta = {
-    ...violating,
-    description: "When the user asks for a handoff, Use /skill:sample to compact the conversation.",
-  };
-  for (const sample of [violating, midString]) {
-    const result = checkDescriptionConvention(sample);
-    const ruleFired = result.errors.some((e) => e.includes("Use /skill:sample"));
-    if (!ruleFired) {
-      console.error(
-        "❌ Self-check FAILED: manual-invocation rule did not reject a violating description. Fix the rule or the self-check."
-      );
-      process.exit(1);
-    }
-  }
-}
-
-// ─── Self-check: model-invocable workflow trigger-first convention must warn on violations ───
-
-function selfCheckModelInvocableConvention(): void {
-  const violating: SkillMeta = {
-    dirName: "sample",
-    layer: "workflows",
-    frontmatterError: undefined,
-    name: "sample",
-    description: "Per-task context bootstrap — descriptive-first description.",
-    disableModelInvocation: false,
-    content: "",
-    lineCount: 1,
-  };
-  const result = checkDescriptionConvention(violating);
-  const ruleFired = result.warnings.some((w) => w.includes("model-invocable workflow convention"));
-  if (!ruleFired) {
-    console.error(
-      "❌ Self-check FAILED: model-invocable workflow convention did not warn on a descriptive-first description. Fix the rule or the self-check."
-    );
-    process.exit(1);
-  }
-  // 触发句前置的描述不应误报（warn 只针对描述优先措辞）
-  const conforming: SkillMeta = {
-    ...violating,
-    description: "Use when the user wants to stress-test their thinking.",
-  };
-  const ok = checkDescriptionConvention(conforming);
-  if (ok.warnings.some((w) => w.includes("model-invocable workflow convention"))) {
-    console.error(
-      "❌ Self-check FAILED: model-invocable workflow convention false-positives on a trigger-first description. Fix the rule or the self-check."
-    );
-    process.exit(1);
-  }
-}
-
 // ─── Main ───
 
 function main() {
-  selfCheckManualInvocationRule();
-  selfCheckModelInvocableConvention();
   const principlesAnchors = loadPrinciplesAnchors();
-  selfCheckPrinciplesAnchorRule(principlesAnchors);
   const skills = collectSkills();
+  const skillRegistry = new Map(skills.map((skill) => [skill.dirName, skill]));
   console.log(`Validating ${skills.length} skills...\n`);
 
   let totalErrors = 0;
@@ -450,6 +384,7 @@ function main() {
       checkLineCount(skill),
       checkExternalUrls(skill),
       checkPrinciplesRefs(skill, principlesAnchors),
+      checkUserInvokedReferences(skill, skillRegistry),
     ];
 
     const skillErrors = checks.flatMap((c) => c.errors);
@@ -479,4 +414,7 @@ function main() {
   }
 }
 
-main();
+// 脚本直跑时执行校验；被测试导入时仅暴露规则函数（自检已迁至 tests/）。
+if (import.meta.main) {
+  main();
+}

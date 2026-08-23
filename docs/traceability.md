@@ -73,3 +73,27 @@
 结论：本次核查未发现任何来源删除、改许可或引入新的第三方 substantial portions。`pi-permission-system` 与 `pi-landstrip` 已归档，其内容已冻结，后续同步引用以核查时 HEAD 为参考；andrej-karpathy-skills 的许可证证据缺口依旧存在，重新同步其文本前必须补齐可归档证据。
 
 **同步记录（2026-08-06）**：从 obra/superpowers v6.2.0 吸收 `writing-good-tests.md` 的可证伪性纪律至 `skills/disciplines/test-driven-development/`：SKILL.md 织入 falsifiability 定义与反模式（String-presence、Change detector）并扩展 rationalization 行；tests.md 新增 Falsifiability 节、删除 Why Order Matters 段落（列举语义迁至表格行）；mocking.md 并入 mock-earns-no-assertions 并新增 Mirror Real Data Completely。上游 commit 链：`e74961c1`（testing-anti-patterns → writing-good-tests 重构）→ `9d8630d5`（吸收可证伪性）→ `e8a9748a`（关闭 change-detector 漏洞）→ `517a9c64`（压缩）→ `caa1826c`（两原则重写，HEAD）。
+
+## 上游状态核查（2026-08-23）
+
+周期性上游状态确认，不改变既有映射与许可证义务；HEAD 快照供未来同步时作参考点，不替代“每次同步记录 commit 或 release”的要求。
+
+| 来源 | 核查时状态 | 核查时 HEAD | 与 2026-08-06 核查对比 |
+|------|-----------|-------------|-------------------------|
+| multica-ai/andrej-karpathy-skills | 活跃（最后推送 2026-04-20，未变）；仍只有 README 声明 MIT，仓库根目录无独立 LICENSE 文件（API license 为 null） | `2c606141` | 未变 |
+| obra/superpowers | 活跃；仓库根目录存在 MIT LICENSE | `b36e0829` | 前进：2026-08-12 发布 v6.3.0，晚于 2026-08-06 同步的 v6.2.0（`caa1826c`） |
+| mattpocock/skills | 活跃；存在 MIT LICENSE | `5b15a47f` | 前进：2026-08-21 HEAD 为 code review 流程措辞修订 |
+| danielvm-git/bigpowers | 活跃；存在 MIT LICENSE | `c0209032` | 前进：2026-08-07 release v2.87.5 |
+| gotgenes/pi-permission-system | 仓库描述含迁移公告 “Moved to gotgenes/pi-packages”并指向 monorepo 新址（新址活跃，最后推送 2026-08-22）；GitHub API archived 标志为 false；最后推送 2026-07-03，内容冻结由迁移公告确认 | `f1d2f619` | HEAD 未变；新增事实：上游迁移公告与 monorepo 新址 |
+| kenryu42/cc-safety-net | 活跃（最后推送 2026-08-23）；存在 MIT LICENSE | `270839b4` | 前进 |
+| chandra447/pi-hermes-memory | 活跃（最后推送 2026-08-17）；存在 MIT LICENSE | `71beae8a` | 前进 |
+| landstrip/pi-landstrip | 已归档（GitHub API archived=true）；存在 MIT LICENSE | `61220413` | 未变 |
+| eemeli/yaml | 最新 release 仍为 v2.9.0（2026-05-11 发布），与固定版本一致，无需更新 | — | 未变 |
+
+结论：本次核查未发现任何来源删除、改许可或引入新的第三方 substantial portions。5 个活跃上游的 HEAD 有推进（obra/superpowers v6.3.0 晚于上次同步的 v6.2.0，mattpocock/skills、bigpowers、cc-safety-net、pi-hermes-memory），均为参考点更新，不改变既有映射与许可证义务。
+
+两点澄清：`gotgenes/pi-permission-system` 上次核查记录的“已归档（内容冻结）”在本核查中 API archived 标志为 false，内容冻结由迁移公告与最后推送时间确认，保留冻结判定；上游内容已迁入 `gotgenes/pi-packages` monorepo（该 monorepo API license 为 null，未检出独立 LICENSE 文件，未来若从新址同步需要先补可归档许可证证据）。`andrej-karpathy-skills` 的许可证证据缺口依旧存在，重新同步其文本前必须补齐可归档证据。
+
+**同步记录（2026-08-23）**：从 mattpocock/skills 吸收两处纪律至 pi-keel：
+- `1dab982`（user-invoked skill 不可被其他技能调用，2026-08-15 修复）：`scripts/validate-skills.ts` 新增 `/skill:` 交叉引用检查——引用 `disable-model-invocation` 目标时仅允许用户面向措辞（"tell the user to run ..."）或描述性提及，祈使式（hand off to / invoke / run / call）报错；`skills/disciplines/code-cleanup/SKILL.md` 与 `skills/disciplines/systematic-debugging/SKILL.md` 三处 hand-off 同步改为用户指令形式。
+- `85f83d3`（grilling 问题块以 `---` 分隔，2026-08-20）：`skills/workflows/grill-plan/SKILL.md` 按一次一问模型适配，新增问题块模板——问题与推荐答案之间以 `---` 分隔，连续问题块互相独立。
