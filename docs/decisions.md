@@ -615,4 +615,26 @@
 
 **Out of Scope:** `models-store.json` 可能内嵌 provider `apiKey`（中间态）不硬拒，由 profile 写规则治理；若未来需收紧单独评估。
 
-## D-052: 待创建
+## D-052: git clone 显式目标目录提取
+
+**Status:** active
+**Reversal surface:** engineering
+
+**Decision:** git 适配器的 `clone` 子命令增加写目标提取：取值选项单一来源表（`CLONE_VALUE_OPTS`，官方 git-clone(1)）消费选项后，位置参数恰好为 [`<repo>`, `<dir>`] 两个时，把 `<dir>` 作为 write intent（argument/exact，与 mv/bundle create 同构）；consumed 的 file 值（`--template`/`--reference(-if-able)`）映射为 read intent（D-040 契约兑现：模板/引用目录的真实读取进 PathPolicy 读轴）；其余情况不提取，保持 shell-compiler 的 cwd 保守写面回退。
+
+**Rules:**
+
+- len==2 门控是 fail-closed 不变量：任何解析异常（如未建模 separated 取值选项的值泄漏进位置参数 → ≥3）一律放弃提取、回退保守行为——提取只能把决策收窄，不能放宽。
+- 未建模 equals/attached 形式选项整 token 原子跳过，无值泄漏——取值选项表完整性只影响覆盖率，不影响安全。
+- `--separate-git-dir` 值只消费、不产生 intent：归因会使无 `<dir>` 的 clone intents 非空、抑制 cwd fallback（fail-open）。
+- 无 `<dir>` 时的 ==2 泄漏签名（`[泄漏值, <repo>]`）会令提取指向 `<repo>` 并抑制 cwd fallback——当前不可达（表覆盖 git-clone(1) 全部取值选项，未知选项 git 在写盘前报错），未来新增取值选项须先复核此签名再改表。
+
+**Why:** clone 此前是 modify 命令中少数无路径提取的子命令，写面 fallback 钉在 cwd（项目根）——显式克隆到 `/tmp/pi-work/**`（keel-plan/keel-explore 写面内）被误拒为 write path denied。目标目录是静态可析取的位置参数，与 archive -o / bundle create 同级。
+
+**Impact:** 显式目标落在 scratch/docs 写面内的 clone 从误拒转为放行（路径维度；命令级 shellPolicy 仍按档位裁决，keel-plan 下 modify 审批一次）；项目内显式目标按精确路径走既有规则（与 mkdir/cp 一致）；无 `<dir>` 的 clone 行为不变（cwd 回退）。`--template`/`--reference` 的读取从此受 PathPolicy 读轴治理。既有语义用例 `git clone <url>`（无 dir）不变。
+
+**Rejected:** 通用「末个位置参数 = 写目标」规则（sed -e/commit -m/push ref 误归因，泄漏面全开）；fallback 改为 cwd+显式目标双检查（冗余，不换收益）；放宽 profile 项目写（放弃最小权限）；`--separate-git-dir` 归因（fail-open，见 Rules）。
+
+**Out of Scope:** 本地仓库源（`<repo>` 为本地路径时）的 read intent——与本次误拒无关，且需 URL 启发式；其读压力由既有分类级 shellPolicy 覆盖。
+
+## D-053: 待创建

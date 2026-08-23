@@ -77,7 +77,7 @@ const GIT_CLASSIFY: readonly GitClassifyDef[] = [
   { cmd: "reset", cls: "modify", upgrade: { flags: [{ name: "--hard" }], to: "destroy", reason: "hard reset" }, reason: "reset HEAD" },
   { cmd: "fetch", cls: "modify", reason: "fetch from remote" },
   { cmd: "pull", cls: "modify", reason: "pull from remote" },
-  { cmd: "clone", cls: "modify", reason: "clone repository" },
+  { cmd: "clone", cls: "modify", paths: cloneWritePaths, reason: "clone repository" },
   { cmd: "init", cls: "modify", reason: "initialize repository" },
   { cmd: "remote", cls: "modify", reason: "manage remotes" },
   { cmd: "mv", cls: "modify", paths: (args) => positionalWords(args, { dashIsOption: true }).map((a) => ({ op: "write" as const, value: a.value })), reason: "move/rename tracked files" },
@@ -135,6 +135,51 @@ const FORMAT_PATCH_OUTPUT_OPTS: readonly Opt[] = [
   { names: ["--output-directory"], kind: "file", operation: "write", forms: ["separated", "equals"] },
 ];
 
+// ─── git clone 显式目标目录（D-052）：取值选项单一来源表（官方 git-clone(1)）───
+// separated/attached 形式消费值（值泄漏进位置参数会破坏 len==2 门控）；equals 形式整 token
+// 原子消费（机制上无泄漏）。未建模 separated 取值选项 → 值泄漏 → 位置参数 ≥3 → 不提取、
+// 回退 shell-compiler 的 cwd 保守写面（fail-closed）。无 `<dir>` 时的 ==2 签名
+// （`[泄漏值, <repo>]`）指向 repo 且抑制 fallback——当前不可达（表覆盖全部官方取值选项，
+// 未知选项 git 写盘前报错），新增取值选项须先复核此签名再改表（D-052 Rule 4）。
+// `--separate-git-dir` 只消费不归因——归因会使无 `<dir>` 的 clone intents 非空、
+// 抑制 cwd fallback（fail-open），见 D-052。
+const CLONE_VALUE_OPTS: readonly Opt[] = [
+  // 短选项：separated + attached（-b main / -bmain）；跨名差异拆条（B2，同 archive -o vs --output）
+  { names: ["-b"], kind: "expression", forms: ["separated", "attached"] },
+  { names: ["-o"], kind: "expression", forms: ["separated", "attached"] },
+  { names: ["-u"], kind: "expression", forms: ["separated", "attached"] },
+  { names: ["-c"], kind: "expression", forms: ["separated", "attached"] },
+  { names: ["-j"], kind: "expression", forms: ["separated", "attached"] },
+  // 长选项：separated + equals（--branch main / --branch=main）
+  { names: ["--branch"], kind: "expression", forms: ["separated", "equals"] },
+  { names: ["--origin"], kind: "expression", forms: ["separated", "equals"] },
+  { names: ["--upload-pack"], kind: "expression", forms: ["separated", "equals"] },
+  { names: ["--config"], kind: "expression", forms: ["separated", "equals"] },
+  { names: ["--jobs"], kind: "expression", forms: ["separated", "equals"] },
+  { names: ["--template"], kind: "file", forms: ["separated", "equals"] },
+  { names: ["--depth"], kind: "expression", forms: ["separated", "equals"] },
+  { names: ["--shallow-since"], kind: "expression", forms: ["separated", "equals"] },
+  { names: ["--shallow-exclude"], kind: "expression", forms: ["separated", "equals"] },
+  { names: ["--filter"], kind: "expression", forms: ["separated", "equals"] },
+  { names: ["--reference", "--reference-if-able"], kind: "file", forms: ["separated", "equals"] },
+  { names: ["--separate-git-dir"], kind: "expression", forms: ["separated", "equals"] },
+  { names: ["--recurse-submodules"], kind: "flag", forms: ["equals"] },
+  { names: ["--server-option", "--ref-format", "--bundle-uri", "--revision"], kind: "expression", forms: ["separated", "equals"] },
+];
+
+/** git clone 写面（D-052）：取值选项消费后位置参数恰好为 [`<repo>`, `<dir>`] 时提取 `<dir>` 为
+ * write intent（argument/exact，与 mv/bundle create 同构）；否则不提取——len≠2 门控是
+ * fail-closed 不变量：任何解析异常都放弃提取、回退保守行为，提取只能收窄、不能放宽。
+ * consumed 的 file 值（--template/--reference(-if-able)）→ read intents（D-040 契约兑现）：
+ * 模板/引用目录的真实读取进 PathPolicy 读轴（blocked 路径硬拒生效），不再静默逃逸。 */
+function cloneWritePaths(args: readonly ShellArg[]): { op: "read" | "write"; value: string }[] {
+  const { positional, consumed } = parseOptions(args, { opts: CLONE_VALUE_OPTS, positional: "file", opaqueOnUnknown: false });
+  const reads = consumedFileIntents(consumed)
+    .filter((i) => i.operation === "read")
+    .map((i) => ({ op: "read" as const, value: i.rawPath }));
+  if (positional.length !== 2) return reads;
+  return [...reads, { op: "write" as const, value: positional[1]!.value }];
+}
 
 /** git bundle create <file> 的 bundle 文件：create 之后的第一个位置参数（create 本身由 pattern 保证）。 */
 function bundleCreateFile(args: readonly ShellArg[]): { op: "write"; value: string }[] {

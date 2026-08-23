@@ -48,6 +48,20 @@ function projectWriteProfile(): ResolvedProfile {
   });
 }
 
+/** 镜像 keel-plan 路径面（项目根写 deny，scratch 区写 allow）：隔离 clone 路径维度，shell 轴全 allow。 */
+function scratchCloneProfile(): ResolvedProfile {
+  return profile({
+    shellPolicy: { inspect: "allow", modify: "allow", execute: "deny", destroy: "deny", unknown: "ask" },
+    pathPolicy: {
+      default: { read: "deny", list: "deny", search: "deny", write: "deny" },
+      rules: [
+        { path: "project/**", read: "allow", list: "allow", search: "allow" },
+        { path: "/tmp/pi-work/**", read: "allow", list: "allow", search: "allow", write: "allow" },
+      ],
+    },
+  });
+}
+
 async function evaluateBash(command: string, activeProfile = profile(), selection?: string): Promise<Awaited<ReturnType<typeof evaluateToolCall>>> {
   const ctx = makeContext("pi-access-gate-");
   try {
@@ -123,11 +137,47 @@ test("asks once for a guarded project write", async () => {
   assert.equal(prompts.length, 1);
 });
 
-test("asks for an unknown network command", async () => {
+test("asks once for a network modify command", async () => {
   const { runtime, prompts } = makeRuntime(["Allow once"]);
-  const result = await evaluateTool("bash", { command: "git clone https://example.test/repo /tmp/repo" }, runtime);
+  // 无显式 dir 的 clone：写面回到 cwd 保守检查（项目写 ask），命令级仍是 modify 审批
+  const result = await evaluateTool("bash", { command: "git clone https://example.test/repo" }, runtime);
   assert.deepEqual(result, { kind: "allow" });
   assert.equal(prompts.length, 1);
+});
+
+test("allows git clone into the scratch area by its explicit destination", async () => {
+  // shell 轴隔离（modify=allow）：本用例只验证路径维度；真实 keel-plan 命令级仍走 modify 审批一次
+  const { runtime, prompts } = makeRuntime();
+  const result = await evaluateTool("bash", {
+    command: "git clone --depth 80 --filter=blob:none https://example.test/repo /tmp/pi-work/upstream/x",
+  }, runtime, { profile: scratchCloneProfile() });
+  assert.deepEqual(result, { kind: "allow" });
+  assert.equal(prompts.length, 0);
+});
+
+test("denies git clone with no explicit dir (cwd write fallback stays conservative)", async () => {
+  const { runtime } = makeRuntime();
+  const result = await evaluateTool("bash", { command: "git clone https://example.test/repo" }, runtime, { profile: scratchCloneProfile() });
+  assert.equal(result.kind, "block");
+});
+
+test("clone destination follows exact project path rules (not the cwd fallback)", async () => {
+  // 镜像 keel-plan 路径面：docs/** 可写、src/** 不可写——同一 shell 轴下按精确目标裁决
+  const { runtime } = makeRuntime();
+  const keelPlanLike = profile({
+    shellPolicy: { inspect: "allow", modify: "allow", execute: "deny", destroy: "deny", unknown: "ask" },
+    pathPolicy: {
+      default: { read: "deny", list: "deny", search: "deny", write: "deny" },
+      rules: [
+        { path: "project/**", read: "allow", list: "allow", search: "allow" },
+        { path: "project/docs/**", write: "allow" },
+      ],
+    },
+  });
+  const allowed = await evaluateTool("bash", { command: "git clone https://example.test/repo docs/x" }, runtime, { profile: keelPlanLike });
+  assert.deepEqual(allowed, { kind: "allow" });
+  const denied = await evaluateTool("bash", { command: "git clone https://example.test/repo src/x" }, runtime, { profile: keelPlanLike });
+  assert.equal(denied.kind, "block");
 });
 
 test("ask prompt shows the literal form of an unknown command", async () => {
