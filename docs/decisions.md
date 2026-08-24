@@ -682,16 +682,18 @@
 **Decision:** `search.ts` 的 grep/rg 选项表按官方文档建模，并锚定 **rg 14.x**（与仓库声明的 Arch Linux 工具链基线一致）为 rg 短选项语义基线：
 
 - grep 补 regex 引擎族 `-E/--extended-regexp`、`-G/--basic-regexp`、`-F/--fixed-strings`、`-P/--perl-regexp`（无值 flag，GNU grep §grep Programs）；NUL 短长形式按官方拆分：`-z/--null-data`、`-Z/--null`。
-- rg 修正错映射：`-L` 是 `--follow`（符号链接），不是 `--files-without-match`（该选项实际无短形式）；`-I` 是 `--no-filename` 的短形式（`-h` 在 rg 是 `--help`，不建模、保持 opaque）；`-z` 在 14.x 是 `--search-zip`（≤13 无 `-z`），NUL 输出的短形式是 `-0/--null`，`--null-data` 无短形式。
-- rg 补建模安全选项：无值 flag `-P/--pcre2`、`-U/--multiline`、`-S/--smart-case`、`-N/--no-line-number`、`-0/--null`、`-p/--pretty`；`-E/--encoding` 建模为**取值**（expression）——rg 的 `-E` 与 grep 的 `-E` 语义不同，严禁跨命令复制。
+- rg 修正错映射：`-L` 是 `--follow`（符号链接），不是 `--files-without-match`（该选项实际无短形式）；`-I` 是 `--no-filename` 的短形式（`-h` 在 rg 是 `--help`，建模为无值 flag）；`-z` 在 14.x 是 `--search-zip`（≤13 无 `-z`），NUL 输出的短形式是 `-0/--null`，`--null-data` 无短形式。
+- rg 补建模安全选项：无值 flag `-P/--pcre2`、`-U/--multiline`、`-S/--smart-case`、`-N/--no-line-number`、`-0/--null`、`-p/--pretty`；`-E/--encoding` 建模为**取值**（expression）——rg 的 `-E` 与 grep 的 `-E` 语义不同，严禁跨命令复制；`-d/--max-depth` 短形式建模为**取值**（rg 14.x 新增，`-d` 与 grep `-d`=--directories 语义不同，严禁跨命令复制）。
 - 删除编造的 `--min-filesize`（rg 官方无此选项，只有 `--max-filesize`）。
+- 五个只读搜索命令（find/tree/grep/rg/ls）补只读信息探测长形式 `--version`/`--help`（无值 flag）——闭合同族的 opaque 误拦（`rg --version`/`grep --version` 及 `--help` 此前被 opaqueOnUnknown 拦为 opaque-command，且引号无法绕过，D-055 紧随的 bootstrap 悖论）。信息探测短形式同批建模：grep/rg `-V`（`--version`，GNU grep 与 rg 官方 man 均确认）、rg `-h`（`--help`，rg 项目确认 `-h` 即 help）；grep `-h`/ls `-h` 是已建模的真实选项（`--no-filename`/`--human-readable`），不误当帮助短形式。
+- 收敛剩余未建模只读选项（均官方 man 确认、只读无写面）：rg 取值短形式 `-M/--max-columns`、`-T/--type-not`、`-r/--replace`、`-j/--threads`、`--engine`，及 `--max-depth` 别名 `--maxdepth`；grep 无值 flag `-T/--initial-tab`、`-U/--binary`、`--line-buffered`，取值 `-D/--devices`、`--binary-files`、`--group-separator`，文件读取 `--exclude-from=FILE`（read intent，同 `-f`）。跨命令同名短选项差异照 D-055 原则各自建模（`-T`：rg=--type-not 值 / grep=--initial-tab flag；`-r`：rg=--replace 值 / grep=--recursive flag；`-U`：rg=--multiline / grep=--binary，均无值 flag 但语义不同）。
 
 **Why:** `opaqueOnUnknown`（D-040）的收紧意图是堵未建模的破坏性选项（find `-delete`/`-exec` 等），但 grep/rg 只读、无写面，官方确认的无值取值选项不建模只会把可分析的字面搜索命令变成 `opaque-command` 误拦（`npm test 2>&1 | grep -E '^ℹ ...'` 被拦即为此因）；建模必须映射真实工具语义——rg 的错标签（`-L`/`-h`/`-z`）虽不改变 gate 判定（同为无值 flag），但会在未来按选项语义做 upgrade/downgrade 调节时埋错。
 
-**Impact:** `grep -E/-G/-F/-P/-Z/--null-data` 与 `rg -P/-U/-S/-N/-0/-p/-z/-L/-I`（及 `-E` 取值）不再误拦；rg 短选项模型以 14.x 为基线，未来版本漂移（如 14.x 新增 `-d`=--max-depth 短形式）按同一基线评估；新增选项建模须对照官方 man 并核对 grep/rg 同名短选项差异（`-E/-L/-h/-I/-s/-z` 六组均不同）。
+**Impact:** `grep -E/-G/-F/-P/-Z/--null-data` 与 `rg -P/-U/-S/-N/-0/-p/-z/-L/-I`（及 `-E` 取值）不再误拦；`--version`/`--help` 长形式在 find/tree/grep/rg/ls 均不再误拦，grep/rg `-V` 与 rg `-h` 短形式同样不再误拦（信息探测打开至执行面，仍为 inspect 只读、无路径 write 面）；rg `-M/-T/-r/-j/--engine/--maxdepth` 与 grep `-T/-U/-D/--line-buffered/--binary-files/--group-separator/--exclude-from` 不再误拦；rg 短选项模型以 14.x 为基线，未来版本漂移（新增短形式）按同一基线评估；新增选项建模须对照官方 man 并核对 grep/rg 同名短选项差异（`-E/-L/-h/-I/-s/-z` 六组均不同）。
 
-**Rejected:** 把 grep 的 `-E` 直接复制为 rg flag（rg `-E` 是 `--encoding` 取值，当 flag 会吞掉下一个参数并错解析路径 intent）；按 rg 13.0.0 建模（与实际 Arch 14.x 基线不符）；完整枚举 rg 全部选项（超出安全决策面的噪音）；建模 `--color[=WHEN]`（可选值形态，当前 opt 表无此表达力）。
+**Rejected:** 把 grep 的 `-E` 直接复制为 rg flag（rg `-E` 是 `--encoding` 取值，当 flag 会吞掉下一个参数并错解析路径 intent）；按 rg 13.0.0 建模（与实际 Arch 14.x 基线不符）；完整枚举 rg 全部选项（超出安全决策面的噪音）；建模 `--color[=WHEN]`（可选值形态，当前 opt 表无此表达力）；把 rg 的 `-T`/`-r`/`-U` 语义复制到 grep（同名短选项语义不同，严禁跨命令复制）。
 
-**Out of Scope:** grep 其余未建模安全选项（`-T/--initial-tab`、`-U/--binary`、`--line-buffered`、`--binary-files`、`-D/--devices`、`--exclude-from`、`--group-separator`）与 rg 的 `-M/-T/-d/-r/-j/--engine` 短形式——另立跟进；`--color[=WHEN]` 可选值形态；本机已安装 rg 二进制版本不在建模依赖内（gate 拦截 `rg --version` 时无法执行确认）。
+**Out of Scope:** `--color[=WHEN]` 可选值形态（grep/rg 均，当前 opt 表无此表达力）；本机已安装 rg 二进制版本不在建模依赖内（安装副本在重装前仍按旧表拦截 `rg --version`，属分发产物待更新，非源模型的 gaps）。
 
 ## D-056: 待创建

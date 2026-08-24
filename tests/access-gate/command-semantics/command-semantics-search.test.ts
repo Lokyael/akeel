@@ -47,6 +47,13 @@ defineAdapterTests("search", [
   { cmd: "grep -z -l 'x' file.txt", name: "grep -z null-data short flag stays non-opaque", cls: "inspect", opaque: false, intents: [{ operation: "read", rawPath: "file.txt" }] },
   { cmd: "grep -Z -l 'x' file.txt", name: "grep -Z null short flag stays non-opaque", cls: "inspect", opaque: false, intents: [{ operation: "read", rawPath: "file.txt" }] },
   { cmd: "grep --null-data -l 'x' file.txt", name: "grep --null-data long flag stays non-opaque", cls: "inspect", opaque: false, intents: [{ operation: "read", rawPath: "file.txt" }] },
+  // grep 其余安全选项（D-055 Out of Scope 闭合）；-T/-U/-D/--exclude-from/--line-buffered 均只读
+  { cmd: "grep -T -rn 'x' src/", name: "grep -T initial-tab flag non-opaque", cls: "inspect", opaque: false, intents: [{ operation: "search", rawPath: "src/" }] },
+  { cmd: "grep -U 'x' file.txt", name: "grep -U binary flag non-opaque (read intent)", cls: "inspect", opaque: false, intents: [{ operation: "read", rawPath: "file.txt" }] },
+  { cmd: "grep -D skip 'x' file.txt", name: "grep -D devices value consumed (non-opaque)", cls: "inspect", opaque: false, intents: [{ operation: "read", rawPath: "file.txt" }] },
+  { cmd: "grep --exclude-from skip.txt -rn 'x' src/", name: "grep --exclude-from extracts file read intent", cls: "inspect", opaque: false, intents: [{ operation: "read", rawPath: "skip.txt" }, { operation: "search", rawPath: "src/" }] },
+  { cmd: "grep --line-buffered -rn 'x' src/", name: "grep --line-buffered flag non-opaque", cls: "inspect", opaque: false, intents: [{ operation: "search", rawPath: "src/" }] },
+  { cmd: "grep --binary-files=text -rn 'x' src/", name: "grep --binary-files value consumed (non-opaque)", cls: "inspect", opaque: false, intents: [{ operation: "search", rawPath: "src/" }] },
   // rg 14.x 基线：安全无值 flag（此前未建模 → opaque 误拦）
   { cmd: "rg -P 'x' src/", name: "rg -P pcre2 flag stays non-opaque", cls: "inspect", opaque: false, intents: [{ operation: "search", rawPath: "src/" }] },
   { cmd: "rg -U -S 'x' src/", name: "rg -U multiline and -S smart-case flags stay non-opaque", cls: "inspect", opaque: false, intents: [{ operation: "search", rawPath: "src/" }] },
@@ -57,6 +64,28 @@ defineAdapterTests("search", [
   { cmd: "rg -s 'x' src/", name: "rg -s case-sensitive flag stays non-opaque", cls: "inspect", opaque: false, intents: [{ operation: "search", rawPath: "src/" }] },
   // rg -E 是 --encoding 取值（与 grep -E 语义不同）：值必须被消费，不成为搜索根
   { cmd: "rg -E utf16le 'x' src/", name: "rg -E encoding consumes its value (stays non-opaque)", cls: "inspect", opaque: false, intents: [{ operation: "search", rawPath: "src/" }] },
-  // rg -h 是 --help（非 --no-filename），不建模 → opaque（防回归：勿再标回 no-filename）
-  { cmd: "rg -h 'x' src/", name: "rg -h stays unmodeled (rg help, not no-filename)", cls: "inspect", opaque: true },
+  // rg -d 是 --max-depth 短形式（14.x 基线，与 grep -d=--directories 语义不同）：取值 expression，消费深度值
+  { cmd: "rg -d 2 'x' src/", name: "rg -d separated max-depth value consumed (non-opaque)", cls: "inspect", opaque: false, intents: [{ operation: "search", rawPath: "src/" }] },
+  { cmd: "rg -d2 'x' src/", name: "rg attached max-depth value consumed (non-opaque)", cls: "inspect", opaque: false, intents: [{ operation: "search", rawPath: "src/" }] },
+  { cmd: "rg --max-depth 2 'x' src/", name: "rg --max-depth long form consumes its value (non-opaque)", cls: "inspect", opaque: false, intents: [{ operation: "search", rawPath: "src/" }] },
+  // rg 其余长度取值短形式（D-055 Out of Scope 闭合）：-M/-T/-r/-j + --engine + --maxdepth 别名，都只读取值
+  { cmd: "rg -M 80 'x' src/", name: "rg -M max-columns value consumed (non-opaque)", cls: "inspect", opaque: false, intents: [{ operation: "search", rawPath: "src/" }] },
+  { cmd: "rg -T py 'x' src/", name: "rg -T type-not value consumed (non-opaque; differs from grep -T flag)", cls: "inspect", opaque: false, intents: [{ operation: "search", rawPath: "src/" }] },
+  { cmd: "rg -r 'repl' 'x' src/", name: "rg -r replace value consumed (non-opaque; differs from grep -r flag)", cls: "inspect", opaque: false, intents: [{ operation: "search", rawPath: "src/" }] },
+  { cmd: "rg -j 4 'x' src/", name: "rg -j threads value consumed (non-opaque)", cls: "inspect", opaque: false, intents: [{ operation: "search", rawPath: "src/" }] },
+  { cmd: "rg --engine pcre2 'x' src/", name: "rg --engine value consumed (non-opaque)", cls: "inspect", opaque: false, intents: [{ operation: "search", rawPath: "src/" }] },
+  { cmd: "rg --maxdepth 2 'x' src/", name: "rg --maxdepth alias consumed (non-opaque)", cls: "inspect", opaque: false, intents: [{ operation: "search", rawPath: "src/" }] },
+  // rg -h / -V 是官方短形式（--help / --version），建模为无值 flag；此前 -h 保持 opaque
+  { cmd: "rg -h 'x' src/", name: "rg -h is --help short form, modeled non-opaque (was opaque)", cls: "inspect", opaque: false, intents: [{ operation: "search", rawPath: "src/" }] },
+  // --version / --help：只读信息探测（长形式 + grep/rg 短形式），无值 flag，闭合 D-055 Out of Scope 的 opaque 误拦
+  { cmd: "grep --version", name: "grep --version stays non-opaque (no path intents)", cls: "inspect", opaque: false, intents: [] },
+  { cmd: "grep -V", name: "grep -V version short flag stays non-opaque (no path intents)", cls: "inspect", opaque: false, intents: [] },
+  { cmd: "grep --help", name: "grep --help stays non-opaque (no path intents)", cls: "inspect", opaque: false, intents: [] },
+  { cmd: "rg --version", name: "rg --version stays non-opaque (default root search, rg has no requires-recursive)", cls: "inspect", opaque: false, intents: [{ operation: "search", rawPath: "." }] },
+  { cmd: "rg -V", name: "rg -V version short flag stays non-opaque (default root search)", cls: "inspect", opaque: false, intents: [{ operation: "search", rawPath: "." }] },
+  { cmd: "rg --help", name: "rg --help stays non-opaque (default root search)", cls: "inspect", opaque: false, intents: [{ operation: "search", rawPath: "." }] },
+  { cmd: "ls --version", name: "ls --version stays non-opaque (default list root)", cls: "inspect", opaque: false, intents: [{ operation: "list", rawPath: "." }] },
+  { cmd: "ls --help", name: "ls --help stays non-opaque (default list root)", cls: "inspect", opaque: false, intents: [{ operation: "list", rawPath: "." }] },
+  { cmd: "find --version", name: "find --version stays non-opaque (default search root)", cls: "inspect", opaque: false, intents: [{ operation: "search", rawPath: "." }] },
+  { cmd: "tree --version", name: "tree --version stays non-opaque (default search root)", cls: "inspect", opaque: false, intents: [{ operation: "search", rawPath: "." }] },
 ]);
