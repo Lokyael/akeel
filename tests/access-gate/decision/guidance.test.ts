@@ -245,6 +245,18 @@ test("user deny renderer explains the operation was not executed", () => {
 });
 
 
+test("recheck guidance keeps the retry ban as the sole carrier (D-054)", () => {
+  // 重试禁令撤出恒定注入面后（D-054 Impact），运行时 guidance 是唯一载体：三条
+  // recheck guidance 必须都保留"不原样重试被拒 Shell 形式"；任何编辑删掉该句即删禁令。
+  const retryBan = /Do not retry (?:this|the same) Shell form unchanged/;
+  const recheckIds = ["batch-inspection-tools", "literal-command-or-direct-tool", "split-supported-commands"] as const;
+  for (const id of recheckIds) {
+    assert.match(guidanceText(id), retryBan);
+  }
+  // 语义对照：check-tool-input 允许修正参数后重试同一工具，不携带禁令
+  assert.doesNotMatch(guidanceText("check-tool-input"), /Shell form unchanged/);
+});
+
 test("every GuidanceId maps to a non-empty text", () => {
   const ids: GuidanceId[] = [
     "batch-inspection-tools",

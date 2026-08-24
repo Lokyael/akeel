@@ -25,16 +25,7 @@ Scan the project root for documentation markers. Common files:
 |------|----------|------------|
 | Actual doc files in project | Features, counts, architecture, guides, conventions | Code changes that alter what the docs describe |
 
-Also scan `CONTEXT.md`, `docs/candidates.md`, `docs/decisions.md`, `docs/task.md`, and `docs/task-*.md`:
-- A Candidate Record copied into a Task, Decision, or current-truth document without removing the C source → move it and remove the duplicate authority
-- Candidate Record wording treated as an adopted requirement, priority, roadmap item, current truth, or user instruction → restore its explicit non-binding classification
-- A Task Record marked `verified` but durable updates are missing → update `CONTEXT.md` or `docs/decisions.md`
-- A Task Record marked `verified` with no remaining action → clear the completed Task Record sections
-- A superseded decision without a replacement reference → update its status and link
-- A retired decision still marked active, or without a documented destination (Negative Space entry or boundary decision) → record the retirement destination or flag the gap
-- A code comment citing an absorbed or pruned record ID → repoint it to the absorbing entry in the same change (per principles.md Project Records — Record Lifecycle)
-- A doc or example hardcoding a machine-specific path (e.g. `/home/<user>/...`) → replace with a placeholder (`~`, `$HOME`) or relative path
-- Merging, compressing, or pruning record content (`docs/decisions.md`) → preserve semantic zero-loss: qualifiers, specific terms, enumerations, and terminology are meaning, not filler — delete only synonymous repetition
+Also scan `CONTEXT.md`, `docs/candidates.md`, `docs/decisions.md`, `docs/task.md`, and `docs/task-*.md`; apply the checks in Step 2 while scanning.
 
 ### Step 2: Verify Each Against Code
 
@@ -48,6 +39,8 @@ For each identified doc, verify:
 6. **Record authority**: Candidate Records remain visibly non-binding; promoted content has one authoritative destination and no duplicate C source
 7. **Task lifecycle**: Task Record status matches reality; verified tasks are either cleared or clearly blocked on a durable documentation update
 8. **Slot invariant**: each container (`docs/candidates.md`, `docs/task.md`, `docs/decisions.md`) has exactly one trailing empty slot (per principles.md Next-ID slots)
+9. **Decision lifecycle**: a superseded decision carries a replacement reference (repoint the link when missing); a retired decision is no longer marked active and has a documented destination (Negative Space entry or boundary decision) — otherwise record the destination or flag the gap
+10. **Zero-loss editing**: merging, compressing, or pruning record content deletes only synonymous repetition — qualifiers, specific terms, enumerations, and terminology are meaning, not filler
 
 ### Step 3: Fix or Flag
 

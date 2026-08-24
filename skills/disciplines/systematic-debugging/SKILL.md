@@ -33,6 +33,8 @@ performance problems, build failures, integration issues.
 
 ### Phase 1: Root Cause Investigation
 
+Goal: understand WHAT and WHY — do not fix yet.
+
 **BEFORE attempting ANY fix:**
 
 1. **Read Error Messages Carefully** — Don't skip. They often contain the exact solution.
@@ -117,12 +119,3 @@ If you catch yourself thinking:
 | "Emergency, no time for process" | Systematic is FASTER than guess-and-check thrashing. |
 | "Multiple fixes at once saves time" | Can't isolate what worked. Causes new bugs. |
 | "I see the problem, let me fix it" | Seeing symptoms ≠ understanding root cause. |
-
-## Quick Reference
-
-| Phase | Key Activities | Success Criteria |
-|-------|---------------|------------------|
-| 1. Root Cause | Read errors, reproduce, check changes, gather evidence | Understand WHAT and WHY |
-| 2. Pattern | Find working examples, compare | Identify differences |
-| 3. Hypothesis | Form theory, test minimally | Confirmed or new hypothesis |
-| 4. Implementation | Create test, fix, verify, clean up, post-mortem | Bug resolved, tests pass, cleanup done |

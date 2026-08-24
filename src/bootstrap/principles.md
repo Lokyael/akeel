@@ -103,8 +103,7 @@ from current sources (web, library docs, community threads) first, and
 cite the source in your claim. When no retrieval tool is available,
 state the fact as unverified instead of asserting it from memory.
 
-Never use "should", "probably", "seems to". Run the command. Read the output.
-Then claim the result.
+Never use "should", "probably", "seems to".
 
 ### 7. Keep Docs in Sync
 

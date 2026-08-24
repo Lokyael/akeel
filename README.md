@@ -29,7 +29,7 @@ The active Profile is the only permission mode exposed to users. Built-ins live 
 /profile status          # Show its detailed policy
 ```
 
-The Footer shows the active Profile and project location on the first line, with Pi's native token/context/model details on the second. Shell commands without a matching adapter use the Profile's `unknown` decision; commands an adapter cannot safely analyze are hard-denied as opaque. Network effects follow Shell policy (e.g. `git push`); unknown network commands (`curl`, `wget`) require one-time approval in Profiles that allow it.
+The Footer shows the active Profile, Session, and project location on the first line, with Pi's native runtime stats (tokens/context/model) and extension status on the second. Shell commands without a matching adapter use the Profile's `unknown` decision; commands an adapter cannot safely analyze are hard-denied as opaque. Network effects follow Shell policy (e.g. `git push`); unknown network commands (`curl`, `wget`) require one-time approval in Profiles that allow it.
 
 Hard threats, unsafe Shell syntax, symlink escapes, and blocked paths always deny and cannot be overridden by a Profile or approval. `ask` offers only `Allow once` and `Deny`; headless modes fail closed when approval would be required.
 
@@ -111,7 +111,7 @@ Pi Keel reads internal environment variables only — `PI_CODING_AGENT_DIR` (age
 
 | Variable | Package | Effect | Without it |
 |----------|---------|--------|------------|
-| `EXA_API_KEY` | pi-search | `websearch`/`codesearch` call Exa REST directly: `searchType: deep`, `recencyFilter`, `domainFilter`, `highlights` | Falls back to the public Exa MCP server — narrower feature set |
+| `EXA_API_KEY` | pi-search | `websearch`/`codesearch` use Exa REST directly (deep search, filters, result highlights) | Falls back to the public Exa MCP server — narrower feature set |
 | `FIRECRAWL_API_KEY` | pi-search | Enables `firecrawl_scrape` and `firecrawl_crawl` | Those two tools always fail |
 | `BRAVE_API_KEY` | pi-search | Optional `websearch` failover when Exa is unavailable | No failover (a free key is available) |
 | `GITHUB_TOKEN` / `GH_TOKEN` | pi-search | Avoids GitHub API rate limiting (HTTP 403) in `web_fetch` for GitHub URLs | Intermittent 403s when fetching GitHub content |

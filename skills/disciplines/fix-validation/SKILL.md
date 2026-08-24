@@ -60,7 +60,7 @@ Confirm: only the files you intended to change are modified. No stray files.
 - [ ] Original failing test passes
 - [ ] Full test suite passes (0 failures)
 - [ ] Build succeeds (exit 0)
-- [ ] Lint clean (0 errors)
+- [ ] Lint clean (exit 0, no new warnings)
 - [ ] No unintended files changed
 - [ ] Bug no longer reproduces manually (if applicable)
 

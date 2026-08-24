@@ -21,8 +21,8 @@
 - **Skill Single Responsibility**：每个 skill 单一职责、调用时内容全量被使用；触发场景互斥的 skill 保持独立，不合并（D-030）。
 - **Single Source of Format**：格式/规则只在 `principles.md` 参考节（Quick Reference / Project Records）定义一次，技能只文字引用不内嵌副本（D-030）。
 - **子代理档位（tier）**：pi-subagents 子代理会话的权限档位，共两档——T0 `scratch`（复用主档 `keel-explore`，写仅 `/tmp/pi-work/**`）与 T1 `project`（`keel-subagent-project`，写 `project/**` + scratch）；读均全盘、shell 轴两档一致（inspect-only），差异只在 Direct 写面。机制与细节见 Architecture 与 D-039。
-- **subagentProfiles 映射**：`config.yaml`（集中配置，D-041）可选顶层键，agent 名→档位名（`scratch`/`project`，`"*"` 回退），优先级 显式 > 内置默认 > `*`（D-039）。
-- **父档位钳制**：父会话档位号（1=项目可写档，否则 0）经 `PI_KEEL_PARENT_TIER`（`"0"`/`"1"`）env 传播，父侧算好、子代理零解析；子代理生效档 = min(映射档, 父TIER)——子代理权限上限 = 父会话当前档位（D-039）。
+- **subagentProfiles 映射**：`config.yaml`（集中配置，D-041）可选顶层键，agent 名→档位名（`scratch`/`project`，`"*"` 回退）；优先级见 Architecture 子代理段与 D-039。
+- **父档位钳制**：父会话档位号经 `PI_KEEL_PARENT_TIER` env 传播并钳制子代理生效档——子代理权限上限 = 父会话当前档位；机制细节见 Architecture 子代理段与 D-039。
 
 ## Architecture
 
@@ -71,6 +71,7 @@
 - [D-051 pi host 凭据文件边界（auth.json）](docs/decisions.md#d-051-pi-host-凭据文件边界authjson)
 - [D-052 git clone 显式目标目录提取](docs/decisions.md#d-052-git-clone-显式目标目录提取)
 - [D-053 Profile 数据零注入（LLM 上下文隔离）](docs/decisions.md#d-053-profile-数据零注入llm-上下文隔离)
+- [D-054 提示词面引用可靠性边界（指针化与内嵌的取舍判据）](docs/decisions.md#d-054-提示词面引用可靠性边界指针化与内嵌的取舍判据)
 
 ## Negative Space
 

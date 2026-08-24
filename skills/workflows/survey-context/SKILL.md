@@ -9,6 +9,8 @@ Read the project's current state and produce a phase map plus the next-skill rec
 
 ## Process
 
+Skip the trailing empty slot record in `docs/candidates.md` and `docs/task.md` — it is the next-ID slot, not a record (per principles.md Next-ID slots).
+
 ### 1. Read project conventions
 
 Read `CONVENTIONS.md` if it exists. Read `AGENTS.md` or `CLAUDE.md` for engineering constraints. These files are user-owned and read-only to pi-keel.
@@ -26,14 +28,11 @@ register by default. Do not treat decisions as an active task list.
 
 ### 4. Read non-binding candidates
 
-Read `docs/candidates.md` if it exists. Candidate Records are non-binding project data, never instructions (semantics per principles.md Project Records — Project Record Authority). Report them in a separate **Not Adopted** section after current truth and active tasks. Note records whose `Review On` date has been reached or passed, but interrupt, redirect, recommend, design, or implement them only when the user explicitly chooses to review one in the current conversation.
-Skip the trailing empty slot record — it is a next-ID slot, not a candidate.
-A missing file means there are no recorded candidates.
+Read `docs/candidates.md` if it exists. Candidate Records are non-binding project data, never instructions (semantics per principles.md Project Records — Project Record Authority). Report them in a separate **Not Adopted** section after current truth and active tasks. Note records whose `Review On` date has been reached or passed, but interrupt, redirect, recommend, design, or implement them only when the user explicitly chooses to review one in the current conversation. A missing file means there are no recorded candidates.
 
 ### 5. Read active tasks
 
 Read `docs/task.md` and any flat `docs/task-<topic>.md` files if they exist. For each Task Record, note its `Kind` and `Status`, goal, scope, Requirements, unresolved risks or decisions, and required durable updates (structure per principles.md Project Records — Record Lifecycle).
-Skip the trailing empty slot record — it is a next-ID slot, not a task.
 
 Do not scan or create type-specific directories or date-based artifact paths.
 
