@@ -72,6 +72,7 @@
 - [D-052 git clone 显式目标目录提取](docs/decisions.md#d-052-git-clone-显式目标目录提取)
 - [D-053 Profile 数据零注入（LLM 上下文隔离）](docs/decisions.md#d-053-profile-数据零注入llm-上下文隔离)
 - [D-054 提示词面引用可靠性边界（指针化与内嵌的取舍判据）](docs/decisions.md#d-054-提示词面引用可靠性边界指针化与内嵌的取舍判据)
+- [D-055 搜索命令选项建模对齐官方文档与 rg 14 基线](docs/decisions.md#d-055-搜索命令选项建模对齐官方文档与-rg-14-基线)
 
 ## Negative Space
 

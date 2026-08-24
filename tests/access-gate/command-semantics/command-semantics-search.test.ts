@@ -39,4 +39,24 @@ defineAdapterTests("search", [
   { cmd: "ls -l -- -f", name: "ls -- after options treats everything as path", cls: "inspect", intents: [{ operation: "list", rawPath: "-f" }] },
   { cmd: "ls -w 80 /etc", name: "ls -w consumes width value", cls: "inspect", intents: [{ operation: "list", rawPath: "/etc" }] },
   { cmd: "ls --width=80 /etc", name: "ls --width= consumes attached value", cls: "inspect", intents: [{ operation: "list", rawPath: "/etc" }] },
+  // grep 官方 regex 引擎族（GNU grep §grep Programs：-E/-G/-F/-P 均无值 flag）
+  { cmd: "grep -E 'x' file.txt", name: "grep -E extended-regexp flag stays non-opaque", cls: "inspect", opaque: false, intents: [{ operation: "read", rawPath: "file.txt" }] },
+  { cmd: "grep --extended-regexp -r 'x' src/", name: "grep --extended-regexp long form with recursion stays non-opaque", cls: "inspect", opaque: false, intents: [{ operation: "search", rawPath: "src/" }] },
+  { cmd: "grep -F -G -P 'x' file.txt", name: "grep fixed/basic/perl regexp flags stay non-opaque", cls: "inspect", opaque: false, intents: [{ operation: "read", rawPath: "file.txt" }] },
+  // grep NUL 短长形式按官方拆分：-z=--null-data、-Z=--null
+  { cmd: "grep -z -l 'x' file.txt", name: "grep -z null-data short flag stays non-opaque", cls: "inspect", opaque: false, intents: [{ operation: "read", rawPath: "file.txt" }] },
+  { cmd: "grep -Z -l 'x' file.txt", name: "grep -Z null short flag stays non-opaque", cls: "inspect", opaque: false, intents: [{ operation: "read", rawPath: "file.txt" }] },
+  { cmd: "grep --null-data -l 'x' file.txt", name: "grep --null-data long flag stays non-opaque", cls: "inspect", opaque: false, intents: [{ operation: "read", rawPath: "file.txt" }] },
+  // rg 14.x 基线：安全无值 flag（此前未建模 → opaque 误拦）
+  { cmd: "rg -P 'x' src/", name: "rg -P pcre2 flag stays non-opaque", cls: "inspect", opaque: false, intents: [{ operation: "search", rawPath: "src/" }] },
+  { cmd: "rg -U -S 'x' src/", name: "rg -U multiline and -S smart-case flags stay non-opaque", cls: "inspect", opaque: false, intents: [{ operation: "search", rawPath: "src/" }] },
+  { cmd: "rg -N -I -0 -p 'x' src/", name: "rg -N no-line-number, -I no-filename, -0 null, -p pretty flags stay non-opaque", cls: "inspect", opaque: false, intents: [{ operation: "search", rawPath: "src/" }] },
+  { cmd: "rg -z 'x' src/", name: "rg -z search-zip flag (14.x) stays non-opaque", cls: "inspect", opaque: false, intents: [{ operation: "search", rawPath: "src/" }] },
+  { cmd: "rg -L 'x' src/", name: "rg -L follows symlinks flag stays non-opaque (not files-without-match)", cls: "inspect", opaque: false, intents: [{ operation: "search", rawPath: "src/" }] },
+  { cmd: "rg --files-without-match 'x' src/", name: "rg files-without-match remains a long-only flag", cls: "inspect", opaque: false, intents: [{ operation: "search", rawPath: "src/" }] },
+  { cmd: "rg -s 'x' src/", name: "rg -s case-sensitive flag stays non-opaque", cls: "inspect", opaque: false, intents: [{ operation: "search", rawPath: "src/" }] },
+  // rg -E 是 --encoding 取值（与 grep -E 语义不同）：值必须被消费，不成为搜索根
+  { cmd: "rg -E utf16le 'x' src/", name: "rg -E encoding consumes its value (stays non-opaque)", cls: "inspect", opaque: false, intents: [{ operation: "search", rawPath: "src/" }] },
+  // rg -h 是 --help（非 --no-filename），不建模 → opaque（防回归：勿再标回 no-filename）
+  { cmd: "rg -h 'x' src/", name: "rg -h stays unmodeled (rg help, not no-filename)", cls: "inspect", opaque: true },
 ]);

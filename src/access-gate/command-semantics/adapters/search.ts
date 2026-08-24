@@ -30,21 +30,30 @@ const TREE_OPTS: Opt[] = [
 ];
 
 // ─── grep：-e/-f 是 pattern 提供者；-f 值是 pattern 文件（read intent）；-d recurse 等价递归 ───
+// 建模对齐 GNU grep 官方手册（v3.12 §2.1/§grep Programs）；regex 引擎族 -E/-G/-F/-P 均无值 flag。
 
 const GREP_OPTS: Opt[] = [
   { names: ["-e", "--regexp"], kind: "expression", isPattern: true, forms: ["separated", "attached", "equals"] },
   { names: ["-f", "--file"], kind: "file", operation: "read", isPattern: true, forms: ["separated", "equals"] },
   { names: ["-m", "--max-count", "-A", "--after-context", "-B", "--before-context", "-C", "--context", "--include", "--exclude", "--exclude-dir", "-d", "--directories", "--label"], kind: "expression", forms: ["separated", "attached", "equals"] },
-  { names: ["-r", "-R", "--recursive", "-i", "--ignore-case", "-n", "--line-number", "-l", "--files-with-matches", "-L", "--files-without-match", "-w", "--word-regexp", "-x", "--line-regexp", "-c", "--count", "-v", "--invert-match", "-h", "--no-filename", "-H", "--with-filename", "-s", "--no-messages", "-q", "--quiet", "-o", "--only-matching", "-a", "--text", "-I", "-z", "--null", "-b", "--byte-offset"], kind: "flag" },
+  { names: ["-E", "--extended-regexp", "-G", "--basic-regexp", "-F", "--fixed-strings", "-P", "--perl-regexp"], kind: "flag" },
+  { names: ["-r", "-R", "--recursive", "-i", "--ignore-case", "-n", "--line-number", "-l", "--files-with-matches", "-L", "--files-without-match", "-w", "--word-regexp", "-x", "--line-regexp", "-c", "--count", "-v", "--invert-match", "-h", "--no-filename", "-H", "--with-filename", "-s", "--no-messages", "-q", "--quiet", "-o", "--only-matching", "-a", "--text", "-I", "-z", "--null-data", "-Z", "--null", "-b", "--byte-offset"], kind: "flag" },
 ];
 
 // ─── rg：同 grep 的 pattern/glob/type 语义 ───
+// 短选项语义锚定 rg 14.x（与仓库的 Arch Linux 工具链基线一致，D-055）：
+// -L=--follow（符号链接）、-I=--no-filename、-N=--no-line-number、-0=--null、-z=--search-zip；
+// --files-without-match / --null-data 无短形式；-h 在 rg 是 --help（不建模 → opaque，勿标回 no-filename）；
+// -E=--encoding 是取值（与 grep -E 的 extended-regexp flag 语义不同，严禁跨命令复制）。
 
 const RG_OPTS: Opt[] = [
   { names: ["-e", "--regexp"], kind: "expression", isPattern: true, forms: ["separated", "attached", "equals"] },
   { names: ["-f", "--file"], kind: "file", operation: "read", isPattern: true, forms: ["separated", "equals"] },
-  { names: ["-g", "--glob", "--iglob", "-t", "--type", "--type-not", "-m", "--max-count", "-A", "--after-context", "-B", "--before-context", "-C", "--context", "--max-columns", "--max-depth", "--sort", "--sortr", "--max-filesize", "--min-filesize"], kind: "expression", forms: ["separated", "attached", "equals"] },
-  { names: ["-i", "--ignore-case", "-n", "--line-number", "-l", "--files-with-matches", "-L", "--files-without-match", "-w", "--word-regexp", "-x", "--line-regexp", "-c", "--count", "-v", "--invert-match", "-h", "--no-filename", "-H", "--with-filename", "-s", "--no-messages", "-q", "--quiet", "-o", "--only-matching", "-F", "--fixed-strings", "-u", "--unrestricted", "-a", "--text", "-z", "--null", "--no-ignore", "--hidden"], kind: "flag" },
+  { names: ["-E", "--encoding"], kind: "expression", forms: ["separated", "attached", "equals"] },
+  { names: ["-g", "--glob", "--iglob", "-t", "--type", "--type-not", "-m", "--max-count", "-A", "--after-context", "-B", "--before-context", "-C", "--context", "--max-columns", "--max-depth", "--sort", "--sortr", "--max-filesize"], kind: "expression", forms: ["separated", "attached", "equals"] },
+  { names: ["-L", "--follow"], kind: "flag" },
+  { names: ["-P", "--pcre2", "-U", "--multiline", "-S", "--smart-case", "-N", "--no-line-number", "-0", "--null", "-p", "--pretty", "-z", "--search-zip"], kind: "flag" },
+  { names: ["-i", "--ignore-case", "-n", "--line-number", "-l", "--files-with-matches", "--files-without-match", "-w", "--word-regexp", "-x", "--line-regexp", "-c", "--count", "-v", "--invert-match", "-I", "--no-filename", "-H", "--with-filename", "-s", "--case-sensitive", "--no-messages", "--null-data", "-q", "--quiet", "-o", "--only-matching", "-F", "--fixed-strings", "-u", "--unrestricted", "-a", "--text", "--no-ignore", "--hidden"], kind: "flag" },
 ];
 
 // ─── ls：-w 取值；常见 flag ───

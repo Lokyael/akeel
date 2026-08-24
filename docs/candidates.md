@@ -37,12 +37,11 @@
 - **Trigger:** 未来 kernel 出现按 effect 决策的真实需求，或 plan 体积成为可测性能问题。
 - **Review On:** 2027-02-17
 
-## C-013: 子代理基础设施在 Bun 运行时不可用（node:v8.promiseHooks.createHook 未实现）
+## C-014: 控制流复合命令建模（for 循环的识别与可判定子集建模）
 
-- **Created:** 2026-08-17
-- **Domain:** pi-subagents 子代理编排层 / 宿主运行时（非 pi-keel 仓库代码）
-- **Why Not Now:** pi-subagents ≥0.50.0 将 workflow script 的 promise 追踪改为 `node:v8.promiseHooks.createHook`（0.50.0 CHANGELOG 未声明的破坏性变更），Bun 宿主未实现该 API → `subagent` 派发起 worker 即失败（`NotImplementedError`），影响「parallel Axes 独立子代理审查」类工作流；属宿主运行时 × 上游包能力缺口，非 pi-keel 代码缺陷，仓库自身构建/测试不受影响（node 下 `npm test` 全绿）。现用 workaround：钉住 `npm:pi-subagents@0.49.0`（settings.json pinned，`pi update --all` 跳过）；但 **0.49.0 的 workflowScript await 消费检测有假阳性**（`await runs.run/all`、`Promise.all` 误报未消费）——并行审查改用 return 风格 `return runs.all([...])`（实测可用）、链式编排用 `resume` 接力，两条版本线各坏一半。升级 pi 宿主仍为内嵌 Bun，不解决。
-- **Trigger（何时可解决）:** ① 向 pi-subagents 上游提 issue：建议 createHook 缺失时回退 0.49.0 式 then-patch（现成实现可作证据）；采纳后解除钉住。② pi 宿主切换到 Node 运行时（若配置支持）。③ Bun 实现 `node:v8.promiseHooks`（上游 open 三年，进度非本项目可控）。④ 本地 patch：移植 0.49.0 worker 至 0.50.0，或为 0.49.0 补 await 消费检测；仅当 await 限制成为实际摩擦时考虑。
-- **Review On:** 2027-02-17
+- **Created:** 2026-08-24
+- **Why Not Now:** 现状是 fail-closed 的正确分类，非安全缺陷。全字面可判定循环（如 `for f in a b c; do echo x; done`）被 parser 按 `;` 切分为三条独立命令，`for`/`do`/`done` 无 adapter → 归类 `unknown` → 按 `shellPolicy.unknown`=ask 聚合为一次审批，展示三个无意义的 `unknown command — literal form`（keyword 不可能是命令，批准无信息量）；而使用循环变量（`do echo $f`）的形态已被 lexer 的 dynamic 检测 hard deny，fail-closed 正确。一期只改 parser 保留字识别 + 新增 `compound-command` decision code + 专门 guidance（Level 1）不引入新安全语义，收益是修正错误分类与知情同意表述；二期（Level 2）对可判定子集真正建模（无 `$var` 使用、无动态/glob 词表、体内无 `cd`、非位置参数形态 → 等价于把 body 重复 N 次，gate 检查 intent 而非次数，判定与展开一致）。改动面涉及 parser 复合语法与可判定性证明，暂无用户摩擦的量化证据。
+- **Trigger:** 字面 for 循环（无动态 token、无 `$var` 使用、无体内 `cd`）在真实工作流中造成频繁或误导性审批；或用户明确提出希望在 gate 内支持此类循环（而不仅是拆分/Direct 工具规避）。
+- **Review On:** 2027-02-24
 
-## C-014: 待创建
+## C-015: 待创建
