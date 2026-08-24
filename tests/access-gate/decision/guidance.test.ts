@@ -12,10 +12,13 @@ test("maps dynamic-shell to batch-inspection-tools guidance", () => {
   assert.equal(guidance[0]!.id, "batch-inspection-tools");
 });
 
-test("literal command guidance states a verifiable literal criterion", () => {
+test("literal command guidance points opaque forms at known commands or Direct tools", () => {
   const text = guidanceText("literal-command-or-direct-tool");
-  assert.ok(text.includes("single-quote"));
-  assert.ok(text.includes("command substitution"));
+  // opaque 场景 dynamic 已为 false（先于 opaque 被判），引导加单引号是无效/误导指令——不得回归
+  assert.equal(text.includes("single-quote"), false);
+  assert.equal(text.includes("command substitution"), false);
+  assert.ok(text.includes("Direct"));
+  assert.ok(text.includes("known commands"));
   assert.ok(text.includes("Do not retry"));
 });
 
