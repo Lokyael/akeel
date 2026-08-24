@@ -182,7 +182,7 @@
 
 **加载：** 只读取用户全局 `~/.pi/agent/pi-keel/config.yaml` 的 `commands` 段（`PI_CODING_AGENT_DIR` 可改变 agent 目录）；TypeScript adapter 是内置权威来源。本配置不改变 Profile、PathPolicy、Gate、Shell IR 或 Direct/passthrough 行为。
 
-**已知局限：** `reclassify` 的子命令提取（`fullSubcommand`）不跳过取值选项的值（如 `cargo --manifest-path Cargo.toml build` 得子命令 `"Cargo.toml build"`）；实际影响极小，pattern 用 substring 匹配即可规避，实现细节见 `adapters/shared.ts`。
+**已知局限：** `reclassify` 的子命令提取（`fullSubcommand`）不跳过取值选项的值（如 `cargo --manifest-path Cargo.toml build` 得子命令 `"Cargo.toml build"`）；实际影响极小，pattern 用 substring 匹配即可规避，实现细节见 `args.ts`。
 
 **Why:** 分类、路径提取和效果推断共享同一趟参数解析，是同一个分析的输出——拆成声明式 YAML 与 TS 双源会产生双源真理；内置分类是权威语义知识，覆盖层只用于用户主动补充本机 Shell 命令语义；Direct 工具需要精确参数 schema、路径字段和 effect 证明，继续通过源码和测试扩展。显式作用域取代隐式 basename 回退，因为回退把工具身份与调用拼写混为一谈——一个裸名键同时覆盖 `./bin/mytool` 与 `./vendor/mytool`，gate 不做 filesystem 解析（D-031），同名不同工具无法区分；想覆盖两种拼写就写两条声明（`mytool: cat` + `"bin/": cat`），声明取代猜测。
 
@@ -452,7 +452,7 @@
 
 **Status:** active
 
-**Decision:** `tests/access-gate/` 按 `src/access-gate/` 子目录镜像分层（`plan/`、`decision/`、`command-semantics/`、`shell-parse/`、`profile/`、`path/`、`config/`、`session/`、`ui/`，有测试的目录才物化——当前 `security/` 无测试故无镜像目录；根层留扩展入口集成测试）；`package.json` 组脚本用目录 glob（`tests/<dir>/*.test.ts`）而非文件枚举；共享测试工具按消费者集合拆分归属（表格驱动 DSL → `command-semantics/`，通用 fixtures → `shared/`，extension harness 留根层）。文件粒度：超大测试文件可沿 src 概念边界拆分（shell-parse 已按 lexer/parser 二分），前提是有对齐边界且拆分不引入跨文件共享 setup；纯集成面大文件（command-overrides）保持单文件，体积是领域深度而非结构问题。`npm test` 的 `**` glob 由 node test runner 自行展开（node ≥21，引号包裹）。
+**Decision:** `tests/access-gate/` 按 `src/access-gate/` 子目录镜像分层（`plan/`、`decision/`、`command-semantics/`、`shell-parse/`、`profile/`、`path/`、`config/`、`session/`、`ui/`，有测试的目录才物化；根层留扩展入口集成测试）；`package.json` 组脚本用目录 glob（`tests/<dir>/*.test.ts`）而非文件枚举；共享测试工具按消费者集合拆分归属（表格驱动 DSL → `command-semantics/`，通用 fixtures → `shared/`，extension harness 留根层）。文件粒度：超大测试文件可沿 src 概念边界拆分（shell-parse 已按 lexer/parser 二分），前提是有对齐边界且拆分不引入跨文件共享 setup；纯集成面大文件（command-overrides）保持单文件，体积是领域深度而非结构问题。`npm test` 的 `**` glob 由 node test runner 自行展开（node ≥21，引号包裹）。
 
 **Why:** 平铺 40 个测试文件与 `src/` 的 10 个子目录是两张并行地图（模块→测试靠命名前缀猜）；`test:gate` 手写枚举 9 个文件，新增/改名内核测试必须同步编辑 `package.json`（shotgun surgery）；`helpers.ts` 混装 fixtures / 表格驱动 DSL / 编译器工具三责，且三者的消费者集合不相交（command-semantics 测试 vs gate/plan 测试），镜像后共享 helper 无处安放，拆分是镜像的必然推论。
 
