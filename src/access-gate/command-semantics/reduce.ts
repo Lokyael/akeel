@@ -22,6 +22,8 @@ export interface ReducedSegment {
 export interface ReductionResult {
   text: string;
   segments: ReducedSegment[];
+  /** 仅各 loop 展开段、多 scope 逐段 `;` 连接的拼接文本（Task 8 expanded form；非全文）。 */
+  reductionText: string;
 }
 
 export interface ScopeWordValues {
@@ -122,6 +124,7 @@ export function reduceToFlat(
 
   const segments: ReducedSegment[] = [];
   const parts: string[] = [];
+  const expandedParts: string[][] = []; // 每 loop 的展开段（intra-loop 已含 `; ` 前缀）
   let reducedPos = 0;
   let cursor = 0;
 
@@ -146,6 +149,7 @@ export function reduceToFlat(
       ? { start: body[0]!.span.start, end: body[body.length - 1]!.span.end }
       : { start: cursor, end: cursor };
     const loopVar = ext.scope.variable.value;
+    const loopExpanded: string[] = [];
     for (let vi = 0; vi < ext.values.length; vi++) {
       const bodyText = bodyTextWithValue(rawCommand, body, loopVar, ext.values[vi]!);
       // loop 级重定向重挂载：迭代 ≥1 截断类改 `>>`
@@ -164,8 +168,10 @@ export function reduceToFlat(
         originalSpan: bodySpan,
       });
       parts.push(segText);
+      loopExpanded.push(segText);
       reducedPos += segText.length;
     }
+    expandedParts.push(loopExpanded);
     cursor = ext.end;
   }
 
@@ -191,5 +197,8 @@ export function reduceToFlat(
   if (rparseErr) return null;
   if (rprogram.dynamic || rprogram.loopScopes.length > 0 || rprogram.opaqueRegions.length > 0) return null;
 
-  return { text, segments };
+  // reductionText：仅各 loop 展开段、多 scope 逐段 `;` 连接的拼接文本（非全文）
+  const reductionText = expandedParts.map((loopPart) => loopPart.join("")).join("; ");
+
+  return { text, segments, reductionText };
 }

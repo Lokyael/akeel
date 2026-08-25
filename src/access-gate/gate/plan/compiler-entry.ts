@@ -104,6 +104,7 @@ function sealPlan(draft: AccessPlanDraft): CompleteAccessPlan {
       cwdCandidateCount: draft.coverage.cwdCandidateCount,
     },
     compilerVersion: COMPILER_VERSION,
+    ...(draft.reductionText !== undefined ? { reductionText: draft.reductionText } : {}),
   });
   ISSUED_PLANS.add(plan);
   return plan as CompleteAccessPlan;
@@ -119,9 +120,19 @@ function cloneCandidate(candidate: CwdCandidate): CwdCandidate {
 
 function cloneOperation(operation: AccessOperation): AccessOperation {
   if (operation.kind === "path") {
-    return { ...operation, cwdCandidates: operation.cwdCandidates.map(cloneCandidate), span: cloneSpan(operation.span) };
+    return {
+      ...operation,
+      cwdCandidates: operation.cwdCandidates.map(cloneCandidate),
+      span: cloneSpan(operation.span),
+      ...(operation.originalSpan !== undefined ? { originalSpan: cloneSpan(operation.originalSpan) } : {}),
+    };
   }
-  return { ...operation, effects: [...operation.effects], span: cloneSpan(operation.span) };
+  return {
+    ...operation,
+    effects: [...operation.effects],
+    span: cloneSpan(operation.span),
+    ...(operation.originalSpan !== undefined ? { originalSpan: cloneSpan(operation.originalSpan) } : {}),
+  };
 }
 
 function deepFreeze<T>(value: T): T {

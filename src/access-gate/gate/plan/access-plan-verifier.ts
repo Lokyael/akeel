@@ -73,7 +73,8 @@ export function validateCompleteAccessPlan(
     && value.cwdCandidates.length === uniquePathCandidates.length
     && value.cwdCandidates.every((candidate, index) => isSameCandidate(candidate, uniquePathCandidates[index]))
     && coverage.commandSpans.every(isSourceSpan)
-    && coverage.redirectionSpans.every(isSourceSpan);
+    && coverage.redirectionSpans.every(isSourceSpan)
+    && (value.reductionText === undefined || typeof value.reductionText === "string");
 }
 
 function isNonNegativeInteger(value: unknown): value is number {
@@ -118,6 +119,7 @@ function isCwdCandidate(value: unknown): value is CwdCandidate {
 
 function isValidOperation(value: unknown): value is AccessOperation {
   if (!isRecord(value) || !isSourceSpan(value.span)) return false;
+  if (value.originalSpan !== undefined && !isSourceSpan(value.originalSpan)) return false;
   if (value.kind === "path") {
     return typeof value.input === "string"
       && value.input.length <= ANALYSIS_LIMITS.maxArgumentLength

@@ -107,6 +107,7 @@ function commandEvidence(operation: CommandAccessOperation, forAsk = false): Gat
     subject: forAsk
       ? `${operation.commandClass} command`
       : `${operation.commandClass} command: ${operation.executable ?? "?"}`,
-    span: operation.span,
+    // 归约路径：literal form 一律按原始坐标切原文（防拿归约坐标切错位）
+    span: operation.originalSpan ?? operation.span,
   };
 }
