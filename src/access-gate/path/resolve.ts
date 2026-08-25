@@ -1,4 +1,4 @@
-import { existsSync, realpathSync } from "node:fs";
+import { existsSync, realpathSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, isAbsolute, join, normalize, relative, resolve } from "node:path";
 import type { ShellArg } from "../shell-parse/types";
@@ -30,6 +30,26 @@ export function expandTildeArg(arg: ShellArg): string {
   if (arg.value === "~") return homedir();
   if (arg.value.startsWith("~/")) return join(homedir(), arg.value.slice(2));
   return arg.value;
+}
+
+/**
+ * cd 目标解析统一服务（T-062 A0-3）：resolve + 存在性单一实现（与 resolvePath 共享 canonical/exists 语义），
+ * 供 control-flow 的 D-045 候选解析与后续 loop 展开（Phase 2）同源使用；控制流不再手写 isDirectory/resolve。
+ */
+export function resolveTargetForCwd(
+  currentCwd: string,
+  target: string,
+): { absolute: string; exists: boolean } {
+  // 兼容直接传 "~" 的调用方（analyzeCd 已词级展开，恒等路径仍守恒）
+  const expanded = target === "~" ? homedir() : target;
+  const absolute = isAbsolute(expanded) ? expanded : resolve(currentCwd, expanded);
+  let exists = false;
+  try {
+    exists = statSync(absolute).isDirectory();
+  } catch {
+    exists = false;
+  }
+  return { absolute, exists };
 }
 
 function normalizeInput(input: string): string | null {

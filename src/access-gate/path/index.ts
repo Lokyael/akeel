@@ -1,3 +1,3 @@
 export { decidePath, isProjectWritable, PATH_DENY_REASONS } from "./policy";
 export type { PathDecision, PathDenyReason } from "./policy";
-export { resolvePath, expandTildeArg } from "./resolve";
+export { resolvePath, expandTildeArg, resolveTargetForCwd } from "./resolve";

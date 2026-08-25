@@ -2,13 +2,11 @@
 // 输入：ShellProgram + 初始 CWD
 // 输出：每个命令节点的 CWD + 是否 opaque
 
-import { isAbsolute, resolve } from "node:path";
 import { homedir } from "node:os";
-import { statSync } from "node:fs";
 import type { ShellProgram, ShellCommandNode } from "../shell-parse/types";
 import type { CwdCandidate, CwdState } from "./types";
 import { prefixedCommand } from "./prefix";
-import { expandTildeArg } from "../path";
+import { expandTildeArg, resolveTargetForCwd } from "../path";
 
 // ─── 初始状态 ───
 
@@ -55,7 +53,7 @@ export function analyzeCd(node: ShellCommandNode): CdInfo {
   }
   // pushd/popd（或 cd 家族之外）→ cwd 变异未追踪 → 保守 opaque（fail-closed）
   if (exe !== "cd") return { isCd: true, target: null, opaque: true };
-  // cd 无参数 → ~（展开为绝对 home，与 list 意图同源；resolveCdTarget 对绝对输入恒等）
+  // cd 无参数 → ~（展开为绝对 home，与 list 意图同源；resolveTargetForCwd 对绝对输入恒等）
   if (args.length === 0) return { isCd: true, target: homedir(), opaque: false };
   // 多于一个参数 → opaque（cd 不允许多个参数，但 Shell 会忽略多余的）
   if (args.length > 1) return { isCd: true, target: null, opaque: true };
@@ -67,28 +65,6 @@ export function analyzeCd(node: ShellCommandNode): CdInfo {
   // cd 目标走字面、cd-list 意图却会被 normalizeInput string-mode 误展开 home，无法同源且不引入 PathIntent.quoted）
   if (arg.quoted && arg.value.startsWith("~")) return { isCd: true, target: null, opaque: true };
   return { isCd: true, target: expandTildeArg(arg), opaque: false };
-}
-
-function isDirectory(path: string): boolean {
-  try {
-    return statSync(path).isDirectory();
-  } catch {
-    return false;
-  }
-}
-
-/**
- * 在给定 cwd 下解析 cd target。
- * 返回绝对目标与存在性（基于分析时点，statSync）；
- * 不存在时由调用方按后继操作符决定候选建模（D-045：; / newline → 双候选，&& → 单候选）。
- */
-export function resolveCdTarget(target: string, currentCwd: string): { cwd: string; exists: boolean } {
-  if (target === "~") {
-    const home = homedir();
-    return { cwd: home, exists: isDirectory(home) };
-  }
-  const resolved = isAbsolute(target) ? target : resolve(currentCwd, target);
-  return { cwd: resolved, exists: isDirectory(resolved) };
 }
 
 // ─── 主控制流分析 ───
@@ -142,9 +118,9 @@ export function analyzeControlFlow(
       // D-045：目标存在性基于分析时点。存在 → 单候选（现状不变）；不存在且后继为
       // ; / newline（cd 失败后命令仍在旧 cwd 执行）→ 双候选保守 {目标, cd 前 cwd}——
       // 目标可能被前序命令创建（先建后 cd），也可能运行时失败；&& 短路时旧 cwd 分支不存在，不虚构。
-      const resolved = before.candidates.map((candidate) => resolveCdTarget(cdInfo.target!, candidate.cwd));
+      const resolved = before.candidates.map((candidate) => resolveTargetForCwd(candidate.cwd, cdInfo.target!));
       const targetCandidates = resolved.map((target, index) => ({
-        cwd: target.cwd,
+        cwd: target.absolute,
         certainty: "exact" as const,
         branch: `${i}:cd:${index}`,
       }));

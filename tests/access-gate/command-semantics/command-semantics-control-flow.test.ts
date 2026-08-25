@@ -8,11 +8,12 @@ import { tmpdir, homedir } from "node:os";
 import { lex } from "../../../src/access-gate/shell-parse/lexer";
 import { parse } from "../../../src/access-gate/shell-parse/parser";
 import { normalizeCommand } from "../../../src/access-gate/command-semantics/normalize";
-import { analyzeControlFlow, initialCwd, resolveCdTarget } from "../../../src/access-gate/command-semantics/control-flow";
+import { analyzeControlFlow, initialCwd } from "../../../src/access-gate/command-semantics/control-flow";
+import { resolveTargetForCwd } from "../../../src/access-gate/path";
 
 test("control: unavailable cd target returns exists=false without throwing", () => {
-  const result = resolveCdTarget("missing/subdir", "/path/that/does/not/exist");
-  assert.deepEqual(result, { cwd: "/path/that/does/not/exist/missing/subdir", exists: false });
+  const result = resolveTargetForCwd("/path/that/does/not/exist", "missing/subdir");
+  assert.deepEqual(result, { absolute: "/path/that/does/not/exist/missing/subdir", exists: false });
 });
 
 test("normalize: env rm keeps underlying executable", () => {
@@ -154,12 +155,12 @@ test("control: ; chain with distinct missing targets accumulates candidates with
   assert.deepEqual(cwdSet(result, 2), ["/b", "/a", "/project"]);
 });
 
-test("control: resolveCdTarget reports exists for a real directory (D-045)", () => {
+test("control: resolveTargetForCwd reports exists for a real directory (D-045)", () => {
   const root = mkdtempSync(join(tmpdir(), "pi-cflow-"));
   try {
-    assert.equal(resolveCdTarget("sub", root).exists, false);
+    assert.equal(resolveTargetForCwd(root, "sub").exists, false);
     mkdirSync(join(root, "sub"), { recursive: true });
-    assert.deepEqual(resolveCdTarget("sub", root), { cwd: join(root, "sub"), exists: true });
+    assert.deepEqual(resolveTargetForCwd(root, "sub"), { absolute: join(root, "sub"), exists: true });
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
