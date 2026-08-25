@@ -57,9 +57,15 @@ export function compileShellDraft(input: ShellCompilerInput): CompilerDraftResul
   const lexResult = lex(command);
   if (lexResult.unsafeSyntax) return reject("unsafe-syntax", lexResult.unsafeSyntax);
   const parsed = parse(lexResult.tokens);
-  if (parsed.error || parsed.program.commands.length === 0) return reject("unsafe-syntax", parsed.error ?? "empty command");
-  if (parsed.program.commands.length > ANALYSIS_LIMITS.maxCommands) return reject("resource-limit", "command count exceeds the analysis budget");
+  if (parsed.error && parsed.error !== "empty command") return reject("unsafe-syntax", parsed.error);
   if (parsed.program.unsafeSyntax) return reject("unsafe-syntax", parsed.program.unsafeSyntax);
+  if (parsed.program.commands.length > ANALYSIS_LIMITS.maxCommands) return reject("resource-limit", "command count exceeds the analysis budget");
+
+  // 结构扫描（T-062 P1T2）：非 for 保留字区 / 未建模 for-scope → compound-command（fail-closed，先于 preflight/动态检查）
+  const opaque = parsed.program.opaqueRegions[0];
+  if (opaque) return reject("compound-command", opaque.keyword, opaque.span);
+  if (parsed.program.loopScopes.length > 0) return reject("compound-command", "for", parsed.program.loopScopes[0]!.headerSpan);
+  if (parsed.error || parsed.program.commands.length === 0) return reject("unsafe-syntax", parsed.error ?? "empty command");
 
   // preflight 在 dynamic 检查之前运行，以便硬规则和威胁扫描提供更具体的错误信息；
   // 结构级检查基于 parse 后的 program（引号拆分规范化、注释/字符串不误报）

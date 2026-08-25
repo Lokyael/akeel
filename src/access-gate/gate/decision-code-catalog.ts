@@ -6,6 +6,7 @@ export type DenyResponseKind = "shell-form" | "security-boundary" | "generic";
 const DENY_RESPONSE_KIND: Readonly<Record<DecisionCode, DenyResponseKind>> = {
   "dynamic-shell": "shell-form",
   "unsafe-syntax": "shell-form",
+  "compound-command": "shell-form",
   "opaque-command": "shell-form",
   "unsupported-redirection": "shell-form",
   "uncertain-cwd": "shell-form",
@@ -37,6 +38,7 @@ export function denyResponseKindFor(code: DecisionCode): DenyResponseKind {
 const EVIDENCE_KIND: Readonly<Record<DecisionCode, GateEvidence["kind"]>> = {
   "dynamic-shell": "syntax",
   "unsafe-syntax": "syntax",
+  "compound-command": "command",
   "uncertain-cwd": "syntax",
   threat: "threat",
   "unknown-tool": "tool",
@@ -62,6 +64,7 @@ export function evidenceKind(code: DecisionCode): GateEvidence["kind"] {
 
 const GUIDANCE_CATALOG: Readonly<Partial<Record<DecisionCode, readonly Guidance[]>>> = {
   "dynamic-shell": [{ id: "batch-inspection-tools", safety: "recheck" }],
+  "compound-command": [{ id: "compound-command-hint", safety: "recheck" }],
   "opaque-command": [{ id: "literal-command-or-direct-tool", safety: "recheck" }],
   "unsafe-syntax": [{ id: "split-supported-commands", safety: "recheck" }],
   "unsupported-redirection": [{ id: "split-supported-commands", safety: "recheck" }],
@@ -79,6 +82,7 @@ export function guidanceFor(code: DecisionCode): readonly Guidance[] {
 
 const GUIDANCE_TEXT: Readonly<Record<GuidanceId, string>> = {
   "batch-inspection-tools": "Use a Direct read, grep, find, or ls tool for this inspection. Do not retry this Shell form unchanged.",
+  "compound-command-hint": "This compound control-flow form cannot be approved as written. Unroll it into literal commands or use a Direct read/grep/find/ls tool. Do not retry this Shell form unchanged.",
   "literal-command-or-direct-tool": "Use a Direct read, grep, find, or ls tool, or a literal Shell command made only of known commands with supported options so the whole form is statically analyzable. Do not retry this Shell form unchanged.",
   "split-supported-commands": "Split the operation into separate commands joined by && or ;, one action per command, and avoid command substitution and complex redirection; when redirection is needed, use only simple forms such as >, >>, 2>, or < with a plain file path. For inspection, use Direct tools (read, grep, find, ls). Do not retry the same Shell form unchanged.",
   "check-tool-input": "The requested tool or its input is not supported. Use a known Direct tool (read, write, edit, find, grep, ls) or a literal Shell command; if you retry the same tool, correct its parameters to match the tool schema.",

@@ -7,14 +7,15 @@
 import type { LexToken } from "./lexer";
 import type {
   ShellProgram,
+  LoopScope,
   ShellCommandNode,
   ShellArg,
   ShellRedirectionNode,
-  ShellOperator,
   RedirectionKind,
   SourceSpan,
 } from "./types";
 import { WRAPPER_CMDS_SET, WRAPPER_POS_SKIP } from "./wrappers";
+import { regionPass } from "./region";
 
 const ALL_DIGITS = /^\d+$/;
 
@@ -205,60 +206,55 @@ function resolvePreamble(tokens: LexToken[]): Preamble {
 
 export function parse(tokens: LexToken[]): { program: ShellProgram; error: string | null } {
   if (tokens.length === 0) {
-    return { program: { commands: [], unsafeSyntax: null, dynamic: false }, error: "empty command" };
+    return { program: { commands: [], unsafeSyntax: null, dynamic: false, loopScopes: [], opaqueRegions: [] }, error: "empty command" };
   }
 
   const commands: ShellCommandNode[] = [];
   let error: string | null = null;
   const totalDynamic = tokens.some((t) => t.dynamic);
 
-  // 分割 token 流为 command groups
-  const groups: { tokens: LexToken[]; opBefore: ShellOperator }[] = [];
-  let currentGroup: LexToken[] = [];
-  let lastOp: ShellOperator = "start";
-
-  for (let i = 0; i < tokens.length; i++) {
-    const tok = tokens[i];
-    if (tok.kind === "operator") {
-      // flush current group
-      groups.push({ tokens: currentGroup, opBefore: lastOp });
-      currentGroup = [];
-      lastOp = tok.value as ShellOperator;
-    } else if (tok.kind === "redirect") {
-      // redirect token 留在组内原位，parseCommandGroup 用 tryParseRedirect 处理
-      currentGroup.push(tok);
-    } else {
-      currentGroup.push(tok);
-    }
+  // T-062 P1T1：区域扫描（切组 + for 作用域 + opaque 区 + 边界关键字守卫）
+  const region = regionPass(tokens);
+  if (region.unsafeSyntax) {
+    return { program: { commands: [], unsafeSyntax: region.unsafeSyntax, dynamic: totalDynamic, loopScopes: [], opaqueRegions: region.opaqueRegions }, error: region.unsafeSyntax };
   }
-  groups.push({ tokens: currentGroup, opBefore: lastOp });
 
-  // 过滤空组
-  const nonEmpty = groups.filter((g) => g.tokens.length > 0);
-
-  for (const group of nonEmpty) {
+  region.groups.forEach((group) => {
+    if (group.tokens.length === 0) return;
     const parsed = parseCommandGroup(group.tokens);
     if (!parsed) {
       error = "invalid command syntax";
-      continue;
+      return;
     }
     commands.push({
       ...parsed,
       operatorBefore: group.opBefore,
     });
-  }
+  });
 
-  // 剩余没有 command 的情况（全空）
-  if (commands.length === 0 && nonEmpty.length === 0) {
-    // 所有组都为空 → 空命令
-    return { program: { commands: [], unsafeSyntax: null, dynamic: totalDynamic }, error: "empty command" };
+  // 汇编 LoopScope（region 产出的 bodyGroupIndices → 命令节点；命令不回指 W1）
+  const loopScopes: LoopScope[] = region.scopeBuilds.map((b) => ({
+    variable: b.variable,
+    words: b.words,
+    hasIn: b.hasIn,
+    opBefore: b.opBefore,
+    trailingOperator: b.trailingOperator,
+    body: b.bodyGroupIndices.map((i) => commands[i]!).filter(Boolean),
+    redirections: b.redirections,
+    headerSpan: b.headerSpan,
+    doneSpan: b.doneSpan,
+  }));
+
+  // 剩余没有 command 的情况（全空：无命令、无作用域、无 opaque 区）
+  if (commands.length === 0 && region.groups.every((g) => g.tokens.length === 0) && region.opaqueRegions.length === 0) {
+    return { program: { commands: [], unsafeSyntax: null, dynamic: totalDynamic, loopScopes, opaqueRegions: region.opaqueRegions }, error: "empty command" };
   }
 
   // 计算 unsafeSyntax
   const unsafe = error ? error : null;
 
   return {
-    program: { commands, unsafeSyntax: unsafe, dynamic: totalDynamic },
+    program: { commands, unsafeSyntax: unsafe, dynamic: totalDynamic, loopScopes, opaqueRegions: region.opaqueRegions },
     error: unsafe,
   };
 }

@@ -51,4 +51,33 @@ export interface ShellProgram {
   commands: readonly ShellCommandNode[];
   unsafeSyntax: string | null;
   dynamic: boolean;
+  /** T-062 P1T1：for 作用域（region pass 产出；结构扫描判据；命令不回指，单向无环 W1）。 */
+  loopScopes: readonly LoopScope[];
+  /** T-062 P1T1：非 for 保留字区（if/while/case/… 全部 opaque，统一 compound-command 拒绝）。 */
+  opaqueRegions: readonly OpaqueRegion[];
+}
+
+/** for 作用域（T-062 P1T1）。body 为命令引用、唯一来源（R3）；region pass 装配，命令不持有回指（W1）。 */
+export interface LoopScope {
+  variable: ShellArg;
+  words: readonly ShellArg[];
+  hasIn: boolean;
+  /** for-group 的前操作符（P2 守卫 `|`/`&` 与归约首条承载所需）。 */
+  opBefore: ShellOperator;
+  /** loop 后首条命令的 operatorBefore（后置 `|`/`&` 守卫；孤立 `&` 一并收进；无后继 = null）。 */
+  trailingOperator: ShellOperator | null;
+  /** body 命令（唯一来源 R3）。 */
+  body: readonly ShellCommandNode[];
+  /** loop 级重定向（pre-for 前导 / pre-do 头部 / post-done 尾部，三类位置）。 */
+  redirections: readonly ShellRedirectionNode[];
+  /** `for...in...; do`（多行形态为 `\ndo` 前缀换行）原始坐标区间。 */
+  headerSpan: SourceSpan;
+  /** 终止分隔符（`;`/newline）+ `done` 原始坐标区间。 */
+  doneSpan: SourceSpan;
+}
+
+/** 非 for 保留字区（if/while/case/… 与 C 风格 for、`time`/`!` 管线形态）。 */
+export interface OpaqueRegion {
+  keyword: string;
+  span: SourceSpan;
 }

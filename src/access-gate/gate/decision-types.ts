@@ -3,6 +3,7 @@ import type { SourceSpan } from "../shell-parse";
 export type DecisionCode =
   | "dynamic-shell"
   | "unsafe-syntax"
+  | "compound-command"
   | "threat"
   | "opaque-command"
   | "destroy-command"
@@ -35,7 +36,8 @@ export type GuidanceId =
   | "literal-command-or-direct-tool"
   | "split-supported-commands"
   | "check-tool-input"
-  | "profile-restriction";
+  | "profile-restriction"
+  | "compound-command-hint";
 
 export interface Guidance {
   readonly id: GuidanceId;

@@ -248,6 +248,23 @@ test("ask: path evidence aggregates resolved absolute paths, deduped (D1)", asyn
   assert.equal(prompts[0]!.includes("@"), false, "D1 移除 @ cwd 后缀");
 });
 
+test("P1T2: for loop is rejected as compound-command (no unknown noise, not opaque-command)", async () => {
+  const result = await evaluateBash("for f in a b c; do echo x; done");
+  assert.deepEqual({ kind: result.kind, code: result.kind === "block" ? result.code : null }, { kind: "block", code: "compound-command" });
+});
+
+test("P1T2: if/while compound regions are rejected as compound-command", async () => {
+  const r1 = await evaluateBash("if true; then ls; fi");
+  assert.deepEqual({ kind: r1.kind, code: r1.kind === "block" ? r1.code : null }, { kind: "block", code: "compound-command" });
+  const r2 = await evaluateBash("while true; do echo x; done");
+  assert.deepEqual({ kind: r2.kind, code: r2.kind === "block" ? r2.code : null }, { kind: "block", code: "compound-command" });
+});
+
+test("P1T2: malformed for stays unsafe-syntax (not compound)", async () => {
+  const result = await evaluateBash("for f in a; do echo x");
+  assert.deepEqual({ kind: result.kind, code: result.kind === "block" ? result.code : null }, { kind: "block", code: "unsafe-syntax" });
+});
+
 test("denies modify commands that target protected paths", async () => {
   const result = await evaluateBash("touch ~/.ssh/authorized_keys");
   assert.equal(result.kind, "block");
