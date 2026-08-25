@@ -191,7 +191,11 @@ export function compileShellDraft(input: ShellCompilerInput): CompilerDraftResul
   if (parsed.program.loopScopes.length > 0) {
     const pairs: ScopeWordValues[] = [];
     for (const scope of parsed.program.loopScopes) {
-      // 展开命令数预算是 verify 守卫（N×body > maxCommands → 拒）；长度/命令数在扁平管线显式检查
+      // 预算（H1）：展开命令数 = values×body 显式检查 → resource-limit（不落 compound-command 误导“拆解”）；
+      // 值集的另一重守卫在 verifyLoopScope（直接调用方的 `limits` 契约）
+      if (scope.words.length * scope.body.length > ANALYSIS_LIMITS.maxCommands) {
+        return reject("resource-limit", "reduced command count exceeds the analysis budget");
+      }
       const verified = verifyLoopScope(scope, { maxCommands: ANALYSIS_LIMITS.maxCommands });
       if (!verified) return reject("compound-command", "for", scope.headerSpan);
       pairs.push({ scope, values: verified.wordValues });

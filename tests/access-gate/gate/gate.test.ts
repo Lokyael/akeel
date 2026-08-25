@@ -319,6 +319,13 @@ test("P2T7: mixed modelable + unmodelable scope rejects whole command (no partia
   assert.deepEqual({ kind: result.kind, code: result.kind === "block" ? result.code : null }, { kind: "block", code: "compound-command" });
 });
 
+test("P2T7: oversized expansion is resource-limit (not misleading unroll guidance)", async () => {
+  // values×body > maxCommands(128)：诚实分类为分析预算超限，而非 compound-command 的“拆解”建议
+  const big = "for f in " + Array.from({ length: 200 }, (_, i) => `v${i}`).join(" ") + "; do echo \"$f\"; done";
+  const result = await evaluateBash(big);
+  assert.deepEqual({ kind: result.kind, code: result.kind === "block" ? result.code : null }, { kind: "block", code: "resource-limit" });
+});
+
 // ── Phase 2 / Task 8: 展示（expanded form + 原始 literal form + 去重） ──
 
 function homeAskProfile(): ResolvedProfile {

@@ -31,7 +31,10 @@ export interface ScopeWordValues {
   values: readonly string[];
 }
 
-/** 值转义（插入双引号区段内；转义后重 lex 即成字面）。 */
+/** 值转义（插入双引号区段内；转义后重 lex 即成字面）。
+ * 仅需转义 `"`/`$`/反引号/`\` 四类：双引号区内真实换行/回车是字面（lexer 引号内
+ * 不产分隔，值原样保留）——把 `\n`/`\r` 映射成反斜杠文本反而会改变词值，破坏判定==展开
+ * （计划 T1 的映射假设“自校验会拦”不成立：重 lex 成功但值已漂移）。 */
 function escapeValue(v: string): string {
   let out = "";
   for (const ch of v) {
@@ -40,9 +43,7 @@ function escapeValue(v: string): string {
       case "$": out += "\\$"; break;
       case "`": out += "\\`"; break;
       case "\\": out += "\\\\"; break;
-      case "\n": out += "\\n"; break;
-      case "\r": out += "\\r"; break;
-      default: out += ch;
+      default: out += ch; // \n/\r 等原样入双引号区段（字面保留）
     }
   }
   return out;

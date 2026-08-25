@@ -122,3 +122,12 @@ test("reduce: &> loop-level redirect is not modeled (null)", () => {
   const r = reduceToFlat("for f in a; do echo x; done &> out", [scope], [{ scope, values: ["a"] }]);
   assert.equal(r, null);
 });
+
+test("reduce: newline-containing value round-trips literally inside quotes (判定==展开)", () => {
+  // 双引号区段内真实换行是字面：值不映射成反斜杠文本，重 lex 后词值不变
+  const cmd = "for f in 'a\nb'; do touch \"$f\"; done";
+  const t = text(cmd);
+  assert.equal(t, "touch \"a\nb\"");
+  const { program } = parse(lex(t).tokens);
+  assert.deepEqual(program.commands[0]!.args.map((a) => a.value), ["a\nb"]);
+});
