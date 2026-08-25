@@ -66,16 +66,20 @@ export interface RegionResult {
   unsafeSyntax: string | null;
 }
 
-/** 重定向 kind 推断（与 parser 的 redirectKind 同规则的精简版；仅用于 region 内重定向采集）。 */
+/** 重定向 kind 推断（region 局部精简版，与 parser 的 redirectKind 有意不共享——扫描期无 fd 上下文）。
+ * 已知偏差：`&>` 标 stdoutAppend（parser 标 stdout——截断 vs 追加）。仅用于 heredoc/hereString
+ * 判定与目标静态检查；`&>`/`&>>` 由归约 remountRedirect 显式拒（reduce.ts），偏差行为被掩蔽，
+ * 但本表应与 parser 保持同侧（README：新增操作符双表同步）。 */
 function redirKindOf(op: string, target: string | null): RedirectionKind {
   if (op === "<") return "stdin";
-  if (op === "<>" || op === "<&" || op === ">&") {
+  if (op === "<>" || op === "<&" || op === ">&" ) {
     if (op !== "<>" && target === "-") return "fdClose";
     if (op !== "<>" && target !== null && ALL_DIGITS.test(target)) return "fdDuplicate";
   }
   if (op === ">" || op === ">|") return "stdout";
   if (op === ">>") return "stdoutAppend";
-  if (op === "&>" || op === "&>>") return "stdoutAppend";
+  if (op === "&>") return "stdout";
+  if (op === "&>>") return "stdoutAppend";
   if (op === "<<") return "heredoc";
   if (op === "<<<") return "hereString";
   return "stdout";

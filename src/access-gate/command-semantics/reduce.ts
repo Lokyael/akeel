@@ -110,6 +110,10 @@ export function reduceToFlat(
   scopeWordValues: readonly ScopeWordValues[],
 ): ReductionResult | null {
   if (scopes.length !== scopeWordValues.length) return null;
+  // 空 body scope（`for f in a; do ; done`）：直接 fail-closed null（生产路径由 verify 先拒；
+  // 此处为 API 级契约兜底——文档承诺不可建模输入返回 null 而非抛错）
+  if (scopes.some((s) => s.body.length === 0)) return null;
+  if (scopeWordValues.some((p) => p.values.length === 0)) return null;
 
   // 每个 scope 的实际文本区间 = header 起点（或更早的 pre-for 重定向）到 doneSpan.end
   const extents = scopes.map((s, i) => {

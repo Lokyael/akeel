@@ -99,6 +99,16 @@ test("verify: env-assignment VALUES with dynamic content are null (G10 env 面)"
   assert.deepEqual(values("for f in a; do FOO=x echo y; done"), ["a"]); // 字面 env 值放行
 });
 
+test("verify: compound/indirect loop-var assignment is null (f+= 族)", () => {
+  assert.equal(values("for f in a; do f+=x; echo \"$f\"; done"), null); // 复合赋值
+  assert.equal(values("for f in a; do printf -v f x; done"), null); // printf -v 赋值
+  assert.equal(values("for f in a; do let \"f=1\"; done"), null); // let 算数赋值
+  assert.equal(values("for f in a; do mapfile -t f < x; done"), null); // mapfile 读入
+  // 正向：printf 非 -v 用法、-v 其他变量、let/mapfile 不出现 → 可建模
+  assert.deepEqual(values("for f in a; do printf '%s' \"$f\"; done"), ["a"]);
+  assert.deepEqual(values("for f in a; do printf -v g x; echo \"$f\"; done"), ["a"]);
+});
+
 test("verify: loop-level | and & operators are null", () => {
   assert.equal(values("cat x | for f in a; do echo \"$f\"; done"), null);
   assert.equal(values("for f in a; do echo \"$f\"; done | cat"), null);

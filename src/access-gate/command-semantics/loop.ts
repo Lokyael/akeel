@@ -17,12 +17,14 @@ export interface VerifiedLoop {
 
 const EMPTY_ENV: ReadonlyMap<string, Binding> = new Map();
 
-/** 状态变异 / 早期退出 / cwd 变异内建（统一覆盖 builtin|command 前缀经 prefixedCommand 展开）。 */
+/** 状态变异 / 早期退出 / cwd 变异内建（统一覆盖 builtin|command 前缀经 prefixedCommand 展开）。
+ * 含赋值型内建（let/mapfile/readarray 只做赋值，可能重写循环变量；printf 的 `-v` 赋值单独检查）。 */
 const BODY_FORBIDDEN = new Set([
   "cd", "pushd", "popd",
   "eval", "source", ".", "exec", "export", "readonly", "declare", "typeset", "local",
   "unset", "read", "shift", "set", "trap", "alias", "unalias",
   "break", "continue", "exit", "return",
+  "let", "mapfile", "readarray",
 ]);
 
 const TILDE_SPECIAL = /^~[^/]/; // ~user / ~+ / ~-（未引用，bash 会展开为用户/目录 → 不建模）
@@ -47,6 +49,21 @@ function verifyBodyCommand(cmd: ShellCommandNode, loopVar: string, env: Readonly
     const eq = a.value.indexOf("=");
     const assignedVar = eq >= 0 ? a.value.slice(0, eq) : a.value;
     if (assignedVar === loopVar) return false;
+  }
+
+  // 复合赋值 `f+=x`：parser 的 ENV_ASSIGN 正则不认 `+`，落为 executable 而非 envAssignment——在此识别
+  if (name !== null) {
+    const plus = name.indexOf("+=");
+    if (plus > 0 && name.slice(0, plus) === loopVar) return false;
+    // printf -v <循环变量> 重写循环变量（-v 其他变量允许；printf 本身仍需 static 词检查）
+    if (name === "printf") {
+      const args = prefixed?.kind === "command" ? prefixed.args : cmd.args;
+      for (let i = 0; i < args.length; i++) {
+        const v = args[i]!.value;
+        if (v === "-v" && args[i + 1]?.value === loopVar) return false;
+        if (v.startsWith("-v") && v.length > 2 && v.slice(2) === loopVar) return false;
+      }
+    }
   }
 
   if (name !== null && BODY_FORBIDDEN.has(name)) return false;

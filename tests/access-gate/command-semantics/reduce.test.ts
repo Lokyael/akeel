@@ -123,6 +123,14 @@ test("reduce: &> loop-level redirect is not modeled (null)", () => {
   assert.equal(r, null);
 });
 
+test("reduce: empty-body scope fails closed with null (no throw)", () => {
+  const { program } = parse(lex("for f in a; do ; done").tokens);
+  const scope = program.loopScopes[0]! as LoopScope;
+  assert.equal(scope.body.length, 0);
+  const r = reduceToFlat("for f in a; do ; done", [scope], [{ scope, values: ["a"] }]);
+  assert.equal(r, null);
+});
+
 test("reduce: newline-containing value round-trips literally inside quotes (判定==展开)", () => {
   // 双引号区段内真实换行是字面：值不映射成反斜杠文本，重 lex 后词值不变
   const cmd = "for f in 'a\nb'; do touch \"$f\"; done";

@@ -27,7 +27,6 @@ export interface VarRef {
   inDoubleQuotes: boolean;
   /** `${f}` 花括号形态（决定 raw/value 长度）。 */
   brace: boolean;
-  escaped: boolean;
 }
 
 /**
@@ -88,7 +87,7 @@ function tryRef(raw: string, at: number, valuePos: number, inDoubleQuotes: boole
     let id = "";
     while (j < raw.length && /[A-Za-z0-9_]/.test(raw[j]!)) { id += raw[j]!; j++; }
     if (id && id[0] && /[A-Za-z_]/.test(id[0]!) && raw[j] === "}") {
-      return { refName: id, rawPos: at, valuePos, inDoubleQuotes, brace: true, escaped: false };
+      return { refName: id, rawPos: at, valuePos, inDoubleQuotes, brace: true };
     }
     return null; // ${f...} 修饰 / 空 / 非标识符
   }
@@ -96,7 +95,7 @@ function tryRef(raw: string, at: number, valuePos: number, inDoubleQuotes: boole
     let j = at + 1;
     let id = "";
     while (j < raw.length && /[A-Za-z0-9_]/.test(raw[j]!)) { id += raw[j]!; j++; }
-    return { refName: id, rawPos: at, valuePos, inDoubleQuotes, brace: false, escaped: false };
+    return { refName: id, rawPos: at, valuePos, inDoubleQuotes, brace: false };
   }
   return null;
 }

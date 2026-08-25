@@ -101,6 +101,7 @@ const ILLEGAL_COMPOUND: readonly string[] = [
   "for f in a; do echo \"$HOME\"; done", // 未绑定变量
   "for f in a; do cd /tmp; done", // cwd 变异
   "for f in a; do f=evil; echo x; done", // 循环变量重赋值
+  "for f in a; do f+=x; echo \"$f\"; done", // 复合赋值（parser 正则不认 +=，落为 executable → verify 识别）
   "for f in a; do g=evil; echo $g; done", // body 裸 $g（非循环变量也拒）
   "for f in a; do eval \"$f\"; done", // 变异内建
   "for f in a; do builtin eval \"$f\"; done", // builtin 前缀变异
