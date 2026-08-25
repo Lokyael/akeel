@@ -79,7 +79,7 @@
 - modify 命令的源路径按 `read` 检查，目标、删除和权限变化按 `write` 检查。
 - 无法确定分支 cwd 时不得 allow。
 - 一个 tool call 的所有 ask intent 聚合为一次审批。
-- 复杂形态可拒绝：无法精确建模的形态编译期拒绝并引导拆解（heredoc/hereString 已如此；`unsupported-redirection` + split-supported-commands guidance 让 AI 拆成可识别的简单形态或 Direct 工具）——“尽量识别，但不是必要项”；识别不足时拒绝优先于猜测建模（fail-closed），不再引入无法建模的中间状态，拒绝路径必须携带拆解 guidance。
+- 复杂形态可拒绝：无法精确建模的形态编译期拒绝并引导拆解（heredoc/hereString 已如此；`unsupported-redirection` + split-supported-commands guidance 让 AI 拆成可识别的简单形态或 Direct 工具）——“尽量识别，但不是必要项”；识别不足时拒绝优先于猜测建模（fail-closed），不再引入无法建模的中间状态，拒绝路径必须携带拆解 guidance。**例外：可静态归约的 `for` 循环建模（T-062 归约前端）**——`verifyLoopScope` strict 守卫（字面词表 + 双引号区内未修饰 `$f` 绑定、常量拼接；非循环变量引用/裸 `$f`/变异内建/早期退出/循环变量重赋值/loop 级 `|` 与 `&`/动态或 `~user` 词表/redirection 目标含 `$f` 或未静态/heredoc → 拒）→ `reduceToFlat` 以原始 raw 切片合成扁平文本（值经转义；loop 级截断类重定向首条 `>` 后续 `>>`；重定向 fd 前缀与引号原样；重 lex/parse 自校验失败 → fail-closed）→ 重喂既有管线（compileFlat）；归约构造等价即“判定==展开”——每条展开命令双坐标（`span` 归约坐标对账展示、`originalSpan` 原始坐标切 literal form），ask 附 `expanded form`。其余复合结构与不可静态求值的展开一律 `compound-command`（含嵌套 for、C 风格 `for ((…))`、body 含 if/while）。tilde 词级处理为单一来源（`expandTildeArg`：cd/重定向/归约词表；quoted 不展开），路径层 string-mode tilde 保持不变（既有文档化边界，扩张偏 deny、安全向无害）。
 - `<>`（O_RDWR 读写打开）按 write 侧建模（`<>`→stdout、`2<>`→stderr）：write 决策允许即覆盖读面（write⇒read 一致性，D-017），只建模 read 会漏写侧；自定义矛盾 profile 下 `<>` 的读侧行为不保证（配置责任）。Rejected：`readwrite` 独立 kind（+ read+write 双 intent / 编译期拒绝）——为“read-deny + write-allow”矛盾配置付建模成本职责外，且 verifier/coverage 对账需配套改动；write 建模已语义完整，拒绝引入不必要的可用性损失；profile 验证层强制 write⇒read（矛盾配置报错）与“不负责自定义 profile”裁定矛盾。
 
 **Enforcement scope:**
