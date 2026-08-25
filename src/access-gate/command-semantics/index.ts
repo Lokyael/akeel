@@ -4,8 +4,8 @@
 export { analyzeSemantics } from "./registry";
 export { analyzeCd, analyzeControlFlow, initialCwd } from "./control-flow";
 export type { CdInfo, ControlFlowAnalysis } from "./control-flow";
-export { denoteWord } from "./denote";
-export type { Binding, WordEvalResult } from "./denote";
+export { denoteWord, scanVarRefs } from "./denote";
+export type { Binding, WordEvalResult, VarRef } from "./denote";
 export { normalizeCommand } from "./normalize";
 export { LANGUAGE_RUNTIMES, HARD_RULE_INTERPRETERS } from "./interpreter-names";
 export { canonicalExecutableName } from "./naming";
