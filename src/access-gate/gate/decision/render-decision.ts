@@ -69,7 +69,16 @@ export function renderDecision(decision: GateDecision, rawCommand?: string): Gat
       const literal = literalForm(rawCommand, e.span);
       // ask 侧 command subject 已是类别-only（evaluate-request 按面构造），
       // 渲染器纯追加 literal form，不做格式手术。
-      return literal ? `${subject} — literal form: ${literal}` : subject;
+      let out = literal ? `${subject} — literal form: ${literal}` : subject;
+      // P2T8：归约路径展开文本（reductionText），截断上限 maxEvidenceSubjectLength
+      if (e.expandedText !== undefined) {
+        const ex = e.expandedText;
+        const rendered = ex.length <= ANALYSIS_LIMITS.maxEvidenceSubjectLength
+          ? ex
+          : ex.slice(0, ANALYSIS_LIMITS.maxEvidenceSubjectLength) + "… (truncated)";
+        out += ` — expanded form: ${rendered}`;
+      }
+      return out;
     });
     const reason = items.length < decision.evidence.length
       ? items.join("; ") + " and " + (decision.evidence.length - items.length) + " additional items"

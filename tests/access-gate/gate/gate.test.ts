@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { homedir } from "node:os";
 import { evaluateToolCall } from "../../../src/access-gate/gate";
 import type { GateRuntime } from "../../../src/access-gate/gate/host";
 import type { ResolvedProfile } from "../../../src/access-gate/profile/types";
@@ -316,6 +317,38 @@ test("P2T7: mixed modelable + unmodelable scope rejects whole command (no partia
   // 第二 loop 重赋值循环变量 b → verify null → 整条命令拒绝，不部分归约（S3）
   const result = await evaluateBash("for a in x; do touch \"$a\"; done; for b in y; do b=evil; echo x; done");
   assert.deepEqual({ kind: result.kind, code: result.kind === "block" ? result.code : null }, { kind: "block", code: "compound-command" });
+});
+
+// ── Phase 2 / Task 8: 展示（expanded form + 原始 literal form + 去重） ──
+
+function homeAskProfile(): ResolvedProfile {
+  return profile({
+    pathPolicy: {
+      default: { read: "deny", list: "deny", search: "deny", write: "deny" },
+      rules: [
+        { path: "project/**", read: "allow", list: "allow", search: "allow", write: "ask" },
+        { path: join(homedir(), "**"), read: "allow", list: "allow", search: "allow", write: "ask" },
+      ],
+    },
+  });
+}
+
+test("P2T8: modelable for shows absolute path evidence + expanded form + original literal", async () => {
+  const { runtime, prompts } = makeRuntime(["Allow once"]);
+  await evaluateTool("bash", { command: "for f in ~/a ~/b; do touch \"$f\"; done" }, runtime, { profile: homeAskProfile() });
+  const prompt = prompts[0]!;
+  assert.ok(prompt.includes(`write path: ${join(homedir(), "a")}, ${join(homedir(), "b")}`), "D1 绝对路径聚合");
+  assert.ok(prompt.includes(`expanded form: touch "${join(homedir(), "a")}"; touch "${join(homedir(), "b")}"`), "expanded form 展示归约展开段");
+  assert.ok(prompt.includes('literal form: touch "$f"'), "literal form 切原始命令（含 $f）");
+});
+
+test("P2T8: repeated identical loop commands dedup to one evidence item", async () => {
+  const { runtime, prompts } = makeRuntime(["Allow once"]);
+  await evaluateTool("bash", { command: "for f in a b c d e; do touch \"$f\"; done" }, runtime);
+  const prompt = prompts[0]!;
+  const modifyItems = prompt.match(/modify command/g)?.length ?? 0;
+  assert.equal(modifyItems, 1, "5 次相同 body 命令只留一条 command 证据");
+  assert.ok(prompt.includes("expanded form: touch \"a\"; touch \"b\"; touch \"c\"; touch \"d\"; touch \"e\""));
 });
 
 test("denies modify commands that target protected paths", async () => {
