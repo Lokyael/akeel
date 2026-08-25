@@ -107,9 +107,9 @@ function refLen(ref: VarRef): number {
 }
 
 /** 将 value 按 refs（按 valuePos 升序）切成常量段与变量段，做笛卡尔拼接。 */
-function expandValue(value: string, refs: VarRef[], bindings: string[][]): string[] {
+function expandValue(value: string, refs: VarRef[], bindings: readonly (readonly string[])[]): string[] {
   const sorted = [...refs].sort((a, b) => a.valuePos - b.valuePos);
-  const segments: { before: string; values: string[] }[] = [];
+  const segments: { before: string; values: readonly string[] }[] = [];
   let cursor = 0;
   for (let k = 0; k < sorted.length; k++) {
     const ref = sorted[k]!;
@@ -136,6 +136,9 @@ function expandValue(value: string, refs: VarRef[], bindings: string[][]): strin
  */
 export function denoteWord(arg: ShellArg, env: ReadonlyMap<string, Binding>): WordEvalResult {
   const { refs, residualDynamic } = scanVarRefs(arg.raw);
+  // G10：任一未引用 `$f`（含与合法引号 ref 混排，如 `x$f"$f"`）→ opaque——未引用态有
+  // 字段拆分/glob 分歧，必须由归约自校验兜底改成在守卫层就拒。
+  if (refs.some((r) => !r.inDoubleQuotes)) return { kind: "opaque" };
   const legal = refs.filter((r) => r.inDoubleQuotes);
   if (legal.length === 0) {
     if (arg.dynamic || residualDynamic) return { kind: "opaque" };
@@ -143,11 +146,11 @@ export function denoteWord(arg: ShellArg, env: ReadonlyMap<string, Binding>): Wo
   }
   if (arg.dynamic && residualDynamic) return { kind: "opaque" };
   // 每个 ref 解析绑定
-  const bindings: string[][] = [];
+  const bindings: (readonly string[])[] = [];
   for (const ref of legal) {
     const b = env.get(ref.refName);
     if (!b || b.kind !== "literals" || b.values.length === 0) return { kind: "opaque" };
-    bindings.push(b.values as string[]);
+    bindings.push(b.values);
   }
   const values = expandValue(arg.value, legal, bindings);
   return { kind: "static", values };

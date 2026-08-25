@@ -2,8 +2,8 @@
 // 归约前端核心：以原始命令文本的 raw 切片为基础合成扁平文本，重 lex/parse 自校验。
 // - 单次调用处理命令内全部可建模 scopes（一个 pass 模板实例化，无拼接，G1）
 // - 决不从解码值重序列化：body 命令直接取原 raw span 文本，引号/转义/空白不动
-// - 只在双引号区段内且非转义的 `$f` 替换点改写（scanVarRefs 单源，O2）；值经转义
-//   （`"`→`\"`、`$`→`\$`、反引号→`\``、`\`→`\\`、`\n`/`\r`→`\n`/`\r` 文本）
+// - 只在双引号区段内且非转义的 `$f` 替换点改写（scanVarRefs 单源，O2）；值转义后
+//   插入双引号区段（`"`→`\"`、`$`→`\$`、反引号→`\``、`\`→`\\`；换行/回车原样字面）
 // - loop 整体重定向重挂载：首条截断类原样、后续截断类改 `>>`（fd 前缀与 target 引号原样）
 // - 合成后立即重 lex/parse 自校验：解析失败/残余动态/带作用域 → null（fail-closed）
 
@@ -158,7 +158,7 @@ export function reduceToFlat(
       for (let mi = 0; mi < ext.scope.redirections.length; mi++) {
         const m = remountRedirect(rawCommand, ext.scope.redirections[mi]!, vi === 0);
         if (m === null) return null; // &>/&>> 双流等不建模 → fail-closed
-        mountText += (mountText === "" ? " " : " ") + m;
+        mountText += " " + m;
       }
       const iterText = bodyText + mountText;
       const segText = (vi > 0 ? "; " : "") + iterText;

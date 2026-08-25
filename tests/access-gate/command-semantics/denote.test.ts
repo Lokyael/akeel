@@ -132,3 +132,8 @@ test("denote: unquoted glob alongside quoted ref is opaque", () => {
   // "$f"* ：尾部未引用 `*` 是 glob → opaque（N3/G10）
   assert.equal(denoteWord(dq("$f*", '"$f"*'), fEnv).kind, "opaque");
 });
+
+test("denote: mixed unquoted + quoted ref is opaque (G10 at guard layer)", () => {
+  // x$f"$f"：未引用 $f 有字段拆分分歧；不洁混排不再放行为 static（原先仅靠归约自校验兜底）
+  assert.equal(denoteWord(dq("x$f$f", 'x$f"$f"'), fEnv).kind, "opaque");
+});

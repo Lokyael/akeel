@@ -3,8 +3,8 @@
 // body 命令唯一来源 = scope.body（R3，region pass 装配，防双源漂移）。
 // 守卫：词表静态 / 无循环变量重赋值 / 无状态变异内建 / 无早期退出 / 无循环级管道与重定向动态目标。
 
-import type { ShellCommandNode, ShellArg, ShellRedirectionNode, LoopScope } from "../shell-parse/types";
-import { denoteWord, scanVarRefs, type Binding } from "./denote";
+import type { ShellCommandNode, ShellArg, LoopScope } from "../shell-parse/types";
+import { denoteWord, type Binding } from "./denote";
 import { prefixedCommand } from "./prefix";
 
 export interface LoopLimits {
@@ -32,12 +32,6 @@ function isTildeSpecial(w: ShellArg): boolean {
   return !w.quoted && TILDE_SPECIAL.test(w.value);
 }
 
-/** loop 级重定向（pre-do + post-done）目标若引用循环变量 `$f` → 病态语义，拒（N2）。 */
-function redirectTargetHasLoopVar(redir: ShellRedirectionNode, loopVar: string): boolean {
-  if (!redir.target) return false;
-  return scanVarRefs(redir.target.raw).refs.some((r) => r.refName === loopVar);
-}
-
 /** 单条 body 命令守卫。env 绑定循环变量为词表字面值（供 `"$f"` 展开）。 */
 function verifyBodyCommand(cmd: ShellCommandNode, loopVar: string, env: ReadonlyMap<string, Binding>): boolean {
   // O3：wrapper 含 exec → 拒（exec 是 wrapper 成员，永不出现于 executable 位，按其名检查）
@@ -51,17 +45,17 @@ function verifyBodyCommand(cmd: ShellCommandNode, loopVar: string, env: Readonly
   // 循环变量重赋值（`f=evil`：executable 为 null 的 env 赋值命令；赋值词形如 `f=evil`）
   for (const a of cmd.envAssignments) {
     const eq = a.value.indexOf("=");
-    const name = eq >= 0 ? a.value.slice(0, eq) : a.value;
-    if (name === loopVar) return false;
+    const assignedVar = eq >= 0 ? a.value.slice(0, eq) : a.value;
+    if (assignedVar === loopVar) return false;
   }
 
   if (name !== null && BODY_FORBIDDEN.has(name)) return false;
 
-  // 词级静态检查：executable + args + wrapperPositionals + 本命令重定向目标
-  // 裸 `$f` / `$HOME` / 命令替换 / 未引用动态 → denoteWord opaque → 拒（G10）
+  // 词级静态检查：executable + args + wrapperPositionals + env 赋值值 + 本命令重定向目标
+  // 裸 `$f` / `$HOME` / 命令替换 / 未引用动态 / 未绑定 env 值 → denoteWord opaque → 拒（G10）
   const words: ShellArg[] = [];
   if (cmd.executable) words.push(cmd.executable);
-  words.push(...cmd.args, ...cmd.wrapperPositionals);
+  words.push(...cmd.args, ...cmd.wrapperPositionals, ...cmd.envAssignments);
   for (const r of cmd.redirections) {
     if (r.kind === "heredoc" || r.kind === "hereString") return false;
     if (r.target) words.push(r.target);
@@ -88,11 +82,10 @@ export function verifyLoopScope(scope: LoopScope, limits: LoopLimits): VerifiedL
   if (scope.opBefore === "|" || scope.opBefore === "&") return null;
   if (scope.trailingOperator === "|" || scope.trailingOperator === "&") return null;
 
-  // 循环级重定向：目标静态且不引用循环变量；heredoc/hereString → 干净拒
+  // 循环级重定向：目标须静态（EMPTY_ENV 下 `$f` 必 opaque → 覆盖 N2 病态语义；heredoc/hereString 干净拒）
   for (const redir of scope.redirections) {
     if (redir.kind === "heredoc" || redir.kind === "hereString") return null;
     if (!redir.target) continue;
-    if (redirectTargetHasLoopVar(redir, scope.variable.value)) return null;
     if (denoteWord(redir.target, EMPTY_ENV).kind !== "static") return null;
   }
 

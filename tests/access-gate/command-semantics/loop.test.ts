@@ -93,6 +93,12 @@ test("verify: body heredoc redirect is null, fdDuplicate is allowed", () => {
   assert.deepEqual(values("for f in a; do echo \"$f\" 2>&1; done"), ["a"]);
 });
 
+test("verify: env-assignment VALUES with dynamic content are null (G10 env 面)", () => {
+  assert.equal(values("for f in a; do FOO=$HOME touch x; done"), null);
+  assert.equal(values("for f in a; do FOO=$f echo x; done"), null); // 未引用 $f 不建模
+  assert.deepEqual(values("for f in a; do FOO=x echo y; done"), ["a"]); // 字面 env 值放行
+});
+
 test("verify: loop-level | and & operators are null", () => {
   assert.equal(values("cat x | for f in a; do echo \"$f\"; done"), null);
   assert.equal(values("for f in a; do echo \"$f\"; done | cat"), null);
