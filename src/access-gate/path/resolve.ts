@@ -1,6 +1,7 @@
 import { existsSync, realpathSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, isAbsolute, join, normalize, relative, resolve } from "node:path";
+import type { ShellArg } from "../shell-parse/types";
 
 type PathScope = "project" | "staging" | "external";
 
@@ -17,6 +18,18 @@ export interface ResolvedPath {
 
 function canonical(path: string): string {
   return realpathSync(path);
+}
+
+/**
+ * 唯一 tilde 词级归一源（T-062 A0-1）：quoted 或 raw 前导 `\~`（转义）→ 原样不展开；
+ * 仅未引用词首 `~` / `~/x` → homedir；其余（`~user`/`~+`/`~-`）原样。
+ * 消费方：cd 目标（control-flow）、重定向 target、归约引擎（Phase 2）——均持有 ShellArg（token 级）。
+ */
+export function expandTildeArg(arg: ShellArg): string {
+  if (arg.quoted || arg.raw.startsWith("\\~")) return arg.value;
+  if (arg.value === "~") return homedir();
+  if (arg.value.startsWith("~/")) return join(homedir(), arg.value.slice(2));
+  return arg.value;
 }
 
 function normalizeInput(input: string): string | null {

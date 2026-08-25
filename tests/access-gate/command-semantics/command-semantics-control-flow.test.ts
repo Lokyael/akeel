@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { mkdtempSync, mkdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
-import { tmpdir } from "node:os";
+import { tmpdir, homedir } from "node:os";
 import { lex } from "../../../src/access-gate/shell-parse/lexer";
 import { parse } from "../../../src/access-gate/shell-parse/parser";
 import { normalizeCommand } from "../../../src/access-gate/command-semantics/normalize";
@@ -203,13 +203,13 @@ test("control: cd to absolute path", () => {
   assert.equal(result.nodes[1]!.effectiveCwd.cwd, "/etc");
 });
 
-test("control: nested wrapper cd is tracked (D-037)", () => {
-  // 曾绕过：parser 把 env 放 executable 槽，cd 沉入 args，analyzeCd 不识别 → cwd 不追踪
+test("control: env-wrapped cd is NOT tracked (G8, T-062)", () => {
+  // G8 闭环：env 执行外层命令、无 cwd 变更；旧实现把 env cd 误追踪（现存下近似）
   const { program } = parse(lex("timeout 5 env cd subdir && cat file").tokens);
   const result = analyzeControlFlow(program, initialCwd("/project"));
   assert.equal(result.nodes.length, 2);
-  assert.equal(result.nodes[0]!.effectiveCwd.cwd, "/project/subdir");
-  assert.equal(result.nodes[1]!.effectiveCwd.cwd, "/project/subdir");
+  assert.equal(result.nodes[0]!.effectiveCwd.cwd, "/project");
+  assert.equal(result.nodes[1]!.effectiveCwd.cwd, "/project");
 });
 
 test("control: dynamic program is opaque", () => {
@@ -235,4 +235,62 @@ test("control: nohup wrapper preserves cwd", () => {
   const result = analyzeControlFlow(program, initialCwd("/project"));
   assert.equal(result.nodes.length, 1);
   assert.equal(result.nodes[0]!.effectiveCwd.cwd, "/project");
+});
+
+// ─── T-062 A0-1: tilde 词级 + cd 家族 + time/! 剥离 ───
+
+test("A0-1: cd ~/x resolves to home (tilde word-level)", () => {
+  const { program } = parse(lex("cd ~/sub; ls").tokens);
+  const result = analyzeControlFlow(program, initialCwd("/project"));
+  assert.equal(result.opaque, false);
+  assert.ok(cwdSet(result, 1).includes(join(homedir(), "sub")));
+});
+
+test("A0-1: quoted-tilde cd target is opaque (literal-tilde vs list-intent conflict)", () => {
+  const { program } = parse(lex("cd \"~/sub\"; ls").tokens);
+  const result = analyzeControlFlow(program, initialCwd("/project"));
+  assert.equal(result.opaque, true);
+});
+
+test("A0-1: command cd keeps cd tracking (regression)", () => {
+  const { program } = parse(lex("command cd /x; ls").tokens);
+  const result = analyzeControlFlow(program, initialCwd("/project"));
+  assert.equal(result.opaque, false);
+  assert.ok(cwdSet(result, 1).includes("/x"));
+});
+
+test("A0-1: builtin cd now tracks cwd (prefixedCommand)", () => {
+  const { program } = parse(lex("builtin cd /x; ls").tokens);
+  const result = analyzeControlFlow(program, initialCwd("/project"));
+  assert.equal(result.opaque, false);
+  assert.ok(cwdSet(result, 1).includes("/x"));
+});
+
+test("A0-1: env cd is NOT tracked (wrapper-masked cd, G8)", () => {
+  const { program } = parse(lex("env cd /tmp; ls").tokens);
+  const result = analyzeControlFlow(program, initialCwd("/project"));
+  assert.equal(result.opaque, false);
+  assert.ok(cwdSet(result, 1).includes("/project"));
+});
+
+test("A0-1: pushd/popd mark flow opaque (fail-closed)", () => {
+  const { program } = parse(lex("pushd /tmp; ls").tokens);
+  assert.equal(analyzeControlFlow(program, initialCwd("/project")).opaque, true);
+  const { program: p2 } = parse(lex("popd; ls").tokens);
+  assert.equal(analyzeControlFlow(p2, initialCwd("/project")).opaque, true);
+});
+
+test("A0-1: time/! simple-body prefixes are stripped by normalize (G7)", () => {
+  for (const cmd of ["time ls", "time -p ls", "! ls"]) {
+    const { program } = parse(lex(cmd).tokens);
+    const norm = normalizeCommand(program.commands[0]!);
+    assert.equal(norm.executable, "ls", cmd);
+  }
+});
+
+test("A0-1: command time / env time are NOT stripped (G7)", () => {
+  const { program } = parse(lex("command time ls").tokens);
+  assert.equal(normalizeCommand(program.commands[0]!).executable, "time");
+  const { program: p2 } = parse(lex("env time ls").tokens);
+  assert.equal(normalizeCommand(p2.commands[0]!).executable, "time");
 });

@@ -7,6 +7,8 @@ import { homedir } from "node:os";
 import { statSync } from "node:fs";
 import type { ShellProgram, ShellCommandNode } from "../shell-parse/types";
 import type { CwdCandidate, CwdState } from "./types";
+import { prefixedCommand } from "./prefix";
+import { expandTildeArg } from "../path";
 
 // ─── 初始状态 ───
 
@@ -28,29 +30,43 @@ export interface CdInfo {
 }
 
 /**
- * 提取 cd 的目标路径。
- * cd（无参数）→ ~
- * cd path → path（如果 path 不含变量/glob）
- * cd - / pushd / popd → opaque
+ * 提取 cd 的目标路径（T-062 A0-1 重构）。
+ * cd（无参数）→ homedir（展开值，与 list 意图同源）
+ * cd path → path 经 expandTildeArg 词级归一（quoted/转义不展开）；引号内 `~/x` 字面目标与
+ *   cd-list 意图（normalizeInput string-mode 重新展开）无法同源 → opaque（文档化边界）
+ * builtin cd / command cd → 经 prefixedCommand 追踪（command 为 wrapper、executable 已是 cd）
+ * env cd → 不追踪（G8：wrapper 包裹，无 cwd 变更）
+ * pushd / popd → opaque（既有 cwd 变异未追踪的下近似闭环，fail-closed）
  */
 export function analyzeCd(node: ShellCommandNode): CdInfo {
-  if (!node.executable || node.executable.value?.toLowerCase() !== "cd") {
+  // G8：env 包裹 → 不是 cd（env cd 由 env 执行、无 cwd 变更、无 list 意图）
+  if (node.wrapper.some((w) => w.value === "env")) {
     return { isCd: false, target: null, opaque: false };
   }
-  // cd 无参数 → ~
-  if (node.args.length === 0) {
-    return { isCd: true, target: "~", opaque: false };
-  }
-  // 多于一个参数 → opaque（cd 不允许多个参数，但 Shell 会忽略多余的）
-  // 保守处理：多个参数也 opaque
-  if (node.args.length > 1) {
+  const prefix = prefixedCommand(node);
+  if (prefix && prefix.kind === "opaque-options") {
     return { isCd: true, target: null, opaque: true };
   }
-  const arg = node.args[0]!;
+  const exe = prefix?.kind === "command" ? prefix.cmd : node.executable?.value?.toLowerCase();
+  const args = prefix?.kind === "command" ? prefix.args : node.args;
+  if (!exe) return { isCd: false, target: null, opaque: false };
+  if (exe !== "cd" && exe !== "pushd" && exe !== "popd") {
+    return { isCd: false, target: null, opaque: false };
+  }
+  // pushd/popd（或 cd 家族之外）→ cwd 变异未追踪 → 保守 opaque（fail-closed）
+  if (exe !== "cd") return { isCd: true, target: null, opaque: true };
+  // cd 无参数 → ~（展开为绝对 home，与 list 意图同源；resolveCdTarget 对绝对输入恒等）
+  if (args.length === 0) return { isCd: true, target: homedir(), opaque: false };
+  // 多于一个参数 → opaque（cd 不允许多个参数，但 Shell 会忽略多余的）
+  if (args.length > 1) return { isCd: true, target: null, opaque: true };
+  const arg = args[0]!;
   if (!arg.value || arg.dynamic || arg.value === "-") {
     return { isCd: true, target: null, opaque: true };
   }
-  return { isCd: true, target: arg.value, opaque: false };
+  // 引号内 tilde 字面目标（`cd "~/x"`）→ opaque（T-062 A0-1 文档化边界：
+  // cd 目标走字面、cd-list 意图却会被 normalizeInput string-mode 误展开 home，无法同源且不引入 PathIntent.quoted）
+  if (arg.quoted && arg.value.startsWith("~")) return { isCd: true, target: null, opaque: true };
+  return { isCd: true, target: expandTildeArg(arg), opaque: false };
 }
 
 function isDirectory(path: string): boolean {
