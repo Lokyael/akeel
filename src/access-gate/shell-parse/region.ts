@@ -332,10 +332,11 @@ function parseForHeader(g: RegionGroup, forTok: LexToken): { build: ScopeBuild; 
   // I1：pre-for 前导重定向（`>out for …`）
   collectRedirsFrom(tokens, 0, build.redirections);
   let i = forIdx + 1;
-  // for 后 pre-do 重定向（`for f in a > out; do`）
-  while (i < tokens.length && tokens[i]!.kind === "redirect") {
-    collectRedir(tokens, i, build);
-    i += tokens[i + 1]?.kind === "word" ? 2 : 1;
+  // for 后 pre-do 重定向（`for f in a > out; do`；fd 前缀一体折叠）
+  while (i < tokens.length) {
+    const next = collectRedirAt(tokens, i, build.redirections);
+    if (next === null) break;
+    i = next;
   }
   const varTok = tokens[i];
   if (!varTok || varTok.kind !== "word" || varTok.quoted || !/^[A-Za-z_][A-Za-z0-9_]*$/.test(varTok.value)) {
@@ -348,18 +349,16 @@ function parseForHeader(g: RegionGroup, forTok: LexToken): { build: ScopeBuild; 
     i++;
     const words: LexToken[] = [];
     while (i < tokens.length) {
+      const next = collectRedirAt(tokens, i, build.redirections); // pre-do 重定向（fd 前缀一体折叠）
+      if (next !== null) { i = next; continue; }
       const t = tokens[i]!;
       if (t.kind === "word") {
         if (!t.quoted && t.value === "do") break; // H2：未引用 do 终止词表
         words.push(t);
-      } else if (t.kind === "redirect") {
-        collectRedir(tokens, i, build); // pre-do 重定向
-        i += tokens[i + 1]?.kind === "word" ? 2 : 1;
+        i++;
         continue;
-      } else {
-        break;
       }
-      i++;
+      break;
     }
     build.words = words.map(wordArg);
   } else {
@@ -382,23 +381,22 @@ function parseForHeader(g: RegionGroup, forTok: LexToken): { build: ScopeBuild; 
   return { build, rest, hasDo: false };
 }
 
-function collectRedir(tokens: readonly LexToken[], i: number, body: ScopeBuild): void {
+/** 单点重定向采集（fd 数字前缀一体折叠，镜像 parser tryParseRedirect）；消费则返回下一索引，否则 null。 */
+function collectRedirAt(tokens: readonly LexToken[], i: number, into: ShellRedirectionNode[]): number | null {
   const t = tokens[i]!;
-  const target = tokens[i + 1]?.kind === "word" ? tokens[i + 1]! : null;
-  body.redirections.push({
-    kind: redirKindOf(t.value, target?.value ?? null),
-    fd: null,
-    target: target ? wordArg(target) : null,
-    span: { start: t.span.start, end: target ? target.span.end : t.span.end },
-  });
-}
-
-/** 从 from 起连续采集重定向（post-done 区等）。 */
-function collectRedirsFrom(tokens: readonly LexToken[], from: number, into: ShellRedirectionNode[]): void {
-  let i = from;
-  while (i < tokens.length) {
-    const t = tokens[i]!;
-    if (t.kind !== "redirect") break;
+  if (t.kind === "word" && ALL_DIGITS.test(t.value) && !t.quoted
+    && tokens[i + 1]?.kind === "redirect" && tokens[i + 1]!.span.start === t.span.end) {
+    const op = tokens[i + 1]!;
+    const target = tokens[i + 2]?.kind === "word" ? tokens[i + 2]! : null;
+    into.push({
+      kind: redirKindOf(op.value, target?.value ?? null),
+      fd: Number(t.value),
+      target: target ? wordArg(target) : null,
+      span: { start: t.span.start, end: target ? target.span.end : op.span.end },
+    });
+    return target ? i + 3 : i + 2;
+  }
+  if (t.kind === "redirect") {
     const target = tokens[i + 1]?.kind === "word" ? tokens[i + 1]! : null;
     into.push({
       kind: redirKindOf(t.value, target?.value ?? null),
@@ -406,6 +404,17 @@ function collectRedirsFrom(tokens: readonly LexToken[], from: number, into: Shel
       target: target ? wordArg(target) : null,
       span: { start: t.span.start, end: target ? target.span.end : t.span.end },
     });
-    i += target ? 2 : 1;
+    return target ? i + 2 : i + 1;
+  }
+  return null;
+}
+
+/** 从 from 起连续采集重定向（post-done / pre-for 区）。 */
+function collectRedirsFrom(tokens: readonly LexToken[], from: number, into: ShellRedirectionNode[]): void {
+  let i = from;
+  while (i < tokens.length) {
+    const next = collectRedirAt(tokens, i, into);
+    if (next === null) break;
+    i = next;
   }
 }
