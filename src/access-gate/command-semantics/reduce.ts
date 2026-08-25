@@ -19,7 +19,7 @@ export interface ReducedSegment {
   originalSpan: SourceSpan;
 }
 
-export interface ReductionResult {
+interface ReductionResult {
   text: string;
   segments: ReducedSegment[];
   /** 仅各 loop 展开段、多 scope 逐段 `;` 连接的拼接文本（Task 8 expanded form；非全文）。 */

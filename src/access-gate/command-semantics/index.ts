@@ -9,7 +9,7 @@ export type { Binding, WordEvalResult, VarRef } from "./denote";
 export { verifyLoopScope } from "./loop";
 export type { LoopLimits } from "./loop";
 export { reduceToFlat } from "./reduce";
-export type { ReductionResult, ReducedSegment, ScopeWordValues } from "./reduce";
+export type { ReducedSegment, ScopeWordValues } from "./reduce";
 export { normalizeCommand } from "./normalize";
 export { LANGUAGE_RUNTIMES, HARD_RULE_INTERPRETERS } from "./interpreter-names";
 export { canonicalExecutableName } from "./naming";

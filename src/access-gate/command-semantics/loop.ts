@@ -11,7 +11,7 @@ export interface LoopLimits {
   maxCommands: number;
 }
 
-export interface VerifiedLoop {
+interface VerifiedLoop {
   wordValues: string[];
 }
 
