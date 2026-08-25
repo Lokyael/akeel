@@ -37,11 +37,12 @@
 - **Trigger:** 未来 kernel 出现按 effect 决策的真实需求，或 plan 体积成为可测性能问题。
 - **Review On:** 2027-02-17
 
-## C-014: 控制流复合命令建模（for 循环的识别与可判定子集建模）
+## C-015: 复杂特性验证方法收敛（评审停用标准 + bash 差分语料仲裁）
 
-- **Created:** 2026-08-24
-- **Why Not Now:** 现状是 fail-closed 的正确分类，非安全缺陷。全字面可判定循环（如 `for f in a b c; do echo x; done`）被 parser 按 `;` 切分为三条独立命令，`for`/`do`/`done` 无 adapter → 归类 `unknown` → 按 `shellPolicy.unknown`=ask 聚合为一次审批，展示三个无意义的 `unknown command — literal form`（keyword 不可能是命令，批准无信息量）；而使用循环变量（`do echo $f`）的形态已被 lexer 的 dynamic 检测 hard deny，fail-closed 正确。一期只改 parser 保留字识别 + 新增 `compound-command` decision code + 专门 guidance（Level 1）不引入新安全语义，收益是修正错误分类与知情同意表述；二期（Level 2）对可判定子集真正建模（无 `$var` 使用、无动态/glob 词表、体内无 `cd`、非位置参数形态 → 等价于把 body 重复 N 次，gate 检查 intent 而非次数，判定与展开一致）。改动面涉及 parser 复合语法与可判定性证明，暂无用户摩擦的量化证据。
-- **Trigger:** 字面 for 循环（无动态 token、无 `$var` 使用、无体内 `cd`）在真实工作流中造成频繁或误导性审批；或用户明确提出希望在 gate 内支持此类循环（而不仅是拆分/Direct 工具规避）。
-- **Review On:** 2027-02-24
+- **Created:** 2026-08-25
+- **Why Not Now:** T-062（for 归约建模）纸面评审已历多轮且仍能发现新边角——bash 语义无穷、纸面阅读的边际发现率不归零；且归约产生的语法合法但语义偏离类问题（如双引号内 `\$` 误替换）**只有对照真 bash 才能仲裁**，纸面审查结构性盲区。议题内容为验证方法论候选，未与当前架构决策绑定，采用与否待用户在当前会话明确选择。
+- **Proposal:** ①评审停用标准——连续两轮无架构级/下近似级发现，且所有语义存疑均可落成语料用例，即停止纸面评审；②**bash oracle 差分语料**提升为独立仲裁任务（排 T-062 Task 6 归约器之后）：`(input → 期望归约文本 → 期望 gate 判定)` 语料表每条经真 bash 核过、单测锁表，dev 侧 bash -c 交叉核对；③**新守卫准入规则**——任何新守卫必须带一条语料条目才能进计划，防“纸面猜边角→加标记”的无限循环；④**垂直切片先行 + 架构冻结**——优先跑通 A0-1 + region pass + compound-command（风险最高新代码）并以差分测试收敛，剩余发现由测试驱动。
+- **Trigger:** 实施阶段出现"纸面评审未覆盖的语义分歧"实证，或用户决定启用差分语料仲裁。
+- **Review On:** 2027-02-25
 
-## C-015: 待创建
+## C-016: 待创建
