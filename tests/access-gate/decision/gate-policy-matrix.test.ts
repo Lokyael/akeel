@@ -59,7 +59,7 @@ test("hard-denies blocked paths before profile evaluation", () => {
   }
 });
 
-test("aggregates all path approval evidence into one ask", () => {
+test("aggregates all path approval evidence into one ask (D1 consolidated)", () => {
   const env = context();
   try {
     const request = complete(compileShellCall({ ...env, command: "echo data > first.txt > second.txt" }));
@@ -67,7 +67,9 @@ test("aggregates all path approval evidence into one ask", () => {
     assert.equal(decision.disposition, "ask");
     if (decision.disposition === "ask") {
       assert.equal(decision.code, "approval-required");
-      assert.equal(decision.approval.evidence.length >= 2, true);
+      // D1：同一 cwd 候选组的路径证据聚合为一条（绝对路径、distinct 去重）
+      const pathItem = decision.approval.evidence.find((e) => e.kind === "path");
+      assert.ok(pathItem && pathItem.subject.includes("first.txt") && pathItem.subject.includes("second.txt"));
     }
   } finally {
     env.cleanup();

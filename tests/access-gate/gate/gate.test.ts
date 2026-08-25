@@ -231,12 +231,21 @@ test("path deny reason names the operation without repeating the path", async ()
   assert.equal(result.reason.includes("~/.ssh"), false);
 });
 
-test("direct write ask keeps the full path for consent", async () => {
-  // Direct 工具无 literal form，ask 侧 path 证据必须保留完整路径供人类同意。
+test("direct write ask keeps the full path for consent (D1 absolute)", async () => {
+  // Direct 工具无 literal form，ask 侧 path 证据必须保留完整路径供人类同意（绝对路径聚合，D1）。
+  let root = "";
   const { runtime, prompts } = makeRuntime(["Allow once"]);
-  await evaluateTool("write", { path: "src/main.ts", content: "code" }, runtime);
+  await evaluateTool("write", { path: "src/main.ts", content: "code" }, runtime, { prepare: (r) => { root = r; } });
   assert.equal(prompts.length, 1);
-  assert.ok(prompts[0]!.includes("write path: src/main.ts"));
+  assert.ok(prompts[0]!.includes(`write path: ${join(root, "src/main.ts")}`));
+});
+
+test("ask: path evidence aggregates resolved absolute paths, deduped (D1)", async () => {
+  let root = "";
+  const { runtime, prompts } = makeRuntime(["Allow once"]);
+  await evaluateTool("bash", { command: "touch a b" }, runtime, { prepare: (r) => { root = r; } });
+  assert.ok(prompts[0]!.includes(`write path: ${join(root, "a")}, ${join(root, "b")}`));
+  assert.equal(prompts[0]!.includes("@"), false, "D1 移除 @ cwd 后缀");
 });
 
 test("denies modify commands that target protected paths", async () => {

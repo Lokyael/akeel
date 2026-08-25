@@ -1,7 +1,8 @@
 import { decidePath, resolvePath, PATH_DENY_REASONS, type PathDenyReason, type PathDecision } from "../../path";
 import type { ResolvedProfile } from "../../profile";
-import { hasPlanBrand, ANALYSIS_LIMITS, type CommandAccessOperation, type CompleteAccessPlan, type PathAccessOperation } from "../plan";
+import { hasPlanBrand, ANALYSIS_LIMITS, type CommandAccessOperation, type CompleteAccessPlan } from "../plan";
 import type { GateDecision, GateEvidence, HardDenyCode } from "../decision-types";
+import type { SourceSpan } from "../../shell-parse/types";
 import { hardDeny, profileDeny, requireApproval } from "./decision-builder";
 import { EFFECT_AXIS } from "../../domain";
 
@@ -44,23 +45,38 @@ export function evaluateRequest(
     }
   }
 
+  const pathAskGroups: Array<{ key: string; label: string; absolutes: Set<string>; span: SourceSpan }> = [];
+  const pathAskIndex = new Map<string, number>();
+
   for (const operation of plan.paths) {
     if (operation.source === "redirection" && operation.input === "/dev/null") continue;
     for (const candidate of operation.cwdCandidates) {
       const resolved = resolvePath(candidate.cwd, plan.projectRoot, plan.stagingDir, operation.input);
       const decision = decidePath(resolved, profile, operation.operation);
-      const evidence = [pathEvidence(operation, candidate.cwd)];
       if (decision.decision === "deny") {
         const code = pathDecisionCode(decision);
         // 模型侧 deny 只携带操作类型分类，不含原始路径——模型已持有命令（toolCall 参数），
         // 不重复具体路径信息（D-023）。ask 侧（pathEvidence）保留完整路径供人类同意。
         const denySubject = `${operation.operation} path denied`;
-        if (decision.hard) return hardDeny(code === "path-denied" ? "path-unclassifiable" : code, denySubject, evidence[0]!.span);
+        if (decision.hard) return hardDeny(code === "path-denied" ? "path-unclassifiable" : code, denySubject, operation.span);
         if (code === "path-denied" && !profileDenial) profileDenial = profileDeny(code, denySubject);
       } else if (decision.decision === "ask") {
-        asks.push(...evidence);
+        // D1：绝对路径聚合——逐 cwd 候选分组、distinct 去重；判定与展示同一 resolvePath 结果
+        const key = `${operation.operation}:${candidate.cwd}`;
+        let entry = pathAskGroups[pathAskIndex.get(key) ?? -1];
+        if (!entry) {
+          entry = { key, label: operation.operation, absolutes: new Set(), span: operation.span };
+          pathAskIndex.set(key, pathAskGroups.length);
+          pathAskGroups.push(entry);
+        }
+        entry.absolutes.add(resolved.absolute);
       }
     }
+  }
+  for (const group of pathAskGroups) {
+    const subject = `${group.label} path: ${[...group.absolutes].join(", ")}`
+      .slice(0, ANALYSIS_LIMITS.maxEvidenceSubjectLength);
+    asks.push({ kind: "path", subject, span: group.span });
   }
 
   if (profileDenial) return profileDenial;
@@ -93,8 +109,4 @@ function commandEvidence(operation: CommandAccessOperation, forAsk = false): Gat
       : `${operation.commandClass} command: ${operation.executable ?? "?"}`,
     span: operation.span,
   };
-}
-
-function pathEvidence(operation: PathAccessOperation, cwd: string): GateEvidence {
-  return { kind: "path", subject: `${operation.operation} path: ${operation.input} @ ${cwd}`.slice(0, ANALYSIS_LIMITS.maxEvidenceSubjectLength), span: operation.span };
 }
