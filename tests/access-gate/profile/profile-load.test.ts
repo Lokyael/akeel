@@ -36,7 +36,7 @@ test("global profiles override same-name built-ins and set the default", () => {
   }
 });
 
-test("only the global pi-keel/config.yaml is read; no project config exists", () => {
+test("loadProfiles reads only the global agentDir config; no project-level read path", () => {
   const agentDir = mkdtempSync(join(tmpdir(), "pi-access-agent-"));
   try {
     // 项目级配置不存在，且不受任何 cwd/projectRoot 影响：

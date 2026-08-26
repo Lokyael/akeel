@@ -40,7 +40,7 @@ export const EFFECT_SET: ReadonlySet<Effect> = new Set(EFFECT_VALUES);
 // 轴拆分：path（文件面）与 shell（解释执行面）。消费方（evaluate-request 的
 // Direct-only effect 检查）从这里查，不另建平行表。
 
-export const EFFECT_AXIS: Readonly<Record<Effect, "path" | "shell">> = {
+export const EFFECT_AXIS: Readonly<Record<Effect, EffectAxis>> = {
   read: "path",
   search: "path",
   write: "path",

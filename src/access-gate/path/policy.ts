@@ -41,10 +41,10 @@ function identityForms(path: ResolvedPath): string[] {
 
 // ─── 编译制品记忆化（C 编译边界落点 B：path 层 WeakMap，引用稳定则一次编译） ───
 // blocked 常量与 profile rules 数组在 session 内引用稳定 → 首次编译后全程命中；
-// WeakMap 随对象 GC 自动回收，无泄漏。resetPathPolicyCache 供测试（仿 config.resetConfig）。
+// WeakMap 随对象 GC 自动回收，无泄漏。
 
 const _blockedCompile = new WeakMap<readonly string[], readonly CompiledGlob[]>();
-let _rulesCompile = new WeakMap<readonly PathRule[], readonly CompiledRule[]>();
+const _rulesCompile = new WeakMap<readonly PathRule[], readonly CompiledRule[]>();
 
 function compileBlockedOnce(blockedPaths: readonly string[]): readonly CompiledGlob[] {
   let compiled = _blockedCompile.get(blockedPaths);
@@ -62,12 +62,6 @@ function compileRulesOnce(rules: readonly PathRule[]): readonly CompiledRule[] {
     _rulesCompile.set(rules, compiled);
   }
   return compiled;
-}
-
-/** 测试用：清空编译记忆化缓存（替换引用实现重置，仿 config.resetConfig）。 */
-export function resetPathPolicyCache(): void {
-  _blockedCompile.delete(DEFAULT_BLOCKED_PATHS as readonly string[]);
-  _rulesCompile = new WeakMap();
 }
 
 function blockedPattern(path: ResolvedPath, blockedPaths: readonly string[]): string | undefined {

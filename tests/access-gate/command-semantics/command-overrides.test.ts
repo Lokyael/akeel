@@ -262,7 +262,7 @@ test("aliases: 无 overrides 时不受影响", () => {
   assert.ok(sem.reason.includes("show working tree"));
 });
 
-test("only the global pi-keel/config.yaml is read; no project config exists", () => {
+test("no project config exists → command overrides fall back to builtin classification", () => {
   resetConfigCache();
   const { cleanup } = setupProject("");
   try {
