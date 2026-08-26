@@ -11,10 +11,10 @@ Write a handoff document summarising the current conversation so another agent c
 Include:
 - **Goal**: What we're trying to accomplish
 - **Current state**: Where we are in the process
-- **Decisions**: references only — link the relevant `D-xxx` entries in `docs/decisions.md` and Task Record sections. Never restate decision content: its single authoritative home is the container (per principles.md Project Records — Record Lifecycle). If a decision from this session is not yet recorded, record it first (domain-modeling) before handing off.
+- **Decisions**: references only — link the relevant `D-xxx` entries in `docs/decisions.md` and the relevant sections of the active Task Record. Never restate decision content: its single authoritative home is the container (per principles.md Project Records — Project Record Authority). If a decision from this session is not yet recorded, record it first (domain-modeling) before handing off.
 - **Files involved**: Paths to relevant files, `CONTEXT.md`, `docs/decisions.md`, or the active Task Record (`docs/task.md` or `docs/task-<topic>.md`)
 - **Next steps**: What to do next
-- **Suggested skills**: Which skills the next agent should invoke
+- **Suggested skills**: Which skills to recommend to the user for the next session
 
 ## What NOT to Include
 
