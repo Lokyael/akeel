@@ -37,6 +37,15 @@ test("profile guidance tells the agent to ask the user instead of self-serving",
   assert.equal(text.includes("Use an allowed Profile"), false);
 });
 
+test("profile guidance stops probing rather than routing around the block (D-053)", () => {
+  // 守卫句：禁止为同一操作换命令探测；不得退化为机制/家族描述（D-053 不描述机制）。
+  const text = guidanceText("profile-restriction");
+  assert.ok(text.includes("Do not probe alternative commands for this operation"));
+  assert.equal(text.includes("npm"), false);
+  assert.equal(text.includes("toolchain"), false);
+  assert.equal(text.includes("entry point"), false);
+});
+
 test("check-tool-input guidance covers both unknown tool and bad input", () => {
   const text = guidanceText("check-tool-input");
   assert.ok(text.includes("not supported"));

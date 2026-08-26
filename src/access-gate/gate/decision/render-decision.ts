@@ -133,7 +133,7 @@ export function renderDecision(decision: GateDecision, ctx?: DecisionRenderConte
   } else if (decision.enforcement === "profile") {
     reason = guidance.length > 0
       ? renderGuidance(guidance)
-      : "This request is not allowed by the active Profile. Ask the user to update the Profile.";
+      : "This request is not allowed by the active Profile. Ask the user to update the Profile. Do not probe alternative commands for this operation.";
   } else {
     reason = "The user denied this operation. It was not executed; wait for the user's next instruction.";
   }

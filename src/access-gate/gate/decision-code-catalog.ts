@@ -86,7 +86,7 @@ const GUIDANCE_TEXT: Readonly<Record<GuidanceId, string>> = {
   "literal-command-or-direct-tool": "Use a Direct read, grep, find, or ls tool, or a literal Shell command made only of known commands with supported options so the whole form is statically analyzable. Do not retry this Shell form unchanged.",
   "split-supported-commands": "Split the operation into separate commands joined by && or ;, one action per command, and avoid command substitution and complex redirection; when redirection is needed, use only simple forms such as >, >>, 2>, or < with a plain file path. For inspection, use Direct tools (read, grep, find, ls). Do not retry the same Shell form unchanged.",
   "check-tool-input": "The requested tool or its input is not supported. Use a known Direct tool (read, write, edit, find, grep, ls) or a literal Shell command; if you retry the same tool, correct its parameters to match the tool schema.",
-  "profile-restriction": "This operation is not allowed by the active Profile. You cannot change the Profile yourself; ask the user to update the Profile.",
+  "profile-restriction": "This operation is not allowed by the active Profile. You cannot change the Profile yourself; ask the user to update the Profile. Do not probe alternative commands for this operation.",
 };
 
 export function guidanceText(id: GuidanceId): string {
