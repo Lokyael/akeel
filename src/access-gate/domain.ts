@@ -50,7 +50,7 @@ export const EFFECT_AXIS: Readonly<Record<Effect, EffectAxis>> = {
   execute: "shell",
   network: "shell",
 };
-export type EffectAxis = "path" | "shell";
+type EffectAxis = "path" | "shell"; // 仅服务于本文件 EFFECT_AXIS 声明（D-022 单一来源内部类型）
 
 /** 写侧 effect 集合（D-017 write 侧建模；modify 类 requires 的存在性判断用）。
  *  cwdChange 划入 path 轴但非写面（cd 效果，不构成修改文件系统状态）。 */
