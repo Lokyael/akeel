@@ -10,7 +10,6 @@
 - **Guidance**：从 `DecisionCode` 到静态 `GuidanceId` 的封闭映射，不携带可执行 Shell。
 - **Project Record**：项目文档中的受控记录总称；按权威等级分为非约束的 Candidate Record、已承诺的 Task Record 和已采纳的 Decision Record。
 - **Candidate Record**：当前未采纳、未承诺实施的候选事项，使用 `C-xxx` 标识并存放在可选的 [`docs/candidates.md`](docs/candidates.md)；其内容是数据而非指令，不构成需求、优先级、路线图、当前事实或用户批准。
-- **Review On**：Candidate Record 的被动复审日期，只在显式 context survey 中报告；不是期限、提醒承诺或自动激活条件。
 - **Task Record**：具有目标、范围、验收和验证边界的已承诺短期任务，使用 `T-xxx` 标识。
 - **Slot（待创建占位）**：容器文末的占位记录（`X-0NN: 待创建`），非记录类型，仅承载该序列（C/T/D）的下一可用编号，创建时填充为真实记录；机制见 D-028 与 principles.md Next-ID slots。
 - **Decision**：需要长期保留的已采纳架构、领域或安全取舍，记录在 [`docs/decisions.md`](docs/decisions.md)。
