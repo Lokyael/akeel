@@ -358,6 +358,17 @@ test("P2T8: repeated identical loop commands dedup to one evidence item", async 
   assert.ok(prompt.includes("expanded form: touch \"a\"; touch \"b\"; touch \"c\"; touch \"d\"; touch \"e\""));
 });
 
+test("P2T8: distinct body commands do not collapse in dedup (命令级分组)", async () => {
+  // 多命令 body：touch "$f" 与 touch x 是两条不同命令（不同原始坐标），只能折叠迭代拷贝（2×2→2），不可并成一条
+  const { runtime, prompts } = makeRuntime(["Allow once"]);
+  await evaluateTool("bash", { command: "for f in a b; do touch \"$f\" && touch x; done" }, runtime);
+  const prompt = prompts[0]!;
+  assert.equal(prompt.match(/literal form:/g)?.length ?? 0, 2, "两条不同 body 命令各留一条证据");
+  assert.ok(prompt.includes('literal form: touch "$f"'), "首命令 literal 切命令级原始坐标");
+  assert.ok(prompt.includes("literal form: touch x"), "次命令 literal 切命令级原始坐标");
+  assert.ok(prompt.includes("expanded form: touch \"a\" && touch x; touch \"b\" && touch x"), "expanded form 全量展示");
+});
+
 test("denies modify commands that target protected paths", async () => {
   const result = await evaluateBash("touch ~/.ssh/authorized_keys");
   assert.equal(result.kind, "block");

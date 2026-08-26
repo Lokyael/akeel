@@ -79,7 +79,7 @@
 - modify 命令的源路径按 `read` 检查，目标、删除和权限变化按 `write` 检查。
 - 无法确定分支 cwd 时不得 allow。
 - 一个 tool call 的所有 ask intent 聚合为一次审批。
-- 复杂形态可拒绝：无法精确建模的形态编译期拒绝并引导拆解（heredoc/hereString 已如此；`unsupported-redirection` + split-supported-commands guidance 让 AI 拆成可识别的简单形态或 Direct 工具）——“尽量识别，但不是必要项”；识别不足时拒绝优先于猜测建模（fail-closed），不再引入无法建模的中间状态，拒绝路径必须携带拆解 guidance。**例外：可静态归约的 `for` 循环建模（T-062 归约前端）**——`verifyLoopScope` strict 守卫（字面词表 + 双引号区内未修饰 `$f` 绑定、常量拼接；非循环变量引用/裸 `$f`/变异内建/早期退出/循环变量重赋值/loop 级 `|` 与 `&`/动态或 `~user` 词表/redirection 目标含 `$f` 或未静态/heredoc → 拒）→ `reduceToFlat` 以原始 raw 切片合成扁平文本（值经转义；loop 级截断类重定向首条 `>` 后续 `>>`；重定向 fd 前缀与引号原样；重 lex/parse 自校验失败 → fail-closed）→ 重喂既有管线（compileFlat）；归约构造等价即“判定==展开”——每条展开命令双坐标（`span` 归约坐标对账展示、`originalSpan` 原始坐标切 literal form），ask 附 `expanded form`。其余复合结构与不可静态求值的展开一律 `compound-command`（含嵌套 for、C 风格 `for ((…))`、body 含 if/while）。tilde 词级处理为单一来源（`expandTildeArg`：cd/重定向/归约词表；quoted 不展开），路径层 string-mode tilde 保持不变（既有文档化边界，扩张偏 deny、安全向无害）。
+- 复杂形态可拒绝：无法精确建模的形态编译期拒绝并引导拆解（heredoc/hereString 已如此；`unsupported-redirection` + split-supported-commands guidance 让 AI 拆成可识别的简单形态或 Direct 工具）——“尽量识别，但不是必要项”；识别不足时拒绝优先于猜测建模（fail-closed），不再引入无法建模的中间状态，拒绝路径必须携带拆解 guidance。**例外：可静态归约的 `for` 循环建模（T-062 归约前端）**——`verifyLoopScope` strict 守卫（字面词表 + 双引号区内未修饰 `$f` 绑定、常量拼接；非循环变量引用/裸 `$f`/变异内建/早期退出/循环变量重赋值/loop 级 `|` 与 `&`/动态或 `~user` 词表/redirection 目标含 `$f` 或未静态/heredoc → 拒）→ `reduceToFlat` 以原始 raw 切片合成扁平文本（值经转义；loop 级截断类重定向首条 `>` 后续 `>>`；重定向 fd 前缀与引号原样；重 lex/parse 自校验失败 → fail-closed）→ 重喂既有管线（compileFlat）；归约构造等价即“判定==展开”——每条展开命令 `span` 为唯一归约坐标（对账与 kernel 证据共用）；原始坐标只存于 plan `expansion` 段数据（命令级），由渲染层映射（D-056），ask 附 `expanded form`。其余复合结构与不可静态求值的展开一律 `compound-command`（含嵌套 for、C 风格 `for ((…))`、body 含 if/while）。tilde 词级处理为单一来源（`expandTildeArg`：cd/重定向/归约词表；quoted 不展开），路径层 string-mode tilde 保持不变（既有文档化边界，扩张偏 deny、安全向无害）。
 - `<>`（O_RDWR 读写打开）按 write 侧建模（`<>`→stdout、`2<>`→stderr）：write 决策允许即覆盖读面（write⇒read 一致性，D-017），只建模 read 会漏写侧；自定义矛盾 profile 下 `<>` 的读侧行为不保证（配置责任）。Rejected：`readwrite` 独立 kind（+ read+write 双 intent / 编译期拒绝）——为“read-deny + write-allow”矛盾配置付建模成本职责外，且 verifier/coverage 对账需配套改动；write 建模已语义完整，拒绝引入不必要的可用性损失；profile 验证层强制 write⇒read（矛盾配置报错）与“不负责自定义 profile”裁定矛盾。
 
 **Enforcement scope:**
@@ -696,4 +696,25 @@
 
 **Out of Scope:** `--color[=WHEN]` 可选值形态（grep/rg 均，当前 opt 表无此表达力）；本机已安装 rg 二进制版本不在建模依赖内（安装副本在重装前仍按旧表拦截 `rg --version`，属分发产物待更新，非源模型的 gaps）。
 
-## D-056: 待创建
+## D-056: 归约展示视图：坐标职责与 renderer 归属
+
+**Status:** active
+**Reversal surface:** engineering
+
+**Decision:** 归约路径（T-062 for 建模）的展示职责全归渲染层。Policy Kernel（evaluate-request）证据坐标恒为归约坐标，不再持有原始坐标/去重/expanded form 知识（每条命令一证据）；plan 只携带纯数据 `expansion`（`{ segments: {kind: "verbatim"|"expanded", reduced, original}[], expandedText }`，命令级段 + verbatim 段线性位移由段自身差承载），经 seal clone + verifier 形状检查 + deepFreeze 三件套入场；渲染层新增 `gate/decision/expansion-view`（`mapOriginal` 段映射、`originalGroupKey` 去重组键）作为「归约坐标 → 原始坐标」唯一查询面；`renderDecision(decision, ctx?: {rawCommand?, expansion?})` 分组去重（迭代拷贝同 original 折叠、不同 body 命令不折叠）、literal form 按原始坐标切原文、expanded form 首条 command 证据后附加一次。删除三处散落载体：`operation.originalSpan?`（Path/Command 两操作类型，Path 侧本为写-only 死字段）、`plan.reductionText?`、`GateEvidence.expandedText?`。coverage/verifier 对账语义唯一化：`span` 恒为归约坐标，无第二坐标系。COMPILER_VERSION 不因字段增删 bump（verifier 是唯一形状门，无外部 plan 消费方）。
+
+**Why:** 双坐标契约以裸字段 + 每家消费者各自实现散落五层，且 expanded 段 original 为整 body 区间导致去重折叠不同命令（`do echo x && echo y` 并入一条）——根因是段粒度是「整 body 迭代」而非命令级；去重与 expanded 布点是纯展示关切（决策 per-plan，证据条数只影响提示文案），留在内核持续污染 D-022 分层纯度；方法对象进 plan 破坏「可信数据制品」形态（D-046：验证收敛 seal + brand 门，行为不可结构验证、不可版本化对齐）。展示逻辑作为决策视图，与 kernel 纯策略职责分离是本仓库分层原则的自然延伸而非新规。
+
+**Impact:** plan 场播加 `expansion` 字段（新形状，verifier/seal clone 同步）；kernel 减负（证据列表 = 每命令一条，展示折叠归渲染层）；`reduceToFlat` 段重塑为命令级（文本全等不变，corpus 锁死）；corpus/gate P2T8 断言不变（判定==展开文本同值），新增多命令 body 命令级分组测试锚与 expansion-view 单测；D-018 双坐标描述改口（span 唯一归约坐标，原始坐标居 plan.expansion，渲染层映射）；D-056 为离内核的展示层新增模块（`decision/expansion-view`）。
+
+**Rejected:**
+
+- **方法服务进 plan（V2a）**：行为无法被 verifier 形状验证、plan 失去值语义（序列化/版本化对齐），展示逻辑入编译器层；混合形态（数据在 plan、渲染边界构造服务）在单一消费方 + 行为量小前提下是过度抽象。
+- **kernel 侧去重（现状收拢版）**：展示知识留在决策内核，D-022 纯度不还原；整 body 粒度过粗的折叠缺陷无法根治。
+- **双坐标字段保留**：散落载体继续泄漏，Path 死字段留恒。
+- **verbatim 位移由命令记录推导**：骨架删除量（`for…; do`/`done` 删除 + 合成 `; `/重挂载）不在命令记录内，推导不成立——展段/verbatim 段结构必须由段数据整体承载。
+- **编译期命令级细化（C3b）**：坐标解释出现第二处（合成器 + 编译器各一半），序不变量隐式扩散到解释器，违背单源原则。
+
+**Out of Scope:** expandedText 为 reductionText 同值改名（无语义变化）；非归约路径去重行为（span 天然互异，渲染层分组恒直通）；结构化审批 UI 等第二展示消费方出现时把 expansion-view 查询提为共享模块/服务对象的触发路径（届时本决策据 D-047 engineering 面正式 supersede）。
+
+## D-057: 待创建

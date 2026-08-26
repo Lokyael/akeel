@@ -19,6 +19,7 @@ import type {
   AccessOperation,
   AccessPlanDraft,
   CompleteAccessPlan,
+  ExpansionData,
 } from "./access-request-types";
 
 type ToolCompilerInput = CompilerContext & {
@@ -104,7 +105,7 @@ function sealPlan(draft: AccessPlanDraft): CompleteAccessPlan {
       cwdCandidateCount: draft.coverage.cwdCandidateCount,
     },
     compilerVersion: COMPILER_VERSION,
-    ...(draft.reductionText !== undefined ? { reductionText: draft.reductionText } : {}),
+    ...(draft.expansion !== undefined ? { expansion: cloneExpansion(draft.expansion) } : {}),
   });
   ISSUED_PLANS.add(plan);
   return plan as CompleteAccessPlan;
@@ -112,6 +113,13 @@ function sealPlan(draft: AccessPlanDraft): CompleteAccessPlan {
 
 function cloneSpan(span: { readonly start: number; readonly end: number }): { start: number; end: number } {
   return { start: span.start, end: span.end };
+}
+
+function cloneExpansion(expansion: ExpansionData): ExpansionData {
+  return {
+    expandedText: expansion.expandedText,
+    segments: expansion.segments.map((s) => ({ kind: s.kind, reduced: cloneSpan(s.reduced), original: cloneSpan(s.original) })),
+  };
 }
 
 function cloneCandidate(candidate: CwdCandidate): CwdCandidate {
@@ -124,14 +132,12 @@ function cloneOperation(operation: AccessOperation): AccessOperation {
       ...operation,
       cwdCandidates: operation.cwdCandidates.map(cloneCandidate),
       span: cloneSpan(operation.span),
-      ...(operation.originalSpan !== undefined ? { originalSpan: cloneSpan(operation.originalSpan) } : {}),
     };
   }
   return {
     ...operation,
     effects: [...operation.effects],
     span: cloneSpan(operation.span),
-    ...(operation.originalSpan !== undefined ? { originalSpan: cloneSpan(operation.originalSpan) } : {}),
   };
 }
 

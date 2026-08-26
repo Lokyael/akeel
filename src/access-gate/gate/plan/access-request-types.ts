@@ -30,8 +30,6 @@ export interface PathAccessOperation {
   readonly source: PathSource;
   readonly confidence: "exact" | "conservative";
   readonly span: SourceSpan;
-  /** 归约路径：原始命令坐标（Task 8 展示用；coverage 对账仍用 span——归约坐标）。 */
-  readonly originalSpan?: SourceSpan;
 }
 
 export interface CommandAccessOperation {
@@ -41,8 +39,6 @@ export interface CommandAccessOperation {
   readonly executable: string | null;
   readonly effects: readonly Effect[];
   readonly span: SourceSpan;
-  /** 归约路径：原始命令坐标（Task 8 展示用；coverage 对账仍用 span——归约坐标）。 */
-  readonly originalSpan?: SourceSpan;
 }
 
 // EffectAccessOperation 已删除：effect 只以 command.effects 承载，
@@ -77,8 +73,8 @@ export interface CompleteAccessPlan {
   readonly coverage: PlanCoverage;
   readonly resourceUsage: ResourceUsage;
   readonly compilerVersion: string;
-  /** 归约路径：仅各 loop 展开段、多 scope 逐段 `;` 连接的拼接文本（Task 8 expanded form 展示；非全文）。 */
-  readonly reductionText?: string;
+  /** 归约路径：坐标/展示数据（D-056）；仅 shell 归约路径存在，kernel 不消费。 */
+  readonly expansion?: ExpansionData;
 }
 
 export interface AccessPlanDraft {
@@ -89,7 +85,24 @@ export interface AccessPlanDraft {
   readonly cwdCandidates: readonly CwdCandidate[];
   readonly coverage: PlanCoverage;
   readonly inputLength: number;
-  readonly reductionText?: string;
+  readonly expansion?: ExpansionData;
+}
+
+// ── 归约展示数据（D-056）──
+// plan 场播的纯数据坐标，kernel 不消费；渲染层（gate/decision/expansion-view）查询映射。
+// - segments 按归约序铺满文本：expanded 段命令级（迭代拷贝同 original → 渲染去重组键）、
+//   verbatim 段线性位移（每段内 offset 恒定，骨架删除量自动吸收）；
+// - expandedText：仅各 loop 展开段、多 scope 逐段 `;` 连接的拼接文本（expanded form 展示；非全文）。
+
+export interface ExpansionSegment {
+  readonly kind: "verbatim" | "expanded";
+  readonly reduced: SourceSpan;
+  readonly original: SourceSpan;
+}
+
+export interface ExpansionData {
+  readonly segments: readonly ExpansionSegment[];
+  readonly expandedText: string;
 }
 
 export type CompilerDecisionCode = Exclude<DecisionCode, "path-denied" | "shell-policy-denied" | "approval-required" | "user-denied">;

@@ -27,4 +27,6 @@ export type {
   CompilerContext,
   ShellCompilerInput,
   DirectToolCompilerInput,
+  ExpansionData,
+  ExpansionSegment,
 } from "./access-request-types";

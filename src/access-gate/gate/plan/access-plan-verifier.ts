@@ -3,6 +3,8 @@ import type { SourceSpan } from "../../shell-parse";
 import type {
   AccessOperation,
   CompleteAccessPlan,
+  ExpansionData,
+  ExpansionSegment,
 } from "./access-request-types";
 import {
   ANALYSIS_LIMITS,
@@ -74,7 +76,21 @@ export function validateCompleteAccessPlan(
     && value.cwdCandidates.every((candidate, index) => isSameCandidate(candidate, uniquePathCandidates[index]))
     && coverage.commandSpans.every(isSourceSpan)
     && coverage.redirectionSpans.every(isSourceSpan)
-    && (value.reductionText === undefined || typeof value.reductionText === "string");
+    && (value.expansion === undefined || isExpansionData(value.expansion));
+}
+
+function isExpansionData(value: unknown): value is ExpansionData {
+  return isRecord(value)
+    && Array.isArray(value.segments)
+    && value.segments.every(isExpansionSegment)
+    && typeof value.expandedText === "string";
+}
+
+function isExpansionSegment(value: unknown): value is ExpansionSegment {
+  return isRecord(value)
+    && (value.kind === "verbatim" || value.kind === "expanded")
+    && isSourceSpan(value.reduced)
+    && isSourceSpan(value.original);
 }
 
 function isNonNegativeInteger(value: unknown): value is number {
@@ -119,7 +135,6 @@ function isCwdCandidate(value: unknown): value is CwdCandidate {
 
 function isValidOperation(value: unknown): value is AccessOperation {
   if (!isRecord(value) || !isSourceSpan(value.span)) return false;
-  if (value.originalSpan !== undefined && !isSourceSpan(value.originalSpan)) return false;
   if (value.kind === "path") {
     return typeof value.input === "string"
       && value.input.length <= ANALYSIS_LIMITS.maxArgumentLength

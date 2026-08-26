@@ -3,8 +3,8 @@ import { normalizeCommand } from "../../command-semantics";
 import { analyzeSemantics } from "../../command-semantics";
 import { lex } from "../../shell-parse";
 import { parse } from "../../shell-parse";
-import type { CwdCandidate } from "../../command-semantics";
-import type { ScopeWordValues, ReducedSegment } from "../../command-semantics";
+import type { CwdCandidate, ScopeWordValues } from "../../command-semantics";
+import type { ExpansionData } from "./access-request-types";
 import type { ShellRedirectionNode, SourceSpan } from "../../shell-parse";
 import { runPreflight } from "./preflight";
 import {
@@ -49,30 +49,15 @@ function redirectionOperation(
   }
 }
 
-/** 归约坐标 → 原始坐标：按命令起点定位所在 segment（verbatim 线性偏移、expanded 取 body 原始 span）。 */
-function originalSpanFor(segments: readonly ReducedSegment[], span: SourceSpan): SourceSpan {
-  for (const seg of segments) {
-    if (span.start >= seg.spanInReduced.start && span.start < seg.spanInReduced.end) {
-      if (seg.kind === "verbatim") {
-        const off = seg.originalSpan.start - seg.spanInReduced.start;
-        return { start: span.start + off, end: span.end + off };
-      }
-      return seg.originalSpan;
-    }
-  }
-  return span;
-}
-
 /**
  * 扁平命令管线（lex→parse→preflight→dynamic→control-flow→逐条编译）。
- * 归约路径（segments 提供）为每条 operation 装配 originalSpan（原始坐标），
- * coverage/verifier 对账仍用 span（归约坐标）。
+ * 归约路径在 plan 上携带 expansion（D-056）；coverage/verifier 对账用 span（归约坐标），
+ * 不再做任何坐标系映射（映射职责在渲染层 decision/expansion-view）。
  */
 function compileFlatPipeline(
   command: string,
   input: ShellCompilerInput,
-  segments?: readonly ReducedSegment[],
-  reductionText?: string,
+  expansion?: ExpansionData,
 ): CompilerDraftResult {
   const lexResult = lex(command);
   if (lexResult.unsafeSyntax) return reject("unsafe-syntax", lexResult.unsafeSyntax);
@@ -95,8 +80,6 @@ function compileFlatPipeline(
   const flow = analyzeControlFlow(parsed.program, initialCwd(input.cwd));
   if (flow.opaque) return reject("opaque-command", "opaque control flow");
 
-  const mapOriginal = (span: SourceSpan): SourceSpan => (segments ? originalSpanFor(segments, span) : span);
-
   const operations: AccessOperation[] = [];
   const commandSpans: SourceSpan[] = [];
   const redirectionSpans: SourceSpan[] = [];
@@ -104,12 +87,12 @@ function compileFlatPipeline(
   for (const flowNode of flow.nodes) {
     const normalized = normalizeCommand(flowNode.node);
     const semantics = analyzeSemantics(normalized.command);
-    if (semantics.opaque) return reject("opaque-command", normalized.executable ?? "unknown command", mapOriginal(flowNode.node.span));
-    if (semantics.commandClass === "destroy") return reject("destroy-command", normalized.executable ?? "destroy command", mapOriginal(flowNode.node.span));
+    if (semantics.opaque) return reject("opaque-command", normalized.executable ?? "unknown command", flowNode.node.span);
+    if (semantics.commandClass === "destroy") return reject("destroy-command", normalized.executable ?? "destroy command", flowNode.node.span);
 
     commandSpans.push(flowNode.node.span);
     const cdInfo = analyzeCd(flowNode.node);
-    if (cdInfo.opaque) return reject("uncertain-cwd", "cd target cannot be classified", mapOriginal(flowNode.node.span));
+    if (cdInfo.opaque) return reject("uncertain-cwd", "cd target cannot be classified", flowNode.node.span);
     // isCd 由 analyzeCd 单点判定，消除二次 executable === "cd" 判断
     const isCd = cdInfo.isCd;
     const effects = isCd
@@ -117,7 +100,6 @@ function compileFlatPipeline(
       : effectsFor(semantics.commandClass, semantics.effects, semantics.intents, flowNode.node.redirections.length > 0);
     const invalidEffect = validateEffects(effects, flowNode.node.span);
     if (invalidEffect) return invalidEffect;
-    const commandOriginalSpan = mapOriginal(flowNode.node.span);
     operations.push({
       kind: "command",
       origin: "shell",
@@ -125,13 +107,11 @@ function compileFlatPipeline(
       executable: normalized.executable,
       effects,
       span: flowNode.node.span,
-      ...(segments ? { originalSpan: commandOriginalSpan } : {}),
     });
 
     if (cdInfo.target) {
       operations.push({
         ...pathOperation("list", cdInfo.target, flowNode.cwdBefore, "cwd", "exact", flowNode.node.span),
-        ...(segments ? { originalSpan: commandOriginalSpan } : {}),
       });
     }
 
@@ -143,19 +123,13 @@ function compileFlatPipeline(
       redirectionSpans.push(redirection.span);
     }
     for (const intent of semantics.intents) {
-      operations.push({
-        ...pathOperation(intent.operation, intent.rawPath, flowNode.effectiveCwd, intent.source, intent.confidence, intent.span),
-        ...(segments ? { originalSpan: mapOriginal(intent.span) } : {}),
-      });
+      operations.push(pathOperation(intent.operation, intent.rawPath, flowNode.effectiveCwd, intent.source, intent.confidence, intent.span));
     }
     // Conservative fallback: modify-class commands with no explicit paths
     // or redirections get a synthetic write intent on cwd.  Direct tools do not
     // need this fallback because every Direct surface always carries a path arg.
     if (semantics.commandClass === "modify" && semantics.intents.length === 0 && flowNode.node.redirections.length === 0) {
-      operations.push({
-        ...pathOperation("write", ".", flowNode.effectiveCwd, "cwd", "conservative", flowNode.node.span),
-        ...(segments ? { originalSpan: commandOriginalSpan } : {}),
-      });
+      operations.push(pathOperation("write", ".", flowNode.effectiveCwd, "cwd", "conservative", flowNode.node.span));
     }
   }
 
@@ -167,8 +141,8 @@ function compileFlatPipeline(
     pathOperationCount: operations.filter((operation) => operation.kind === "path").length,
     cwdCandidateCount: cwdCandidates.length,
   }, command.length, { projectRoot: input.projectRoot, stagingDir: input.stagingDir });
-  if (draft.kind === "reject" || reductionText === undefined) return draft;
-  return { kind: "draft", draft: { ...draft.draft, reductionText } };
+  if (draft.kind === "reject" || expansion === undefined) return draft;
+  return { kind: "draft", draft: { ...draft.draft, expansion } };
 }
 
 export function compileShellDraft(input: ShellCompilerInput): CompilerDraftResult {
@@ -204,7 +178,12 @@ export function compileShellDraft(input: ShellCompilerInput): CompilerDraftResul
     const reduced = reduceToFlat(command, parsed.program.loopScopes, pairs);
     if (!reduced) return reject("compound-command", "for", parsed.program.loopScopes[0]!.headerSpan);
     if (reduced.text.length > ANALYSIS_LIMITS.maxInputLength) return reject("resource-limit", "reduced command exceeds the analysis budget");
-    return compileFlatPipeline(reduced.text, input, reduced.segments, reduced.reductionText);
+    // plan 场播纯数据（D-056）：命令级段坐标 + 展开文本；坐标映射职责在渲染层
+    const expansion: ExpansionData = {
+      segments: reduced.segments.map((s) => ({ kind: s.kind, reduced: s.spanInReduced, original: s.originalSpan })),
+      expandedText: reduced.expandedText,
+    };
+    return compileFlatPipeline(reduced.text, input, expansion);
   }
 
   return compileFlatPipeline(command, input);

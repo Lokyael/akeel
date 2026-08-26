@@ -1,6 +1,7 @@
 import { denyResponseKindFor, guidanceFor, guidanceText } from "../decision-code-catalog";
-import { ANALYSIS_LIMITS, type CompileResult } from "../plan";
-import type { GateDecision, Guidance } from "../decision-types";
+import { ANALYSIS_LIMITS, type CompileResult, type ExpansionData } from "../plan";
+import { mapOriginal, originalGroupKey } from "./expansion-view";
+import type { GateDecision, GateEvidence, Guidance } from "../decision-types";
 import type { GateResult } from "../host";
 import type { SourceSpan } from "../../shell-parse";
 
@@ -59,30 +60,55 @@ function literalForm(rawCommand: string | undefined, span: SourceSpan): string |
   return sliced.slice(0, ANALYSIS_LIMITS.maxEvidenceSubjectLength) + "… (truncated)";
 }
 
-export function renderDecision(decision: GateDecision, rawCommand?: string): GateResult {
+/** 决策渲染上下文（D-056）：rawCommand + 归约展示数据；拒绝路径无 expansion 概念。 */
+export interface DecisionRenderContext {
+  readonly rawCommand?: string;
+  readonly expansion?: ExpansionData;
+}
+
+export function renderDecision(decision: GateDecision, ctx?: DecisionRenderContext): GateResult {
   if (decision.disposition === "allow") return { kind: "allow" };
 
   if (decision.disposition === "ask") {
-    const items = decision.evidence.slice(0, MAX_EVIDENCE_ITEMS).map((e) => {
+    const rawCommand = ctx?.rawCommand;
+    const expansion = ctx?.expansion;
+    // 去重（D-056）：command 证据按原始坐标分组（归约迭代拷贝同键 → 只留一条），
+    // 防 "and N additional items" 爆量；path 等其他证据直通。kernel 不持有该展示知识。
+    const grouped: GateEvidence[] = [];
+    const groupIndex = new Map<string, number>();
+    for (const e of decision.evidence) {
+      if (e.kind === "command" && e.span && expansion) {
+        const key = originalGroupKey(expansion, e.span);
+        if (groupIndex.has(key)) continue;
+        groupIndex.set(key, grouped.length);
+      }
+      grouped.push(e);
+    }
+    const rendered = grouped.slice(0, MAX_EVIDENCE_ITEMS).map((e) => {
       const subject = e.subject.slice(0, ANALYSIS_LIMITS.maxEvidenceSubjectLength);
       if (e.kind !== "command" || !e.span) return subject;
-      const literal = literalForm(rawCommand, e.span);
+      // literal 用原始坐标切原文（非归约路径原样；归约路径经 expansion 映射）
+      const literalSpan = expansion ? mapOriginal(expansion, e.span) : e.span;
+      const literal = literalForm(rawCommand, literalSpan);
       // ask 侧 command subject 已是类别-only（evaluate-request 按面构造），
       // 渲染器纯追加 literal form，不做格式手术。
-      let out = literal ? `${subject} — literal form: ${literal}` : subject;
-      // P2T8：归约路径展开文本（reductionText），截断上限 maxEvidenceSubjectLength
-      if (e.expandedText !== undefined) {
-        const ex = e.expandedText;
-        const rendered = ex.length <= ANALYSIS_LIMITS.maxEvidenceSubjectLength
+      return literal ? `${subject} — literal form: ${literal}` : subject;
+    });
+    // P2T8：归约路径 expanded form 在首条 command 证据后追加一次（截断上限 maxEvidenceSubjectLength）
+    if (expansion) {
+      const firstCommand = rendered.findIndex((_item, index) => grouped[index]?.kind === "command");
+      if (firstCommand >= 0) {
+        const ex = expansion.expandedText;
+        const shown = ex.length <= ANALYSIS_LIMITS.maxEvidenceSubjectLength
           ? ex
           : ex.slice(0, ANALYSIS_LIMITS.maxEvidenceSubjectLength) + "… (truncated)";
-        out += ` — expanded form: ${rendered}`;
+        rendered[firstCommand] += ` — expanded form: ${shown}`;
       }
-      return out;
-    });
-    const reason = items.length < decision.evidence.length
-      ? items.join("; ") + " and " + (decision.evidence.length - items.length) + " additional items"
-      : items.join("; ");
+    }
+    const total = grouped.length;
+    const reason = rendered.length < total
+      ? rendered.join("; ") + " and " + (total - rendered.length) + " additional items"
+      : rendered.join("; ");
     return { kind: "block", reason: reason.slice(0, MAX_RENDERED_REASON), code: decision.code };
   }
 

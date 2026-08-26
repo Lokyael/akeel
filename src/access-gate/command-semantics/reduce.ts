@@ -22,8 +22,8 @@ export interface ReducedSegment {
 interface ReductionResult {
   text: string;
   segments: ReducedSegment[];
-  /** 仅各 loop 展开段、多 scope 逐段 `;` 连接的拼接文本（Task 8 expanded form；非全文）。 */
-  reductionText: string;
+  /** 仅各 loop 展开段、多 scope 逐段 `;` 连接的拼接文本（expanded form 展示；非全文）。 */
+  expandedText: string;
 }
 
 export interface ScopeWordValues {
@@ -65,43 +65,65 @@ function remountRedirect(rawCommand: string, redir: ShellRedirectionNode, isFirs
   return slice; // `>>`/`<`/`<>`/fd 复制 原样不变
 }
 
-/** 一条 body 命令的双引号 `$f` 替换点（绝对坐标）。 */
-function collectRefs(body: readonly ShellCommandNode[], loopVar: string): { pos: number; len: number }[] {
+/** 单条 body 命令的双引号 `$f` 替换点（绝对坐标）。 */
+function collectRefs(cmd: ShellCommandNode, loopVar: string): { pos: number; len: number }[] {
   const out: { pos: number; len: number }[] = [];
-  for (const cmd of body) {
-    const words: { raw: string; span: SourceSpan }[] = [];
-    if (cmd.executable) words.push(cmd.executable);
-    words.push(...cmd.args, ...cmd.wrapperPositionals, ...cmd.envAssignments);
-    for (const r of cmd.redirections) if (r.target) words.push(r.target);
-    for (const w of words) {
-      const { refs } = scanVarRefs(w.raw);
-      for (const ref of refs) {
-        if (!ref.inDoubleQuotes || ref.refName !== loopVar) continue;
-        out.push({
-          pos: w.span.start + ref.rawPos,
-          len: ref.brace ? ref.refName.length + 3 : ref.refName.length + 1,
-        });
-      }
+  const words: { raw: string; span: SourceSpan }[] = [];
+  if (cmd.executable) words.push(cmd.executable);
+  words.push(...cmd.args, ...cmd.wrapperPositionals, ...cmd.envAssignments);
+  for (const r of cmd.redirections) if (r.target) words.push(r.target);
+  for (const w of words) {
+    const { refs } = scanVarRefs(w.raw);
+    for (const ref of refs) {
+      if (!ref.inDoubleQuotes || ref.refName !== loopVar) continue;
+      out.push({
+        pos: w.span.start + ref.rawPos,
+        len: ref.brace ? ref.refName.length + 3 : ref.refName.length + 1,
+      });
     }
   }
   return out;
 }
 
-/** body raw 文本 + 该迭代值的 `$f` 替换。 */
-function bodyTextWithValue(rawCommand: string, body: readonly ShellCommandNode[], loopVar: string, value: string): string {
-  const start = body[0]!.span.start;
-  const end = body[body.length - 1]!.span.end;
+/** 单条 body 命令 tile 的 raw 文本 + 该 tile 内 `$f` 替换（lead 承载迭代分隔 `; ` 前缀）。
+ * tile = [cmd.span.start, tileEnd)：命令本体 + 其后分隔符（`&&`/`;` 等归前段，文本全等前提）。 */
+function tileTextWithValue(
+  rawCommand: string,
+  cmd: ShellCommandNode,
+  tileEnd: number,
+  loopVar: string,
+  value: string,
+  lead: string,
+): string {
   const esc = escapeValue(value);
-  const repl = collectRefs(body, loopVar).sort((a, b) => a.pos - b.pos);
-  let out = "";
-  let cur = start;
+  const repl = collectRefs(cmd, loopVar).sort((a, b) => a.pos - b.pos);
+  let out = lead;
+  let cur = cmd.span.start;
   for (const r of repl) {
     if (r.pos < cur) continue; // 防重叠（理论不发生）
     out += rawCommand.slice(cur, r.pos) + esc;
     cur = r.pos + r.len;
   }
-  out += rawCommand.slice(cur, end);
+  out += rawCommand.slice(cur, tileEnd);
   return out;
+}
+
+/** 追加一个 ReducedSegment（verbatim/expanded 共用装配）。 */
+function pushSegment(
+  segments: ReducedSegment[],
+  parts: string[],
+  kind: ReducedSegment["kind"],
+  text: string,
+  reducedPos: number,
+  originalSpan: SourceSpan,
+): void {
+  segments.push({
+    kind,
+    text,
+    spanInReduced: { start: reducedPos, end: reducedPos + text.length },
+    originalSpan,
+  });
+  parts.push(text);
 }
 
 export function reduceToFlat(
@@ -137,44 +159,38 @@ export function reduceToFlat(
     // verbatim 段：cursor → extent.start
     if (ext.start > cursor) {
       const v = rawCommand.slice(cursor, ext.start);
-      segments.push({
-        kind: "verbatim",
-        text: v,
-        spanInReduced: { start: reducedPos, end: reducedPos + v.length },
-        originalSpan: { start: cursor, end: ext.start },
-      });
-      parts.push(v);
+      pushSegment(segments, parts, "verbatim", v, reducedPos, { start: cursor, end: ext.start });
       reducedPos += v.length;
     }
     cursor = ext.start;
 
     // 展开段：逐迭代
     const body = ext.scope.body;
-    const bodySpan: SourceSpan = body.length > 0
-      ? { start: body[0]!.span.start, end: body[body.length - 1]!.span.end }
-      : { start: cursor, end: cursor };
     const loopVar = ext.scope.variable.value;
     const loopExpanded: string[] = [];
     for (let vi = 0; vi < ext.values.length; vi++) {
-      const bodyText = bodyTextWithValue(rawCommand, body, loopVar, ext.values[vi]!);
-      // loop 级重定向重挂载：迭代 ≥1 截断类改 `>>`
-      let mountText = "";
+      const value = ext.values[vi]!;
+      const lead = vi > 0 ? "; " : "";
+      const iterParts: string[] = [];
+      // 命令级展开段：逐 body 命令 tile（original 为命令自身 span——修复整 body 粒度的去重折叠）
+      for (let k = 0; k < body.length; k++) {
+        const cmd = body[k]!;
+        const tileEnd = k + 1 < body.length ? body[k + 1]!.span.start : cmd.span.end;
+        const segText = tileTextWithValue(rawCommand, cmd, tileEnd, loopVar, value, k === 0 ? lead : "");
+        pushSegment(segments, parts, "expanded", segText, reducedPos, cmd.span);
+        reducedPos += segText.length;
+        iterParts.push(segText);
+      }
+      // loop 级重定向重挂载段：迭代 ≥1 截断类改 `>>`（original 用重定向自身坐标）
       for (let mi = 0; mi < ext.scope.redirections.length; mi++) {
         const m = remountRedirect(rawCommand, ext.scope.redirections[mi]!, vi === 0);
         if (m === null) return null; // &>/&>> 双流等不建模 → fail-closed
-        mountText += " " + m;
+        const segText = " " + m;
+        pushSegment(segments, parts, "expanded", segText, reducedPos, ext.scope.redirections[mi]!.span);
+        reducedPos += segText.length;
+        iterParts.push(segText);
       }
-      const iterText = bodyText + mountText;
-      const segText = (vi > 0 ? "; " : "") + iterText;
-      segments.push({
-        kind: "expanded",
-        text: segText,
-        spanInReduced: { start: reducedPos, end: reducedPos + segText.length },
-        originalSpan: bodySpan,
-      });
-      parts.push(segText);
-      loopExpanded.push(segText);
-      reducedPos += segText.length;
+      loopExpanded.push(iterParts.join(""));
     }
     expandedParts.push(loopExpanded);
     cursor = ext.end;
@@ -183,13 +199,7 @@ export function reduceToFlat(
   // 尾 verbatim
   if (cursor < rawCommand.length) {
     const v = rawCommand.slice(cursor);
-    segments.push({
-      kind: "verbatim",
-      text: v,
-      spanInReduced: { start: reducedPos, end: reducedPos + v.length },
-      originalSpan: { start: cursor, end: rawCommand.length },
-    });
-    parts.push(v);
+    pushSegment(segments, parts, "verbatim", v, reducedPos, { start: cursor, end: rawCommand.length });
     reducedPos += v.length;
   }
 
@@ -202,8 +212,8 @@ export function reduceToFlat(
   if (rparseErr) return null;
   if (rprogram.dynamic || rprogram.loopScopes.length > 0 || rprogram.opaqueRegions.length > 0) return null;
 
-  // reductionText：仅各 loop 展开段、多 scope 逐段 `;` 连接的拼接文本（非全文）
-  const reductionText = expandedParts.map((loopPart) => loopPart.join("")).join("; ");
+  // expandedText：仅各 loop 展开段、多 scope 逐段 `;` 连接的拼接文本（expanded form 展示；非全文）
+  const expandedText = expandedParts.map((loopPart) => loopPart.join("")).join("; ");
 
-  return { text, segments, reductionText };
+  return { text, segments, expandedText };
 }

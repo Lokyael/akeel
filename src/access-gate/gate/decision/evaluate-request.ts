@@ -19,8 +19,6 @@ export function evaluateRequest(
 
   const asks: GateEvidence[] = [];
   let profileDenial: GateDecision | null = null;
-  const seenCommandEvidence = new Set<string>();
-  let expandedAttached = false;
 
   for (const operation of plan.commands) {
     const shellOnlyEffect = operation.origin === "direct"
@@ -41,18 +39,8 @@ export function evaluateRequest(
     if (decision === "deny" && !profileDenial) {
       profileDenial = profileDeny("shell-policy-denied", commandEvidence(operation).subject);
     } else if (decision === "ask") {
-      // P2T8：同类命令去重（类别 + 坐标键）——归约循环的逐迭代拷贝（同一 originalSpan）只留一条，
-      // 防 "and N additional items" 爆量；expandedText 只在首条带一次（renderer 追加 expanded form）
-      const key = commandDedupKey(operation);
-      if (seenCommandEvidence.has(key)) continue;
-      seenCommandEvidence.add(key);
-      const evidence = commandEvidence(operation, true);
-      if (plan.reductionText !== undefined && !expandedAttached) {
-        expandedAttached = true;
-        asks.push({ ...evidence, expandedText: plan.reductionText });
-      } else {
-        asks.push(evidence);
-      }
+      // 每条命令一条证据（D-056）：归约迭代拷贝 / 同源重复由渲染层按原始坐标分组去重，kernel 不持有展示知识
+      asks.push(commandEvidence(operation, true));
     }
   }
 
@@ -118,16 +106,7 @@ function commandEvidence(operation: CommandAccessOperation, forAsk = false): Gat
     subject: forAsk
       ? `${operation.commandClass} command`
       : `${operation.commandClass} command: ${operation.executable ?? "?"}`,
-    // 归约路径：literal form 一律按原始坐标切原文（防拿归约坐标切错位）
-    span: operation.originalSpan ?? operation.span,
+    // 恒为归约坐标（D-056）：展示坐标映射（literal 切片 / 去重组键）归渲染层 expansion-view
+    span: operation.span,
   };
-}
-
-/** 同类 command 证据去重键（类别 + executable + 坐标；归约路径按 originalSpan 折叠逐迭代拷贝）。 */
-function commandDedupKey(operation: CommandAccessOperation): string {
-  const os = operation.originalSpan;
-  // 非归约路径：归约坐标即原始坐标，span 永不重复 → 天然互异
-  return os
-    ? `${operation.commandClass}|${operation.executable ?? ""}|${os.start}:${os.end}`
-    : `${operation.commandClass}|${operation.executable ?? ""}|L|${operation.span.start}:${operation.span.end}`;
 }

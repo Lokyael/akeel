@@ -29,8 +29,6 @@ export interface GateEvidence {
   readonly kind: "syntax" | "threat" | "command" | "tool" | "redirection" | "path";
   readonly subject: string;
   readonly span?: SourceSpan;
-  /** 归约路径：expanded form 展示文本（仅各 loop 展开段拼接；renderer 在 command 条目后追加）。 */
-  readonly expandedText?: string;
 }
 
 export type GuidanceId =

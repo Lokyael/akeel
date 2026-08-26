@@ -1,4 +1,5 @@
 import { bashCommandFromArgs, classifyTool, compileToolCall } from "../plan";
+import type { ExpansionData } from "../plan";
 import { evaluateRequest } from "./evaluate-request";
 import { renderCompilationFailure, renderDecision } from "./render-decision";
 import type { GateDecision } from "../decision-types";
@@ -20,13 +21,15 @@ export async function evaluateToolCall(input: ToolCallInput, runtime: GateRuntim
   });
   if (compiled.kind === "reject") return renderCompilationFailure(compiled);
   const rawCommand = bashCommandFromArgs(input.surface, input.args);
-  return adaptDecision(evaluateRequest(compiled.plan, input.profile), runtime, rawCommand);
+  const expansion = compiled.plan.expansion;
+  return adaptDecision(evaluateRequest(compiled.plan, input.profile), runtime, rawCommand, expansion);
 }
 
-async function adaptDecision(decision: GateDecision, runtime: GateRuntime, rawCommand?: string): Promise<GateResult> {
+async function adaptDecision(decision: GateDecision, runtime: GateRuntime, rawCommand?: string, expansion?: ExpansionData): Promise<GateResult> {
   if (decision.disposition === "allow") return { kind: "allow" };
   if (decision.disposition === "ask") {
-    const rendered = renderDecision(decision, rawCommand);
+    // D-056：展示上下文（rawCommand + 归约展示数据）透传渲染层；kernel 证据坐标恒为归约坐标
+    const rendered = renderDecision(decision, { rawCommand, expansion });
     return askOnce(runtime, "Access profile approval", rendered.kind === "block" ? rendered.reason : "approval required");
   }
   return renderDecision(decision);

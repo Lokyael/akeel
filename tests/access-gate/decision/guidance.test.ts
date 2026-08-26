@@ -130,7 +130,7 @@ test("ask renderer shows the literal form of command evidence when raw command i
   const ask: GateDecision = askDecision([
     { kind: "command", subject: "unknown command", span: { start: 0, end: command.length } },
   ]);
-  const result = renderDecision(ask, command);
+  const result = renderDecision(ask, { rawCommand: command });
   assert.equal(result.kind, "block");
   assert.ok(result.reason.includes("unknown command"), "类别保留");
   assert.ok(result.reason.includes(`literal form: ${command}`));
@@ -144,7 +144,7 @@ test("ask renderer shows the full command in the literal form without redaction"
   const ask: GateDecision = askDecision([
     { kind: "command", subject: "unknown command", span: { start: 0, end: command.length } },
   ]);
-  const result = renderDecision(ask, command);
+  const result = renderDecision(ask, { rawCommand: command });
   assert.equal(result.kind, "block");
   assert.ok(result.reason.includes(`literal form: ${command}`));
 });
@@ -154,7 +154,7 @@ test("ask literal form marks truncation instead of silently cutting", () => {
   const ask: GateDecision = askDecision([
     { kind: "command", subject: "unknown command", span: { start: 0, end: command.length } },
   ]);
-  const result = renderDecision(ask, command);
+  const result = renderDecision(ask, { rawCommand: command });
   assert.equal(result.kind, "block");
   assert.ok(result.reason.includes("(truncated)"), "截断显式标注，不静默丢信息");
   assert.equal(result.reason.includes("x".repeat(5_000)), false);
@@ -174,7 +174,7 @@ test("ask renderer skips literal form for out-of-range spans", () => {
   const ask: GateDecision = askDecision([
     { kind: "command", subject: "unknown command", span: { start: 0, end: 999 } },
   ]);
-  const result = renderDecision(ask, "xargs sed -i 's/a/b/g'");
+  const result = renderDecision(ask, { rawCommand: "xargs sed -i 's/a/b/g'" });
   assert.equal(result.kind, "block");
   assert.ok(result.reason.includes("unknown command"));
   assert.equal(result.reason.includes("literal form:"), false);

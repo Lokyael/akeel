@@ -58,6 +58,43 @@ test("verifier accepts the plan produced by the compiler", () => {
   assert.equal(verify(base), true);
 });
 
+test("verifier validates expansion shape (D-056)", () => {
+  const loopResult = compileShellCall({ ...env, command: "for f in a b; do echo \"$f\"; done" });
+  assert.equal(loopResult.kind, "complete");
+  const loopBase = loopResult.plan;
+  assert.ok(loopBase.expansion, "归约路径 plan 携带 expansion");
+  const issued = new WeakSet<object>();
+  issued.add(loopBase);
+  assert.equal(validateCompleteAccessPlan(loopBase, issued), true);
+
+  const cloneLoopExpansion = () => ({
+    expandedText: loopBase.expansion!.expandedText,
+    segments: loopBase.expansion!.segments.map((s) => ({ kind: s.kind as string, reduced: { ...s.reduced }, original: { ...s.original } })),
+  });
+  const tamperExpansion = (mutate: (draft: ReturnType<typeof cloneLoopExpansion>) => void): object => {
+    const draft = {
+      ...loopBase,
+      operations: loopBase.operations.map(cloneOperation),
+      commands: loopBase.commands.slice(),
+      paths: loopBase.paths.slice(),
+      cwdCandidates: loopBase.cwdCandidates.map(cloneCandidate),
+      coverage: {
+        ...loopBase.coverage,
+        commandSpans: loopBase.coverage.commandSpans.map((s) => ({ ...s })),
+        redirectionSpans: loopBase.coverage.redirectionSpans.map((s) => ({ ...s })),
+      },
+      resourceUsage: { ...loopBase.resourceUsage },
+      expansion: cloneLoopExpansion(),
+    };
+    mutate((draft as { expansion: ReturnType<typeof cloneLoopExpansion> }).expansion);
+    return deepFreeze(draft);
+  };
+
+  assert.equal(verify(tamperExpansion((d) => { d.segments[0]!.kind = "bogus"; })), false, "段 kind 非法 → 拒");
+  assert.equal(verify(tamperExpansion((d) => { delete (d.segments[0] as { reduced?: unknown }).reduced; })), false, "段 reduced 缺失 → 拒");
+  assert.equal(verify(tamperExpansion((d) => { d.expandedText = 42 as unknown as string; })), false, "expandedText 非字符串 → 拒");
+});
+
 test("rejects redirection spans that do not match redirection path operations", () => {
   const plan = tampered((draft) => {
     draft.coverage.redirectionSpans = [{ start: 0, end: 1 }];
