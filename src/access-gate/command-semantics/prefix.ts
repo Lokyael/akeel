@@ -4,7 +4,7 @@
 
 import type { ShellArg, ShellCommandNode } from "../shell-parse/types";
 
-export type PrefixedCommand =
+type PrefixedCommand =
   | { kind: "command"; cmd: string; args: readonly ShellArg[] }
   | { kind: "opaque-options" }
   | null;

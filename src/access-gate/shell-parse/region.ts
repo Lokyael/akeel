@@ -37,17 +37,17 @@ const STRAY_RESERVED = new Set(["do", "done", "then", "fi", "elif", "else", "esa
 /** time/! 管线的连接操作符。 */
 const PIPELINE_JOIN = new Set(["|", "||", "&&"]);
 
-export const MAX_REGION_NESTING = 64;
+const MAX_REGION_NESTING = 64;
 const ENV_ASSIGN = /^[A-Za-z_][A-Za-z0-9_]*=/;
 const ALL_DIGITS = /^\d+$/;
 
-export interface RegionGroup {
+interface RegionGroup {
   tokens: LexToken[];
   opBefore: ShellOperator;
 }
 
 /** 扫描期 for 作用域构建信息（parse() 汇编 ShellCommandNode 后转正式 LoopScope）。 */
-export interface ScopeBuild {
+interface ScopeBuild {
   variable: ShellArg;
   words: ShellArg[];
   hasIn: boolean;
@@ -59,7 +59,7 @@ export interface ScopeBuild {
   doneSpan: SourceSpan;
 }
 
-export interface RegionResult {
+interface RegionResult {
   groups: RegionGroup[];
   scopeBuilds: ScopeBuild[];
   opaqueRegions: OpaqueRegion[];

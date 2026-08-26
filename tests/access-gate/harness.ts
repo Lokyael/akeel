@@ -8,7 +8,7 @@ import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-a
 import accessGate from "../../src/access-gate/index";
 
 export type Footer = { render(width: number): string[] };
-export type FooterFactory = (
+type FooterFactory = (
   tui: { requestRender(): void },
   theme: { fg(color: string, text: string): string },
   footerData: { getGitBranch(): string | null },
@@ -24,7 +24,7 @@ export interface Harness {
   getNotifications(): { message: string; level: string }[];
 }
 
-export function createHarness(root: string): Harness {
+function createHarness(root: string): Harness {
   const commands = new Map<string, (args: string, ctx: ExtensionContext) => Promise<void>>();
   type Handler = (event: unknown, ctx: ExtensionContext) => Promise<unknown>;
   const handlers = new Map<string, Handler>();

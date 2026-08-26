@@ -46,7 +46,7 @@ export interface FooterSnapshot {
 }
 
 /** 会话条目数据源（buildStats 消费；宿主 session 结构的最小化契约）。 */
-export interface FooterEntrySource {
+interface FooterEntrySource {
   getEntries(): readonly unknown[];
 }
 

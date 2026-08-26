@@ -275,7 +275,7 @@ export function checkUserInvokedReferences(skill: SkillMeta, registry: Map<strin
 
 const PRINCIPLES_FILE = join(SKILLS_ROOT, "..", "src", "bootstrap", "principles.md");
 
-export interface PrinciplesAnchors {
+interface PrinciplesAnchors {
   /** Quick Reference 与 Project Records 两节的 ### 锚点（S4b 拆节后合并收集）。 */
   anchorSections: Set<string>;
   /** 编号标题（§N → 标题文本）；值仅作可读性参考，解析只用键。 */

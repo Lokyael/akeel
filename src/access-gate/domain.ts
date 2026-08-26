@@ -77,13 +77,13 @@ export const COMMAND_CLASS_EFFECTS: Readonly<Record<CommandClass, {
 
 // ─── 路径意图来源 ───
 
-export const PATH_SOURCE_VALUES = ["argument", "option", "redirection", "cwd"] as const;
+const PATH_SOURCE_VALUES = ["argument", "option", "redirection", "cwd"] as const;
 export type PathSource = (typeof PATH_SOURCE_VALUES)[number];
 export const PATH_SOURCE_SET: ReadonlySet<PathSource> = new Set(PATH_SOURCE_VALUES);
 
 // ─── 决策（Profile 层） ───
 
-export const DECISION_VALUES = ["allow", "ask", "deny"] as const;
+const DECISION_VALUES = ["allow", "ask", "deny"] as const;
 export type ProfileDecision = (typeof DECISION_VALUES)[number];
 export const DECISION_SET: ReadonlySet<ProfileDecision> = new Set(DECISION_VALUES);
 
@@ -92,8 +92,8 @@ export const DECISION_SET: ReadonlySet<ProfileDecision> = new Set(DECISION_VALUE
 //（tool-schemas.ts 以 DirectToolSurface 约束 Record 键）。
 
 const SHELL_SURFACE = "bash" as const;
-export const DIRECT_TOOL_SURFACES = ["read", "write", "edit", "find", "grep", "ls"] as const;
+const DIRECT_TOOL_SURFACES = ["read", "write", "edit", "find", "grep", "ls"] as const;
 export type DirectToolSurface = (typeof DIRECT_TOOL_SURFACES)[number];
-export const TOOL_SURFACE_VALUES = [SHELL_SURFACE, ...DIRECT_TOOL_SURFACES] as const;
+const TOOL_SURFACE_VALUES = [SHELL_SURFACE, ...DIRECT_TOOL_SURFACES] as const;
 export type ToolSurface = (typeof TOOL_SURFACE_VALUES)[number];
 export const TOOL_SURFACE_SET: ReadonlySet<ToolSurface> = new Set(TOOL_SURFACE_VALUES);

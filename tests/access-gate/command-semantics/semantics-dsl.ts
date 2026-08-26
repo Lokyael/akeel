@@ -19,7 +19,7 @@ import type {
   PathIntent,
 } from "../../../src/access-gate/command-semantics/types";
 
-export interface SemCase {
+interface SemCase {
   cmd: string | readonly string[];
   name: string;
   cls?: CommandClass;
@@ -78,7 +78,7 @@ export function assertSemanticCase(c: SemCase): void {
 }
 
 /** 按行注册 node:test 用例：每行独立 test，失败精确到行。 */
-export function defineSemanticTests(suite: {
+function defineSemanticTests(suite: {
   prefix: string;
   analyze?: (cmd: string) => CommandSemantics;
   cases: readonly SemCase[];
