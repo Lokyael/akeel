@@ -1,15 +1,10 @@
 ---
 name: handoff-session
-description: Use /skill:handoff-session to compact the current conversation into a handoff document so another agent without access to this session's history can continue the work. Reference existing artifacts by path rather than duplicating content. Redact sensitive information.
+description: Use /skill:handoff-session to write a handoff document summarising the current conversation so another agent can continue the work. Reference artifacts by path; redact sensitive information.
 disable-model-invocation: true
 ---
 
-Write a handoff document summarising the current conversation so an agent without access to this session's history can continue the work.
-
-## When to Use
-
-- **Same pi environment** (new session, another model, `pi -c`): prefer pi's built-in `/resume`, `/tree`, or `/import` — the full session history lives in pi's persistent session file and reloads completely. A handoff summary adds no fidelity here.
-- **Cross-environment / non-pi agent**: the receiver cannot read this pi session's file. This is the only scenario where a handoff document adds value.
+Write a handoff document summarising the current conversation so another agent can continue the work from the document and the repo content alone; if that cannot be guaranteed, abort before writing and resolve the gaps in this session first — never produce an incomplete document.
 
 ## Content
 
@@ -30,4 +25,4 @@ Include:
 
 If the user passed arguments, treat them as a description of what the next session will focus on and tailor the document accordingly.
 
-Output the handoff document in the conversation for the user to copy and deliver. Write a file only when the user specifies a target path — persistence is the user's choice. Do not default to a temp file: `/tmp` is cleared on reboot and unreachable across machines, so it can never actually deliver the handoff.
+Output the document in the conversation. With the user's agreement, write it to `/tmp/pi-work/handoffs/handoff-<timestamp>.md` or any user-named destination and show the path.

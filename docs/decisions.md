@@ -237,7 +237,7 @@
 
 **Why:** 混合职责的 skill 调用时部分内容永远用不到，浪费 token、稀释注意力并使触发匹配模糊；内嵌格式副本在多个 skill 间漂移（survey-context 与 principles 的 Candidate Record 措辞已出现分歧）。用户项目中可稳定获得的渠道是会话注入内容和按需加载的技能；principles 每 session 恒定注入，格式放此处零额外注入成本，模型无需额外 read 即获权威定义——集中定义可以避免规则分叉和死链。
 
-**Impact:** `principles.md` 是通用参考数据的唯一注入来源；不新建承载格式的 skill。
+**Impact:** `principles.md` 是通用参考数据的唯一注入来源；不新建承载格式的 skill。**触发面与替代机制无关（2026-08-25）**：description 是触发前注入面（available_skills，`disable-model-invocation` 只禁调用不禁注入），只描述技能产出与约束，不做与其他机制的替代比较——采用何种交接（全量恢复 vs 蒸馏文档）由用户在对话中决定，替代判断不属技能内容；正文只承载执行（用户触发型 skill 不设 When to Use 段），场景边界权威在决策记录（D-036）。When to Use 段仅保留给需要模型强制/例外判别的技能（TDD、systematic-debugging 反 rationalization）。执行：handoff-session 全文不出现 /resume 替代提示。
 
 **Rejected:**
 
@@ -311,7 +311,7 @@
 
 **Out of Scope:**
 
-- **handoff-session 定位**（跨环境交接）：其唯一不可替代价值是“无本会话历史访问权的接收方”（非 pi 工具、跨机器/环境）获得状态摘要；同 pi 环境交接由 `/resume`/`/tree`（持久 session 全量恢复）与 `survey-context` 覆盖，摘要不增加保真度。原实现写 `$TMPDIR` 是缺陷：Linux `/tmp` 重启即清理、跨机器不可达，在唯一需要它的场景（跨环境）恰恰无法送达。重构：默认在会话中输出内容由用户交付（用户掌控持久性），显式指定路径时才写入；未沉淀决策不写入 handoff，先经 domain-modeling 入 `docs/decisions.md` 再引用路径（防双源，D-028）。**Revisit when** 出现需频繁跨工具交接的真实用户场景。
+- **handoff-session 定位**（跨环境交接 + 本地蒸馏交接）：不可替代价值是向“无法获得、或不想全量重放本会话上下文的接收方”提供状态摘要——跨环境（非 pi、跨机器）读不到 session 文件；本地开新会话且原会话过长时，`/resume` 全量重放不合用、`/compact` 只在同一会话内压缩，蒸馏 handoff 是合法路径。同 pi 且会话可用时仍由 `/resume`/`/tree` 与 `survey-context` 覆盖，摘要不增加保真度。**交接自足判据（2026-08-25）**：文档 + 仓库内容必须足以让接收方完全继续；**提前中止语义（2026-08-26）**——仓库是自足载体，handoff 文档不弥补未落档内容，交接前必须完成未落档决策落档（domain-modeling 入 `docs/decisions.md`）与未决工作；识别到自足缺口（未落档决策/未落代码/上下文依赖）即**中止 handoff 流程**返回本会话解决——不产出半成品交接文档（提前中止而非写残再补），也避免 handoff 处理到中途才发现缺口导致的上下文污染。**不采用“先 /compact 收尾再 handoff 交接”的接力设计（2026-08-26 否决）**：handoff 是一次性完整交接，缺什么先在本会话补齐，不以部分交接/接力方式交付。**交付规则与场景无关**：默认写约定路径 `/tmp/pi-work/handoffs/handoff-<时间戳>.md` 并向用户显示，用户可覆盖为任意路径或拒绝文件，无用户同意不落盘（`/tmp` 根在默认 keel-plan 写面之外，`/tmp/pi-work/**` 全 profile 放行，D-049）——原实现默认写 `$TMPDIR` 是缺陷（重启即清理、跨机器不可达、默认落盘未经用户选择）。未沉淀决策不写入 handoff，先经 domain-modeling 入 `docs/decisions.md` 再引用路径（防双源，D-028）。**Revisit 已满足（2026-08-25：原会话过长→本地新会话为真实高频场景）。**
 
 ## D-037: 解析器拥有 wrapper 链（IR 契约：executable 永不承载 wrapper）
 

@@ -19,12 +19,19 @@
 | 来源 | 采用方式 | 当前映射 | 许可证与证据 |
 |------|----------|----------|----------------|
 | [multica-ai/andrej-karpathy-skills](https://github.com/multica-ai/andrej-karpathy-skills)；思想起点为 [Andrej Karpathy 的公开观察](https://x.com/karpathy/status/2015883857489522876) | adapted | `src/bootstrap/principles.md` 的 Think Before Coding、Simplicity First、Surgical Changes 和 Goal-Driven Execution | 上游 README 声明 MIT，但核查时仓库根目录没有可读取的独立 `LICENSE`；原始 revision 未固定 |
-| [obra/superpowers](https://github.com/obra/superpowers) | adapted | `src/bootstrap/index.ts`；`evidence-first`、TDD、systematic debugging、plan writing、brainstorming、handoff 等技能的流程基础 | MIT；Copyright (c) 2025 Jesse Vincent；原始 revision 未固定 |
+| [obra/superpowers](https://github.com/obra/superpowers) | adapted | `src/bootstrap/index.ts`；`evidence-first`、TDD、systematic debugging、plan writing、brainstorming 等技能的流程基础 | MIT；Copyright (c) 2025 Jesse Vincent；原始 revision 未固定 |
 | [mattpocock/skills](https://github.com/mattpocock/skills) | adapted | TDD 辅助文档、code review、bug diagnosis、domain modeling、codebase design、grilling、implementation、handoff、spec/ticket 等技能的流程基础 | MIT；Copyright (c) 2026 Matt Pocock；原始 revision 未固定 |
 | [danielvm-git/bigpowers](https://github.com/danielvm-git/bigpowers) | adapted | security review、code audit、fix validation、bug investigation、survey context，以及部分 planning 和 document grilling 流程 | MIT；Copyright (c) 2026 Daniel VM；原始 revision 未固定 |
 | John Ousterhout, *A Philosophy of Software Design* | conceptual reference | `skills/disciplines/codebase-design/SKILL.md` 中的 deep module 等设计词汇 | 受版权保护的出版物；仅记录概念影响，不复制书籍正文 |
 
 当前技能经过多轮重构，表中“当前映射”表示来源的现存后继范围，不表示当前文件与上游仍逐行对应。具体历史变更由 Git 保留，不在本文复制。
+
+**溯源修正（handoff-session，2026-08-25）**：初始导入记录（提交 `2f4a3ef`）把 `skills/workflows/handoff-session/SKILL.md` 标注为 mattpocock/skills `skills/productivity/handoff-session/SKILL.md`（80%）+ obra/superpowers `handoff` 概念（20%）。核查后修正两处：
+
+- mattpocock 上游实际文件是 `skills/productivity/handoff/SKILL.md`（该名自 2026-07-02 起存在，`handoff-session` 从未存在），初始记录的路径是本地改名误转写。
+- obra/superpowers 在核查时 HEAD `b36e0829` 全树与提交历史中均无 handoff 技能；初始记录归因给它的 redact sensitive information 等内容在 mattpocock 文件中已原生存在，20% 归属无对账文件，故从 superpowers 行的当前映射移除 “handoff”。
+
+当前 handoff-session 在 mattpocock 基线之上经 D-036 重构（交付规则与场景无关：默认约定路径 `/tmp/pi-work/handoffs/` + 用户覆盖；交接自足判据；Decisions 只引用防双源），逐行差异由 Git 历史承载。
 
 ## Access Gate 来源
 
