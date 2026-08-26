@@ -25,4 +25,4 @@ Include:
 
 If the user passed arguments, treat them as a description of what the next session will focus on and tailor the document accordingly.
 
-Output the document in the conversation. With the user's agreement, write it to `/tmp/pi-work/handoffs/handoff-<timestamp>.md` or any user-named destination and show the path.
+Write the document to `/tmp/pi-work/handoffs/handoff-<timestamp>.md`. Reply with the file path and a brief summary.
