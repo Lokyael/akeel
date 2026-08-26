@@ -49,19 +49,24 @@ export function renderCompilationFailure(result: Extract<CompileResult, { kind: 
  * 不重复命令——模型已持有自己的 toolCall 参数。仅做长度截断保持审批框可读；
  * span 缺失/越界/为空时返回 null（不附加）。
  */
+/** 展示文本截断：超长显式标注，不静默丢信息（知情同意完整性）；上限与后缀单一来源。 */
+function clampDisplay(text: string): string {
+  return text.length <= ANALYSIS_LIMITS.maxEvidenceSubjectLength
+    ? text
+    : text.slice(0, ANALYSIS_LIMITS.maxEvidenceSubjectLength) + "… (truncated)";
+}
+
 function literalForm(rawCommand: string | undefined, span: SourceSpan): string | null {
   if (!rawCommand) return null;
   const { start, end } = span;
   if (!Number.isInteger(start) || !Number.isInteger(end)) return null;
   if (start < 0 || end > rawCommand.length || start >= end) return null;
-  const sliced = rawCommand.slice(start, end);
-  if (sliced.length <= ANALYSIS_LIMITS.maxEvidenceSubjectLength) return sliced;
-  // 超长命令显式标注截断，不静默丢信息（知情同意完整性）。
-  return sliced.slice(0, ANALYSIS_LIMITS.maxEvidenceSubjectLength) + "… (truncated)";
+  return clampDisplay(rawCommand.slice(start, end));
 }
 
-/** 决策渲染上下文（D-056）：rawCommand + 归约展示数据；拒绝路径无 expansion 概念。 */
-export interface DecisionRenderContext {
+/** 决策渲染上下文（D-056）：rawCommand + 归约展示数据；拒绝路径无 expansion 概念。
+ * 内部类型：外部调用方以结构字面量传入，无需命名本接口（无外部引用方）。 */
+interface DecisionRenderContext {
   readonly rawCommand?: string;
   readonly expansion?: ExpansionData;
 }
@@ -98,11 +103,7 @@ export function renderDecision(decision: GateDecision, ctx?: DecisionRenderConte
     if (expansion) {
       const firstCommand = rendered.findIndex((_item, index) => grouped[index]?.kind === "command");
       if (firstCommand >= 0) {
-        const ex = expansion.expandedText;
-        const shown = ex.length <= ANALYSIS_LIMITS.maxEvidenceSubjectLength
-          ? ex
-          : ex.slice(0, ANALYSIS_LIMITS.maxEvidenceSubjectLength) + "… (truncated)";
-        rendered[firstCommand] += ` — expanded form: ${shown}`;
+        rendered[firstCommand] += ` — expanded form: ${clampDisplay(expansion.expandedText)}`;
       }
     }
     const total = grouped.length;
