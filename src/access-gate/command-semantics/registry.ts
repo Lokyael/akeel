@@ -16,6 +16,7 @@ import { interpreterAdapter } from "./adapters/interpreters";
 import { shellBuiltinsAdapter } from "./adapters/shell-builtins";
 import { pythonToolsAdapter } from "./adapters/python-tools";
 import { dateAdapter } from "./adapters/date";
+import { uvAdapter } from "./adapters/uv";
 import { makeSemantics } from "./semantics";
 import { canonicalExecutableName } from "./naming";
 import {
@@ -39,6 +40,7 @@ const CORE_ADAPTERS: CommandAdapter[] = [
   shellBuiltinsAdapter,
   pythonToolsAdapter,
   dateAdapter,
+  uvAdapter,
 ];
 
 /** 注册 adapter 到索引；同名重复注册是结构错误——fail-fast 防止静默覆盖。 */

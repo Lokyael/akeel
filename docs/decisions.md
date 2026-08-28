@@ -717,4 +717,24 @@
 
 **Out of Scope:** expandedText 为 reductionText 同值改名（无语义变化）；非归约路径去重行为（span 天然互异，渲染层分组恒直通）；结构化审批 UI 等第二展示消费方出现时把 expansion-view 查询提为共享模块/服务对象的触发路径（届时本决策据 D-047 engineering 面正式 supersede）。
 
-## D-057: 待创建
+## D-057: uv run 执行语义
+
+**Status:** active
+**Reversal surface:** engineering
+
+**Decision:** 将 `uv` 纳入核心命令 adapter；`uv run` 分类为 `execute`，`uv --version`/`-V`、`uv --help`/`-h` 和 `uv help` 分类为 `inspect`。未建模的 uv 顶层子命令保持 `unknown + opaque`，不以一个宽泛的 `uv: execute` 定义覆盖整个 CLI。
+
+**Why:** `uv run` 不只是启动已存在的 pytest：在项目中它会确保环境最新，并可能自动 lock/sync、解析或下载依赖，然后运行任意命令。把 `uv run pytest tests/test_reporting.py -q` 留作 unknown 会在允许 `unknown` 的 profile 中失去“执行代码”的分类；把所有 uv 命令统一成 execute 又会过度收紧只读版本/帮助场景。该分类依据 uv 官方 CLI/项目文档的 `run` 行为。
+
+**Impact:** `uv run` 继承 Profile 的 `execute` 决策；其参数中的 pytest、脚本或其他程序不在 uv adapter 内重复推断，均由 execute 类覆盖。`uv` 环境同步产生的 `.venv`、`uv.lock`、缓存和配置文件路径写入仍不单独建模；未建模子命令继续 fail-closed。核心 adapter 及对应 command-semantics 测试位于 `src/access-gate/command-semantics/adapters/uv.ts` 与 `tests/access-gate/command-semantics/command-semantics-uv.test.ts`。
+
+**Rejected:**
+
+- **把整个 uv 注册为 execute**：版本/帮助以及未来可证明只读的子命令会被过度分类，且无法表达逐子命令的安全语义。
+- **仅注册为 unknown 或仅使用用户 commands 覆盖**：真实的 `uv run` 工作流在 `unknown: allow` 下可能绕过 execute 分类；核心行为也不应要求每个用户重复配置。
+- **把 `uv run` 分类为 inspect**：忽略了环境同步、依赖解析/下载和任意子进程执行的副作用。
+- **为 `uv run` 增加 `network` effect**：当前 Shell Gate 只按 `commandClass` 使用 `shellPolicy`，不消费该 effect；它增加语义和维护复杂度，却不改变授权结果。只有出现独立网络授权需求时，才另行设计网络策略轴。
+
+**Out of Scope:** `uv` 其余顶层子命令（如 `sync`、`lock`、`add`、`pip`、`auth`、`build`、`publish`）的细粒度分类、uv 具体文件路径 intent、独立 network policy 轴，以及可选值参数的完整 CLI 语法；出现真实需求和足够语义证据时再按子命令单独扩展。当前既有命令的 `network` effect 不在本决策中清理；只有出现独立网络授权需求时再评估其消费者。
+
+## D-058: 待创建

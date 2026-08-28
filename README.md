@@ -29,7 +29,7 @@ The active Profile is the only permission mode exposed to users. Built-ins live 
 /profile status          # Show its detailed policy
 ```
 
-The Footer shows the active Profile, Session, and project location on the first line, with Pi's native runtime stats (tokens/context/model) and extension status on the second. Shell commands without a matching adapter use the Profile's `unknown` decision; commands an adapter cannot safely analyze are hard-denied as opaque. Network effects follow Shell policy (e.g. `git push`); unknown network commands (`curl`, `wget`) require one-time approval in Profiles that allow it.
+The Footer shows the active Profile, Session, and project location on the first line, with Pi's native runtime stats (tokens/context/model) and extension status on the second. Shell commands without a matching adapter use the Profile's `unknown` decision; commands an adapter cannot safely analyze are hard-denied as opaque. Network effects follow Shell policy (e.g. `git push`); unknown network commands (`curl`, `wget`) require one-time approval in Profiles that allow it. `uv run` is classified as `execute` because it may sync the project environment before running a child command; `uv` version/help remains inspect-only.
 
 Hard threats, unsafe Shell syntax, symlink escapes, and blocked paths always deny and cannot be overridden by a Profile or approval. `ask` offers only `Allow once` and `Deny`; headless modes fail closed when approval would be required.
 

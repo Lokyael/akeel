@@ -156,6 +156,24 @@ test("bare unknown command stays ask in plan (unknown policy bucket)", () => {
   }
 });
 
+test("uv run follows execute policy rather than unknown policy", () => {
+  const env = context();
+  try {
+    const request = complete(compileShellCall({ ...env, command: "uv run pytest tests/test_reporting.py -q" }));
+    const plan = evaluateRequest(request, builtinProfiles.profiles["keel-plan"]!);
+    assert.equal(plan.disposition, "deny", "keel-plan should deny uv run as execute");
+    if (plan.disposition === "deny") assert.equal(plan.enforcement, "profile");
+
+    const develop = evaluateRequest(request, builtinProfiles.profiles["keel-develop"]!);
+    assert.equal(develop.disposition, "ask", "keel-develop should ask for uv run execution");
+
+    const build = evaluateRequest(request, builtinProfiles.profiles["keel-build"]!);
+    assert.equal(build.disposition, "allow", "keel-build should allow uv run execution");
+  } finally {
+    env.cleanup();
+  }
+});
+
 test("keel-build asks for home config writes; keel-develop keeps denying them", () => {
   const env = context();
   try {

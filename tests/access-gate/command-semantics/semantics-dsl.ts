@@ -25,6 +25,7 @@ interface SemCase {
   cls?: CommandClass;
   opaque?: boolean;
   effects?: readonly Effect[];
+  withoutEffects?: readonly Effect[];
   intents?: readonly Partial<PathIntent>[];
   analyze?: (cmd: string) => CommandSemantics;
 }
@@ -58,6 +59,11 @@ export function assertSemanticCase(c: SemCase): void {
     if (c.effects !== undefined) {
       for (const e of c.effects) {
         assert.ok(sem.effects.includes(e), `${label}: effects missing ${e} (have ${sem.effects.join(",")})`);
+      }
+    }
+    if (c.withoutEffects !== undefined) {
+      for (const e of c.withoutEffects) {
+        assert.ok(!sem.effects.includes(e), `${label}: unexpected effect ${e} (have ${sem.effects.join(",")})`);
       }
     }
     if (c.intents !== undefined) {

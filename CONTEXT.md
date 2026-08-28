@@ -32,7 +32,7 @@
 - `shell-parse/` 输出受限 Shell IR；词值（引号剥离 + 转义解析）在 lexer 单点解码（bash 词义），`ShellArg.value` 为解码词值、`raw` 保留原文。region pass 打 for 作用域标签（`LoopScope`，含 opBefore/trailingOperator/body/redirections/headerSpan/doneSpan）与非 for 保留字区（if/while/case/函数/C 风格 for/`time`/`!` 管线 → `opaqueRegions`）。`command-semantics/` 提取命令类别、路径意图、效果和 cwd 转换，用户全局 `pi-keel/config.yaml` 的 `commands` 段是 Shell 命令语义扩展入口（D-024/D-041）。wrapper 链由 parser 单一拥有（`resolvePreamble` 单点解析）——`executable` 永不承载 wrapper，wrapper positional 消费后保留在 `wrapperPositionals` 供 token 级扫描，normalize 纯出栈（D-037）。换行是命令分隔符（等价 `;`）；`&&`/`||`/`|`/`&` 与重定向操作符后紧跟的换行为行尾延续，不产分隔（bash 语义）。
 - 归约前端（T-062）：仅建模**可静态求值**的 for 循环（字面词表 + 双引号内 `$f`/`${f}` 绑定、常量拼接、tilde 词表）——`verifyLoopScope` strict 守卫（词表静态、无循环变量重赋值、无变异内建/early-exit、无 loop 级 `|`/`&`、redirection 目标静态）→ `reduceToFlat` 以原始 raw 切片合成扁平文本（值经转义；loop 级重定向截断类首条 `>` 后续 `>>`；含 `$f` 的目标原地替换并保留引号）→ 重 lex/parse 自校验后重喂既有管线（compileFlat）。其余复合结构与不可静态求值的形态保持 fail-closed → `compound-command`。判定==展开：展示（expanded form / literal form / 路径证据 D1）与决策同值；每条归约命令 `span` 为唯一归约坐标（对账与证据共用）；原始坐标只存于 plan `expansion` 段数据（命令级），展示映射归渲染层 expansion-view（D-056）。
 - `gate/` 编译器将 Shell IR 和 Direct tool 参数转换为 `CompleteAccessPlan`；compiler outcome 的响应分类（shell-form/security-boundary/generic）由 `decision-code-catalog` 的 `DENY_RESPONSE_KIND` 全量表单一权威（拒绝单形状 `CompilationReject` 只携 code，渲染侧按 code 派生）。`compiler-entry.ts` 是唯一 plan sealing boundary（seal 处结构验证 + 品牌，D-046）；Policy Kernel 消费品牌检查通过的 plan 和 Profile，产出 `GateDecision`，renderer 将决策转为 host 兼容结果。物理分两层 + 共享根（D-022）：`plan/`（compiler-entry/shell-compiler/direct-tool-compiler/builder/preflight/access-plan-verifier 等）、`decision/`（evaluate/evaluate-request/decision-builder/render-decision）、根（`host`/`decision-types`/`decision-code-catalog`——被两层共用，避免循环依赖）；`plan/` 与 `decision/` 各经目录 index 单面化，跨目录消费统一走 index。
-- `command-semantics/` 分类器：子命令提取收敛到统一引擎 `option-parse.ts`（值性质 file/expression/flag、位置参数性质 file/program-first/set、未知选项策略 opaqueOnUnknown 显式声明、class 调节原语 upgradeTo/downgradeTo，D-040）；git 用 token 级 `GIT_CLASSIFY` 声明表（cmd + upgrade/downgrade 调节，主流程经引擎定位子命令），stash/bundle 子命令族规则表化，config/branch 走专用 parser（D-040），clone 显式 `<dir>` 按 len==2 门控提取为 write intent（D-052）；branch 标志单声明表（Opt + group 标签派生分类，单源）。adapter 接口 `analyze(node)` 单参（无项目上下文依赖，删除预留的 SemanticContext）。公共原语（makeSemantics/args/intent/rules/naming）在 command-semantics 根层按职责单文件，adapters 与 registry/overrides 同源引用（D-048，无 shared 合流模块）。
+- `command-semantics/` 分类器：内置 adapter 包含 `uv`（`run` 为 execute，版本/帮助为 inspect，其他顶层子命令保持 unknown + opaque）；子命令提取收敛到统一引擎 `option-parse.ts`（值性质 file/expression/flag、位置参数性质 file/program-first/set、未知选项策略 opaqueOnUnknown 显式声明、class 调节原语 upgradeTo/downgradeTo，D-040）；git 用 token 级 `GIT_CLASSIFY` 声明表（cmd + upgrade/downgrade 调节，主流程经引擎定位子命令），stash/bundle 子命令族规则表化，config/branch 走专用 parser（D-040），clone 显式 `<dir>` 按 len==2 门控提取为 write intent（D-052）；branch 标志单声明表（Opt + group 标签派生分类，单源）。adapter 接口 `analyze(node)` 单参（无项目上下文依赖，删除预留的 SemanticContext）。公共原语（makeSemantics/args/intent/rules/naming）在 command-semantics 根层按职责单文件，adapters 与 registry/overrides 同源引用（D-048，无 shared 合流模块）。
 - `domain.ts` 是封闭世界语义模型：枚举词汇（类/操作/effect/来源/决策/工具面）三形态（VALUES/SET/TYPE）+ 派生映射表——类语义模型 `COMMAND_CLASS_EFFECTS`（defaults/requires）、effect 轴 `EFFECT_AXIS`、写面集合 `WRITE_SIDE_EFFECTS`（D-048）。类→基础 effect 蕴含、kernel 轴检查、编译器 requires 守卫、seal 边界 requires 证明侧（effects 覆盖类要求的运行时复核）都查表（D-022/D-048）。
 - `path/`：glob 语言 `glob.ts` 编译一次、匹配多次（globstar：`*` 单段、`**` 跨段含零段）；编译边界在 path 层 WeakMap 记忆化（blocked 常量与 profile rules 按引用），判定零编译；通配符语言独立可测（D-048）。
 - Direct tool（`read`、`write`、`edit`、`find`、`grep`、`ls`）和 Shell 命令经过各自的 compiler 后进入同一 Policy Kernel。
@@ -74,6 +74,7 @@
 - [D-054 提示词面引用可靠性边界（指针化与内嵌的取舍判据）](docs/decisions.md#d-054-提示词面引用可靠性边界指针化与内嵌的取舍判据)
 - [D-055 搜索命令选项建模对齐官方文档与 rg 14 基线](docs/decisions.md#d-055-搜索命令选项建模对齐官方文档与-rg-14-基线)
 - [D-056 归约展示视图：坐标职责与 renderer 归属](docs/decisions.md#d-056-归约展示视图坐标职责与-renderer-归属)
+- [D-057 uv run 执行语义](docs/decisions.md#d-057-uv-run-执行语义)
 
 ## Negative Space
 
@@ -86,7 +87,7 @@
 - 不提供完整 security log scrubbing：执行记录（`BashExecutionMessage.command`）由 pi 宿主负责。
 - `optionalAdapters` 配置字段和随包分发的可选工具 adapter 不再属于 pi-keel 的支持面；用户如需命令语义扩展，应使用 `commands`/`aliases`/`reclassify` 覆盖层。
 - Shell IR 不是完整 Bash 语法树：仅建模可静态归约的 `for`（字面词表 + 双引号内 `$f` 绑定）；其余复合结构（if/while/case/函数/嵌套 for/`[[`/`((`/圆括号）与不可静态求值的展开（词表/body 动态词、修饰/算数/间接/命令替换/裸 `$f`、循环变量重赋值、early-exit、变异内建、loop 级 `|`/`&` 管道、heredoc 重定向）一律 `compound-command` fail-closed；动态 token 在决策前 hard deny，未知命令按 `shellPolicy.unknown` 决策不代表语法已验证。
-- 未建模的配置写手（yarn/pip/uv/cargo 等）的外部配置文件写入不经过 PathPolicy，按 modify + cwd 保守写检查；已建模的 git/npm/pnpm config 写目标经 PathPolicy（含 keel-build 的 `~/**` write=ask 规则）。
+- 未建模的配置写手（yarn/pip/cargo，以及 uv 未建模子命令）的外部配置文件写入不经过 PathPolicy，按 modify + cwd 保守写检查；`uv run` 已建模为 execute，但其环境同步产生的 `.venv`/lockfile/缓存等具体文件写入仍不单独建模；已建模的 git/npm/pnpm config 写目标经 PathPolicy（含 keel-build 的 `~/**` write=ask 规则）。
 - 子代理读全盘（读面不钳制，源码内硬编码密钥不在 blocked paths 覆盖）；write 管路径不管内容（durable 内容防中毒靠父会话 git diff）；`/tmp/pi-work` 是约定非隔离（sticky 共享目录、无 symlink 检查）；父档位钳制基于 spawn 时 env 快照。
 - 不为 Candidate Record 提供自动提醒、后台定时器、Session hook、Footer 状态或专用 review 技能；复审只在显式 context survey 中报告。
 - 不把短期 Task Record、实施过程或审查报告作为永久项目知识。

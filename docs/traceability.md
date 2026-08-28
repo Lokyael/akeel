@@ -41,6 +41,7 @@
 | [kenryu42/cc-safety-net](https://github.com/kenryu42/cc-safety-net) | adapted / historical reference | 命令语义和危险操作识别的早期输入；当前后继位于 `src/access-gate/command-semantics/` | MIT；Copyright (c) 2026 kenryu42；原始 revision 未固定 |
 | [chandra447/pi-hermes-memory](https://github.com/chandra447/pi-hermes-memory) | adapted | 初始 threat/secret pattern 输入；当前后继位于 `src/access-gate/security/threat-scan.ts` 和路径保护规则 | MIT；Copyright (c) 2025 Chandra Teja；原始 revision 未固定 |
 | [landstrip/pi-landstrip](https://github.com/landstrip/pi-landstrip) | conceptual reference / historical adaptation | 配置和路径策略的早期比较基线；pi-keel 当前只提供用户态策略，不包含 Landstrip sandbox | MIT；Copyright (c) 2026 Jarkko Sakkinen；原始 revision 未固定 |
+| [astral-sh/uv](https://github.com/astral-sh/uv) release `0.12.6`；[uv project run documentation](https://docs.astral.sh/uv/concepts/projects/run/)；[uv license policy](https://docs.astral.sh/uv/reference/policies/license/) | conceptual reference / runtime command behavior | `src/access-gate/command-semantics/adapters/uv.ts` 与 `docs/decisions.md` D-057 的 `uv run` 执行和环境同步语义分类依据 | Apache-2.0 OR MIT（uv 官方 license policy）；固定参考 release `0.12.6`，仅作命令语义参考，pi-keel 不分发 uv |
 
 这些来源不定义 pi-keel 的当前安全承诺。当前 enforcement 范围和残余风险在 decisions.md 安全条目与 CONTEXT.md Negative Space 中维护。
 
