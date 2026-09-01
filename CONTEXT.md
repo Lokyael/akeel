@@ -28,6 +28,7 @@
 - `src/bootstrap/` 在 Session 启动和 compaction 后注入工程原则。
 - Prompt Surface（D-030/D-053）：恒定注入仅 `principles.md`（唯一 `context` 注入点）；profile 数据（`ResolvedProfile`/config/builtins/活动 profile 名）永不进入 LLM 上下文（注入消息 / tool description / system prompt 三面皆无），模型可见的 profile 相关文本只有失败路径静态 guidance（`profile-restriction`）；活动 profile 切换不改变注入内容。
 - `src/access-gate/` 统一处理用户全局 Profile、Shell IR、命令语义、路径策略、Gate、Session 状态和 Footer。
+- Canonical Compilation 重建方向（D-059）已采纳但尚未实施；当前分支仍保留既有 compiler/plan 实现，重做任务将直接移除旧 API、旧 plan 模块和 cfc8071 shadow integration，不提供兼容层。
 - 子代理会话（pi-subagents `--mode json -p` 子进程，默认加载全局扩展）在 `session_start` 检测 `PI_SUBAGENT_CHILD`/`PI_SUBAGENT_CHILD_AGENT`，按 `subagentProfiles` 映射（优先级 显式 > 内置默认 > `*`）初始化为子代理档位（T0 `scratch`/T1 `project`）。T0 档 agent 必须无 mutation 工具（bash/write/edit）——pi-subagents 输出契约机制强制（有则被指令自写 output 与 T0 路径策略矛盾），scout 删 write+bash、researcher 原生即无。父会话档位号（1=项目可写档，否则 0）由父侧按自身 pathPolicy 算好，经 `PI_KEEL_PARENT_TIER` env 传播、子代理零解析；生效档 = min(映射档, 父TIER)——两档下即"父非项目可写 → 一律回退 T0 scratch"——子代理权限上限 = 父会话当前档位（D-039）。
 - `shell-parse/` 输出受限 Shell IR；词值（引号剥离 + 转义解析）在 lexer 单点解码（bash 词义），`ShellArg.value` 为解码词值、`raw` 保留原文。region pass 打 for 作用域标签（`LoopScope`，含 opBefore/trailingOperator/body/redirections/headerSpan/doneSpan）与非 for 保留字区（if/while/case/函数/C 风格 for/`time`/`!` 管线 → `opaqueRegions`）。`command-semantics/` 提取命令类别、路径意图、效果和 cwd 转换，用户全局 `pi-keel/config.yaml` 的 `commands` 段是 Shell 命令语义扩展入口（D-024/D-041）。wrapper 链由 parser 单一拥有（`resolvePreamble` 单点解析）——`executable` 永不承载 wrapper，wrapper positional 消费后保留在 `wrapperPositionals` 供 token 级扫描，normalize 纯出栈（D-037）。换行是命令分隔符（等价 `;`）；`&&`/`||`/`|`/`&` 与重定向操作符后紧跟的换行为行尾延续，不产分隔（bash 语义）。
 - 归约前端（T-062）：仅建模**可静态求值**的 for 循环（字面词表 + 双引号内 `$f`/`${f}` 绑定、常量拼接、tilde 词表）——`verifyLoopScope` strict 守卫（词表静态、无循环变量重赋值、无变异内建/early-exit、无 loop 级 `|`/`&`、redirection 目标静态）→ `reduceToFlat` 以原始 raw 切片合成扁平文本（值经转义；loop 级重定向截断类首条 `>` 后续 `>>`；含 `$f` 的目标原地替换并保留引号）→ 重 lex/parse 自校验后重喂既有管线（compileFlat）。其余复合结构与不可静态求值的形态保持 fail-closed → `compound-command`。判定==展开：展示（expanded form / literal form / 路径证据 D1）与决策同值；每条归约命令 `span` 为唯一归约坐标（对账与证据共用）；原始坐标只存于 plan `expansion` 段数据（命令级），展示映射归渲染层 expansion-view（D-056）。
@@ -75,6 +76,7 @@
 - [D-055 搜索命令选项建模对齐官方文档与 rg 14 基线](docs/decisions.md#d-055-搜索命令选项建模对齐官方文档与-rg-14-基线)
 - [D-056 归约展示视图：坐标职责与 renderer 归属](docs/decisions.md#d-056-归约展示视图坐标职责与-renderer-归属)
 - [D-057 uv run 执行语义](docs/decisions.md#d-057-uv-run-执行语义)
+- [D-059 Canonical Compilation 统一事实来源与旧架构移除](docs/decisions.md#d-059-canonical-compilation-统一事实来源与旧架构移除)
 
 ## Negative Space
 

@@ -737,4 +737,37 @@
 
 **Out of Scope:** `uv` 其余顶层子命令（如 `sync`、`lock`、`add`、`pip`、`auth`、`build`、`publish`）的细粒度分类、uv 具体文件路径 intent、独立 network policy 轴，以及可选值参数的完整 CLI 语法；出现真实需求和足够语义证据时再按子命令单独扩展。当前既有命令的 `network` effect 不在本决策中清理；只有出现独立网络授权需求时再评估其消费者。
 
-## D-058: 待创建
+## D-059: Canonical Compilation 统一事实来源与旧架构移除
+
+**Status:** active
+**Reversal surface:** engineering
+
+**Decision:** Canonical Compilation 是操作事实与静态 Content Flow facts 的唯一生成来源。既有 `CompleteAccessPlan`、既有 compiler API、旧 `gate/` compiler 模块和当前 cfc8071 的 shadow integration 不保留；迁移后的实现直接以新 canonical 模块为生产入口，不提供旧 API 或旧模块兼容层。
+
+Canonical Compilation 产生一次有序、可验证的规范化编译结果，并分别提供两类独立输出：
+
+- Plan 输出直接生成新的 Operation Admission plan；它不是旧 `CompleteAccessPlan` 的适配结果。
+- Static Flow 输出由唯一的 Graph Composer 组合为 sealed Static Flow Graph；不增加独立的 Static Flow Adapter，也不从 Graph 反推 plan 或 command/path semantics。
+
+Operation Admission 与 Content Flow Governance 仍是两个独立决策域。两者可以共享 canonical operation facts，但不共享 plan/graph brand、验证器、生命周期或授权语义。Static Flow Graph 不承载 Profile、GateDecision、runtime Evidence、payload、authorization 或 receipt；运行时 checkpoint capability 仍须由独立任务和真实 host/enforcement seam 验证后才能实现。
+
+**Why:** 旧 compiler→Flow 的 shadow 方向让旧模块继续拥有事实来源，Content Flow 只能事后对账；旧 API 和旧模块保留还会迫使新架构承担迁移兼容责任，并把 registry、parity facade 和双重验证固定为生产边界。直接删除旧入口和旧模块，使所有未来消费者从 canonical seam 开始，避免两套事实来源和长期兼容层漂移。
+
+**Impact:** Shell/Direct 的解析、语义分析、路径意图、cwd 候选、for reduction 和编译拒绝统一收敛到 Canonical Compilation。新的 plan 与 Static Flow Graph 分别由 canonical result 生成；不存在 `integrateStaticFlow()`、外部 operation registry、旧 `CompleteAccessPlan` 适配器或旧 compiler 反向驱动 Content Flow 的生产路径。仓库内调用方和测试必须迁移到新 public seam；这是有意的 breaking migration，不保留旧 API。
+
+**Rejected:**
+
+- **保留旧 compiler API 作为薄 Plan Adapter：** 用户已明确不保留旧 API 或旧模块；兼容层会延长旧事实来源的生命周期并增加迁移后的双入口。
+- **保留 `integrateStaticFlow()` parity shadow：** 它以旧 compiler 结果驱动 Flow，再用对账证明一致，不能使 canonical 架构成为事实来源。
+- **新增独立 Static Flow Adapter：** canonical result 已按领域提供最小 flow facts，Graph Composer 直接负责组合、budget、unknown propagation 和 sealing；额外转发层没有独立职责。
+- **从 Static Flow Graph 推导 Operation Admission plan：** Graph 的 opaque references 和 flow topology 不承载 plan metadata、资源统计或 Gate 语义；反推会混淆两个决策域。
+- **把 Static Flow Graph 嵌入 `CompleteAccessPlan`：** 会破坏 plan 的请求真实性、验证边界和独立生命周期。
+
+**Out of Scope:**
+
+- **Runtime Content Flow capability：** 不在本次迁移中实现 Publication、Network Send、Process Start、File Commit checkpoint、Payload Lease、Evidence Ingress、Artifact lineage、authorization、enforcement 或 receipt；重新评估条件是对应真实 host/enforcement seam 可测试且失败默认值已锁定。
+- **Profile/config/command semantics 的新授权规则：** 本决策只改变事实生成与模块归属，不改变既有策略语义；需要行为变化时另立 Decision 和 Task。
+- **旧 API 的兼容发布：** 旧入口和旧模块直接移除，不提供 deprecation wrapper、re-export、shim 或 migration runtime；迁移由同一仓库变更完成。
+- **从 cfc8071 逐个修补验证漏洞：** 归档分支保留其历史，新的实现只迁移仍有价值的领域约束和测试场景，不沿用 shadow 生产接口。
+
+## D-060: 待创建

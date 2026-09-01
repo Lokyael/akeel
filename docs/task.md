@@ -2,208 +2,232 @@
 
 > 活跃任务。验证完成后，提炼长期信息到 `docs/decisions.md` 或 `CONTEXT.md`，然后清空对应 Task Record 章节。
 
-## T-065: Canonical Compilation 与 Content Flow 归属重做
+## T-069: Canonical Compilation 重建与旧架构移除
 
 **Kind:** refactor
 **Status:** draft
-**Goal:** 将规范化编译结果设为操作事实的唯一来源，使既有 `CompleteAccessPlan` 与 Static Content Flow Graph 都由新架构分别适配生成，而不是由 Content Flow 反向兼容既有 compiler。
+**Goal:** 以 Canonical Compilation 作为唯一事实来源，直接重建 Operation Admission plan 与 Static Flow Graph，并删除既有 compiler API、旧 plan 模块和 cfc8071 shadow integration，不保留兼容入口或旧模块。
 
 ### Architecture
 
-本任务只记录设计，不实施代码。当前 `content-flow-redesign` 分支基于 `ef026a4`；原 `cfc8071` 保存在 `archive/cfc8071-shadow`，而 `main` 仍保留原提交，作为未改写的工作基线。新设计不以旧 compiler 作为 Content Flow 的输入，不以 parity facade 包裹旧 compiler，也不要求调用方从旧 plan 手工建立 operation registry。
+本记录完成设计落档，不实施代码。D-059 已记录本次 breaking migration 的事实归属和旧架构移除结论。当前分支 `content-flow-redesign` 基于 `ef026a4`；`archive/cfc8071-shadow` 和当前 `main` 保留 cfc8071 的完整历史，仅作参考，不属于新实现的兼容目标。
 
-新增一个位于现有 `gate/` 与 Content Flow 之间的中性 Canonical Compilation 层。Shell/Direct 的解析、语义分析、路径意图、cwd 候选和归约结果在该层形成规范化 facts；该层同时向两个独立领域提供输出：Legacy Plan Adapter 生成既有 `CompleteAccessPlan`，Static Flow Adapter/Composer 生成 sealed `StaticFlowGraph`。旧的 compiler API 若继续保留，只能作为新 canonical 层的适配输出，不能继续拥有事实来源地位。
+Shell/Direct 的解析、语义分析、路径意图、cwd 候选、for reduction、资源预算和 compilation reject 全部迁移到新的 `src/access-gate/canonical-compile/`。该模块一次生成 ordered canonical operation facts、Operation Admission 所需 metadata 和静态 Flow contribution facts。新 Operation Admission plan 直接从 canonical result 生成；Static Flow Composer 直接消费 canonical flow facts、显式 Composition Root links，并且是唯一的 Graph writer/sealing boundary。
 
 ```text
 Shell / Direct request
           |
           v
 Canonical Compilation
-  - ordered AccessOperation facts
-  - operation identity/reference binding
-  - static flow contributions
-  - compilation metadata
+  - ordered operation facts
+  - plan metadata
+  - local flow contribution facts
+  - stable internal operation references
           |
-          +----------------------+----------------------+
-          v                      v                      v
-Legacy Plan Adapter       Static Flow Composer      future adapters
-          |                      |
-          v                      v
-CompleteAccessPlan       Sealed Static Flow Graph
-          |
-          v
-existing Policy Kernel / Gate
+          +-------------------------------+
+          v                               v
+Operation Admission Plan           Static Flow Composer
+          |                               |
+          v                               v
+new sealed admission plan         sealed Static Flow Graph
+          |                               |
+          v                               v
+Policy Kernel                      future Content Flow consumers
 ```
 
-`CompleteAccessPlan` 与 Static Flow Graph 仍然是两个独立决策域。Canonical Compilation 可以共享规范化 operation facts，但不把 Graph、runtime Evidence、payload、authorization、receipt、Profile 或 GateDecision 塞进 plan，也不让 Static Flow Graph 推导 command/path 语义。跨 Boundary link 仍由明确的 Composition Root 声明；Boundary、Port、URL、path、时间、registry insertion order 都不能作为 operation identity 或授权事实的推导来源。
+新 plan 与 Static Flow Graph 是独立领域对象：共享同一 canonical result 中的事实，但不共享 brand、validator、lifecycle、Profile、GateDecision、runtime Evidence、payload、authorization 或 receipt。Graph 不从 Boundary、Port、path、URL、时间或 insertion order 推导 operation semantics；跨 Boundary link 始终由明确的 Composition Root 声明。
+
+旧的 `src/access-gate/gate/plan/` compiler、`CompleteAccessPlan`、`compileShellCall()`、`compileDirectToolCall()`、`compileToolCall()`、旧 plan brand/verifier，以及 cfc8071 的 `content-flow/integration/`、`operation-projection/`、外部 `OperationRegistry` 和 parity shadow 都不保留。仓库内消费者、Kernel、renderer、host 和测试在同一次 breaking migration 中改用新 public seam；不提供 shim、re-export、deprecated wrapper 或 runtime migration path。
 
 ### Design Alternatives
 
-#### A. Canonical Compilation 双适配输出（推荐）
+#### A. Canonical Compilation + 直接 plan/graph 生成（采用）
 
-Canonical Compilation 生成一次规范化结果；Legacy Plan Adapter 和 Static Flow Adapter 分别消费同一结果。既有 compiler 函数可以暂时保留，但其内部只负责调用 canonical 层并将结果适配为旧返回类型。
+Canonical Compilation 是唯一事实来源；新的 Operation Admission plan 和 Static Flow Graph 各自直接从 canonical result 构建。Static Flow Composer 直接承担 contribution composition、link validation、budget、unknown propagation、deep-freeze 和 sealing。
 
-**优点：**事实来源单一；Shell/Direct 可共享；旧 Gate 的 plan 形状与 Flow Graph 的领域边界保持独立；不需要生产 parity comparison，也不需要调用方手工维护 registry。
+**Why:** 每一种事实只生成一次；新调用方不接触旧类型或 registry；Graph Composer 是有独立领域职责的深模块，plan builder 与 Graph Composer 都不充当兼容 adapter。
 
-**代价：**需要把当前 Shell/Direct draft 逻辑拆到中性层，并重新定义错误、身份和 sealing 的边界；旧 plan adapter 与 Flow adapter 需要各自测试。
+#### B. 保留旧 plan/API 并由 canonical 层投影（不采用）
 
-#### B. Static Flow Graph 作为唯一来源
+保留 `CompleteAccessPlan` 和旧 compiler API，让它们调用 canonical compiler。
 
-先构造 Graph，再从 Graph 推导 `CompleteAccessPlan`。
+**Why rejected:** 用户明确不保留旧 API 或旧模块；即使事实来源倒置，旧模块、双类型和双入口仍构成无收益的兼容表面，并会让未来消费者继续依赖旧架构。
 
-**不采用原因：**Graph 只有 opaque operation references 与静态流关系，不能自然承载 plan 的 `resourceUsage`、compiler metadata、plan coverage 和既有 sealing 约束；从 Boundary/Port 反推 command/path semantics 会混淆 Content Flow 与 Operation Admission。
+#### C. 新增独立 Static Flow Adapter（不采用）
 
-#### C. 保留 `integrateStaticFlow()` 作为旧 compiler 的 shadow facade
+在 Canonical Compilation 和 Composer 之间建立 `flow-adapter.ts`。
 
-旧 compiler 先生成 `CompleteAccessPlan`，调用方再提供 assembly 和 registry，Content Flow 最后对账。
+**Why rejected:** canonical result 已提供最小 flow contribution facts，Composer 可直接消费；单纯转发层没有组合、验证、sealing 或领域转换职责，是 shallow module。
 
-**不采用原因：**旧 compiler 继续拥有事实来源；新架构只能证明自己复刻旧结果，无法接管旧代码；registry 是从旧 plan 反向重建的测试支架，不是稳定的生产边界；parity comparison 会成为永久适配层而不是迁移阶段工具。
+#### D. Static Flow Graph 作为唯一来源（不采用）
+
+先构造 Graph，再从 Graph 推导 Operation Admission plan。
+
+**Why rejected:** Graph 的 opaque operation references 与 topology 不包含 plan metadata、资源统计、coverage、reject evidence 和 admission 语义；通过 Boundary/Port 反推 command/path semantics 会混淆两个决策域。
+
+#### E. cfc8071 的旧 compiler → Flow parity shadow（不采用）
+
+旧 compiler 先生成 plan，调用方再提供 assembly 和 registry，Content Flow 最后对账。
+
+**Why rejected:** 旧 compiler 仍是事实来源；生产接口要求调用方从旧 plan 反向建 registry；parity facade 只能验证复刻，无法实现架构接管。
 
 ### Out of Scope
 
-- **本任务不实现 runtime Content Flow capability：** 不创建或启用 Publication、Network Send、Process Start、File Commit checkpoint、Payload Lease、Evidence Ingress、Artifact lineage、authorization、enforcement 或 receipt；这些需要真实 host/enforcement seam 的独立任务。
-- **本任务不把 Graph 放进 `CompleteAccessPlan`：** 两者继续保持独立类型、验证器、品牌和生命周期；共享只限于 canonical operation facts。
-- **本任务不改变 Profile、config、shellPolicy、pathPolicy、command classification 或现有 `network` effect：** 新架构先改变事实归属和适配方向，不借此引入新的授权语义。
-- **本任务不承诺保留全部旧 compiler 入口：** 是否保留 `compileShellCall()`、`compileDirectToolCall()` 和 `compileToolCall()`，由迁移阶段根据实际消费者决定；若保留，它们是 compatibility surface，而不是 canonical architecture。
-- **本任务不从 `cfc8071` 直接修补：** archived shadow 实现、operation projection registry、integration facade 和对应 parity tests 不作为新生产接口；有价值的验证场景可以迁移为 canonical/adapter 测试。
+- **Runtime Content Flow capability：** 不创建 Publication、Network Send、Process Start、File Commit checkpoint、Payload Lease、Evidence Ingress、Artifact lineage、authorization、enforcement 或 receipt。只有真实 host/enforcement seam 可测试且失败默认值锁定后，才可另立 Task。
+- **新的授权规则：** 不在本任务改变 Profile、config、shellPolicy、pathPolicy、command classification 或 `network` effect 的决策语义；该任务只替换事实生成与模块结构。
+- **旧 API/模块兼容：** 不发布 deprecation wrapper、re-export、shim、dual write、dual reader 或 runtime migration path；旧实现和 API 在同一 migration 中移除。
+- **修补 cfc8071：** 归档分支保留完整历史；新实现可迁移仍然成立的领域约束和测试场景，但不迁移旧 integration facade、registry projection、旧 compiler 事实来源或它们的文档结论。
 
 ### Proposed Contracts
 
-以下接口是待确认的设计草案，不是当前代码契约。
+以下是待实施前复核的目标接口；它们描述新架构，不兼容旧 `CompleteAccessPlan`。
 
 ```ts
 interface CanonicalCompilation {
-  readonly operations: readonly AccessOperation[];
-  readonly operationRefs: readonly string[];
+  readonly operations: readonly CanonicalOperation[];
+  readonly plan: CanonicalPlanFacts;
   readonly flow: CanonicalFlowFacts;
-  readonly metadata: CanonicalCompilationMetadata;
+}
+
+interface CanonicalPlanFacts {
+  readonly source: CanonicalSource;
+  readonly projectRoot: string;
+  readonly stagingDir: string;
+  readonly inputLength: number;
+  readonly coverage: CanonicalCoverage;
+  readonly expansion?: CanonicalExpansion;
 }
 
 interface CanonicalFlowFacts {
   readonly contributions: readonly BoundaryContribution[];
-  readonly links: readonly LinkDeclaration[];
 }
 
-interface CanonicalCompilationMetadata {
-  readonly source: "bash" | ToolSurface;
-  readonly projectRoot: string;
-  readonly stagingDir: string;
-  readonly inputLength: number;
-  readonly coverage: PlanCoverage;
-  readonly expansion?: ExpansionData;
+interface StaticFlowCompositionInput {
+  readonly compilation: CanonicalCompilation;
+  readonly links: readonly LinkDeclaration[];
+  readonly limits: StaticAssemblyLimits;
 }
 
 type CanonicalCompileResult =
   | { readonly kind: "complete"; readonly compilation: CanonicalCompilation }
-  | CompilationReject;
+  | CanonicalCompilationReject;
 ```
 
-需要在设计确认时解决的边界：
+Required boundaries:
 
-1. **operation identity：** canonical compiler 在生成 operation 时同时生成稳定的内部 reference；reference 只绑定同一份 canonical result，不从 path、命令名或 registry 顺序推导。
-2. **Flow contribution 的来源：** Shell/Direct canonical compiler 负责生成自身可证明的局部 contribution；Composition Root 负责显式补充跨 Boundary links，不由 adapter 猜测。
-3. **错误归属：** Shell/Direct 无法安全解析时仍返回既有 compilation reject；canonical result 完成但 Graph assembly 失败时，失败属于 Flow adapter，不得改写为 plan permit 或重新解释为 GateDecision。
-4. **sealing：** canonical result 不直接伪装成 `CompleteAccessPlan` 或 sealed Graph；Legacy Plan Adapter 与 Composer 各自复制、验证并 sealing，避免一个领域的 brand 被另一个领域接受。
-5. **旧 API 策略：** 先盘点仓库内和分发面消费者；若保留旧入口，测试必须证明它调用 canonical 层，而不是 canonical 层调用它。若没有外部消费者，允许在同一迁移中删除旧入口并迁移测试。
+1. **Operation identity:** Canonical Compilation creates internal opaque references while it creates each operation. A reference is only valid within its sealed canonical result and is never inferred from path, command name, port name, URL, time or collection order.
+2. **Local Flow facts:** Shell/Direct canonical compilers generate only their own provable local contributions. The Composition Root supplies explicit cross-Boundary links. Neither plan generation nor Composer invents a relation.
+3. **Failure categories:** parse/preflight/resource failures return `CanonicalCompilationReject`; Graph composition failures return closed flow composition failures and never become an admission permit, Profile result or partial Graph.
+4. **Sealing:** Canonical result, admission plan and Graph have distinct validators, brands and immutable copies. No domain accepts another domain's sealed object as its own proof.
+5. **Public surface:** callers consume only `canonical-compile` and the new plan/flow public indexes. No public export retains an old compiler function, `CompleteAccessPlan`, `OperationRegistry`, integration facade, compatibility type alias or old plan module path.
 
 ### Proposed Implementation Slices
 
-#### Slice 1: 锁定 canonical contract（只写测试与类型）
+#### Slice 1: Define new canonical and admission contracts
 
 **Files:**
 - Create: `src/access-gate/canonical-compile/types.ts`
 - Create: `src/access-gate/canonical-compile/index.ts`
+- Create: `src/access-gate/admission-plan/types.ts`
+- Create: `src/access-gate/admission-plan/index.ts`
 - Test: `tests/access-gate/canonical-compile/contract.test.ts`
-- Modify: `docs/task.md`（仅在设计确认后补充执行证据）
+- Test: `tests/access-gate/admission-plan/contract.test.ts`
 
-**Interface:** 定义 `CanonicalCompilation`、`CanonicalFlowFacts`、`CanonicalCompilationMetadata` 和 `CanonicalCompileResult`。测试通过 public index 验证操作顺序、operation reference 绑定、独立 Flow facts 和 reject 形状；不导入 Profile、Policy Kernel 或旧 `CompleteAccessPlan` brand。
+**Interface:** Define new `CanonicalOperation`, canonical metadata, flow facts, reject types, new sealed admission plan and their public indexes. Do not import any old `gate/plan` type or symbol.
 
-**Acceptance:** 类型和测试明确 canonical result 不包含 decision、authorization、runtime evidence 或 Graph writer；Shell/Direct 都能表达同一 ordered operation facts。
+**Acceptance:** Tests prove ordered operation facts, reference binding, closed reject shape, immutable sealing and domain separation. No new type exports Profile, GateDecision, runtime Evidence, payload, authorization, receipt or Graph writer.
 
-#### Slice 2: 提取 Shell/Direct canonical compiler
+#### Slice 2: Move Shell and Direct compilation into Canonical Compilation
 
 **Files:**
-- Create/Modify: `src/access-gate/canonical-compile/shell.ts`
-- Create/Modify: `src/access-gate/canonical-compile/direct.ts`
-- Modify: `src/access-gate/gate/plan/shell-compiler.ts`
-- Modify: `src/access-gate/gate/plan/direct-tool-compiler.ts`
+- Create: `src/access-gate/canonical-compile/shell.ts`
+- Create: `src/access-gate/canonical-compile/direct.ts`
+- Create/Modify: `src/access-gate/canonical-compile/builder.ts`
+- Create/Modify: `src/access-gate/canonical-compile/preflight.ts`
+- Delete after migration: `src/access-gate/gate/plan/shell-compiler.ts`
+- Delete after migration: `src/access-gate/gate/plan/direct-tool-compiler.ts`
+- Delete or migrate: old plan compiler tests
 - Test: `tests/access-gate/canonical-compile/shell.test.ts`
 - Test: `tests/access-gate/canonical-compile/direct.test.ts`
 
-**Interface:** 将现有 lexer/parser、command semantics、path intents、cwd candidates、for reduction 和输入限制复用到 canonical 层；canonical 层只返回 canonical result 或 compilation reject。旧 `compileShellDraft()` / `compileDirectToolDraft()` 不再作为 Content Flow 的输入。
+**Interface:** Reuse lexer/parser, command semantics, path intent, cwd analysis, for reduction and input limits, but produce only canonical result or canonical reject. Shell/Direct complete facts must include all information required by both new admission plan generation and local Flow contributions.
 
-**Acceptance:** Shell inspect、Shell hard-path、Shell command ask、Direct read、Direct write 和归约场景的 operation facts 与既有语义一致；但测试比较的是 canonical facts，不是由旧 plan 反向生成的 registry。
+**Acceptance:** Shell inspect, hard-path, command ask, Direct read/write and reduction scenarios are tested through canonical public functions; no test calls old compiler APIs.
 
-#### Slice 3: 让旧 Plan API 适配 canonical result
-
-**Files:**
-- Modify: `src/access-gate/gate/plan/compiler-entry.ts`
-- Modify: `src/access-gate/gate/plan/builder.ts` 或新建 `src/access-gate/gate/plan/legacy-plan-adapter.ts`
-- Modify: `src/access-gate/gate/plan/index.ts`
-- Test: `tests/access-gate/plan/access-request.test.ts`
-- Test: `tests/access-gate/decision/gate-policy-matrix.test.ts`
-
-**Interface:** `compileShellCall()`、`compileDirectToolCall()` 和 `compileToolCall()`（若确认保留）调用 canonical compiler，再由 Legacy Plan Adapter 生成并 sealing `CompleteAccessPlan`。Kernel、Profile 和 renderer 不改接口。
-
-**Acceptance:** 旧入口的所有现有 decision、brand、冻结状态、coverage、resourceUsage 和 reject evidence 保持明确测试覆盖；静态依赖检查证明 canonical compiler 不依赖 legacy plan adapter。
-
-#### Slice 4: 从 canonical flow facts 组装 Static Flow Graph
+#### Slice 3: Build the new Operation Admission plan and migrate consumers
 
 **Files:**
-- Create/Modify: `src/access-gate/content-flow/static-flow/composer.ts`
-- Create/Modify: `src/access-gate/content-flow/static-flow/types.ts`
-- Create/Modify: `src/access-gate/content-flow/static-flow/index.ts`
-- Create/Modify: `src/access-gate/content-flow/flow-adapter.ts`
+- Create: `src/access-gate/admission-plan/build.ts`
+- Create: `src/access-gate/admission-plan/seal.ts`
+- Create: `src/access-gate/admission-plan/verifier.ts`
+- Modify: `src/access-gate/gate/decision/`
+- Modify: `src/access-gate/gate/host.ts`
+- Modify: `src/access-gate/gate/index.ts`
+- Delete: `src/access-gate/gate/plan/`
+- Delete or migrate: `tests/access-gate/plan/`
+- Test: `tests/access-gate/admission-plan/`
+- Test: `tests/access-gate/decision/`
+
+**Interface:** Build the new sealed admission plan directly from `CanonicalCompilation`; migrate Kernel, renderer and host to the new plan guard/types. Remove all imports, exports and tests for `CompleteAccessPlan`, old plan brands and old compiler entry points.
+
+**Acceptance:** Existing admission behavior (hard deny, ask, allow, evidence and renderer output) is asserted via the new public seam; static dependency checks confirm no source file imports `gate/plan` or an old compiler name.
+
+#### Slice 4: Add Static Flow Composer directly over canonical facts
+
+**Files:**
+- Create: `src/access-gate/content-flow/static-flow/types.ts`
+- Create: `src/access-gate/content-flow/static-flow/composer.ts`
+- Create: `src/access-gate/content-flow/static-flow/views.ts`
+- Create: `src/access-gate/content-flow/static-flow/index.ts`
 - Test: `tests/access-gate/content-flow/static-flow.test.ts`
-- Test: `tests/access-gate/content-flow/flow-adapter.test.ts`
 
-**Interface:** Flow adapter 接收 canonical compilation 的 flow facts 和明确的 Composition Root links，调用唯一 Composer/sealing boundary，返回 sealed Graph。operation refs 直接来自 canonical result；不接收旧 `CompleteAccessPlan`、Profile 或外部 registry，不重新推导操作语义。
+**Interface:** `assembleStaticFlowGraph(input: StaticFlowCompositionInput)` directly receives a canonical compilation plus explicit links and limits. Composer is the only Graph writer and sealer; it validates contribution/link shape, operation-reference validity, budgets, duplicate/conflicting identities and unknown coverage, then publishes deeply immutable facet views.
 
-**Acceptance:** contribution/link budget、unknown coverage、immutability、sealing、显式跨 Boundary link 和 malformed input 通过 public seam 验证；Graph assembly 失败不会生成 partial Graph，也不会改变 plan adapter 的结果。
+**Acceptance:** Tests cover explicit content/control links, malformed local facts, malformed references, link incompatibility, duplicate identities, budgets, unknown propagation and no partial graph. No `flow-adapter.ts`, `integrateStaticFlow()`, `OperationRegistry` or old plan import exists.
 
-#### Slice 5: 删除 shadow facade 并验证双适配输出
+#### Slice 5: Remove every old public/API/module surface and migrate tests
 
 **Files:**
-- Delete or replace: `src/access-gate/content-flow/integration/`
-- Delete or replace: `src/access-gate/content-flow/operation-projection/`
-- Delete or migrate: `tests/access-gate/content-flow/integration.test.ts`
-- Delete or migrate: `tests/access-gate/content-flow/operation-projection.test.ts`
-- Create/Modify: `tests/access-gate/content-flow/canonical-parity.test.ts`
+- Delete: `src/access-gate/gate/plan/`
+- Delete: any old compiler re-exports from `src/access-gate/gate/`
+- Do not create: `src/access-gate/content-flow/integration/`
+- Do not create: `src/access-gate/content-flow/operation-projection/`
+- Delete or migrate: all tests named for old plan compiler, integration facade or operation projection
+- Modify: all remaining imports under `src/` and `tests/`
 
-**Interface:** 新测试从同一个 canonical compilation 分别调用 Legacy Plan Adapter 与 Flow Adapter，验证两种输出共享 operation facts 但不共享领域对象；不再测试“旧 compiler 结果 + registry + Graph 的事后 parity facade”。
+**Interface:** The repository exposes only canonical compilation, new admission plan and Static Flow Composer surfaces. All consumers import these new surfaces; no compatibility alias or retained module path remains.
 
-**Acceptance:** 仓库中不存在 Content Flow 调用 `compileShellCall()` / `compileDirectToolCall()` 的生产路径；不存在从旧 plan 反向建立 operation registry 的生产接口；未调用 Flow adapter 时旧 Gate 行为仍由 canonical→plan adapter 直接提供。
+**Acceptance:** repository-wide source/import scans find no `CompleteAccessPlan`, `compileShellCall`, `compileDirectToolCall`, `compileToolCall`, `gate/plan`, `OperationRegistry`, `projectOperations`, `integrateStaticFlow`, `content-flow/integration` or `content-flow/operation-projection` outside archival Git history.
 
-#### Slice 6: 文档与验证收尾
+#### Slice 6: Validate and synchronize durable documents
 
 **Files:**
 - Modify: `CONTEXT.md`
 - Modify: `docs/decisions.md`
 - Modify: `docs/task.md`
 
-**Interface:** 只在实现和验证完成后，把已确认的架构事实提炼进 `CONTEXT.md`，把已采纳的长期取舍记录进 `docs/decisions.md`，并清理本 Task Record 的过程内容；在此之前不把本草案写成 active Decision。
+**Interface:** Only after implementation and fresh validation, describe the new canonical ownership and current Static Flow capability in `CONTEXT.md`; retain D-059 as the durable decision; clear T-069 process content when its lifecycle completes.
 
-**Acceptance:** `npm test`、`tsc --noEmit`、文档校验、import-boundary 检查、`git diff --check` 和安全边界审查均有 fresh evidence；没有 runtime capability 或授权语义被误报为已实现。
+**Acceptance:** Run `npm test`, `tsc --noEmit`, documentation validation, import-boundary scans, `git diff --check` and a security/boundary review. Do not claim runtime Content Flow capability or altered authorization semantics without independent evidence.
 
-### Confirmation Points
+### Confirmed Direction
 
-在实施前需要用户确认以下取舍：
-
-- 是否采用 **Canonical Compilation 双适配输出** 作为唯一目标，拒绝 Graph→Plan 和旧 compiler→Flow 两种方向。
-- 旧 `compileShellCall()` / `compileDirectToolCall()` / `compileToolCall()` 是暂时保留为薄适配入口，还是在本次迁移中直接删除并迁移消费者。
-- canonical 层是否直接复用现有 `AccessOperation`、`PlanCoverage`、`ExpansionData` 类型，还是先建立完全中性的 facts 类型再由两个 adapter 映射。
-- Static Flow Graph 的跨 Boundary links 由哪个 Composition Root 提供，以及本任务是否只实现编译期局部 contribution、不实现任何 runtime checkpoint。
-- 是否允许把 archived `cfc8071` 的静态 composer 校验测试迁移到新接口；不迁移其 integration facade、registry projection 和“旧 plan 是 source of truth”的文档结论。
+- Canonical Compilation is the sole fact source.
+- No old API, old compiler module, old plan module, compatibility adapter or shadow facade remains.
+- No separate Static Flow Adapter is created; Static Flow Composer directly consumes canonical flow facts.
+- Static Flow Graph does not generate or contain the new admission plan.
+- Runtime checkpoints and authorization remain outside this refactor.
 
 ### Evidence
 
-尚未实施；本记录只完成 Git 分支整理和设计草案落档，不声明任何代码、测试或架构迁移已经完成。
+No implementation has begun. Git branches were prepared, D-059 and this Task Record were written, and document validation was run successfully before this record was finalized.
 
 ### Durable Updates Checklist
 
-- [ ] 用户确认 canonical ownership 与旧 API 适配策略。
-- [ ] 根据确认结果更新本 Task Record，并在实施前形成无歧义的接口与文件计划。
-- [ ] 仅在验证完成后更新 `CONTEXT.md` 与 `docs/decisions.md`。
-- [ ] 清除 archived shadow 方案在当前文档中的 active/approved 表述。
+- [x] Record canonical ownership, explicit old-module removal and no-compatibility decision in D-059.
+- [x] Record the breaking migration design and remove the obsolete compatibility alternatives from this Task Record.
+- [ ] Migrate source, tests and public exports according to the confirmed design.
+- [ ] Verify the new architecture and then update `CONTEXT.md` from fresh evidence.
+- [ ] Clear this completed Task Record according to its lifecycle.
 
-## T-069: 待创建
+## T-070: 待创建
