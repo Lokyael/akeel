@@ -1,8 +1,6 @@
 # Pi Keel
 
-Engineering skills and an access-control system for [pi](https://pi.dev).
-
-Pi Keel combines behavioral principles, engineering disciplines, workflows, and a Profile-driven access gate in one `pi install`. The gate is user-space policy enforcement; it is not an OS sandbox.
+Engineering skills and a user-space access-decision system for [pi](https://pi.dev).
 
 ## Install
 
@@ -10,120 +8,61 @@ Pi Keel combines behavioral principles, engineering disciplines, workflows, and 
 pi install git:github.com/Lokyael/pi-keel
 ```
 
-Principles and the access gate activate automatically. Skills load on demand.
+Principles and skills activate automatically. Skills load on demand.
 
-## What's Inside
+Pi Keel includes evidence-first verification, TDD, code review, debugging, security review, planning, and related engineering disciplines. Recovery remains outside the package: use version control, editor history, or pi's session tree.
 
-- **Injected principles + engineering disciplines + user workflows** — evidence-first verification, TDD, code review, debugging, security review, domain modeling, planning, implementation, and related practices
-- **Access profiles** — composable read/write path rules, Shell command decisions, one-time approval, hard protected paths, and threat scanning
-- **Session-safe authorization** — each Session starts from the configured default Profile; approvals are `Allow once` only
-- **Recovery boundary** — no automatic snapshots or rollback; use version control, editor history, or pi's session tree
+## Access decisions
 
-## Access Gate
+Pi Keel governs the managed `read`, `write`, `edit`, `find`, `grep`, `ls`, and `bash` tool surfaces. Other tool surfaces pass through unchanged. Decisions are made by a Pi-host-neutral canonical pipeline using the supported Linux pathname contract; hard security boundaries and unsupported forms fail closed.
 
-The active Profile is the only permission mode exposed to users. Built-ins live in `src/access-gate/profile/builtins.json`; user Profiles load only from the global agent configuration. Use `/profile status` for the complete resolved policy.
+The global policy input is:
 
 ```text
-/profile                 # Select a Profile
-/profile <name>          # Activate a Profile
-/profile status          # Show its detailed policy
+~/.pi/agent/pi-keel/policy.yaml    # $PI_CODING_AGENT_DIR replaces ~/.pi/agent
 ```
 
-The Footer shows the active Profile, Session, and project location on the first line, with Pi's native runtime stats (tokens/context/model) and extension status on the second. Shell commands without a matching adapter use the Profile's `unknown` decision; commands an adapter cannot safely analyze are hard-denied as opaque. Network effects follow Shell policy (e.g. `git push`); unknown network commands (`curl`, `wget`) require one-time approval in Profiles that allow it. `uv run` is classified as `execute` because it may sync the project environment before running a child command; `uv` version/help remains inspect-only.
-
-Hard threats, unsafe Shell syntax, symlink escapes, and blocked paths always deny and cannot be overridden by a Profile or approval. `ask` offers only `Allow once` and `Deny`; headless modes fail closed when approval would be required.
-
-## Configuration
-
-All user configuration — Profiles and Shell command semantics — is centralized in a single file:
-
-```text
-~/.pi/agent/pi-keel/config.yaml        # $PI_CODING_AGENT_DIR replaces ~/.pi/agent
-```
+A missing policy file denies all managed operations. The file is a new schema and is not compatible with the former `config.yaml` or Profile configuration.
 
 ```yaml
-defaultProfile: team-develop
-
-profiles:
-  team-develop:
-    description: Project writes allowed; execution requires approval.
-    extends: [keel-develop]
-    shellPolicy:
-      execute: ask
-
-subagentProfiles:
-  worker: project   # scratch → keel-explore；project → keel-subagent-project（D-039）
-
+paths:
+  read: allow
+  write: ask
+  list: allow
+  search: allow
+  allowedRoots:
+    - /workspace/project
 commands:
-  aliases:
-    fd: find
-  commands:
-    docker:
-      class: execute
-      effects: [execute, network]
+  inspect: allow
+  modify: ask
+  execute: deny
+  destroy: deny
+  unknown: deny
 ```
 
-Profile decisions are `allow`, `ask`, or `deny`. Path rules independently control `read`, `list`, `search`, and `write`; patterns match virtual (`project/**`), absolute (e.g. `/tmp/**`), or home-relative (`~/...`) forms. Hard-blocked secret paths under `~/` (`.ssh`, `.aws`, `.gnupg`, `.kube`, `.docker/config.json`, `.config/gcloud`, `.pi/agent/auth.json`) stay hard-denied regardless of rules.
+Path modes are `allow`, `ask`, or `deny`; command modes are `allow`, `ask`, or `deny`. The policy may narrow access with `allowedRoots`, `blockedRoots`, and `blockedPaths`. `ask` requires an interactive host confirmation and never executes automatically. Confirmation summaries are bounded, include the literal Shell command form, and omit file content. The policy file is validated when loaded; malformed YAML, unknown fields, and legacy fields fail closed.
 
-### Command Semantics Overrides (`commands`)
+The current release does not provide `/profile`, a Profile Footer, policy-selection UI, or pi-keel-managed subagent permission tiers. These capabilities require separate future work.
 
-Extends or adjusts Shell command semantics declaratively; built-in TypeScript adapters remain authoritative. Resolution order: `commands` definitions → `aliases` → `commands` definitions (alias target) → built-in adapter → `reclassify`.
-
-```yaml
-aliases:
-  fd: find
-  bat: cat
-  just: make
-  "./node_modules/.bin/eslint": node   # 精确键；前缀键（如 "bin/"）覆盖整个前缀
-commands:
-  docker:
-    class: execute
-    effects: [execute, network]
-    subcommands:
-      ps: { class: inspect, effects: [read] }
-reclassify:
-  - command: git
-    pattern: "branch -[dD]"
-    class: destroy
-```
-
-Alias keys are explicit-scope: bare name, full path, or path prefix. `reclassify` patterns are regexes matched against the subcommand string. See [D-024](docs/decisions.md#d-024-命令覆盖层) for the design and known limitations.
-
-## Companion Packages
+## Companion packages
 
 Recommended third-party packages that pair well with Pi Keel:
 
 | Package | Source | What it adds |
 |---------|--------|--------------|
-| pi-subagents | `npm:pi-subagents` | Sub-agent delegation: parallel tasks, chains, async runs, and supervisor review. Children load Pi Keel's gate automatically (ambient extensions), and Pi Keel manages sub-agent permissions via tiered sub-agent Profiles (see [D-039](docs/decisions.md#d-039-子代理档位制pi-keel--pi-subagents)) |
-| pi-search | `npm:@heyhuynhgiabuu/pi-search` | Research tools for the agent: web search, code search, library docs, repo Q&A, URL fetching, and Firecrawl scraping/crawling |
+| pi-subagents | `npm:pi-subagents` | Parallel tasks, chains, async runs, and supervisor review. It is independent of Pi Keel's access-decision policy. |
+| pi-search | `npm:@heyhuynhgiabuu/pi-search` | Research tools for web search, code search, library docs, repo Q&A, URL fetching, and Firecrawl scraping/crawling |
 
 ```bash
 pi install npm:pi-subagents
 pi install npm:@heyhuynhgiabuu/pi-search
 ```
 
-Review the source of any third-party package before installing — Pi packages run with full system access.
+Review third-party packages before installing: Pi packages run with full system access.
 
-### Recommended environment variables
+### Environment variables
 
-Pi Keel reads internal environment variables only — `PI_CODING_AGENT_DIR` (agent directory override, see Configuration) and sub-agent tier variables (`PI_SUBAGENT_CHILD`/`PI_SUBAGENT_CHILD_AGENT`/`PI_KEEL_PARENT_TIER`, see [D-039](docs/decisions.md#d-039-子代理档位制pi-keel--pi-subagents)). It reads no API keys. The companion packages read their own configuration — set these in your shell profile, or equivalently in `~/.pi/pi-search.json` (environment variables take precedence):
-
-| Variable | Package | Effect | Without it |
-|----------|---------|--------|------------|
-| `EXA_API_KEY` | pi-search | `websearch`/`codesearch` use Exa REST directly (deep search, filters, result highlights) | Falls back to the public Exa MCP server — narrower feature set |
-| `FIRECRAWL_API_KEY` | pi-search | Enables `firecrawl_scrape` and `firecrawl_crawl` | Those two tools always fail |
-| `BRAVE_API_KEY` | pi-search | Optional `websearch` failover when Exa is unavailable | No failover (a free key is available) |
-| `GITHUB_TOKEN` / `GH_TOKEN` | pi-search | Avoids GitHub API rate limiting (HTTP 403) in `web_fetch` for GitHub URLs | Intermittent 403s when fetching GitHub content |
-
-```bash
-# shell profile (or the equivalent keys in ~/.pi/pi-search.json)
-export EXA_API_KEY=your-exa-key
-export FIRECRAWL_API_KEY=your-firecrawl-key
-export GITHUB_TOKEN=your-github-token   # optional
-```
-
-See the [pi-search README](https://github.com/heyhuynhgiabuu/pi-search) for the full configuration reference.
+Pi Keel reads `PI_CODING_AGENT_DIR` to override the default agent directory. It reads no API keys. Companion packages read their own configuration.
 
 ## Documentation
 

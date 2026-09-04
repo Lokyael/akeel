@@ -29,14 +29,14 @@
 - **Trigger:** 实施阶段出现"纸面评审未覆盖的语义分歧"实证，或用户决定启用差分语料仲裁。
 ## C-016: 环境变量治理（受管 `.env` 面：单一名份契约 + 按名可靠掩码 + 字面追加/allow 覆写）
 
-- **Why Not Now:** 未采纳。落地方向成立但需演进 D-017 blocked 语义表述（append 子形态）与 D-022 plan 形状（append 标志），并新建命令面治理（env/printenv/export 族目前只有笨重的 unknown→ask）与受管面模块（parse key/value → mask → append → set-allow）；当前无用户实证表明"无法便捷注入 env 配置"已达到不可接受。重设版补充：D-023"拒绝值级掩码"的边界需明确（它拒 deny/ask 渲染面的内容嗅探掩码，不拒受管面**按名**掩码，见下"按名可靠掩码"）。
+- **Why Not Now:** 未采纳。落地方向成立但需演进 D-060 blocked 语义表述（append 子形态）与 D-022 plan 形状（append 标志），并新建命令面治理（env/printenv/export 族目前只有笨重的 unknown→ask）与受管面模块（parse key/value → mask → append → set-allow）；当前无用户实证表明"无法便捷注入 env 配置"已达到不可接受。重设版补充：D-023"拒绝值级掩码"的边界需明确（它拒 deny/ask 渲染面的内容嗅探掩码，不拒受管面**按名**掩码，见下"按名可靠掩码"）。
 - **Proposal:** 以**变量名契约为唯一治理轴**，把 `.env` 建成"受管面"（Managed Env Surface）：所有读写经这一个面、用同一份名字契约决策，掩码也由名字契约驱动因而可靠。
-  - **名字契约（单源）**：`config.yaml` 顶层 `env` 段（D-041 加载即校验）——`protected`（掩码+拒写+拒导出，默认表覆盖 key/ip/真实链接/url：`*(KEY|TOKEN|SECRET|PASSWORD|PASS|PWD|PRIVATE|CREDENTIAL|AUTH|BEARER)`、`*(HOST|URL|URI|ENDPOINT|IP|ADDR|CONN*|DBCONN*)` 等）、`allow`（可读可见+可写：`NODE_ENV`/`PORT`/`DEBUG`/`LOG_LEVEL`/`APP_NAME`/`REGION`/`TZ`）、其余 = neutral（可读可见，不可写）。命名约定本身是治理输入；决策只探测键名集合，不取值。
+  - **名字契约（单源）**：`config.yaml` 顶层 `env` 段（D-062 加载即校验）——`protected`（掩码+拒写+拒导出，默认表覆盖 key/ip/真实链接/url：`*(KEY|TOKEN|SECRET|PASSWORD|PASS|PWD|PRIVATE|CREDENTIAL|AUTH|BEARER)`、`*(HOST|URL|URI|ENDPOINT|IP|ADDR|CONN*|DBCONN*)` 等）、`allow`（可读可见+可写：`NODE_ENV`/`PORT`/`DEBUG`/`LOG_LEVEL`/`APP_NAME`/`REGION`/`TZ`）、其余 = neutral（可读可见，不可写）。命名约定本身是治理输入；决策只探测键名集合，不取值。
   - **三种能力**：① **MASK-read**（替代整读）解析 `.env` → 逐条 `key=value`；protected 名 → `key=****`，allow/neutral 名 → 原值；② **APPEND** 仅 `>>` 追加单行字面 `K=V`（无先读后写、无替换）；③ **SET-allow** 仅对 allow 名单内 key 覆写为字面值（allow 名按契约即非敏感 → 低危）。原始 `cat .env`/`>`/truncate/write/edit、`grep -r` 递归聚合保持 hard deny。
   - **按名可靠掩码（重设核心，回应"屏蔽 key/ip/真实链接/url 但不影响普通变量"）**：掩码失效源于"按内容猜值像不像 secret"；因 `.env` 是结构化 `K=V`，拆成 (key,value) 对后**按 key 名**判——`API_KEY=****`、`NODE_ENV=production`。名字可枚举、用户声明 → 确定性、无内容启发式、无漏判误判（误伤固定词/漏改编码）。这与 D-023 相容：D-023 拒的是 deny/ask 渲染面"嵌入原始值再打码"（值形态任意、无结构）；受管面面对结构化 key-value + 可声明名字契约，掩码键名而非猜值，是全新且可靠的前提。
   - **掩码位点前置条件（可信掩码的唯一正确实现位点，安全不变量）**：掩码必须发生在 **pi-keel 进程内**（受管面 Direct 工具：fs 读 → 按 key 名替换为 `****` → 只把掩码串作为 tool result 返回）。原因：掩码只有在"原始值永不离开可信进程"时才有意义——若是 shell 管道（`cat .env | sed …`），原始内容先经过 shell stdout → host 执行记录（日志）与 LLM tool result，sed 只是给"已读走的原文"打码，**收不回来**，且原始 read 已发生。由此两条硬约束：① `.env` 的读一律走受管面 Direct 工具，**禁止 shell 管道掩码**；② 受管面 **不得 debug-log 原始 `.env` 内容**。**正面承诺（受管面正确实现下）**：进入 LLM 上下文的 `.env` 内容只有两种形态——掩码串（protected 名 `key=****`）与 allow/neutral 名的原值（后者即"普通变量不受影响"的设计意图本身，非泄露）；除此之外的原始值只短暂驻留 pi-keel 进程内存，**不写入任何 pi-keel 侧记录**（无 debug 日志、无事件流落盘），**不进入任何 tool result**。拒绝/失败路径同样保证：gate 决策前不读取文件。此承诺的边界见"诚实边界"残余段（磁盘本体/写路径字面/host 侧记录不在其内）。gate 决策路径本就安全：gate 是纯决策层、不执行文件读（D-022），deny 侧只给类别不给值（D-023），拒绝路径不带原始值。
-  - **命令轴治理**：env/printenv/export/set/declare 按名分类；export protected 名 deny（防 D-039 子代理 env 传播）；env 含 protected 名时全量 dump deny；受限 dump 只见 allow/neutral 或全掩码。子代理对 allow 名可见、对 protected 名拿到 `****`，叠加父档钳制（D-039）多层收敛。
-  - **实现方案大纲**（参考，非承诺）：IR 已区分 append 形态（`RedirectionKind.stdoutAppend`），缺口在 compiler 摊平 → 把 append 标志带进 `PathAccessOperation`（plan 形状同步 D-022/D-046）；`decidePath` 对 env 家族在 write+append 形态放行进入 profile，其余 blocked（D-017"不可覆盖"不破坏——append/SET-allow 是新增子形态而非用户豁免）；新建受管面模块（`access-gate/env/`，parse → mask → append → set-allow，镜像 tests 分层 D-044）；威胁层 `read_secrets` 与名字契约单源对齐。
+  - **命令轴治理**：env/printenv/export/set/declare 按名分类；export protected 名 deny（当前无 pi-keel 子代理 env 策略）；env 含 protected 名时全量 dump deny；受限 dump 只见 allow/neutral 或全掩码。子代理对 allow 名可见、对 protected 名拿到 `****`，当前不提供父档钳制。
+  - **实现方案大纲**（参考，非承诺）：IR 已区分 append 形态（`RedirectionKind.stdoutAppend`），缺口在 compiler 摊平 → 把 append 标志带进 `PathAccessOperation`（plan 形状同步 D-022/D-046）；`decidePath` 对 env 家族在 write+append 形态放行进入 profile，其余 blocked（D-060"不可覆盖"不破坏——append/SET-allow 是新增子形态而非用户豁免）；新建受管面模块（`access-gate/env/`，parse → mask → append → set-allow，镜像 tests 分层 D-044）；威胁层 `read_secrets` 与名字契约单源对齐。
   - **诚实边界**：dedup/覆盖检测不可用（读被禁的必然结果，SET-allow 只对 allow 名提供显式覆写）；printf/多行/`$'…'` 形状 v1 不建模 → fail-closed；名字不在 protected 表、值里却嵌真实 IP/URL 的变量按名掩码覆盖不到——缓解是聚合读保持 hard deny（无批量外流通道）+ 用户把该变量名加 protected，按内容值级兜底掩码不作为保证（与 D-023 一致，结局 fail-open，只作显式 opt-in 非保证最佳努力）；rc 文件（`.bashrc` 等）是混合载体，密钥内容可见性属显式通道边界；执行输出里的 secret 属 pi 宿主 logging scrubbing，pi-keel out of scope（Negative Space 已声明）。**掩码消除不了的残余**：`.env` 本体在磁盘，其他读者（其他 extension 直接 fs、用户编辑器、被 gate 放行的 shell）可读原始值——pi-keel 只保证受管面通道不泄，不保证"无其他读者"（Negative Space：不拦截其他 extension 的 Node fs）；写路径（APPEND/SET-allow）的字面值本就在 agent 自己的 toolCall 里（写配置的意图），非掩码职责；host 侧对工具调用的记录属宿主面，pi-keel out of scope。
 - **Trigger:** 用户确认"agent 需要落盘写项目 `.env` 注入配置"（追加/allow 覆写）为真实高频工作流，或"密钥经 rc 文件/进程 env/按内容掩码漏判"出现实证需求。
 ## C-017: 归约路径单解析收敛（C2）
@@ -44,4 +44,29 @@
 - **Why Not Now:** 纯内部重构、外部可观测行为零变化（拒绝码/判定/展示全不变，corpus 锁死），性能收益微秒级（gate 每 tool_call 支配项是路径解析/语义分析而非 parse）。C1/D-056 已把 `compileFlatPipeline` 签名收敛为 `(command, input, expansion?)`，C2 是同方向下一步，但需动 `reduceToFlat` 返回形状（自校验产物 program 进文本级 API，与 shell-parse 类型耦合）或只收结构双查（收益变小）；当前无正确性/安全/体验压力驱动它立即单做。
 - **Proposal:** 归约路径目前三次解析——① `compileShellDraft` 结构扫描、② `reduceToFlat` 自校验（lex+parse）、③ `compileFlatPipeline` 编译主体（lex+parse）。②③ 之间对同一 text 的解析与 `dynamic`/`loopScopes`/`opaqueRegions`/`unsafeSyntax` 结构检查是确定性重复（纯函数同输入同输出）；③ 独有的 maxCommands/preflight/control-flow/逐命令编译不可归并。方案：拆 `compileParsedProgram(program, input, expansion?)` 共享主体，归约路径以自校验产物（已 parse program）作编译入口，非归约路径 parse 后走同一主体——「归约产物已自校验」成为编译入口结构不变量（编译期 parse 失败 = 合成器 bug 而非用户输入分类），动态/opaque/loopScopes 保证从双处检查收敛为合成器契约 + 注释。自校验不可移出 reduce（其 null → compound-command 分类契约是 fail-closed 组成部分，`residual dynamic` 测试锁定）。先例：D-046 验证收敛 seal、scanVarRefs/prefixedCommand 单源。
 - **Trigger:** 下次触碰 compile 装配（扩展归约形态、预算调整、guard 准入）时顺带实施；或用户在当前会话选定为独立小任务（30–60 分钟）。
-## C-018: 待创建
+## C-018: pi-subagents 工业级工程驯化方案（熔断护栏 + Worktree 有界自治 + Herdr 异步解耦）
+
+- **Why Not Now:** 当前主要在单会话内做高频交互式敏捷开发，全自主多代理流水线仍需对既有扩展 `pi-subagents` 进行系统化配置调优；此前实测已暴露未经驯化的严重病灶（无熔断导致的 5 小时 31 轮审查死循环、前台同步阻塞导致终端卡死、缺乏统一 Worktree 隔离导致工作区混淆等）。此前探讨的“彻底废弃插件并收敛为极简只读脚本”虽然极度轻量，但剥夺了子代理的代码修改权与 TDD 编译/单测自愈闭环，在大型重构与异步无人值守中吞吐受限。本方案选择保留并驯化成熟基础设施（Worktree 生命周期、Herdr 原生桥接、后台异步恢复），待出现高频异步长任务与复杂重构刚需时正式启用。
+- **Proposal:** 拒绝轻率重造轮子，不修改 `pi-subagents` 源码本身，通过**“配置调优 + 物理边界守卫 + 规则注入”**完成工业级驯化，形成“微观全放权，宏观守门禁”的有界自治流水线：
+  - **刚性熔断阀（消灭无限审查死循环）**：在配置中设置 `maxSubagentSpawnsPerRun: 3` 与 `maxSubagentDepth: 1`；在 Prompt/Skill 纪律中硬性约束“审查最多允许 2 轮，第 2 轮后的次要建议必须作为 Advisory 写入交接文档停机，严禁触发第 3 轮循环修复”，杜绝失控拉锯。
+  - **Worker 强制 Git Worktree 物理隔离（微观全自治）**：严格贯彻有界自治原则，所有涉及代码修改与测试执行的子任务强制声明 `worktree: true`。子代理在独立检出的 Worktree 物理目录内享有 100% 的修改代码、运行编译、执行单测与报错自愈自由，全程零审批弹窗、零工作区踩踏；主 Agent 与人类无需微观干涉，仅在最终提交时做 PR/Diff 宏观验收。
+  - **强制默认异步与 Herdr 旁观解耦**：在扩展配置中开启 `asyncByDefault: true` 与 `forceTopLevelAsync: true`，彻底消灭前台同步阻塞（`async: false`）对交互 TUI 的锁死；前台保持低延迟交互心流，后台状态通过 Herdr 原生 Socket 与 `H` 键侧边窗实现全透明旁观与随时干预。
+  - **角色精简收敛（消除戏服）**：通过 `disableBuiltins` 停用同质化冗余角色（oracle/researcher/delegate），全生命周期收敛为 3 个生产力核心：`worker`（Worktree 内全自治攻坚与 TDD 自愈）、`scout`（只读快速扫库压缩事实）、`reviewer`（交付前单次对抗性门禁审查）。
+  - **打通 Pi Keel 空间准入策略**：在 `policy.yaml` 中将 Worktree 专属目录（如 `/tmp/pi-work/**` 或 `.pi/worktrees/**`）配置为 `write: allow`，系统高危操作保持 `deny`，解决后台无头子代理在无 UI 环境下因 `write: ask` 产生权限死锁的结构性矛盾。
+- **Trigger:** 用户正式启动需要长周期后台攻坚、复杂并发重构或夜间无人值守的大型特性开发；或用户决定正式应用上述配置对当前 `pi-subagents` 运行环境进行生产级调优。
+## C-019: 会话上下文水位自省与安全交接协议（Context Introspection & Safe Handoff Protocol）
+
+- **Why Not Now:** 当前主要依赖人工对上下文消耗的感知，且对于常规短平快任务，单会话通常在窗口耗尽前已自然结束；自动化交接涉及工作区状态判决（如 git 干净度、测试通过断言）与主动停机策略，需定义清晰的契约边界，目前尚无自动化切分机制，先落档作为机制候选。实测证据已表明：在长会话（尤其是禁用自动压缩的场景）中，缺乏水位自省会导致上下文膨胀至数十万 Tokens（如实测观察到的 50 万 Token 长会话），引发推理延迟激增、缓存成本高昂以及模型因注意力分散而陷入反复自审死循环。
+- **Proposal:** 建立面向单 Agent 自省与多 Agent 协作的**上下文水位监控与安全交接机制**：
+  - **精准水位探测（真实数据、零开销）**：
+    - **自身探测**：直接读取当前会话 `session.jsonl` 末尾的 `usage` 字段（`cacheRead + input`），获取底层真实的窗口占用数据，避免依赖大模型自然语言“估算”自身 Token；或通过 Extension 运行时钩子注入自省状态。
+    - **跨 Agent/窗格窥探**：通过文件系统扫描其他活动会话的 `session.jsonl`，或经由 Herdr Socket API（`herdr pane list` / metadata）广播窗格 Token 水位，允许 Supervisor 脚本或人类直观监控全局上下文开销。
+  - **安全交接准则（Safe Handoff Boundary）**：
+    - **严防半途截断**：严禁在代码修改中途、测试未通过或存在编译语法报错时强行打断交接，避免接盘 Agent 面临破碎状态；
+    - **原子闭环触发**：当上下文达到软阈值（如 120k~150k 或 70% 窗口）时，Agent 进入收敛模式，不开启新任务，仅等待最近一个**原子闭环点**（当前 Slice 完成、测试全绿、Git 工作区干净或已建立安全保存点）到达。
+  - **交接契约生成（Handoff Contract）**：
+    - 自动在 `/tmp/pi-work/handoffs/handoff-<timestamp>.md` 生成标准化交接文件，内容严格结构化：① 当前阶段完成状态与验证证据（如测试日志、commit hash）；② 已定案的核心设计决策与边界；③ 下一个新会话启动后的第一明确动作（Next Action）与启动命令。
+  - **优雅停机与终端通知**：
+    - 写入交接文档后，Agent 主动停止后续执行，在终端输出明确的交接提示（如果在 Herdr 窗格中，可发送 `herdr notification` 提醒），引导人类新开一个干净的会话加载交接文档继续工作。
+- **Trigger:** 用户确认在大型多阶段特性开发中，上下文膨胀导致的推理退化与循环拉锯成为高频痛点；或用户要求在会话中正式引入自动化水位预警与交接模板生成工具。
+## C-020: 待创建

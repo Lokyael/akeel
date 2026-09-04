@@ -32,6 +32,7 @@ declare module "@earendil-works/pi-coding-agent" {
   }
 
   export interface ExtensionUI {
+    confirm(title: string, message: string, settings?: unknown): Promise<boolean>;
     select(prompt: string, options: string[], settings?: unknown): Promise<string | undefined>;
     notify(message: string, level?: "info" | "warning" | "error"): void;
     setStatus(id: string, text: string | undefined): void;

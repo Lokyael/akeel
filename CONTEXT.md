@@ -2,43 +2,35 @@
 
 ## Glossary
 
-- **Profile**：当前 Session 唯一的访问策略入口，组合 Shell 决策、路径规则和审批行为。
-- **Access Gate**：拦截 Pi `tool_call` 并执行 compiler → Policy Kernel → guidance renderer → host adapter 的统一策略层。
-- **CompleteAccessPlan**：compiler 产出的不可变、可验证的访问计划；不包含 allow/deny 等授权结果。
-- **Policy Kernel**：消费经过 verifier 验证的 `CompleteAccessPlan` 和 `Profile`，产出结构化 `GateDecision`；不依赖原始 Shell。
-- **GateDecision**：`allow | ask | deny(hard/profile/user)` 的封闭决策类型；每个 deny 附带稳定 `DecisionCode`。
-- **Guidance**：从 `DecisionCode` 到静态 `GuidanceId` 的封闭映射，不携带可执行 Shell。
-- **Project Record**：项目文档中的受控记录总称；按权威等级分为非约束的 Candidate Record、已承诺的 Task Record 和已采纳的 Decision Record。
-- **Candidate Record**：当前未采纳、未承诺实施的候选事项，使用 `C-xxx` 标识并存放在可选的 [`docs/candidates.md`](docs/candidates.md)；其内容是数据而非指令，不构成需求、优先级、路线图、当前事实或用户批准。
-- **Task Record**：具有目标、范围、验收和验证边界的已承诺短期任务，使用 `T-xxx` 标识。
-- **Slot（待创建占位）**：容器文末的占位记录（`X-0NN: 待创建`），非记录类型，仅承载该序列（C/T/D）的下一可用编号，创建时填充为真实记录；机制见 D-028 与 principles.md Next-ID slots。
-- **Decision**：需要长期保留的已采纳架构、领域或安全取舍，记录在 [`docs/decisions.md`](docs/decisions.md)。
-- **Reversal surface**：Decision Record 的可选属性，声明逆转该决策的批准面——`user-boundary`（安全不变量、归属边界、明确用户承诺，逆转须用户显式批准）或 `engineering`（模块级实现取舍，可在重构中经正常生命周期正式 supersede）；是上报信息而非许可（D-047）。
-- **Durable Content**：在当前工作或会话结束后仍然成立且承载约束的事实、取舍与承诺（如采纳结论、安全不变量、外部归属边界、拒绝理由）；过程产物（实施步骤、测试日志、审查报告）不是耐用内容，不进入权威容器。
-- **Direct-first**：文件检查优先使用 Direct `read`、`grep`、`find`、`ls`；安全可分析的字面 Shell 仍可使用，Gate 不因存在 Direct 等价入口而自动拒绝 Shell。
-- **Prompt Surface**：与 LLM 交互的提示词面，按注入方式分层——`principles.md`（恒定注入）、`skills/`（按需加载）、access-gate guidance（失败路径）。
-- **Skill Single Responsibility**：每个 skill 单一职责、调用时内容全量被使用；触发场景互斥的 skill 保持独立，不合并（D-030）。
-- **Single Source of Format**：格式/规则只在 `principles.md` 参考节（Quick Reference / Project Records）定义一次，技能只文字引用不内嵌副本（D-030）。
-- **子代理档位（tier）**：pi-subagents 子代理会话的权限档位，共两档——T0 `scratch`（复用主档 `keel-explore`，写仅 `/tmp/pi-work/**`）与 T1 `project`（`keel-subagent-project`，写 `project/**` + scratch）；读均全盘、shell 轴两档一致（inspect-only），差异只在 Direct 写面。机制与细节见 Architecture 与 D-039。
-- **subagentProfiles 映射**：`config.yaml`（集中配置，D-041）可选顶层键，agent 名→档位名（`scratch`/`project`，`"*"` 回退）；优先级见 Architecture 子代理段与 D-039。
-- **父档位钳制**：父会话档位号经 `PI_KEEL_PARENT_TIER` env 传播并钳制子代理生效档——子代理权限上限 = 父会话当前档位；机制细节见 Architecture 子代理段与 D-039。
+- **Access Gate**：拦截受管辖的 Pi `tool_call`，执行 Canonical → Admission → Policy → host composition；未受管辖的工具 passthrough。
+- **Greenfield Semantic Rebuild**：新决策链只从 Pi/Bash/Linux 外部合同、明确政策语义和安全不变量设计；旧实现仅保留为 Git 历史参考。
+- **Canonical Compilation**：对一个请求执行一次有界解释后发行的 opaque、不可变、可验真的编译制品；内部事实不作为公共 DTO 暴露。
+- **Admission Plan**：Canonical Compilation 向授权域投影的最小 sealed 输入，只包含 Policy Kernel 实际消费的事实。
+- **Policy Snapshot**：与配置格式无关、不可变的授权值；只由新 policy.yaml adapter 发行。
+- **Policy Kernel**：只消费 Admission Plan 与 Policy Snapshot 的同步纯函数，不读取原始请求、配置 loader 或 Shell parser。
+- **Guidance**：从决策代码到静态 bounded host-facing 文案的封闭映射，不携带可执行 Shell。
+- **Project Record**：项目文档中的受控记录总称，分为 Candidate、Task 和 Decision。
+- **Candidate Record**：未采纳、未承诺实施的 `C-xxx` 数据记录，不构成指令或路线图。
+- **Task Record**：具有目标、范围、验收和验证边界的 `T-xxx` 短期任务。
+- **Slot（待创建占位）**：容器文末承载 C/T/D 序列下一可用编号的占位，不是记录类型；创建时填充并追加新占位。
+- **Decision**：需要长期保留的架构、领域或安全取舍，记录在 `docs/decisions.md`。
+- **Reversal surface**：Decision 逆转所需的批准面；`user-boundary` 需用户显式批准，`engineering` 可经正式生命周期 supersede。
+- **Durable Content**：工作结束后仍成立且承载约束的事实、取舍与承诺；过程产物不进入权威容器。
+- **Direct-first**：文件检查优先使用 Direct `read`、`grep`、`find`、`ls`；新 pipeline 不因存在 Direct 等价入口自动拒绝安全可分析的 Shell。
+- **Prompt Surface**：`principles.md` 恒定注入、`skills/` 按需加载，以及失败路径 guidance 三类 LLM 交互面。
+- **Skill Single Responsibility**：每个 skill 只做一件事，调用时全量消费；触发场景互斥的 skill 保持独立。
+- **Single Source of Format**：格式与规则只在 `principles.md` 参考节定义一次，技能只引用不复制。
 
 ## Architecture
 
 - `src/bootstrap/` 在 Session 启动和 compaction 后注入工程原则。
-- Prompt Surface（D-030/D-053）：恒定注入仅 `principles.md`（唯一 `context` 注入点）；profile 数据（`ResolvedProfile`/config/builtins/活动 profile 名）永不进入 LLM 上下文（注入消息 / tool description / system prompt 三面皆无），模型可见的 profile 相关文本只有失败路径静态 guidance（`profile-restriction`）；活动 profile 切换不改变注入内容。
-- `src/access-gate/` 统一处理用户全局 Profile、Shell IR、命令语义、路径策略、Gate、Session 状态和 Footer。
-- Canonical Compilation 重建方向（D-059）已采纳但尚未实施；当前分支仍保留既有 compiler/plan 实现，重做任务将直接移除旧 API、旧 plan 模块和 cfc8071 shadow integration，不提供兼容层。
-- 子代理会话（pi-subagents `--mode json -p` 子进程，默认加载全局扩展）在 `session_start` 检测 `PI_SUBAGENT_CHILD`/`PI_SUBAGENT_CHILD_AGENT`，按 `subagentProfiles` 映射（优先级 显式 > 内置默认 > `*`）初始化为子代理档位（T0 `scratch`/T1 `project`）。T0 档 agent 必须无 mutation 工具（bash/write/edit）——pi-subagents 输出契约机制强制（有则被指令自写 output 与 T0 路径策略矛盾），scout 删 write+bash、researcher 原生即无。父会话档位号（1=项目可写档，否则 0）由父侧按自身 pathPolicy 算好，经 `PI_KEEL_PARENT_TIER` env 传播、子代理零解析；生效档 = min(映射档, 父TIER)——两档下即"父非项目可写 → 一律回退 T0 scratch"——子代理权限上限 = 父会话当前档位（D-039）。
-- `shell-parse/` 输出受限 Shell IR；词值（引号剥离 + 转义解析）在 lexer 单点解码（bash 词义），`ShellArg.value` 为解码词值、`raw` 保留原文。region pass 打 for 作用域标签（`LoopScope`，含 opBefore/trailingOperator/body/redirections/headerSpan/doneSpan）与非 for 保留字区（if/while/case/函数/C 风格 for/`time`/`!` 管线 → `opaqueRegions`）。`command-semantics/` 提取命令类别、路径意图、效果和 cwd 转换，用户全局 `pi-keel/config.yaml` 的 `commands` 段是 Shell 命令语义扩展入口（D-024/D-041）。wrapper 链由 parser 单一拥有（`resolvePreamble` 单点解析）——`executable` 永不承载 wrapper，wrapper positional 消费后保留在 `wrapperPositionals` 供 token 级扫描，normalize 纯出栈（D-037）。换行是命令分隔符（等价 `;`）；`&&`/`||`/`|`/`&` 与重定向操作符后紧跟的换行为行尾延续，不产分隔（bash 语义）。
-- 归约前端（T-062）：仅建模**可静态求值**的 for 循环（字面词表 + 双引号内 `$f`/`${f}` 绑定、常量拼接、tilde 词表）——`verifyLoopScope` strict 守卫（词表静态、无循环变量重赋值、无变异内建/early-exit、无 loop 级 `|`/`&`、redirection 目标静态）→ `reduceToFlat` 以原始 raw 切片合成扁平文本（值经转义；loop 级重定向截断类首条 `>` 后续 `>>`；含 `$f` 的目标原地替换并保留引号）→ 重 lex/parse 自校验后重喂既有管线（compileFlat）。其余复合结构与不可静态求值的形态保持 fail-closed → `compound-command`。判定==展开：展示（expanded form / literal form / 路径证据 D1）与决策同值；每条归约命令 `span` 为唯一归约坐标（对账与证据共用）；原始坐标只存于 plan `expansion` 段数据（命令级），展示映射归渲染层 expansion-view（D-056）。
-- `gate/` 编译器将 Shell IR 和 Direct tool 参数转换为 `CompleteAccessPlan`；compiler outcome 的响应分类（shell-form/security-boundary/generic）由 `decision-code-catalog` 的 `DENY_RESPONSE_KIND` 全量表单一权威（拒绝单形状 `CompilationReject` 只携 code，渲染侧按 code 派生）。`compiler-entry.ts` 是唯一 plan sealing boundary（seal 处结构验证 + 品牌，D-046）；Policy Kernel 消费品牌检查通过的 plan 和 Profile，产出 `GateDecision`，renderer 将决策转为 host 兼容结果。物理分两层 + 共享根（D-022）：`plan/`（compiler-entry/shell-compiler/direct-tool-compiler/builder/preflight/access-plan-verifier 等）、`decision/`（evaluate/evaluate-request/decision-builder/render-decision）、根（`host`/`decision-types`/`decision-code-catalog`——被两层共用，避免循环依赖）；`plan/` 与 `decision/` 各经目录 index 单面化，跨目录消费统一走 index。
-- `command-semantics/` 分类器：内置 adapter 包含 `uv`（`run` 为 execute，版本/帮助为 inspect，其他顶层子命令保持 unknown + opaque）；子命令提取收敛到统一引擎 `option-parse.ts`（值性质 file/expression/flag、位置参数性质 file/program-first/set、未知选项策略 opaqueOnUnknown 显式声明、class 调节原语 upgradeTo/downgradeTo，D-040）；git 用 token 级 `GIT_CLASSIFY` 声明表（cmd + upgrade/downgrade 调节，主流程经引擎定位子命令），stash/bundle 子命令族规则表化，config/branch 走专用 parser（D-040），clone 显式 `<dir>` 按 len==2 门控提取为 write intent（D-052）；branch 标志单声明表（Opt + group 标签派生分类，单源）。adapter 接口 `analyze(node)` 单参（无项目上下文依赖，删除预留的 SemanticContext）。公共原语（makeSemantics/args/intent/rules/naming）在 command-semantics 根层按职责单文件，adapters 与 registry/overrides 同源引用（D-048，无 shared 合流模块）。
-- `domain.ts` 是封闭世界语义模型：枚举词汇（类/操作/effect/来源/决策/工具面）三形态（VALUES/SET/TYPE）+ 派生映射表——类语义模型 `COMMAND_CLASS_EFFECTS`（defaults/requires）、effect 轴 `EFFECT_AXIS`、写面集合 `WRITE_SIDE_EFFECTS`（D-048）。类→基础 effect 蕴含、kernel 轴检查、编译器 requires 守卫、seal 边界 requires 证明侧（effects 覆盖类要求的运行时复核）都查表（D-022/D-048）。
-- `path/`：glob 语言 `glob.ts` 编译一次、匹配多次（globstar：`*` 单段、`**` 跨段含零段）；编译边界在 path 层 WeakMap 记忆化（blocked 常量与 profile rules 按引用），判定零编译；通配符语言独立可测（D-048）。
-- Direct tool（`read`、`write`、`edit`、`find`、`grep`、`ls`）和 Shell 命令经过各自的 compiler 后进入同一 Policy Kernel。
-- `src/access-gate/ui/`：`footer-layout.ts` 纯布局/数据派生层（宽度助手显式注入，零宿主依赖）；`profile-footer.ts` 宿主桥（NativeFooter/pi-tui 选择 + 工厂）；`footer-install.ts` 安装。
-- 用户项目运行时文档入口为 `CONTEXT.md`、可选的 `docs/candidates.md`、`docs/decisions.md` 和 `docs/task.md`；Candidate Record 不进入当前事实或 active Decision 索引。
+- `src/access-gate/access-decision/` 是当前唯一决策实现：`core/` 负责 Pi host/config 无关的语义与策略，Linux pathname lookup 属于该语义域的外部合同；`adapters/` 转换 Pi 和 policy.yaml 输入，`runtime/` 负责 project/staging 生命周期和 host composition。
+- Access Decision Pipeline（D-059/D-060）已完成 Greenfield trust path 与原子生产切换。Canonical 只解释一次；Admission 与 Display 按需投影；Policy Kernel 不读取配置或重新解析请求。Canonical path resolution 同时保留 lexical 与 symlink-target traversal prefixes，Direct search 与 Shell recursive path 均在 blocked descendants 上 fail-closed；有显式 path boundary 时，unknown/unbounded Shell path access 也不得放行。
+- 受管辖 surface 为 Direct `read`、`write`、`edit`、`find`、`grep`、`ls` 与 Shell `bash`。无效 host context、unsupported syntax、硬安全边界和损坏政策 fail-closed；未拥有的工具 passthrough。
+- 生产入口只读取 `$PI_CODING_AGENT_DIR/pi-keel/policy.yaml`（默认 `~/.pi/agent/pi-keel/policy.yaml`）。缺失文件是 deny-by-default；旧 config/Profile schema 不读取、不转换、不 fallback。
+- `/profile`、Profile Footer、policy-selection UI 和 pi-keel 管理的 subagent tier/parent-tier 注册均缺席，等待独立任务从零重建。
+- Prompt Surface（D-030/D-053）：Policy Snapshot、policy.yaml 和活动 policy 状态不进入 context 消息、tool description 或 system prompt；模型可见的政策相关文本只有静态失败 guidance。
+- 旧决策实现、旧测试与 archive 不属于当前依赖边界，也不是 parity oracle。Static Flow、Explanation Replay 与 Runtime Content Flow 不属于 T-069。
 
 ## Active Decisions
 
@@ -46,9 +38,7 @@
 - [D-003 bigpowers 技能精选](docs/decisions.md#d-003-bigpowers-技能精选)
 - [D-005 技能组织](docs/decisions.md#d-005-技能组织)
 - [D-009 项目分发与文档边界](docs/decisions.md#d-009-项目分发与文档边界)
-- [D-017 Profile 访问策略](docs/decisions.md#d-017-profile-访问策略)
 - [D-018 Shell IR 与 Access Gate](docs/decisions.md#d-018-shell-ir-与-access-gate)
-- [D-019 Profile Footer](docs/decisions.md#d-019-profile-footer)
 - [D-022 Compiler-Kernel 分层与请求真实性](docs/decisions.md#d-022-compiler-kernel-分层与请求真实性)
 - [D-023 决策渲染与知情同意（静态 Guidance + literal form）](docs/decisions.md#d-023-决策渲染与知情同意静态-guidance--literal-form)
 - [D-024 命令覆盖层](docs/decisions.md#d-024-命令覆盖层)
@@ -57,48 +47,45 @@
 - [D-030 提示词体系边界与原则部署（Prompt Surface）](docs/decisions.md#d-030-提示词体系边界与原则部署prompt-surface)
 - [D-031 路径可执行与 tsx 解释器归类](docs/decisions.md#d-031-路径可执行与-tsx-解释器归类)
 - [D-035 平台边界收窄为仅 Linux](docs/decisions.md#d-035-平台边界收窄为仅-linuxdismiss-c-007)
-- [D-036 Workflows 触发模型（手动调用与即时介入）](docs/decisions.md#d-036-workflows-触发模型手动调用与即时介入)
-- [D-037 解析器拥有 wrapper 链（IR 契约：executable 永不承载 wrapper）](docs/decisions.md#d-037-解析器拥有-wrapper-链ir-契约executable-永不承载-wrapper)
-- [D-039 子代理档位制（pi-keel × pi-subagents）](docs/decisions.md#d-039-子代理档位制pi-keel--pi-subagents)
+- [D-036 Workflows 触发模型](docs/decisions.md#d-036-workflows-触发模型手动调用与即时介入)
+- [D-037 解析器拥有 wrapper 链](docs/decisions.md#d-037-解析器拥有-wrapper-链ir-契约executable-永不承载-wrapper)
 - [D-040 命令语义分类与统一选项引擎](docs/decisions.md#d-040-命令语义分类与统一选项引擎)
-- [D-041 集中配置（config.yaml）](docs/decisions.md#d-041-集中配置configyaml)
 - [D-044 测试组织镜像 src 分层](docs/decisions.md#d-044-测试组织镜像-src-分层)
-- [D-045 cd 目标存在性与幻影 cwd 双候选建模](docs/decisions.md#d-045-cd-目标存在性与幻影-cwd-双候选建模)
-- [D-046 plan 验证收敛到 seal 边界（kernel 品牌检查）](docs/decisions.md#d-046-plan-验证收敛到-seal-边界kernel-品牌检查)
+- [D-045 cd 目标存在性与条件 CWD 结果集](docs/decisions.md#d-045-cd-目标存在性与条件-cwd-结果集)
+- [D-046 plan 验证收敛到 seal 边界](docs/decisions.md#d-046-plan-验证收敛到-seal-边界kernel-品牌检查)
 - [D-047 原则优先级与 Reversal surface 申报属性](docs/decisions.md#d-047-原则优先级与-reversal-surface-申报属性)
-- [D-048 类语义模型收编 domain、glob 编译边界与 config 加载即校验](docs/decisions.md#d-048-类语义模型收编-domainglob-编译边界与-config-加载即校验)
-- [D-049 内置 Profile 集合收敛（移除 keel-code/keel-query/keel-subagent-scratch）](docs/decisions.md#d-049-内置-profile-集合收敛移除-keel-codekeel-querykeel-subagent-scratch)
+- [D-048 类语义模型收编](docs/decisions.md#d-048-类语义模型收编-domainglob-编译边界与-config-加载即校验)
+- [D-049 内置 Profile 集合收敛](docs/decisions.md#d-049-内置-profile-集合收敛移除-keel-codekeel-querykeel-subagent-scratch)
 - [D-050 移除可选工具 adapter 支持](docs/decisions.md#d-050-移除可选工具-adapter-支持)
-- [D-051 pi host 凭据文件边界（auth.json）](docs/decisions.md#d-051-pi-host-凭据文件边界authjson)
+- [D-051 pi host 凭据文件边界](docs/decisions.md#d-051-pi-host-凭据文件边界authjson)
 - [D-052 git clone 显式目标目录提取](docs/decisions.md#d-052-git-clone-显式目标目录提取)
-- [D-053 Profile 数据零注入（LLM 上下文隔离）](docs/decisions.md#d-053-profile-数据零注入llm-上下文隔离)
-- [D-054 提示词面引用可靠性边界（指针化与内嵌的取舍判据）](docs/decisions.md#d-054-提示词面引用可靠性边界指针化与内嵌的取舍判据)
-- [D-055 搜索命令选项建模对齐官方文档与 rg 14 基线](docs/decisions.md#d-055-搜索命令选项建模对齐官方文档与-rg-14-基线)
-- [D-056 归约展示视图：坐标职责与 renderer 归属](docs/decisions.md#d-056-归约展示视图坐标职责与-renderer-归属)
+- [D-053 Profile 数据零注入](docs/decisions.md#d-053-profile-数据零注入llm-上下文隔离)
+- [D-054 提示词面引用可靠性边界](docs/decisions.md#d-054-提示词面引用可靠性边界指针化与内嵌的取舍判据)
+- [D-056 归约展示视图](docs/decisions.md#d-056-归约展示视图坐标职责与-renderer-归属)
 - [D-057 uv run 执行语义](docs/decisions.md#d-057-uv-run-执行语义)
-- [D-059 Canonical Compilation 统一事实来源与旧架构移除](docs/decisions.md#d-059-canonical-compilation-统一事实来源与旧架构移除)
+- [D-059 Greenfield Access Decision Pipeline 与原子替换](docs/decisions.md#d-059-greenfield-access-decision-pipeline-与原子替换)
+- [D-060 受保护 Canonical 制品、窄 Admission 投影与有界求值](docs/decisions.md#d-060-受保护-canonical-制品窄-admission-投影与有界求值)
+- [D-061 T-069 Slice 0 外部边界冻结](docs/decisions.md#d-061-t-069-slice-0-外部边界冻结)
+- [D-062 新 Policy 文件加载边界](docs/decisions.md#d-062-新-policy-文件加载边界)
 
 ## Negative Space
 
 - 不提供 OS-level sandbox、容器、VM、seccomp、Landlock、network namespace 或独立 network policy 轴。
-- 自定义 profile 的矛盾配置（如 write 宽于 read、read=deny + write=allow 同路径）不在保证范围：write⇒read 是配置一致性预期（D-017），gate 不校验自定义配置一致性，也不为矛盾组合的行为追责。
-- 仅保证支持 Linux 平台（以 Arch Linux 的 GNU 工具链为基准）；不提供 Windows / macOS / BSD 支持，不建模其路径语义与选项方言；其他 Linux 发行版的工具链差异不在保证范围。
-- 不承诺 pathname check 与实际文件操作之间的 TOCTOU 消除：gate 是纯决策层，不执行文件操作，与执行方之间没有 fd 传递通道；消除需 pi 宿主提供 fd/OS 级原子机制，结构性超出 pi-keel 能力。
-- 不拦截 `user_bash`、`shellCommandPrefix`、Bash `spawnHook`、tool override、custom tool backend、未知 Direct tool surface 或其他 Extension 的直接操作；用户安装的其他 Extension 可直接调用 Node fs/child_process。
-- 审批后的实际文件操作由操作系统权限决定；gate 只做前置策略检查，不控制执行后的行为。
-- 不提供完整 security log scrubbing：执行记录（`BashExecutionMessage.command`）由 pi 宿主负责。
-- `optionalAdapters` 配置字段和随包分发的可选工具 adapter 不再属于 pi-keel 的支持面；用户如需命令语义扩展，应使用 `commands`/`aliases`/`reclassify` 覆盖层。
-- Shell IR 不是完整 Bash 语法树：仅建模可静态归约的 `for`（字面词表 + 双引号内 `$f` 绑定）；其余复合结构（if/while/case/函数/嵌套 for/`[[`/`((`/圆括号）与不可静态求值的展开（词表/body 动态词、修饰/算数/间接/命令替换/裸 `$f`、循环变量重赋值、early-exit、变异内建、loop 级 `|`/`&` 管道、heredoc 重定向）一律 `compound-command` fail-closed；动态 token 在决策前 hard deny，未知命令按 `shellPolicy.unknown` 决策不代表语法已验证。
-- 未建模的配置写手（yarn/pip/cargo，以及 uv 未建模子命令）的外部配置文件写入不经过 PathPolicy，按 modify + cwd 保守写检查；`uv run` 已建模为 execute，但其环境同步产生的 `.venv`/lockfile/缓存等具体文件写入仍不单独建模；已建模的 git/npm/pnpm config 写目标经 PathPolicy（含 keel-build 的 `~/**` write=ask 规则）。
-- 子代理读全盘（读面不钳制，源码内硬编码密钥不在 blocked paths 覆盖）；write 管路径不管内容（durable 内容防中毒靠父会话 git diff）；`/tmp/pi-work` 是约定非隔离（sticky 共享目录、无 symlink 检查）；父档位钳制基于 spawn 时 env 快照。
-- 不为 Candidate Record 提供自动提醒、后台定时器、Session hook、Footer 状态或专用 review 技能；复审只在显式 context survey 中报告。
+- 仅保证支持 Linux 平台；不提供 Windows、macOS、BSD 支持，也不建模其路径和选项方言。
+- 不承诺 pathname check 与实际文件操作之间的 TOCTOU 消除；gate 只做纯决策，不执行文件操作或传递 fd。
+- 不拦截 `user_bash`、`shellCommandPrefix`、Bash `spawnHook`、tool override、custom tool backend、未知 Direct tool surface 或其他 Extension 的直接操作。
+- 审批后的实际文件操作由操作系统权限决定；gate 不控制执行后的行为，也不提供完整 security log scrubbing。
+- 不提供 `/profile` 命令、Profile Footer、policy-selection UI 或 pi-keel 管理的 subagent tier/parent-tier 钳制；这些能力需后续独立重建。
+- 旧 `config.yaml`、Profile、命令覆盖、继承和子代理字段不属于新 Policy Snapshot 输入；当前只读取全局 `policy.yaml` 的 `paths` 与 `commands`。
+- Shell 只支持显式定义、可静态证明且资源有界的子集；不可证明形态 fail-closed。未建模的命令副作用不单独建模。
 - 不把短期 Task Record、实施过程或审查报告作为永久项目知识。
-- 不自动识别、不写入用户项目的自有文档体系，不提供容器级迁移引导；非标准体系由用户在 `AGENTS.md` 或会话中显式声明。
-- 不修改用户项目的 `README.md`、`AGENTS.md`、`.gitignore` 和 `package.json`，除非用户明确要求。
+- 不在 T-069 实现 Static Flow Graph、Explanation Replay、Runtime Audit Event 或 Runtime Content Flow。
+- 不把旧实现结果当作正确性 oracle；旧代码、旧测试和 archive 只提供待重新证明的历史线索。
+- 不自动识别或写入用户项目的自有文档体系；非标准体系由用户显式声明。
 
 ## Project Documents
 
-- [`docs/candidates.md`](docs/candidates.md)：当前未采纳、未承诺实施的候选事项；不得作为指令、路线图或当前事实。
+- [`docs/candidates.md`](docs/candidates.md)：当前未采纳、未承诺实施的候选事项。
 - [`docs/decisions.md`](docs/decisions.md)：长期决策寄存器。
 - [`docs/task.md`](docs/task.md)：活跃任务记录。
-- [`docs/traceability.md`](docs/traceability.md)：外部来源、采用方式、文件映射和许可证义务；不定义当前架构、行为或决策。
+- [`docs/traceability.md`](docs/traceability.md)：外部来源、采用方式、文件映射和许可证义务。

@@ -37,19 +37,32 @@
 
 | 来源 | 采用方式 | 当前映射 | 许可证与证据 |
 |------|----------|----------|----------------|
-| [gotgenes/pi-permission-system](https://github.com/gotgenes/pi-permission-system) | adapted / historical reference | Profile、三态决策和统一 gate 的早期输入；当前后继位于 `src/access-gate/profile/` 和 `src/access-gate/gate/` | MIT；Copyright (c) 2026 MasuRii and Christopher D. Lasher；原始 revision 未固定 |
-| [kenryu42/cc-safety-net](https://github.com/kenryu42/cc-safety-net) | adapted / historical reference | 命令语义和危险操作识别的早期输入；当前后继位于 `src/access-gate/command-semantics/` | MIT；Copyright (c) 2026 kenryu42；原始 revision 未固定 |
-| [chandra447/pi-hermes-memory](https://github.com/chandra447/pi-hermes-memory) | adapted | 初始 threat/secret pattern 输入；当前后继位于 `src/access-gate/security/threat-scan.ts` 和路径保护规则 | MIT；Copyright (c) 2025 Chandra Teja；原始 revision 未固定 |
+| [gotgenes/pi-permission-system](https://github.com/gotgenes/pi-permission-system) | adapted / historical reference | Profile、三态决策和统一 gate 的早期输入；旧实现已由 `src/access-gate/access-decision/` 的 Greenfield pipeline 替换，Git 历史保留溯源 | MIT；Copyright (c) 2026 MasuRii and Christopher D. Lasher；原始 revision 未固定 |
+| [kenryu42/cc-safety-net](https://github.com/kenryu42/cc-safety-net) | adapted / historical reference | 命令语义和危险操作识别的早期输入；旧实现已删除，新 Shell 语义由 `src/access-gate/access-decision/core/` 独立定义 | MIT；Copyright (c) 2026 kenryu42；原始 revision 未固定 |
+| [chandra447/pi-hermes-memory](https://github.com/chandra447/pi-hermes-memory) | adapted / historical reference | 初始 threat/secret pattern 输入；旧 threat scanner 已删除，新安全边界由 `src/access-gate/access-decision/core/` 独立定义 | MIT；Copyright (c) 2025 Chandra Teja；原始 revision 未固定 |
 | [landstrip/pi-landstrip](https://github.com/landstrip/pi-landstrip) | conceptual reference / historical adaptation | 配置和路径策略的早期比较基线；pi-keel 当前只提供用户态策略，不包含 Landstrip sandbox | MIT；Copyright (c) 2026 Jarkko Sakkinen；原始 revision 未固定 |
-| [astral-sh/uv](https://github.com/astral-sh/uv) release `0.12.6`；[uv project run documentation](https://docs.astral.sh/uv/concepts/projects/run/)；[uv license policy](https://docs.astral.sh/uv/reference/policies/license/) | conceptual reference / runtime command behavior | `src/access-gate/command-semantics/adapters/uv.ts` 与 `docs/decisions.md` D-057 的 `uv run` 执行和环境同步语义分类依据 | Apache-2.0 OR MIT（uv 官方 license policy）；固定参考 release `0.12.6`，仅作命令语义参考，pi-keel 不分发 uv |
+| [astral-sh/uv](https://github.com/astral-sh/uv) release `0.12.6`；[uv project run documentation](https://docs.astral.sh/uv/concepts/projects/run/)；[uv license policy](https://docs.astral.sh/uv/reference/policies/license/) | conceptual reference / historical reference | `src/access-gate/access-decision/core/shell-words.ts` 中 `uv run`、版本/帮助和未建模子命令的分类参考；对应回归测试在 `tests/access-gate/access-decision/core/shell-policy.test.ts` | Apache-2.0 OR MIT（uv 官方 license policy）；固定参考 release `0.12.6`，仅作命令语义参考，pi-keel 不分发 uv |
 
 这些来源不定义 pi-keel 的当前安全承诺。当前 enforcement 范围和残余风险在 decisions.md 安全条目与 CONTEXT.md Negative Space 中维护。
+
+## T-069 Greenfield 外部合同来源
+
+以下来源只为新 Pipeline 的合同仲裁提供外部事实；它们不授权复用旧 Access Gate 的实现、类型、测试或结果。每个新场景仍须在 contract test 中标记来源和 `referenceStatus`，旧行为不能单独成为 expected value。
+
+| 来源 | 固定版本/修订 | 采用方式 | 采用范围与当前映射 | 许可证与证据 |
+|----------|----------|----------|----------|----------|
+| [Pi coding-agent extension guide](https://github.com/badlogic/pi-mono/blob/dd6bea41/packages/coding-agent/docs/extensions.md) 与 [extension types](https://github.com/badlogic/pi-mono/blob/dd6bea41/packages/coding-agent/src/core/extensions/types.ts) | pi-mono commit `dd6bea41` | conceptual reference | `tool_call` 拦截、`toolName`/`input` 请求边界、`ctx.hasUI`、`ctx.ui.confirm` 及 block 结果；只作为 `src/access-gate/access-decision/adapters/` 的外部 host 合同依据，不复制 Pi 内部实现 | pi-mono 仓库许可证以该 revision 为准；本仓库未复制其代码 |
+| [GNU Bash Reference Manual](https://www.gnu.org/software/bash/manual/bash.html) | Bash 5.3，Manual Edition 5.3，2025-05-18；实现基线 tag `bash-5.3` | conceptual reference + independently observed | 仅采用 T-069 支持子集的控制操作、and-or 求值顺序、引用/转义、tilde/参数展开、重定向和 builtin CWD 观察；Slice 2 的 `core/shell-language.ts`、`shell-words.ts`、`shell-flow.ts`、`shell-compile.ts` 只实现已冻结的简单命令词义、wrapper、重定向和 fail-closed 动态/控制语法；不承诺完整 Bash | GNU Free Documentation License 1.3；本仓库只记录语义来源，不复制正文 |
+| [Arch Linux `bash(1)`](https://man.archlinux.org/man/bash.1.en) | Arch man-pages snapshot 标注 Bash 5.3；核查日 2026-09-02 | independently observed | 作为 Linux-only 运行环境的 Bash 命令行/版本交叉核对；不把发行版选项差异扩大为 pi-keel 支持面 | Arch manual page 的上游许可证和版本信息以其页面为准；未复制文本 |
+| [Linux kernel pathname lookup documentation](https://docs.kernel.org/6.15/filesystems/path-lookup.html) 与 [Linux `path_resolution(7)`](https://man7.org/linux/man-pages/man7/path_resolution.7.html) | kernel documentation 6.15；Linux man-pages 6.15 语义基线 | conceptual reference | 只采用路径组件查找、绝对/相对路径和 canonical 阶段解析时点的 Linux 语义；不宣称 fd 传递、OS sandbox 或 TOCTOU 消除 | Linux kernel documentation/man-pages 各自按上游许可证；本仓库未复制实现或正文 |
+
+固定版本和采用范围是 Slice 0/2 的边界：来源更新不会自动改变合同；任何语义变化必须新增核查记录和独立 contract test，再决定是否调整 T-069。
 
 ## Runtime 依赖
 
 | 依赖 | 固定版本 | 用途 | License |
 |------|----------|------|---------|
-| [eemeli/yaml](https://github.com/eemeli/yaml) | `2.9.0`（`package-lock.json`） | 解析集中配置 config.yaml（commands/profiles 段，D-041） | ISC；Copyright (c) Eemeli Aro |
+| [eemeli/yaml](https://github.com/eemeli/yaml) | `2.9.0`（`package-lock.json`） | 解析 T-069 新全局 `policy.yaml` | ISC；Copyright (c) Eemeli Aro |
 
 开发依赖和传递依赖以 `package-lock.json` 为准；本表只列发布包的直接 runtime dependency。
 

@@ -3,102 +3,132 @@ import test from "node:test";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { startSession, type Footer, type Harness } from "./harness";
+import { startSession, withEnv } from "./harness";
 
-async function startSessionWithFooter(): Promise<{ harness: Harness; footer: Footer; cleanup: () => void }> {
-  const { harness, cleanup } = startSession();
-  await harness.handlers.get("session_start")!(undefined, harness.ctx);
-  const footer = harness.startFooter();
-  return { harness, footer, cleanup };
+async function withAgentFiles(
+  policy: string | undefined,
+  legacyConfig: string | undefined,
+  run: (agentDir: string, harness: ReturnType<typeof startSession>["harness"]) => Promise<void>,
+): Promise<void> {
+  const agentDir = mkdtempSync(join(tmpdir(), "pi-keel-extension-agent-"));
+  mkdirSync(join(agentDir, "pi-keel"), { recursive: true });
+  if (policy !== undefined) writeFileSync(join(agentDir, "pi-keel", "policy.yaml"), policy);
+  if (legacyConfig !== undefined) writeFileSync(join(agentDir, "pi-keel", "config.yaml"), legacyConfig);
+
+  await withEnv({ PI_CODING_AGENT_DIR: agentDir }, async () => {
+    const session = startSession();
+    try {
+      await run(agentDir, session.harness);
+    } finally {
+      session.cleanup();
+    }
+  });
+  rmSync(agentDir, { recursive: true, force: true });
 }
 
-test("reports invalid global profile configuration at session start", async () => {
-  const agentDir = mkdtempSync(join(tmpdir(), "pi-access-invalid-agent-"));
-  mkdirSync(join(agentDir, "pi-keel"), { recursive: true });
-  writeFileSync(join(agentDir, "pi-keel", "config.yaml"), "{ bad yaml [::");
-  const previous = process.env.PI_CODING_AGENT_DIR;
-  process.env.PI_CODING_AGENT_DIR = agentDir;
-  const { harness, cleanup } = startSession();
-  try {
-    await harness.handlers.get("session_start")!(undefined, harness.ctx);
-    assert.ok(harness.getNotifications().some((entry) => entry.level === "error" && entry.message.includes("failed to load")));
-  } finally {
-    if (previous === undefined) delete process.env.PI_CODING_AGENT_DIR;
-    else process.env.PI_CODING_AGENT_DIR = previous;
-    cleanup();
-    rmSync(agentDir, { recursive: true, force: true });
-  }
+async function invoke(
+  harness: ReturnType<typeof startSession>["harness"],
+  event: unknown,
+): Promise<unknown> {
+  const handler = harness.handlers.get("tool_call");
+  assert.ok(handler, "production extension must register tool_call");
+  return handler(event, harness.ctx);
+}
+
+test("production extension registers only the new decision composition", async () => {
+  await withAgentFiles(undefined, undefined, async (_agentDir, harness) => {
+    assert.equal(harness.commands.has("profile"), false);
+    assert.equal(harness.hasFooterFactory(), false);
+    assert.equal(harness.handlers.has("session_start"), true);
+    assert.equal(harness.handlers.has("session_shutdown"), true);
+  });
 });
 
-test("/profile status reports the complete resolved policy", async () => {
-  const agentDir = mkdtempSync(join(tmpdir(), "pi-access-status-agent-"));
-  mkdirSync(join(agentDir, "pi-keel"), { recursive: true });
-  writeFileSync(join(agentDir, "pi-keel", "config.yaml"), [
-    "defaultProfile: status-test",
-    "profiles:",
-    "  status-test:",
-    "    description: Status test profile.",
-    "    shellPolicy:",
-    "      inspect: allow",
-    "      modify: ask",
-    "      execute: deny",
-    "      destroy: deny",
-    "      unknown: ask",
-    "    pathPolicy:",
-    "      default:",
-    "        read: allow",
-    "        list: allow",
-    "        search: ask",
-    "        write: deny",
-    "      rules:",
-    "        - path: project/docs/**",
-    "          write: allow",
+test("unowned tools pass through even before the managed decision service initializes", async () => {
+  await withAgentFiles(undefined, undefined, async (_agentDir, harness) => {
+    assert.equal(await invoke(harness, { toolName: "unowned-tool", input: {} }), undefined);
+  });
+});
+
+test("legacy config cannot initialize authorization without the new policy file", async () => {
+  await withAgentFiles(
+    undefined,
+    "paths:\n  read: allow\n",
+    async (_agentDir, harness) => {
+      await harness.handlers.get("session_start")!(undefined, harness.ctx);
+      assert.deepEqual(
+        await invoke(harness, { toolName: "read", input: { path: "README.md" } }),
+        { block: true, reason: "Blocked by access policy." },
+      );
+    },
+  );
+});
+
+test("missing policy fails closed while malformed policy fails before service initialization", async () => {
+  await withAgentFiles(undefined, undefined, async (_agentDir, harness) => {
+    await harness.handlers.get("session_start")!(undefined, harness.ctx);
+    assert.deepEqual(
+      await invoke(harness, { toolName: "read", input: { path: "README.md" } }),
+      { block: true, reason: "Blocked by access policy." },
+    );
+  });
+
+  await withAgentFiles("paths: [", undefined, async (_agentDir, harness) => {
+    await harness.handlers.get("session_start")!(undefined, harness.ctx);
+    assert.deepEqual(
+      await invoke(harness, { toolName: "read", input: { path: "README.md" } }),
+      { block: true, reason: "Blocked because the decision service is not initialized." },
+    );
+  });
+});
+
+test("managed calls use the new allow, confirm, and deny host contract exactly once", async () => {
+  const policy = [
+    "paths:",
+    "  read: allow",
+    "  write: ask",
+    "commands:",
+    "  inspect: allow",
+    "  modify: deny",
+    "  destroy: deny",
     "",
-  ].join("\n"));
-  const previous = process.env.PI_CODING_AGENT_DIR;
-  process.env.PI_CODING_AGENT_DIR = agentDir;
-  const { harness, cleanup } = startSession();
-  try {
+  ].join("\n");
+
+  await withAgentFiles(policy, undefined, async (_agentDir, harness) => {
     await harness.handlers.get("session_start")!(undefined, harness.ctx);
-    await harness.commands.get("profile")!("status", harness.ctx);
-    const message = harness.getNotifications().at(-1)?.message ?? "";
-    assert.match(message, /Shell:\n  inspect=allow modify=ask execute=deny destroy=deny unknown=ask/);
-    assert.match(message, /Path defaults:\n  read=allow list=allow search=ask write=deny/);
-    assert.match(message, /Path rules:\n  project\/docs\/\*\*: write=allow/);
-  } finally {
-    if (previous === undefined) delete process.env.PI_CODING_AGENT_DIR;
-    else process.env.PI_CODING_AGENT_DIR = previous;
-    cleanup();
-    rmSync(agentDir, { recursive: true, force: true });
-  }
+
+    assert.equal(await invoke(harness, { toolName: "read", input: { path: "README.md" } }), undefined);
+
+    harness.setConfirmResult(true);
+    assert.equal(
+      await invoke(harness, { toolName: "write", input: { path: "notes.md", content: "secret" } }),
+      undefined,
+    );
+    assert.equal(harness.getConfirmCalls(), 1);
+
+    harness.setConfirmResult(false);
+    assert.deepEqual(
+      await invoke(harness, { toolName: "write", input: { path: "notes.md", content: "secret" } }),
+      { block: true, reason: "Blocked by user." },
+    );
+    assert.equal(harness.getConfirmCalls(), 2);
+
+    assert.deepEqual(
+      await invoke(harness, { toolName: "bash", input: { command: "mkdir generated" } }),
+      { block: true, reason: "Blocked by access policy." },
+    );
+
+    assert.equal(await invoke(harness, { toolName: "unowned-tool", input: {} }), undefined);
+  });
 });
 
-test("renders the active Profile in a two-line Footer and refreshes after switching", async () => {
-  const { harness, footer, cleanup } = await startSessionWithFooter();
-  try {
-    let lines = footer.render(120);
-    assert.equal(lines.length, 2);
-    assert.match(lines[0]!, /plan$/);
-    assert.doesNotMatch(lines[0]!, /Profile:/);
-    await harness.commands.get("profile")!("develop", harness.ctx);
-    lines = footer.render(120);
-    assert.match(lines[0]!, /develop$/);
-    assert.ok(harness.getRenderRequests() > 0);
-  } finally {
-    cleanup();
-  }
-});
-
-test("resets the active Profile and Footer on every session start", async () => {
-  const { harness, footer, cleanup } = await startSessionWithFooter();
-  try {
-    await harness.commands.get("profile")!("read", harness.ctx);
-    assert.match(footer.render(120)[0]!, /read$/);
-
+test("session shutdown removes the new decision service", async () => {
+  await withAgentFiles("paths:\n  read: allow\n", undefined, async (_agentDir, harness) => {
     await harness.handlers.get("session_start")!(undefined, harness.ctx);
-    const resetFooter = harness.startFooter();
-    assert.match(resetFooter.render(120)[0]!, /plan$/);
-  } finally {
-    cleanup();
-  }
+    await harness.handlers.get("session_shutdown")!(undefined, harness.ctx);
+    assert.deepEqual(
+      await invoke(harness, { toolName: "read", input: { path: "README.md" } }),
+      { block: true, reason: "Blocked because the decision service is not initialized." },
+    );
+  });
 });

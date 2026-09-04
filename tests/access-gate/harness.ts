@@ -1,36 +1,27 @@
-// 共享 extension harness：pi/ctx/sessionManager/footer 构造，供 index 与子代理会话集成测试复用。
-
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import assert from "node:assert/strict";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import accessGate from "../../src/access-gate/index";
 
-export type Footer = { render(width: number): string[] };
-type FooterFactory = (
-  tui: { requestRender(): void },
-  theme: { fg(color: string, text: string): string },
-  footerData: { getGitBranch(): string | null },
-) => Footer;
+type Handler = (event: unknown, ctx: ExtensionContext) => Promise<unknown>;
 
 export interface Harness {
-  commands: Map<string, (args: string, ctx: ExtensionContext) => Promise<void>>;
-  handlers: Map<string, (event: unknown, ctx: ExtensionContext) => Promise<unknown>>;
-  ctx: ExtensionContext;
-  pi: ExtensionAPI;
-  startFooter(): Footer;
-  getRenderRequests(): number;
-  getNotifications(): { message: string; level: string }[];
+  readonly commands: Map<string, (args: string, ctx: ExtensionContext) => Promise<void>>;
+  readonly handlers: Map<string, Handler>;
+  readonly ctx: ExtensionContext;
+  readonly pi: ExtensionAPI;
+  setConfirmResult(value: boolean): void;
+  getConfirmCalls(): number;
+  hasFooterFactory(): boolean;
 }
 
 function createHarness(root: string): Harness {
   const commands = new Map<string, (args: string, ctx: ExtensionContext) => Promise<void>>();
-  type Handler = (event: unknown, ctx: ExtensionContext) => Promise<unknown>;
   const handlers = new Map<string, Handler>();
-  let footerFactory: FooterFactory | undefined;
-  let renderRequests = 0;
-  const notifications: { message: string; level: string }[] = [];
+  let confirmResult = false;
+  let confirmCalls = 0;
+  let footerInstalled = false;
   const sessionManager = {
     getSessionId: () => "test-session",
     getCwd: () => root,
@@ -51,12 +42,13 @@ function createHarness(root: string): Harness {
     hasUI: true,
     sessionManager,
     ui: {
-      select: async () => undefined,
-      notify: (message: string, level: string) => { notifications.push({ message, level }); },
-      setFooter: (factory: FooterFactory | undefined) => {
-        footerFactory = factory;
+      confirm: async () => {
+        confirmCalls++;
+        return confirmResult;
       },
-      getContextUsage: () => ({ percent: 35.2, contextWindow: 272000 }),
+      setFooter: () => {
+        footerInstalled = true;
+      },
     },
   } as unknown as ExtensionContext;
 
@@ -65,35 +57,21 @@ function createHarness(root: string): Harness {
     handlers,
     ctx,
     pi,
-    startFooter(): Footer {
-      assert.ok(footerFactory, "footer factory not installed");
-      return footerFactory(
-        { requestRender: () => renderRequests++ },
-        { fg: (_color, text) => text },
-        { getGitBranch: () => "main" },
-      );
-    },
-    getRenderRequests: () => renderRequests,
-    getNotifications: () => notifications,
+    setConfirmResult: (value) => { confirmResult = value; },
+    getConfirmCalls: () => confirmCalls,
+    hasFooterFactory: () => footerInstalled,
   };
 }
 
 export function startSession() {
   const root = mkdtempSync(join(tmpdir(), "pi-access-"));
+  mkdirSync(join(root, ".git"));
   const harness = createHarness(root);
   const cleanup = () => rmSync(root, { recursive: true, force: true });
   accessGate(harness.pi);
   return { harness, root, cleanup };
 }
 
-// ─── env 构造/保存/恢复（子代理测试样板统一） ───
-
-/** 构造独立 env 对象（默认空），供 env 参数化函数直接断言。 */
-export function makeEnv(overrides: Record<string, string> = {}): NodeJS.ProcessEnv {
-  return { ...overrides };
-}
-
-/** 应用构造 env 到 process.env 并执行 fn，finally 恢复原值（undefined=删除键）。 */
 export async function withEnv(
   env: Record<string, string | undefined>,
   fn: () => Promise<void> | void,

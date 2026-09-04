@@ -1,0 +1,14 @@
+export { handlePiToolCall } from "./host-composition";
+export { installGlobalPiAccessDecision, installPiAccessDecision } from "./pi-composition";
+export { createDecisionService } from "./service";
+export { createPolicyState } from "./policy-state";
+export { createProjectContext } from "./project-context";
+export { renderHostBlock, renderHostFacingDecision } from "./host-render";
+export { createProjectLifecycle } from "./project-lifecycle";
+export type { PiToolCallHandlerResult } from "./host-composition";
+export type { GlobalPiCompositionOptions, PiCompositionOptions } from "./pi-composition";
+export type { DecisionService, RuntimeObserver, RuntimeResult, RuntimeTraceEvent } from "./service";
+export type { PolicyState } from "./policy-state";
+export type { ProjectContext } from "./project-context";
+export type { HostFacingBlockCode, HostFacingDecision } from "./host-render";
+export type { ProjectLifecycle } from "./project-lifecycle";
