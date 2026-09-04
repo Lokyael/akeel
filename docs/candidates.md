@@ -54,6 +54,8 @@
   - **角色精简收敛（消除戏服）**：通过 `disableBuiltins` 停用同质化冗余角色（oracle/researcher/delegate），全生命周期收敛为 3 个生产力核心：`worker`（Worktree 内全自治攻坚与 TDD 自愈）、`scout`（只读快速扫库压缩事实）、`reviewer`（交付前单次对抗性门禁审查）。
   - **打通 Pi Keel 空间准入策略**：在 `policy.yaml` 中将 Worktree 专属目录（如 `/tmp/pi-work/**` 或 `.pi/worktrees/**`）配置为 `write: allow`，系统高危操作保持 `deny`，解决后台无头子代理在无 UI 环境下因 `write: ask` 产生权限死锁的结构性矛盾。
 - **Trigger:** 用户正式启动需要长周期后台攻坚、复杂并发重构或夜间无人值守的大型特性开发；或用户决定正式应用上述配置对当前 `pi-subagents` 运行环境进行生产级调优。
+- **References:**
+  - **pi-subagents**: `NicoBailon/pi-subagents`（Git Worktree 生命周期管理、Manifest 补丁追踪与 Herdr 状态桥接实现）
 ## C-019: 会话上下文水位自省与安全交接协议（Context Introspection & Safe Handoff Protocol）
 
 - **Why Not Now:** 当前主要依赖人工对上下文消耗的感知，且对于常规短平快任务，单会话通常在窗口耗尽前已自然结束；自动化交接涉及工作区状态判决（如 git 干净度、测试通过断言）与主动停机策略，需定义清晰的契约边界，目前尚无自动化切分机制，先落档作为机制候选。实测证据已表明：在长会话（尤其是禁用自动压缩的场景）中，缺乏水位自省会导致上下文膨胀至数十万 Tokens（如实测观察到的 50 万 Token 长会话），引发推理延迟激增、缓存成本高昂以及模型因注意力分散而陷入反复自审死循环。
@@ -69,4 +71,34 @@
   - **优雅停机与终端通知**：
     - 写入交接文档后，Agent 主动停止后续执行，在终端输出明确的交接提示（如果在 Herdr 窗格中，可发送 `herdr notification` 提醒），引导人类新开一个干净的会话加载交接文档继续工作。
 - **Trigger:** 用户确认在大型多阶段特性开发中，上下文膨胀导致的推理退化与循环拉锯成为高频痛点；或用户要求在会话中正式引入自动化水位预警与交接模板生成工具。
-## C-020: 待创建
+## C-020: Content Flow checkpoint governance（仅探索方向）
+
+> 本条只记录未来探索方向，不构成当前需求、路线图、架构采纳或实施承诺；不得据此修改现有 Access Gate 行为。
+
+- **Why Not Now:** 当前项目只有 Operation Admission 信任链，没有可验证的 Content Flow producer/consumer、payload capture、enforcement 或 receipt seam。现在实现会把宿主的 substitution/projection 误称为发布控制，并制造超出实际能力的安全承诺。
+- **Exploration Direction:** 若未来具备真实 seam，重新探索以下边界：Operation Admission 与 Content Flow 独立；静态 Normalized Flow 与运行时 Evidence 分离；Publication、Network Send、Process Start、File Commit 各自拥有 checkpoint 规则、授权、enforcement 和 receipt；只有受控绑定的 `exact` evidence 才能参与进一步判断，`unknown`/`unavailable`/`no-coverage` 不得解释为 clean、safe 或 permit；payload、lineage 和运行时授权不进入 `CompleteAccessPlan`。
+- **Trigger:** 用户明确启动 Content Flow 方向的探索，或宿主提供可测试的发布/发送/进程/提交 enforcement seam，并出现真实 producer/consumer 工作流。
+
+## C-021: 智能体多维访问注入防御与内核级纵深安全架构（Injection Defense & OS-Confinement Architecture）
+
+> 本条只记录未来探索方向，不构成当前需求、路线图、架构采纳或实施承诺；当前不创建 Task、不修改代码、不引入 bwrap/DSH 依赖，也不启动任何实现。
+
+- **Why Not Now:** 当前门禁通过严格的 Shell AST 解析、选项分类（D-040）与软链组件解析，已能阻断已知的路径逃逸与非恶意语法越权；但对抗性推演已证实：**纯应用层 TypeScript AST 存在结构性盲区，无法防御更底层的复合注入攻击**（包括间接提示词注入操纵、依赖生命周期钩子 `preinstall`/`build.rs` 隐式代码执行、命令参数级任意代码执行 `git -c`/`find -exec`、以及环境变量加载器劫持）。引入 OS 级轻量沙盒（如 Linux `bwrap`）需要处理宿主环境依赖检测，当前先作为防御深度升级候选完整立档。
+- **Exploration Direction:** 仅在触发条件满足后，探索面向 AI 编码智能体的**四层纵深注入防御架构（Defense-in-Depth for Agent Access）**，从“单一用户态语法检查”升级为“语义识别 + 物理兜底”；在此之前不据此实施：
+  - **数据/指令边界隔离（Data/Instruction Boundary）**：对网络抓取内容（web search/fetch）、不可信 PR/Issue、第三方数据文件打上不可信数据标签；维持 D-030/D-053 的 Profile 零数据注入原则，防止包含间接提示词注入（IPI）的恶意外部文本被直接解释为最高优先级的系统指令。
+  - **参数级代码执行封杀（Argument ACE Whitelist & Promotion）**：扩充高危命令选项库，严格封杀具有隐式执行子进程能力的参数组合（如 `find -exec`、`git -c`、`tar --checkpoint-action`、`awk 'system()'`、`vim -c` 等）；包含此类参数的命令一律从 `inspect`/`modify` 强制提升为 `execute`（默认 deny）或直接阻断，消除“合法命令壳内藏恶意执行”的绕过空间。
+  - **文件系统与符号链接物理目标追踪（Filesystem Invariants）**：严禁仅做纯词法路径归一化，准入前必须基于真实文件系统进行分段 `readlink` 解析，解析链条中任一部分跨越 `allowedRoots` 立即 Fail-Closed；递归搜索工具（`grep -R`、`rg -L`、`ls -LR`）默认禁止跟链递归，防范第三方恶意仓库自带的软链投毒。
+  - **内核级非特权物理隔离兜底（OS-Level Confinement via bwrap）**：在 Linux 平台（D-035）下为命令执行可选挂载 **Bubblewrap (`bwrap`)** 轻量非特权沙盒（无需 root 权限，零守护进程，纳秒级启动）：
+    - **物理挂载遮蔽**：将工作区以读写挂载，系统核心以只读挂载，将 `~/.ssh`、`~/.gnupg`、`~/.aws`、`/etc/shadow` 等敏感凭据直接挂载为空的只读 tmpfs，在操作系统内核层面终结私钥与凭据窃取通道；
+    - **网络隔离执行**：本地单测或构建阶段默认剥夺网络命名空间（`--unshare-net`），阻断供应链构建钩子向外网回传数据的能力。
+  - **内核抽离与双底座（Pi × DSH）可插拔适配**：将门禁纯逻辑抽离为通用 `@keel/core`（宿主无关、纯函数求值）；针对 Pi 维持毫秒级 TUI 交互拦截；针对 DSH 封装为标准的 Cordis 插件（利用微内核依赖注入与 `bail` 熔断机制），实现安全底座的跨平台复用。
+- **Trigger:** 用户正式启动对外部不可信开源仓库的自动化审计/重构流水线，或间接提示词注入（IPI）与供应链构建脚本注入成为实际业务场景的高频威胁；或用户决定正式引入 `bwrap` 强化执行期隔离。
+- **References:**
+  - **Bubblewrap (`bwrap`)**: `containers/bubblewrap`（Linux 非特权用户命名空间文件系统挂载与网络隔离基准）
+  - **Landlock LSM**: Linux 内核级无特权访问控制接口（`landlock.io`）
+  - **SWE-agent (ACI)**: `princeton-nlp/SWE-agent`（Agent-Computer Interface：以结构化受限工具代替原生 Shell 的范式）
+  - **OpenHands**: `All-Hands-AI/OpenHands`（`SecurityAnalyzer` 风险分级评估器与插拔式 Runtime 抽象）
+  - **Claude Code**: Anthropic 终端 Agent 的 Glob-based 路径授权与命令模式匹配引擎
+  - **Cordis**: `shigma/cordis`（DSH 底座所依托的微内核依赖注入与 Reversible Effects 插件架构）
+
+## C-022: 待创建
