@@ -71,9 +71,9 @@ test("Pi production composition creates the service at session start and routes 
 });
 
 test("Pi global composition loads only the new policy.yaml and denies when absent", async () => {
-  const agentDir = mkdtempSync(join(tmpdir(), "pi-keel-global-policy-"));
-  const projectRoot = mkdtempSync(join(tmpdir(), "pi-keel-global-project-"));
-  mkdirSync(join(agentDir, "pi-keel"), { recursive: true });
+  const agentDir = mkdtempSync(join(tmpdir(), "akeel-global-policy-"));
+  const projectRoot = mkdtempSync(join(tmpdir(), "akeel-global-project-"));
+  mkdirSync(join(agentDir, "akeel"), { recursive: true });
   mkdirSync(join(projectRoot, ".git"));
   try {
     const blocked = fakePi();
@@ -85,7 +85,7 @@ test("Pi global composition loads only the new policy.yaml and denies when absen
       { block: true, reason: "Blocked by access policy." },
     );
 
-    writeFileSync(join(agentDir, "pi-keel", "policy.yaml"), "paths:\n  read: allow\n");
+    writeFileSync(join(agentDir, "akeel", "policy.yaml"), "paths:\n  read: allow\n");
     const allowed = fakePi();
     installGlobalPiAccessDecision(allowed.pi, { agentDir });
     await invoke(allowed.handlers, "session_start", {}, hostContext);

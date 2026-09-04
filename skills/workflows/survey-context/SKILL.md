@@ -13,7 +13,7 @@ Skip the trailing empty slot record in `docs/candidates.md` and `docs/task.md` â
 
 ### 1. Read project conventions
 
-Read `CONVENTIONS.md` if it exists. Read `AGENTS.md` or `CLAUDE.md` for engineering constraints. These files are user-owned and read-only to pi-keel.
+Read `CONVENTIONS.md` if it exists. Read `AGENTS.md` or `CLAUDE.md` for engineering constraints. These files are user-owned and read-only to AKeel.
 
 ### 2. Read current project knowledge
 

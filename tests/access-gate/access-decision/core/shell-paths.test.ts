@@ -11,7 +11,7 @@ const linuxPathContract = {
 } as const;
 
 test("canonical resolution follows existing symlink components", () => {
-  const root = mkdtempSync(join(tmpdir(), "pi-keel-shell-path-"));
+  const root = mkdtempSync(join(tmpdir(), "akeel-shell-path-"));
   const target = join(root, "target");
   mkdirSync(target);
   symlinkSync(target, join(root, "link"), "dir");
@@ -49,7 +49,7 @@ test("a quoted tilde is resolved as a literal path when marked literal", () => {
 });
 
 test("symlink traversal beyond the analysis bound fails closed", () => {
-  const root = mkdtempSync(join(tmpdir(), "pi-keel-deep-link-"));
+  const root = mkdtempSync(join(tmpdir(), "akeel-deep-link-"));
   try {
     const target = join(root, "target");
     mkdirSync(target);

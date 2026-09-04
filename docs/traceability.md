@@ -1,6 +1,6 @@
 # 外部来源与合规记录
 
-本文记录 pi-keel 使用或参考的外部来源、采用方式、当前文件映射和许可证义务。它不定义当前架构、运行时行为、安全边界或长期设计决策：这些内容分别以 [`CONTEXT.md`](../CONTEXT.md)、源码与测试以及 [`decisions.md`](decisions.md) 为准。
+本文记录 AKeel 使用或参考的外部来源、采用方式、当前文件映射和许可证义务。它不定义当前架构、运行时行为、安全边界或长期设计决策：这些内容分别以 [`CONTEXT.md`](../CONTEXT.md)、源码与测试以及 [`decisions.md`](decisions.md) 为准。
 
 本记录用于工程归属和许可证核查，不构成法律意见。
 
@@ -40,10 +40,10 @@
 | [gotgenes/pi-permission-system](https://github.com/gotgenes/pi-permission-system) | adapted / historical reference | Profile、三态决策和统一 gate 的早期输入；旧实现已由 `src/access-gate/access-decision/` 的 Greenfield pipeline 替换，Git 历史保留溯源 | MIT；Copyright (c) 2026 MasuRii and Christopher D. Lasher；原始 revision 未固定 |
 | [kenryu42/cc-safety-net](https://github.com/kenryu42/cc-safety-net) | adapted / historical reference | 命令语义和危险操作识别的早期输入；旧实现已删除，新 Shell 语义由 `src/access-gate/access-decision/core/` 独立定义 | MIT；Copyright (c) 2026 kenryu42；原始 revision 未固定 |
 | [chandra447/pi-hermes-memory](https://github.com/chandra447/pi-hermes-memory) | adapted / historical reference | 初始 threat/secret pattern 输入；旧 threat scanner 已删除，新安全边界由 `src/access-gate/access-decision/core/` 独立定义 | MIT；Copyright (c) 2025 Chandra Teja；原始 revision 未固定 |
-| [landstrip/pi-landstrip](https://github.com/landstrip/pi-landstrip) | conceptual reference / historical adaptation | 配置和路径策略的早期比较基线；pi-keel 当前只提供用户态策略，不包含 Landstrip sandbox | MIT；Copyright (c) 2026 Jarkko Sakkinen；原始 revision 未固定 |
-| [astral-sh/uv](https://github.com/astral-sh/uv) release `0.12.6`；[uv project run documentation](https://docs.astral.sh/uv/concepts/projects/run/)；[uv license policy](https://docs.astral.sh/uv/reference/policies/license/) | conceptual reference / historical reference | `src/access-gate/access-decision/core/shell-words.ts` 中 `uv run`、版本/帮助和未建模子命令的分类参考；对应回归测试在 `tests/access-gate/access-decision/core/shell-policy.test.ts` | Apache-2.0 OR MIT（uv 官方 license policy）；固定参考 release `0.12.6`，仅作命令语义参考，pi-keel 不分发 uv |
+| [landstrip/pi-landstrip](https://github.com/landstrip/pi-landstrip) | conceptual reference / historical adaptation | 配置和路径策略的早期比较基线；AKeel 当前只提供用户态策略，不包含 Landstrip sandbox | MIT；Copyright (c) 2026 Jarkko Sakkinen；原始 revision 未固定 |
+| [astral-sh/uv](https://github.com/astral-sh/uv) release `0.12.6`；[uv project run documentation](https://docs.astral.sh/uv/concepts/projects/run/)；[uv license policy](https://docs.astral.sh/uv/reference/policies/license/) | conceptual reference / historical reference | `src/access-gate/access-decision/core/shell-words.ts` 中 `uv run`、版本/帮助和未建模子命令的分类参考；对应回归测试在 `tests/access-gate/access-decision/core/shell-policy.test.ts` | Apache-2.0 OR MIT（uv 官方 license policy）；固定参考 release `0.12.6`，仅作命令语义参考，AKeel 不分发 uv |
 
-这些来源不定义 pi-keel 的当前安全承诺。当前 enforcement 范围和残余风险在 decisions.md 安全条目与 CONTEXT.md Negative Space 中维护。
+这些来源不定义 AKeel 的当前安全承诺。当前 enforcement 范围和残余风险在 decisions.md 安全条目与 CONTEXT.md Negative Space 中维护。
 
 ## T-069 Greenfield 外部合同来源
 
@@ -53,7 +53,7 @@
 |----------|----------|----------|----------|----------|
 | [Pi coding-agent extension guide](https://github.com/badlogic/pi-mono/blob/dd6bea41/packages/coding-agent/docs/extensions.md) 与 [extension types](https://github.com/badlogic/pi-mono/blob/dd6bea41/packages/coding-agent/src/core/extensions/types.ts) | pi-mono commit `dd6bea41` | conceptual reference | `tool_call` 拦截、`toolName`/`input` 请求边界、`ctx.hasUI`、`ctx.ui.confirm` 及 block 结果；只作为 `src/access-gate/access-decision/adapters/` 的外部 host 合同依据，不复制 Pi 内部实现 | pi-mono 仓库许可证以该 revision 为准；本仓库未复制其代码 |
 | [GNU Bash Reference Manual](https://www.gnu.org/software/bash/manual/bash.html) | Bash 5.3，Manual Edition 5.3，2025-05-18；实现基线 tag `bash-5.3` | conceptual reference + independently observed | 仅采用 T-069 支持子集的控制操作、and-or 求值顺序、引用/转义、tilde/参数展开、重定向和 builtin CWD 观察；Slice 2 的 `core/shell-language.ts`、`shell-words.ts`、`shell-flow.ts`、`shell-compile.ts` 只实现已冻结的简单命令词义、wrapper、重定向和 fail-closed 动态/控制语法；不承诺完整 Bash | GNU Free Documentation License 1.3；本仓库只记录语义来源，不复制正文 |
-| [Arch Linux `bash(1)`](https://man.archlinux.org/man/bash.1.en) | Arch man-pages snapshot 标注 Bash 5.3；核查日 2026-09-02 | independently observed | 作为 Linux-only 运行环境的 Bash 命令行/版本交叉核对；不把发行版选项差异扩大为 pi-keel 支持面 | Arch manual page 的上游许可证和版本信息以其页面为准；未复制文本 |
+| [Arch Linux `bash(1)`](https://man.archlinux.org/man/bash.1.en) | Arch man-pages snapshot 标注 Bash 5.3；核查日 2026-09-02 | independently observed | 作为 Linux-only 运行环境的 Bash 命令行/版本交叉核对；不把发行版选项差异扩大为 AKeel 支持面 | Arch manual page 的上游许可证和版本信息以其页面为准；未复制文本 |
 | [Linux kernel pathname lookup documentation](https://docs.kernel.org/6.15/filesystems/path-lookup.html) 与 [Linux `path_resolution(7)`](https://man7.org/linux/man-pages/man7/path_resolution.7.html) | kernel documentation 6.15；Linux man-pages 6.15 语义基线 | conceptual reference | 只采用路径组件查找、绝对/相对路径和 canonical 阶段解析时点的 Linux 语义；不宣称 fd 传递、OS sandbox 或 TOCTOU 消除 | Linux kernel documentation/man-pages 各自按上游许可证；本仓库未复制实现或正文 |
 
 固定版本和采用范围是 Slice 0/2 的边界：来源更新不会自动改变合同；任何语义变化必须新增核查记录和独立 contract test，再决定是否调整 T-069。
@@ -68,7 +68,7 @@
 
 ## 合规状态与维护要求
 
-- pi-keel 本身使用 MIT License；第三方 MIT 内容仍需保留对应版权和许可声明。
+- AKeel 本身使用 MIT License；第三方 MIT 内容仍需保留对应版权和许可声明。
 - 当前记录恢复了初始提交中的来源映射，但初始引入没有保存上游 revision，这是无法由现有 Git 历史消除的溯源缺口。
 - `multica-ai/andrej-karpathy-skills` 仅在 README 中声明 MIT。重新同步其文本前，必须先获得可归档的许可证证据。
 - 发布前如确认当前文件仍包含第三方 substantial portions，应在分发物中保留对应上游版权和完整许可证文本；本表中的来源链接不能替代许可证义务。
@@ -115,6 +115,6 @@
 
 两点澄清：`gotgenes/pi-permission-system` 上次核查记录的“已归档（内容冻结）”在本核查中 API archived 标志为 false，内容冻结由迁移公告与最后推送时间确认，保留冻结判定；上游内容已迁入 `gotgenes/pi-packages` monorepo（该 monorepo API license 为 null，未检出独立 LICENSE 文件，未来若从新址同步需要先补可归档许可证证据）。`andrej-karpathy-skills` 的许可证证据缺口依旧存在，重新同步其文本前必须补齐可归档证据。
 
-**同步记录（2026-08-23）**：从 mattpocock/skills 吸收两处纪律至 pi-keel：
+**同步记录（2026-08-23）**：从 mattpocock/skills 吸收两处纪律至 AKeel：
 - `1dab982`（user-invoked skill 不可被其他技能调用，2026-08-15 修复）：`scripts/validate-skills.ts` 新增 `/skill:` 交叉引用检查——引用 `disable-model-invocation` 目标时仅允许用户面向措辞（"tell the user to run ..."）或描述性提及，祈使式（hand off to / invoke / run / call）报错；`skills/disciplines/code-cleanup/SKILL.md` 与 `skills/disciplines/systematic-debugging/SKILL.md` 三处 hand-off 同步改为用户指令形式。
 - `85f83d3`（grilling 问题块以 `---` 分隔，2026-08-20）：`skills/workflows/grill-plan/SKILL.md` 按一次一问模型适配，新增问题块模板——问题与推荐答案之间以 `---` 分隔，连续问题块互相独立。

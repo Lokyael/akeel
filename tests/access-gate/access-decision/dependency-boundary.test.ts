@@ -4,7 +4,7 @@ import { dirname, join, relative, resolve } from "node:path";
 import test from "node:test";
 
 const root = join(import.meta.dirname!, "../../../src/access-gate/access-decision");
-const packageName = "pi-keel";
+const packageName = "akeel";
 const legacyDirectories = [
   "shell-parse",
   "command-semantics",

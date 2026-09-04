@@ -6,7 +6,7 @@ disable-model-invocation: true
 
 # Recovery Session
 
-pi-keel does not create snapshots or provide a `/rollback` command.
+AKeel does not create snapshots or provide a `/rollback` command.
 
 ## File Recovery
 

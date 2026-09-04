@@ -1,10 +1,10 @@
-# AGENTS.md — Pi Keel 维护入口与仓库约定
+# AGENTS.md — AKeel 维护入口与仓库约定
 
-本文件只定义 pi-keel 仓库自身的维护入口和内容约定，帮助模型与维护者快速区分仓库内的三类内容。它随仓库提交，只影响仓库内开发会话，不复制注入到用户项目的原则、Task 生命周期或当前架构（见 D-009）。
+本文件只定义 AKeel 仓库自身的维护入口和内容约定，帮助模型与维护者快速区分仓库内的三类内容。它随仓库提交，只影响仓库内开发会话，不复制注入到用户项目的原则、Task 生命周期或当前架构（见 D-009）。
 
 ## 项目定位
 
-Pi Keel 是 [pi](https://pi.dev) 的插件包：以 **扩展（extensions）** 注入工程原则与访问控制，以 **skills** 按需加载工程纪律与工作流，用于在用户项目中管理工程实践。它本身也是一个 TypeScript 开发仓库，包含用于构建与验证自身的开发内容。这三类内容在同一目录树中并存，维护时必须区分对待。
+AKeel 是 [pi](https://pi.dev) 的插件包：以 **扩展（extensions）** 注入工程原则与访问控制，以 **skills** 按需加载工程纪律与工作流，用于在用户项目中管理工程实践。它本身也是一个 TypeScript 开发仓库，包含用于构建与验证自身的开发内容。这三类内容在同一目录树中并存，维护时必须区分对待。
 
 ## 三类内容区分
 
@@ -12,7 +12,7 @@ Pi Keel 是 [pi](https://pi.dev) 的插件包：以 **扩展（extensions）** �
 |------|------|--------|----------|----------|
 | **扩展（插件）** | `src/bootstrap/`、`src/access-gate/` | Session 启动注入的原则（`principles.md`）与 Profile 驱动的访问控制代码 | `package.json` 的 `pi.extensions` | 运行时行为；改动需同步测试与文档 |
 | **Skills** | `skills/foundations/`、`skills/disciplines/`、`skills/workflows/` | 按需加载的技能，含 SKILL.md 与配套文件；三目录表达加载时机（D-005） | `package.json` 的 `pi.skills` | 技能内容与流程；只引用权威文档，不重复定义规则 |
-| **开发内容（dev）** | `tests/`、`scripts/`、`types/`、`tsconfig.json`、`package.json` 脚本 | pi-keel 自身的构建、测试、类型声明与技能校验 | 不进入用户项目分发 | 开发质量；改动随对应功能同步 |
+| **开发内容（dev）** | `tests/`、`scripts/`、`types/`、`tsconfig.json`、`package.json` 脚本 | AKeel 自身的构建、测试、类型声明与技能校验 | 不进入用户项目分发 | 开发质量；改动随对应功能同步 |
 
 ## 目录速查
 

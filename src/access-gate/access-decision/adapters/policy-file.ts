@@ -27,7 +27,7 @@ function error(): PolicyFileLoad {
 }
 
 export function loadPolicyFile(agentDir = defaultAgentDir()): PolicyFileLoad {
-  const path = join(agentDir, "pi-keel", "policy.yaml");
+  const path = join(agentDir, "akeel", "policy.yaml");
   if (!existsSync(path)) return Object.freeze({ kind: "ok", value: Object.freeze({}) });
 
   let value: unknown;

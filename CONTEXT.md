@@ -1,4 +1,4 @@
-# Pi Keel Context
+# AKeel Context
 
 ## Glossary
 
@@ -27,8 +27,8 @@
 - `src/access-gate/access-decision/` 是当前唯一决策实现：`core/` 负责 Pi host/config 无关的语义与策略，Linux pathname lookup 属于该语义域的外部合同；`adapters/` 转换 Pi 和 policy.yaml 输入，`runtime/` 负责 project/staging 生命周期和 host composition。
 - Access Decision Pipeline（D-059/D-060）已完成 Greenfield trust path 与原子生产切换。Canonical 只解释一次；Admission 与 Display 按需投影；Policy Kernel 不读取配置或重新解析请求。Canonical path resolution 同时保留 lexical 与 symlink-target traversal prefixes，Direct search 与 Shell recursive path 均在 blocked descendants 上 fail-closed；有显式 path boundary 时，unknown/unbounded Shell path access 也不得放行。
 - 受管辖 surface 为 Direct `read`、`write`、`edit`、`find`、`grep`、`ls` 与 Shell `bash`。无效 host context、unsupported syntax、硬安全边界和损坏政策 fail-closed；未拥有的工具 passthrough。
-- 生产入口只读取 `$PI_CODING_AGENT_DIR/pi-keel/policy.yaml`（默认 `~/.pi/agent/pi-keel/policy.yaml`）。缺失文件是 deny-by-default；旧 config/Profile schema 不读取、不转换、不 fallback。
-- `/profile`、Profile Footer、policy-selection UI 和 pi-keel 管理的 subagent tier/parent-tier 注册均缺席，等待独立任务从零重建。
+- 生产入口只读取 `$PI_CODING_AGENT_DIR/akeel/policy.yaml`（默认 `~/.pi/agent/akeel/policy.yaml`）。缺失文件是 deny-by-default；旧 config/Profile schema 不读取、不转换、不 fallback。
+- `/profile`、Profile Footer、policy-selection UI 和 AKeel 管理的 subagent tier/parent-tier 注册均缺席，等待独立任务从零重建。
 - Prompt Surface（D-030/D-053）：Policy Snapshot、policy.yaml 和活动 policy 状态不进入 context 消息、tool description 或 system prompt；模型可见的政策相关文本只有静态失败 guidance。
 - 旧决策实现、旧测试与 archive 不属于当前依赖边界，也不是 parity oracle。Static Flow、Explanation Replay 与 Runtime Content Flow 不属于 T-069。
 
@@ -75,7 +75,7 @@
 - 不承诺 pathname check 与实际文件操作之间的 TOCTOU 消除；gate 只做纯决策，不执行文件操作或传递 fd。
 - 不拦截 `user_bash`、`shellCommandPrefix`、Bash `spawnHook`、tool override、custom tool backend、未知 Direct tool surface 或其他 Extension 的直接操作。
 - 审批后的实际文件操作由操作系统权限决定；gate 不控制执行后的行为，也不提供完整 security log scrubbing。
-- 不提供 `/profile` 命令、Profile Footer、policy-selection UI 或 pi-keel 管理的 subagent tier/parent-tier 钳制；这些能力需后续独立重建。
+- 不提供 `/profile` 命令、Profile Footer、policy-selection UI 或 AKeel 管理的 subagent tier/parent-tier 钳制；这些能力需后续独立重建。
 - 旧 `config.yaml`、Profile、命令覆盖、继承和子代理字段不属于新 Policy Snapshot 输入；当前只读取全局 `policy.yaml` 的 `paths` 与 `commands`。
 - Shell 只支持显式定义、可静态证明且资源有界的子集；不可证明形态 fail-closed。未建模的命令副作用不单独建模。
 - 不把短期 Task Record、实施过程或审查报告作为永久项目知识。

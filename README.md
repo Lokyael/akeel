@@ -1,25 +1,25 @@
-# Pi Keel
+# AKeel
 
 Engineering skills and a user-space access-decision system for [pi](https://pi.dev).
 
 ## Install
 
 ```bash
-pi install git:github.com/Lokyael/pi-keel
+pi install git:github.com/Lokyael/akeel
 ```
 
 Principles and skills activate automatically. Skills load on demand.
 
-Pi Keel includes evidence-first verification, TDD, code review, debugging, security review, planning, and related engineering disciplines. Recovery remains outside the package: use version control, editor history, or pi's session tree.
+AKeel includes evidence-first verification, TDD, code review, debugging, security review, planning, and related engineering disciplines. Recovery remains outside the package: use version control, editor history, or pi's session tree.
 
 ## Access decisions
 
-Pi Keel governs the managed `read`, `write`, `edit`, `find`, `grep`, `ls`, and `bash` tool surfaces. Other tool surfaces pass through unchanged. Decisions are made by a Pi-host-neutral canonical pipeline using the supported Linux pathname contract; hard security boundaries and unsupported forms fail closed.
+AKeel governs the managed `read`, `write`, `edit`, `find`, `grep`, `ls`, and `bash` tool surfaces. Other tool surfaces pass through unchanged. Decisions are made by a Pi-host-neutral canonical pipeline using the supported Linux pathname contract; hard security boundaries and unsupported forms fail closed.
 
 The global policy input is:
 
 ```text
-~/.pi/agent/pi-keel/policy.yaml    # $PI_CODING_AGENT_DIR replaces ~/.pi/agent
+~/.pi/agent/akeel/policy.yaml    # $PI_CODING_AGENT_DIR replaces ~/.pi/agent
 ```
 
 A missing policy file denies all managed operations. The file is a new schema and is not compatible with the former `config.yaml` or Profile configuration.
@@ -42,15 +42,15 @@ commands:
 
 Path modes are `allow`, `ask`, or `deny`; command modes are `allow`, `ask`, or `deny`. The policy may narrow access with `allowedRoots`, `blockedRoots`, and `blockedPaths`. `ask` requires an interactive host confirmation and never executes automatically. Confirmation summaries are bounded, include the literal Shell command form, and omit file content. The policy file is validated when loaded; malformed YAML, unknown fields, and legacy fields fail closed.
 
-The current release does not provide `/profile`, a Profile Footer, policy-selection UI, or pi-keel-managed subagent permission tiers. These capabilities require separate future work.
+The current release does not provide `/profile`, a Profile Footer, policy-selection UI, or AKeel-managed subagent permission tiers. These capabilities require separate future work.
 
 ## Companion packages
 
-Recommended third-party packages that pair well with Pi Keel:
+Recommended third-party packages that pair well with AKeel:
 
 | Package | Source | What it adds |
 |---------|--------|--------------|
-| pi-subagents | `npm:pi-subagents` | Parallel tasks, chains, async runs, and supervisor review. It is independent of Pi Keel's access-decision policy. |
+| pi-subagents | `npm:pi-subagents` | Parallel tasks, chains, async runs, and supervisor review. It is independent of AKeel's access-decision policy. |
 | pi-search | `npm:@heyhuynhgiabuu/pi-search` | Research tools for web search, code search, library docs, repo Q&A, URL fetching, and Firecrawl scraping/crawling |
 
 ```bash
@@ -62,7 +62,7 @@ Review third-party packages before installing: Pi packages run with full system 
 
 ### Environment variables
 
-Pi Keel reads `PI_CODING_AGENT_DIR` to override the default agent directory. It reads no API keys. Companion packages read their own configuration.
+AKeel reads `PI_CODING_AGENT_DIR` to override the default agent directory. It reads no API keys. Companion packages read their own configuration.
 
 ## Documentation
 

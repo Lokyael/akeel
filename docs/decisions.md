@@ -1,6 +1,6 @@
-# Pi Keel Decisions
+# AKeel Decisions
 
-本文集中记录 pi-keel 的长期架构、工程和安全决策。每条只保留当前结论、理由、必要替代方案和影响；被完整吸收（`superseded`）或主动退役（`retired`）的条目从寄存器剪除，历史由 Git 保留（规则见 [D-028](#d-028-统一-project-record-模型)）。
+本文集中记录 AKeel 的长期架构、工程和安全决策。每条只保留当前结论、理由、必要替代方案和影响；被完整吸收（`superseded`）或主动退役（`retired`）的条目从寄存器剪除，历史由 Git 保留（规则见 [D-028](#d-028-统一-project-record-模型)）。
 
 **条目模板**：每条的段落顺序固定为 `Status` → `Decision`（可选规格子节紧随其后，如 `Rules`/`Security invariants`/`Guidance mapping`/`Enforcement scope`/`格式`/`延伸`）→ `Why` → `Impact` → `Rejected` → `Out of Scope`；无内容的段落省略，不留空标题。可选 `Reversal surface` 元数据行紧跟 `Status`（值 `user-boundary`/`engineering`，缺省 `user-boundary`；语义见 principles.md Project Records — Record Lifecycle）。
 
@@ -10,9 +10,9 @@
 
 **Decision:** 使用统一的 `src/access-gate/access-decision/` 扩展集中处理 Canonical、Admission、Policy Snapshot、hard boundary 和 host approval，不提供或假定 OS-level isolation。
 
-**Why:** 多个安全扩展会产生拦截顺序竞争、重复审批、分散配置和难以关联的审计信息。Node.js 路径检查没有 kernel-level enforcement；将 pi-keel 称为 sandbox 会造成安全承诺与真实边界不一致。
+**Why:** 多个安全扩展会产生拦截顺序竞争、重复审批、分散配置和难以关联的审计信息。Node.js 路径检查没有 kernel-level enforcement；将 AKeel 称为 sandbox 会造成安全承诺与真实边界不一致。
 
-**Impact:** pi-keel 自行维护统一扩展，不自动继承社区扩展的独立更新。
+**Impact:** AKeel 自行维护统一扩展，不自动继承社区扩展的独立更新。
 
 **Out of Scope:** OS sandbox、容器、VM、seccomp、Landlock、network namespace 和其他 kernel-level isolation。
 
@@ -38,9 +38,9 @@
 
 **Status:** active
 
-**Decision:** `README.md` 是唯一用户使用入口；移除平行的 `USAGE.md`、不必要的 npm 元数据和用户 `AGENTS.md` 模板。长期架构、安全、溯源和 Project Record 文档按职责保留在 `docs/`。本地约束：`AGENTS.md` 只定义 pi-keel 自身的维护入口和仓库约定，不复制注入原则、Task 生命周期或当前架构；`docs/traceability.md` 只记录外部来源、采用方式、当前文件映射和许可证义务——当前架构、安全承诺与残余风险、长期取舍分别由 `CONTEXT.md`（含 Negative Space）和本寄存器维护。
+**Decision:** `README.md` 是唯一用户使用入口；移除平行的 `USAGE.md`、不必要的 npm 元数据和用户 `AGENTS.md` 模板。长期架构、安全、溯源和 Project Record 文档按职责保留在 `docs/`。本地约束：`AGENTS.md` 只定义 AKeel 自身的维护入口和仓库约定，不复制注入原则、Task 生命周期或当前架构；`docs/traceability.md` 只记录外部来源、采用方式、当前文件映射和许可证义务——当前架构、安全承诺与残余风险、长期取舍分别由 `CONTEXT.md`（含 Negative Space）和本寄存器维护。
 
-**Why:** 每个文件都应有明确的维护对象和用户价值；重复的使用、架构、安全和工作流说明会漂移，pi-keel 也不应越过用户项目工程约定文件的所有权边界；溯源文件只有在来源、revision、采用范围和许可证证据可核查时才具有合规价值，运行时行为和融合取舍放入其中会把它变成第二份架构与决策文档。
+**Why:** 每个文件都应有明确的维护对象和用户价值；重复的使用、架构、安全和工作流说明会漂移，AKeel 也不应越过用户项目工程约定文件的所有权边界；溯源文件只有在来源、revision、采用范围和许可证证据可核查时才具有合规价值，运行时行为和融合取舍放入其中会把它变成第二份架构与决策文档。
 
 **Impact:** 修改运行时行为不再自动更新 `docs/traceability.md`，只有第三方来源映射或许可证义务变化时才更新；新增或同步外部内容必须记录固定的上游 commit 或 release。
 
@@ -151,7 +151,7 @@
 
 **作用域键：** 覆盖层键为显式作用域匹配——精确键优先（裸名或完整路径字符串，`./` 归一化对称生效），路径形式按最长路径前缀键匹配（键以 `/` 结尾）；**移除隐式 basename 回退**。别名目标可为 `commands` 定义（复用 class/effects/subcommands，reason 用原始调用名），alias 单步解析不链式；`reclassify` 按 basename 对齐 adapter 身份（路径形式下分类微调不静默失效）。
 
-**加载：** 只读取用户全局 `~/.pi/agent/pi-keel/config.yaml` 的 `commands` 段（`PI_CODING_AGENT_DIR` 可改变 agent 目录）；TypeScript adapter 是内置权威来源。本配置不改变 Profile、PathPolicy、Gate、Shell IR 或 Direct/passthrough 行为。
+**加载：** 只读取用户全局 `~/.pi/agent/akeel/config.yaml` 的 `commands` 段（`PI_CODING_AGENT_DIR` 可改变 agent 目录）；TypeScript adapter 是内置权威来源。本配置不改变 Profile、PathPolicy、Gate、Shell IR 或 Direct/passthrough 行为。
 
 **已知局限：** `reclassify` 的子命令提取（`fullSubcommand`）不跳过取值选项的值（如 `cargo --manifest-path Cargo.toml build` 得子命令 `"Cargo.toml build"`）；实际影响极小，pattern 用 substring 匹配即可规避，实现细节见 `args.ts`。
 
@@ -198,7 +198,7 @@
 
 **Out of Scope:**
 
-- **容器级迁移引导机制**（自有决策寄存器、ADR、跟踪器、ideas/backlog 文档的用户项目）：不建专用 skill、不建声明/路由系统、不改 CONTEXT.md 契约。二元边界：标准路径容器由 pi-keel 管理；非标准体系由用户经 `AGENTS.md` 或显式会话指示声明，pi-keel 不自动识别、不写入。迁移非默认，仅用户显式选择时作为一次性 Task 走 Migration Protocol；不可读来源报告缺口并请求中央化进 CONTEXT.md，不盲猜。
+- **容器级迁移引导机制**（自有决策寄存器、ADR、跟踪器、ideas/backlog 文档的用户项目）：不建专用 skill、不建声明/路由系统、不改 CONTEXT.md 契约。二元边界：标准路径容器由 AKeel 管理；非标准体系由用户经 `AGENTS.md` 或显式会话指示声明，AKeel 不自动识别、不写入。迁移非默认，仅用户显式选择时作为一次性 Task 走 Migration Protocol；不可读来源报告缺口并请求中央化进 CONTEXT.md，不盲猜。
 
 ## D-030: 提示词体系边界与原则部署（Prompt Surface）
 
@@ -469,14 +469,14 @@ T-069 的 Greenfield Semantic Rebuild 不继承该算法，而重新建立条件
 - `keel-query` 合并进 `keel-develop`：develop 改 `extends: [keel-plan]`，显式补 `execute: ask` 与 `project/** write: allow`，resolve 结果与改前完全一致（原 query 的 `project/** write: ask` 规则本就因首匹配被 develop 的 allow 规则 shadow，是死规则）。
 - `keel-subagent-scratch` 合并进 `keel-explore`：explore 增加 `/tmp/pi-work/**` 写规则后与 T0 解析完全一致（实现前验证）；T0 档位映射改为 `keel-explore`，T1 改 `extends: [keel-explore]` 后解析不变；plan/develop 自带的重叠 `/tmp/pi-work` 规则删除——scratch 规则单一来源在 explore。
 
-**Why:** `keel-code` 零实际使用（仓库内无任何运行时引用，只有测试自引用），且语义残缺——真实代码编辑必然触碰 `package.json`/`tsconfig.json` 等项目根配置文件，该档只允许写 src/tests，无法承载“写代码”这一实际用途；真实代码编辑由 `keel-develop`（项目全写）覆盖。结构上它是 `keel-read` 的未用分支，无任何 profile extends 它，删除不改变继承拓扑。`keel-query` 同样零运行时引用，且 ask-first 是“审批哲学”而非能力档——选择 develop 即接受项目写，需要“写前全审”的用户自配 profile（配方：`extends: [keel-plan]` + `project/** write: ask` + `execute: ask`）比内置默认档位更适合表达该偏好。`keel-subagent-scratch` 解析后 = explore + 一条 `/tmp/pi-work` 写规则，是重复档；explore 作为主档的“纯只读”承诺（writes denied）没有安全相关性——`/tmp/pi-work` 是 pi-keel 自有 scratch 约定目录（非用户数据、ephemeral），其余可写档（plan/develop/build）本就全带此规则。合并后主链梯子每级严格递增：read（零写）→ explore（+scratch）→ plan（+docs）→ develop（+项目写）→ build（全信任）。
+**Why:** `keel-code` 零实际使用（仓库内无任何运行时引用，只有测试自引用），且语义残缺——真实代码编辑必然触碰 `package.json`/`tsconfig.json` 等项目根配置文件，该档只允许写 src/tests，无法承载“写代码”这一实际用途；真实代码编辑由 `keel-develop`（项目全写）覆盖。结构上它是 `keel-read` 的未用分支，无任何 profile extends 它，删除不改变继承拓扑。`keel-query` 同样零运行时引用，且 ask-first 是“审批哲学”而非能力档——选择 develop 即接受项目写，需要“写前全审”的用户自配 profile（配方：`extends: [keel-plan]` + `project/** write: ask` + `execute: ask`）比内置默认档位更适合表达该偏好。`keel-subagent-scratch` 解析后 = explore + 一条 `/tmp/pi-work` 写规则，是重复档；explore 作为主档的“纯只读”承诺（writes denied）没有安全相关性——`/tmp/pi-work` 是 AKeel 自有 scratch 约定目录（非用户数据、ephemeral），其余可写档（plan/develop/build）本就全带此规则。合并后主链梯子每级严格递增：read（零写）→ explore（+scratch）→ plan（+docs）→ develop（+项目写）→ build（全信任）。
 
 **Impact:** `/profile` 可选项 9→6（主链 5：read/explore/plan/develop/build + T1 `keel-subagent-project`）；子代理 T0 复用 explore（footer 显示 explore）；既有配置若 `extends: [keel-code]`/`keel-query`/`keel-subagent-scratch` 将解析失败并 fail-closed 到 `keel-read`（三档均无任何文档化使用，爆炸半径为零）；安全梯度与其余档位语义不变（plan/develop/build 逐项 resolve 验证相同）。
 
 **Rejected:**
 
 - **移除 keel-explore**：read-anywhere + scratch 默认需内联进 plan 与 T1 两处，造成配置重复，且失去“全盘只读”主档位。
-- **把 explore 的写面放宽到 `/tmp/**`**：共享目录任意路径写有 symlink/交叉用户风险；合并只用 pi-keel 自有约定 `/tmp/pi-work/**`（build 的 `/tmp/**` 是另一档语义，不受影响）。
+- **把 explore 的写面放宽到 `/tmp/**`**：共享目录任意路径写有 symlink/交叉用户风险；合并只用 AKeel 自有约定 `/tmp/pi-work/**`（build 的 `/tmp/**` 是另一档语义，不受影响）。
 - **合并 keel-develop 与 keel-build**：build 的 modify/execute allow 是全信任语义，与 develop 的 ask 是安全梯度实质差异；合并会让 develop 默认允许执行，是危险默认。
 - **程序化合成子代理档位**：把 T0/T1 从 profile 数据改为运行时合成，增加运行时复杂度并失去配置层可测试性；本次未采用该历史方案。
 
@@ -485,9 +485,9 @@ T-069 的 Greenfield Semantic Rebuild 不继承该算法，而重新建立条件
 **Status:** active
 **Reversal surface:** engineering
 
-**Decision:** pi-keel 不再分发或加载 optional adapter，也不再提供 `optionalAdapters` 配置字段。未被核心 adapter 或用户 `commands` 覆盖层建模的裸名命令保持 `unknown`；路径形式的未建模可执行文件仍按 D-031 分类为 `execute`。
+**Decision:** AKeel 不再分发或加载 optional adapter，也不再提供 `optionalAdapters` 配置字段。未被核心 adapter 或用户 `commands` 覆盖层建模的裸名命令保持 `unknown`；路径形式的未建模可执行文件仍按 D-031 分类为 `execute`。
 
-**Why:** 唯一的 optional adapter 是外部工具的专用建模，增加配置面、注册表分支、测试和文档维护成本，但不属于 pi-keel 的核心访问策略。移除后核心 adapter 集合重新成为唯一内置语义来源，用户仍可通过 `commands`/`aliases`/`reclassify` 显式扩展本地命令语义。
+**Why:** 唯一的 optional adapter 是外部工具的专用建模，增加配置面、注册表分支、测试和文档维护成本，但不属于 AKeel 的核心访问策略。移除后核心 adapter 集合重新成为唯一内置语义来源，用户仍可通过 `commands`/`aliases`/`reclassify` 显式扩展本地命令语义。
 
 **Impact:**
 
@@ -721,7 +721,7 @@ host-neutral request 的具体归一化字段和受管辖 surface 集合、Canon
 **Status:** active
 **Reversal surface:** engineering
 
-**Decision:** T-069 的用户全局 Policy 输入固定为 `$PI_CODING_AGENT_DIR/pi-keel/policy.yaml`，默认目录为 `~/.pi/agent`。文件的唯一顶层字段为新 `PolicyConfig` 的 `paths` 与 `commands`；旧 `config.yaml`、Profile、继承、命令覆盖和子代理字段均不读取、不转换、不 fallback。缺失文件等价于空新配置，因 `PolicyConfig` 的 deny-by-default 语义而关闭所有受管辖操作；YAML 语法错误、根非 mapping 或任何 schema 错误也必须关闭，不保留旧策略。
+**Decision:** T-069 的用户全局 Policy 输入固定为 `$PI_CODING_AGENT_DIR/akeel/policy.yaml`，默认目录为 `~/.pi/agent`。文件的唯一顶层字段为新 `PolicyConfig` 的 `paths` 与 `commands`；旧 `config.yaml`、Profile、继承、命令覆盖和子代理字段均不读取、不转换、不 fallback。缺失文件等价于空新配置，因 `PolicyConfig` 的 deny-by-default 语义而关闭所有受管辖操作；YAML 语法错误、根非 mapping 或任何 schema 错误也必须关闭，不保留旧策略。
 
 **Why:** Policy Snapshot 已有稳定的最小输入合同。独立文件把新格式与旧 `config.yaml` 的名称和 schema 隔离，避免任何兼容读取、隐式迁移或旧字段塑造新内核；缺失和损坏均从同一 closed default 进入决策链。
 

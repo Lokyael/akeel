@@ -10,10 +10,10 @@ async function withAgentFiles(
   legacyConfig: string | undefined,
   run: (agentDir: string, harness: ReturnType<typeof startSession>["harness"]) => Promise<void>,
 ): Promise<void> {
-  const agentDir = mkdtempSync(join(tmpdir(), "pi-keel-extension-agent-"));
-  mkdirSync(join(agentDir, "pi-keel"), { recursive: true });
-  if (policy !== undefined) writeFileSync(join(agentDir, "pi-keel", "policy.yaml"), policy);
-  if (legacyConfig !== undefined) writeFileSync(join(agentDir, "pi-keel", "config.yaml"), legacyConfig);
+  const agentDir = mkdtempSync(join(tmpdir(), "akeel-extension-agent-"));
+  mkdirSync(join(agentDir, "akeel"), { recursive: true });
+  if (policy !== undefined) writeFileSync(join(agentDir, "akeel", "policy.yaml"), policy);
+  if (legacyConfig !== undefined) writeFileSync(join(agentDir, "akeel", "config.yaml"), legacyConfig);
 
   await withEnv({ PI_CODING_AGENT_DIR: agentDir }, async () => {
     const session = startSession();

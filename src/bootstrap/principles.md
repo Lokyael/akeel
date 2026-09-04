@@ -1,5 +1,5 @@
-<PI_KEEL_PRINCIPLES>
-pi-keel:core-principles
+<AKEEL_PRINCIPLES>
+akeel:core-principles
 
 ## Core Behavioral Principles
 
@@ -340,4 +340,4 @@ tool, then follow the skill's process.
 
 Available skills are listed in <available_skills>. If you're unsure which skill
 applies, try /skill:survey-context first — it will orient you.
-</PI_KEEL_PRINCIPLES>
+</AKEEL_PRINCIPLES>

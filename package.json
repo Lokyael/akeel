@@ -1,6 +1,6 @@
 {
-  "name": "pi-keel",
-  "description": "Engineering skills and security system for pi — the keel that keeps AI coding steady",
+  "name": "akeel",
+  "description": "Engineering skills and user-space access decisions for AI coding — A + Keel for steady work",
   "license": "MIT",
   "type": "module",
   "scripts": {

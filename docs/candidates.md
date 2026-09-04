@@ -16,8 +16,8 @@
 - **Trigger:** 出现子代理污染 durable 内容（CONTEXT.md/docs）的事例。
 ## C-011: pi-guard 共存说明
 
-- **Why Not Now:** 装了 pi-keel 再装 pi-guard 会双重拦截同一 tool_call（两者都拦 bash/read/write）；当前无此用户反馈。pi-keel 即 pi-subagents 官方期望的 bash guard 角色（permissions.ts 硬编码外包），且语义更强。
-- **Trigger:** 出现 pi-guard + pi-keel 双重拦截的用户报告。
+- **Why Not Now:** 装了 AKeel 再装 pi-guard 会双重拦截同一 tool_call（两者都拦 bash/read/write）；当前无此用户反馈。AKeel 即 pi-subagents 官方期望的 bash guard 角色（permissions.ts 硬编码外包），且语义更强。
+- **Trigger:** 出现 pi-guard + AKeel 双重拦截的用户报告。
 ## C-012: shell effects 不裁剪（D-048 关联）
 
 - **Why Not Now:** shell 命令的 effects 在 kernel 无直接决策消费（D-022 已记录「effects 只在 Direct-origin 被消费」），但它们是 D-022「effect 被安全解释」安全不变量的承载体、plan 完整性/审计数据、以及 50+ 测试断言锁定的语义提取契约。裁剪会让领域知识（如 git rm→delete）无处安放（deletion test 平移失败）；惰性视图违背 sealed 不可变 plan（deep-freeze/D-046 品牌化）。已由 D-048 的 requires 证明侧强化（effects 覆盖其类要求获 seal 边界运行时证明）。
@@ -34,10 +34,10 @@
   - **名字契约（单源）**：`config.yaml` 顶层 `env` 段（D-062 加载即校验）——`protected`（掩码+拒写+拒导出，默认表覆盖 key/ip/真实链接/url：`*(KEY|TOKEN|SECRET|PASSWORD|PASS|PWD|PRIVATE|CREDENTIAL|AUTH|BEARER)`、`*(HOST|URL|URI|ENDPOINT|IP|ADDR|CONN*|DBCONN*)` 等）、`allow`（可读可见+可写：`NODE_ENV`/`PORT`/`DEBUG`/`LOG_LEVEL`/`APP_NAME`/`REGION`/`TZ`）、其余 = neutral（可读可见，不可写）。命名约定本身是治理输入；决策只探测键名集合，不取值。
   - **三种能力**：① **MASK-read**（替代整读）解析 `.env` → 逐条 `key=value`；protected 名 → `key=****`，allow/neutral 名 → 原值；② **APPEND** 仅 `>>` 追加单行字面 `K=V`（无先读后写、无替换）；③ **SET-allow** 仅对 allow 名单内 key 覆写为字面值（allow 名按契约即非敏感 → 低危）。原始 `cat .env`/`>`/truncate/write/edit、`grep -r` 递归聚合保持 hard deny。
   - **按名可靠掩码（重设核心，回应"屏蔽 key/ip/真实链接/url 但不影响普通变量"）**：掩码失效源于"按内容猜值像不像 secret"；因 `.env` 是结构化 `K=V`，拆成 (key,value) 对后**按 key 名**判——`API_KEY=****`、`NODE_ENV=production`。名字可枚举、用户声明 → 确定性、无内容启发式、无漏判误判（误伤固定词/漏改编码）。这与 D-023 相容：D-023 拒的是 deny/ask 渲染面"嵌入原始值再打码"（值形态任意、无结构）；受管面面对结构化 key-value + 可声明名字契约，掩码键名而非猜值，是全新且可靠的前提。
-  - **掩码位点前置条件（可信掩码的唯一正确实现位点，安全不变量）**：掩码必须发生在 **pi-keel 进程内**（受管面 Direct 工具：fs 读 → 按 key 名替换为 `****` → 只把掩码串作为 tool result 返回）。原因：掩码只有在"原始值永不离开可信进程"时才有意义——若是 shell 管道（`cat .env | sed …`），原始内容先经过 shell stdout → host 执行记录（日志）与 LLM tool result，sed 只是给"已读走的原文"打码，**收不回来**，且原始 read 已发生。由此两条硬约束：① `.env` 的读一律走受管面 Direct 工具，**禁止 shell 管道掩码**；② 受管面 **不得 debug-log 原始 `.env` 内容**。**正面承诺（受管面正确实现下）**：进入 LLM 上下文的 `.env` 内容只有两种形态——掩码串（protected 名 `key=****`）与 allow/neutral 名的原值（后者即"普通变量不受影响"的设计意图本身，非泄露）；除此之外的原始值只短暂驻留 pi-keel 进程内存，**不写入任何 pi-keel 侧记录**（无 debug 日志、无事件流落盘），**不进入任何 tool result**。拒绝/失败路径同样保证：gate 决策前不读取文件。此承诺的边界见"诚实边界"残余段（磁盘本体/写路径字面/host 侧记录不在其内）。gate 决策路径本就安全：gate 是纯决策层、不执行文件读（D-022），deny 侧只给类别不给值（D-023），拒绝路径不带原始值。
-  - **命令轴治理**：env/printenv/export/set/declare 按名分类；export protected 名 deny（当前无 pi-keel 子代理 env 策略）；env 含 protected 名时全量 dump deny；受限 dump 只见 allow/neutral 或全掩码。子代理对 allow 名可见、对 protected 名拿到 `****`，当前不提供父档钳制。
+  - **掩码位点前置条件（可信掩码的唯一正确实现位点，安全不变量）**：掩码必须发生在 **AKeel 进程内**（受管面 Direct 工具：fs 读 → 按 key 名替换为 `****` → 只把掩码串作为 tool result 返回）。原因：掩码只有在"原始值永不离开可信进程"时才有意义——若是 shell 管道（`cat .env | sed …`），原始内容先经过 shell stdout → host 执行记录（日志）与 LLM tool result，sed 只是给"已读走的原文"打码，**收不回来**，且原始 read 已发生。由此两条硬约束：① `.env` 的读一律走受管面 Direct 工具，**禁止 shell 管道掩码**；② 受管面 **不得 debug-log 原始 `.env` 内容**。**正面承诺（受管面正确实现下）**：进入 LLM 上下文的 `.env` 内容只有两种形态——掩码串（protected 名 `key=****`）与 allow/neutral 名的原值（后者即"普通变量不受影响"的设计意图本身，非泄露）；除此之外的原始值只短暂驻留 AKeel 进程内存，**不写入任何 AKeel 侧记录**（无 debug 日志、无事件流落盘），**不进入任何 tool result**。拒绝/失败路径同样保证：gate 决策前不读取文件。此承诺的边界见"诚实边界"残余段（磁盘本体/写路径字面/host 侧记录不在其内）。gate 决策路径本就安全：gate 是纯决策层、不执行文件读（D-022），deny 侧只给类别不给值（D-023），拒绝路径不带原始值。
+  - **命令轴治理**：env/printenv/export/set/declare 按名分类；export protected 名 deny（当前无 AKeel 子代理 env 策略）；env 含 protected 名时全量 dump deny；受限 dump 只见 allow/neutral 或全掩码。子代理对 allow 名可见、对 protected 名拿到 `****`，当前不提供父档钳制。
   - **实现方案大纲**（参考，非承诺）：IR 已区分 append 形态（`RedirectionKind.stdoutAppend`），缺口在 compiler 摊平 → 把 append 标志带进 `PathAccessOperation`（plan 形状同步 D-022/D-046）；`decidePath` 对 env 家族在 write+append 形态放行进入 profile，其余 blocked（D-060"不可覆盖"不破坏——append/SET-allow 是新增子形态而非用户豁免）；新建受管面模块（`access-gate/env/`，parse → mask → append → set-allow，镜像 tests 分层 D-044）；威胁层 `read_secrets` 与名字契约单源对齐。
-  - **诚实边界**：dedup/覆盖检测不可用（读被禁的必然结果，SET-allow 只对 allow 名提供显式覆写）；printf/多行/`$'…'` 形状 v1 不建模 → fail-closed；名字不在 protected 表、值里却嵌真实 IP/URL 的变量按名掩码覆盖不到——缓解是聚合读保持 hard deny（无批量外流通道）+ 用户把该变量名加 protected，按内容值级兜底掩码不作为保证（与 D-023 一致，结局 fail-open，只作显式 opt-in 非保证最佳努力）；rc 文件（`.bashrc` 等）是混合载体，密钥内容可见性属显式通道边界；执行输出里的 secret 属 pi 宿主 logging scrubbing，pi-keel out of scope（Negative Space 已声明）。**掩码消除不了的残余**：`.env` 本体在磁盘，其他读者（其他 extension 直接 fs、用户编辑器、被 gate 放行的 shell）可读原始值——pi-keel 只保证受管面通道不泄，不保证"无其他读者"（Negative Space：不拦截其他 extension 的 Node fs）；写路径（APPEND/SET-allow）的字面值本就在 agent 自己的 toolCall 里（写配置的意图），非掩码职责；host 侧对工具调用的记录属宿主面，pi-keel out of scope。
+  - **诚实边界**：dedup/覆盖检测不可用（读被禁的必然结果，SET-allow 只对 allow 名提供显式覆写）；printf/多行/`$'…'` 形状 v1 不建模 → fail-closed；名字不在 protected 表、值里却嵌真实 IP/URL 的变量按名掩码覆盖不到——缓解是聚合读保持 hard deny（无批量外流通道）+ 用户把该变量名加 protected，按内容值级兜底掩码不作为保证（与 D-023 一致，结局 fail-open，只作显式 opt-in 非保证最佳努力）；rc 文件（`.bashrc` 等）是混合载体，密钥内容可见性属显式通道边界；执行输出里的 secret 属 pi 宿主 logging scrubbing，AKeel out of scope（Negative Space 已声明）。**掩码消除不了的残余**：`.env` 本体在磁盘，其他读者（其他 extension 直接 fs、用户编辑器、被 gate 放行的 shell）可读原始值——AKeel 只保证受管面通道不泄，不保证"无其他读者"（Negative Space：不拦截其他 extension 的 Node fs）；写路径（APPEND/SET-allow）的字面值本就在 agent 自己的 toolCall 里（写配置的意图），非掩码职责；host 侧对工具调用的记录属宿主面，AKeel out of scope。
 - **Trigger:** 用户确认"agent 需要落盘写项目 `.env` 注入配置"（追加/allow 覆写）为真实高频工作流，或"密钥经 rc 文件/进程 env/按内容掩码漏判"出现实证需求。
 ## C-017: 归约路径单解析收敛（C2）
 
@@ -52,7 +52,7 @@
   - **Worker 强制 Git Worktree 物理隔离（微观全自治）**：严格贯彻有界自治原则，所有涉及代码修改与测试执行的子任务强制声明 `worktree: true`。子代理在独立检出的 Worktree 物理目录内享有 100% 的修改代码、运行编译、执行单测与报错自愈自由，全程零审批弹窗、零工作区踩踏；主 Agent 与人类无需微观干涉，仅在最终提交时做 PR/Diff 宏观验收。
   - **强制默认异步与 Herdr 旁观解耦**：在扩展配置中开启 `asyncByDefault: true` 与 `forceTopLevelAsync: true`，彻底消灭前台同步阻塞（`async: false`）对交互 TUI 的锁死；前台保持低延迟交互心流，后台状态通过 Herdr 原生 Socket 与 `H` 键侧边窗实现全透明旁观与随时干预。
   - **角色精简收敛（消除戏服）**：通过 `disableBuiltins` 停用同质化冗余角色（oracle/researcher/delegate），全生命周期收敛为 3 个生产力核心：`worker`（Worktree 内全自治攻坚与 TDD 自愈）、`scout`（只读快速扫库压缩事实）、`reviewer`（交付前单次对抗性门禁审查）。
-  - **打通 Pi Keel 空间准入策略**：在 `policy.yaml` 中将 Worktree 专属目录（如 `/tmp/pi-work/**` 或 `.pi/worktrees/**`）配置为 `write: allow`，系统高危操作保持 `deny`，解决后台无头子代理在无 UI 环境下因 `write: ask` 产生权限死锁的结构性矛盾。
+  - **打通 AKeel 空间准入策略**：在 `policy.yaml` 中将 Worktree 专属目录（如 `/tmp/pi-work/**` 或 `.pi/worktrees/**`）配置为 `write: allow`，系统高危操作保持 `deny`，解决后台无头子代理在无 UI 环境下因 `write: ask` 产生权限死锁的结构性矛盾。
 - **Trigger:** 用户正式启动需要长周期后台攻坚、复杂并发重构或夜间无人值守的大型特性开发；或用户决定正式应用上述配置对当前 `pi-subagents` 运行环境进行生产级调优。
 - **References:**
   - **pi-subagents**: `NicoBailon/pi-subagents`（Git Worktree 生命周期管理、Manifest 补丁追踪与 Herdr 状态桥接实现）

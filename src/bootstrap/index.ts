@@ -8,7 +8,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
-const BOOTSTRAP_MARKER = "pi-keel:core-principles";
+const BOOTSTRAP_MARKER = "akeel:core-principles";
 const EXTENSION_DIR = dirname(fileURLToPath(import.meta.url));
 
 // ─── Bootstrap Content (loaded from file for easy editing) ───
@@ -19,7 +19,7 @@ const CORE_PRINCIPLES = readFileSync(resolve(EXTENSION_DIR, "principles.md"), "u
 
 let needsInjection = true;
 
-export default function piKeelBootstrap(pi: ExtensionAPI) {
+export default function akeelBootstrap(pi: ExtensionAPI) {
   // On session start, mark for injection
   pi.on("session_start", async () => {
     needsInjection = true;

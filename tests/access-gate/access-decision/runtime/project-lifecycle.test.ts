@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import { createProjectLifecycle } from "../../../../src/access-gate/access-decision";
 
 function project(): { readonly root: string; readonly nested: string; readonly cleanup: () => void } {
-  const root = mkdtempSync(join(tmpdir(), "pi-keel-project-"));
+  const root = mkdtempSync(join(tmpdir(), "akeel-project-"));
   const nested = join(root, "packages", "app");
   mkdirSync(join(root, ".git"));
   mkdirSync(nested, { recursive: true });
@@ -30,7 +30,7 @@ test("project lifecycle discovers the enclosing Git root and owns a staging dire
 });
 
 test("project lifecycle rejects a cwd outside a discoverable project", () => {
-  const cwd = mkdtempSync(join(tmpdir(), "pi-keel-no-project-"));
+  const cwd = mkdtempSync(join(tmpdir(), "akeel-no-project-"));
   try {
     assert.throws(() => createProjectLifecycle(cwd), /invalid project lifecycle/);
   } finally {

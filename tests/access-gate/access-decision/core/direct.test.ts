@@ -21,7 +21,7 @@ function testService(paths: NonNullable<PolicyConfig["paths"]>): ReturnType<type
 }
 
 test("Direct path policy follows existing symlink components", () => {
-  const root = mkdtempSync(join(tmpdir(), "pi-keel-direct-path-"));
+  const root = mkdtempSync(join(tmpdir(), "akeel-direct-path-"));
   const target = join(root, "target");
   mkdirSync(target);
   writeFileSync(join(target, "secret"), "hidden\n");
@@ -72,7 +72,7 @@ test("Direct path policy rejects traversal through a blocked component", () => {
 });
 
 test("Direct path policy retains blocked components hidden by a symlink target", () => {
-  const root = mkdtempSync(join(tmpdir(), "pi-keel-direct-link-target-"));
+  const root = mkdtempSync(join(tmpdir(), "akeel-direct-link-target-"));
   const allowed = join(root, "allowed");
   const blocked = join(root, "blocked");
   mkdirSync(allowed);
