@@ -12,22 +12,25 @@ import {
 
 type Handler = (event: unknown, context: ExtensionContext) => unknown | Promise<unknown>;
 
-function fakePi(): { readonly handlers: Map<string, Handler>; readonly pi: ExtensionAPI } {
+function fakePi(): { readonly handlers: Map<string, Handler>; readonly commands: Map<string, (args: string, context: ExtensionContext) => unknown | Promise<unknown>>; readonly pi: ExtensionAPI } {
   const handlers = new Map<string, Handler>();
+  const commands = new Map<string, (args: string, context: ExtensionContext) => unknown | Promise<unknown>>();
   const pi = {
     on(event: string, handler: Handler): void {
       handlers.set(event, handler);
     },
-    registerCommand(): void {},
+    registerCommand(name: string, options: { handler: (args: string, context: ExtensionContext) => unknown | Promise<unknown> }): void {
+      commands.set(name, options.handler);
+    },
   } as unknown as ExtensionAPI;
-  return { handlers, pi };
+  return { handlers, commands, pi };
 }
 
 function context(cwd: string, hasUI: boolean, confirm: (title: string, message: string) => Promise<boolean>): ExtensionContext {
   return {
     cwd,
     hasUI,
-    ui: { confirm },
+    ui: { confirm, notify(): void {}, setStatus(): void {} },
   } as unknown as ExtensionContext;
 }
 
@@ -99,6 +102,37 @@ test("Pi global composition loads only the new policy.yaml and denies when absen
     rmSync(agentDir, { recursive: true, force: true });
     rmSync(projectRoot, { recursive: true, force: true });
   }
+});
+
+test("Pi policy command switches presets and keeps the active state visible", async () => {
+  const { handlers, commands, pi } = fakePi();
+  installPiAccessDecision(pi, {
+    policyConfig: {
+      presets: {
+        review: { paths: { read: "allow" }, commands: { inspect: "allow" } },
+        guided: { paths: { read: "allow", write: "ask", edit: "ask" }, commands: { inspect: "allow", modify: "ask", execute: "ask" } },
+        develop: { paths: { read: "allow", write: "allow", edit: "allow" }, commands: { inspect: "allow", modify: "allow", execute: "allow" } },
+      },
+      activePreset: "review",
+    },
+    projectRoot: "/workspace/project",
+    stagingRoot: "/tmp/pi-work",
+  });
+  const hostContext = context("/workspace/project", true, async () => true);
+  await invoke(handlers, "session_start", {}, hostContext);
+  const command = commands.get("policy");
+  assert.ok(command);
+
+  await command!("develop", hostContext);
+  assert.equal(
+    await invoke(handlers, "tool_call", { toolName: "write", input: { path: "notes.md", content: "updated\n" } }, hostContext),
+    undefined,
+  );
+  await command!("unknown", hostContext);
+  assert.equal(
+    await invoke(handlers, "tool_call", { toolName: "write", input: { path: "notes.md", content: "updated\n" } }, hostContext),
+    undefined,
+  );
 });
 
 test("Pi production composition clears the service at session shutdown", async () => {

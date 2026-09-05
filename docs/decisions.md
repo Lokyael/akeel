@@ -721,11 +721,11 @@ host-neutral request 的具体归一化字段和受管辖 surface 集合、Canon
 **Status:** active
 **Reversal surface:** engineering
 
-**Decision:** T-069 的用户全局 Policy 输入固定为 `$PI_CODING_AGENT_DIR/akeel/policy.yaml`，默认目录为 `~/.pi/agent`。文件的唯一顶层字段为新 `PolicyConfig` 的 `paths` 与 `commands`；旧 `config.yaml`、Profile、继承、命令覆盖和子代理字段均不读取、不转换、不 fallback。缺失文件等价于空新配置，因 `PolicyConfig` 的 deny-by-default 语义而关闭所有受管辖操作；YAML 语法错误、根非 mapping 或任何 schema 错误也必须关闭，不保留旧策略。
+**Decision:** T-069 的用户全局 Policy 输入固定为 `$PI_CODING_AGENT_DIR/akeel/policy.yaml`，默认目录为 `~/.pi/agent`。本条冻结的基础静态形式使用顶层 `paths` 与 `commands`；D-064 在同一文件内增加严格的 `presets` 与 `activePreset` 形式，不改变文件路径或 deny-by-default 原则。旧 `config.yaml`、Profile、继承、命令覆盖和子代理字段均不读取、不转换、不 fallback。缺失文件等价于空新配置，因 `PolicyConfig` 的 deny-by-default 语义而关闭所有受管辖操作；YAML 语法错误、根非 mapping 或任何 schema 错误也必须关闭，不保留旧策略。
 
 **Why:** Policy Snapshot 已有稳定的最小输入合同。独立文件把新格式与旧 `config.yaml` 的名称和 schema 隔离，避免任何兼容读取、隐式迁移或旧字段塑造新内核；缺失和损坏均从同一 closed default 进入决策链。
 
-**Impact:** 新 loader 位于 `access-decision/adapters/`，只解析 YAML 并将未知值交给新 `adaptPolicyConfig` 验证；它不 import 既有 `agent-dir`、`config` 或 Profile 模块。production composition 在切换前只可消费该 loader 发行的 policy state；README 在切换时说明新文件和旧配置不兼容。
+**Impact:** 新 loader 位于 `access-decision/adapters/`，只解析 YAML 并将未知值交给新 `adaptPolicyConfig` 验证；它不 import 既有 `agent-dir`、`config` 或 Profile 模块。production composition 只消费该 loader 发行的 policy state；D-064 的 preset 集合仍由同一 loader 验证。README 说明新文件和旧配置不兼容。
 
 **Rejected:**
 
@@ -733,6 +733,46 @@ host-neutral request 的具体归一化字段和受管辖 surface 集合、Canon
 - **读取旧 Profiles 并投影：** 这是被 D-059 禁止的兼容 adapter，且旧结果不是新 Policy 规格。
 - **缺失配置自动宽松：** 会使首次安装或路径错误成为 silent allow，违反 fail-closed。
 
-**Out of Scope:** 新 policy 选择 UI、多个 policy 文件、项目级配置、热重载、配置迁移与子代理策略；它们需要独立消费者和任务。
+**Out of Scope:** 多个 policy 文件、项目级配置、配置迁移、旧 Profile UI 与子代理策略；D-064 的同文件 preset 和会话 `/policy` 切换不属于多个 policy 文件或旧 Profile 兼容。
 
-## D-063: 待创建
+## D-063: Direct edit 独立策略与显式本地配置
+
+**Status:** active
+**Reversal surface:** user-boundary
+
+**Decision:** Direct `edit` 是独立的路径策略轴。`paths.edit` 未配置时固定为 `deny`，不从 `paths.write` 继承；需要使用 edit 的本地 Policy 文件必须显式写入 `edit: allow`、`edit: ask` 或 `edit: deny`。Edit 输入只做结构与资源边界校验，不在 Gate 内重演宿主的文本匹配语义。
+
+**Why:** edit 与 write 都会改变文件，但两者是不同的 Pi 工具合同；隐式继承会让本地 Policy 无法表达“允许完整写入、禁止局部编辑”或相反的最小权限意图。Gate 只负责受管请求的结构、路径和策略决策，文本替换的唯一匹配与不重叠语义由宿主工具执行。
+
+**Impact:** `src/access-gate/access-decision/adapters/config.ts` 与 `core/policy.ts` 对缺失 edit 使用 deny-by-default；README 和测试要求使用端的本地 Policy 显式配置 edit。
+
+**Rejected:**
+
+- **edit 继承 write：** 隐藏本地权限意图，违反新 Policy 字段的显式配置边界。
+- **Gate 重复实现 oldText 的唯一匹配和区间不重叠：** 这会把宿主编辑器执行语义复制到纯决策层，增加漂移而不扩大路径安全边界。
+
+**Out of Scope:** edit 的实际文件读取、文本替换、唯一匹配和重叠处理；这些仍由 Pi host 的 edit 工具负责。
+
+## D-064: 会话级 Policy Preset 定位
+
+**Status:** active
+**Reversal surface:** user-boundary
+**Origin:** C-022
+
+**Decision:** 会话级权限预设保存三个明确的 Policy Preset：`review`、`guided`、`develop`。每个 preset 保存完整的 `paths` 与 `commands` 策略值，不互相继承；未显式配置的能力保持 deny-by-default。`review` 用于只读审查（读/列举/搜索允许，写入、编辑和命令修改拒绝）；`guided` 用于交互审批（读操作允许，写入/编辑/修改/执行需 ask，销毁与未知命令拒绝）；`develop` 用于日常开发（项目路径读写与编辑、检查/修改/执行允许，销毁与未知命令仍需 ask）。`allowedRoots`、`blockedRoots`、`blockedPaths` 和硬安全边界不因 preset 放宽。
+
+preset 的会话切换属于 runtime/adapters 外围能力；Policy Kernel 仍只消费当前不可变 `Policy Snapshot`。preset 名称、策略内容和活动状态不注入模型上下文。子代理策略管理、父子策略收紧和子代理 preset 继承不属于本决策的实施范围，继续作为候选能力保留。
+
+**Why:** 三个定位覆盖只读审查、人工把关和日常开发三种稳定用户意图，避免恢复旧 Profile 的继承和隐式覆盖。完整策略值使本地 policy 的权限意图可审计；独立的 preset 语义允许未来在会话边界原子替换 snapshot，而不污染 Kernel。
+
+**Impact:** `policy.yaml` 已承载具名 preset 与显式 active binding；runtime 在会话边界替换当前不可变 snapshot，`/policy` 命令切换并通过 host status 显示当前定位。任何新增 preset 都必须保留硬边界。
+
+**Rejected:**
+
+- **旧 Profile/继承模型：** 引入隐式权限来源和兼容负担，违反新 Policy 文件的单一来源边界。
+- **`admin`/`trusted`/`full` preset：** AKeel 不提供 OS sandbox、网络隔离或执行期兜底，不能制造全信任安全承诺。
+- **子代理 preset 管理随本决策实现：** 父子权限关系、降权证明和宿主生命周期仍缺少独立合同，保留到候选任务。
+
+**Out of Scope:** 历史审计、子代理权限管理、父子 preset 继承、独立的旧 Profile UI、OS sandbox 和网络隔离。
+
+## D-065: 待创建

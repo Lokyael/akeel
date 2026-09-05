@@ -86,7 +86,7 @@ test("Pi host composition blocks unsupported governed surfaces with static text"
 });
 
 test("Pi host composition routes edit tool through policy", async () => {
-  const service = createDecisionService(createPolicyState({ paths: { read: "allow", write: "ask" } }));
+  const service = createDecisionService(createPolicyState({ paths: { read: "allow", write: "ask", edit: "ask" } }));
 
   const result = await handlePiToolCall(
     service,

@@ -39,6 +39,45 @@ test("loads and freezes the new global policy.yaml schema", () => {
   }
 });
 
+test("loads the three named policy presets and active selection", () => {
+  const agent = agentDir();
+  try {
+    writeFileSync(join(agent.path, "akeel", "policy.yaml"), [
+      "presets:",
+      "  review:",
+      "    paths:",
+      "      read: allow",
+      "    commands:",
+      "      inspect: allow",
+      "  guided:",
+      "    paths:",
+      "      read: allow",
+      "      write: ask",
+      "      edit: ask",
+      "    commands:",
+      "      inspect: allow",
+      "      modify: ask",
+      "      execute: ask",
+      "  develop:",
+      "    paths:",
+      "      read: allow",
+      "      write: allow",
+      "      edit: allow",
+      "    commands:",
+      "      inspect: allow",
+      "      modify: allow",
+      "      execute: allow",
+      "activePreset: develop",
+      "",
+    ].join("\n"));
+
+    const result = loadPolicyFile(agent.path);
+    assert.equal(result.kind, "ok");
+  } finally {
+    agent.cleanup();
+  }
+});
+
 test("missing policy.yaml supplies the closed empty new policy", () => {
   const agent = agentDir();
   try {

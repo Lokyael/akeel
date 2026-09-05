@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { adaptPolicyConfig } from "../../../../src/access-gate/access-decision";
+import { adaptPolicyConfig, adaptPolicyPresets } from "../../../../src/access-gate/access-decision";
 
 test("new config adapts path and command policy into a deeply immutable snapshot", () => {
   const config = {
@@ -28,7 +28,7 @@ test("new config adapts path and command policy into a deeply immutable snapshot
     direct: {
       read: "allow",
       write: "ask",
-      edit: "ask",
+      edit: "deny",
       list: "allow",
       search: "allow",
       allowedRoots: ["/workspace/project", "/tmp/pi-work"],
@@ -54,7 +54,7 @@ test("new config adapts path and command policy into a deeply immutable snapshot
   assert.equal(Object.isFrozen(snapshot.shell.allowedRoots), true);
 });
 
-test("explicit edit mode overrides write mode and fallback preserves write mode", () => {
+test("explicit edit mode is independent and omission denies by default", () => {
   const custom = adaptPolicyConfig({
     paths: { read: "allow", write: "ask", edit: "allow" },
   });
@@ -65,7 +65,37 @@ test("explicit edit mode overrides write mode and fallback preserves write mode"
     paths: { read: "allow", write: "ask" },
   });
   assert.equal(fallback.direct.write, "ask");
-  assert.equal(fallback.direct.edit, "ask");
+  assert.equal(fallback.direct.edit, "deny");
+});
+
+test("named presets require all three positions and select the active snapshot", () => {
+  const config = {
+    presets: {
+      review: { paths: { read: "allow" }, commands: { inspect: "allow" } },
+      guided: { paths: { read: "allow", write: "ask", edit: "ask" }, commands: { inspect: "allow", modify: "ask", execute: "ask" } },
+      develop: { paths: { read: "allow", write: "allow", edit: "allow" }, commands: { inspect: "allow", modify: "allow", execute: "allow" } },
+    },
+    activePreset: "guided",
+  } as const;
+
+  const presets = adaptPolicyPresets(config);
+  assert.ok(presets);
+  assert.equal(presets.active, "guided");
+  assert.equal(presets.snapshots.review.direct.write, "deny");
+  assert.equal(presets.snapshots.guided.direct.edit, "ask");
+  assert.equal(presets.snapshots.develop.direct.edit, "allow");
+  assert.throws(() => adaptPolicyPresets({
+    presets: { review: config.presets.review, guided: config.presets.guided },
+    activePreset: "review",
+  }), /invalid policy config/);
+  assert.throws(() => adaptPolicyPresets({
+    presets: {
+      review: { ...config.presets.review, paths: { ...config.presets.review.paths, allowedRoots: ["/workspace/project"] } },
+      guided: config.presets.guided,
+      develop: config.presets.develop,
+    },
+    activePreset: "review",
+  }), /invalid policy config/);
 });
 
 test("omitted policy sections use a closed deny-by-default snapshot", () => {

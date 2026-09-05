@@ -47,7 +47,7 @@ export function freezePolicySnapshot(input: PolicyInput): PolicySnapshot {
   return Object.freeze({
     read: values.read,
     write: values.write,
-    edit: values.edit ?? values.write,
+    edit: values.edit ?? "deny",
     list: values.list ?? "deny",
     search: values.search ?? "deny",
     allowedRoots: Object.freeze([...(values.allowedRoots ?? [])]),

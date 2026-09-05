@@ -7,6 +7,7 @@
 - **Canonical Compilation**：对一个请求执行一次有界解释后发行的 opaque、不可变、可验真的编译制品；内部事实不作为公共 DTO 暴露。
 - **Admission Plan**：Canonical Compilation 向授权域投影的最小 sealed 输入，只包含 Policy Kernel 实际消费的事实。
 - **Policy Snapshot**：与配置格式无关、不可变的授权值；只由新 policy.yaml adapter 发行。
+- **Policy Preset**：会话可绑定的完整策略定位；当前采用 `review`、`guided`、`develop` 三种定位，不使用继承式 Profile。
 - **Policy Kernel**：只消费 Admission Plan 与 Policy Snapshot 的同步纯函数，不读取原始请求、配置 loader 或 Shell parser。
 - **Guidance**：从决策代码到静态 bounded host-facing 文案的封闭映射，不携带可执行 Shell。
 - **Project Record**：项目文档中的受控记录总称，分为 Candidate、Task 和 Decision。
@@ -28,7 +29,7 @@
 - Access Decision Pipeline（D-059/D-060）已完成 Greenfield trust path 与原子生产切换。Canonical 只解释一次；Admission 与 Display 按需投影；Policy Kernel 不读取配置或重新解析请求。Canonical path resolution 同时保留 lexical 与 symlink-target traversal prefixes，Direct search 与 Shell recursive path 均在 blocked descendants 上 fail-closed；有显式 path boundary 时，unknown/unbounded Shell path access 也不得放行。
 - 受管辖 surface 为 Direct `read`、`write`、`edit`、`find`、`grep`、`ls` 与 Shell `bash`。无效 host context、unsupported syntax、硬安全边界和损坏政策 fail-closed；未拥有的工具 passthrough。
 - 生产入口只读取 `$PI_CODING_AGENT_DIR/akeel/policy.yaml`（默认 `~/.pi/agent/akeel/policy.yaml`）。缺失文件是 deny-by-default；旧 config/Profile schema 不读取、不转换、不 fallback。
-- `/profile`、Profile Footer、policy-selection UI 和 AKeel 管理的 subagent tier/parent-tier 注册均缺席，等待独立任务从零重建。
+- Policy Preset 的三种定位已由 D-064 冻结并实现：`policy.yaml` 可加载完整的 `review`、`guided`、`develop` 集合，`/policy` 可在会话边界切换，当前状态通过 host UI status 显示；AKeel 管理的 subagent tier/parent-tier 注册和子代理策略管理仍属候选范围。
 - Prompt Surface（D-030/D-053）：Policy Snapshot、policy.yaml 和活动 policy 状态不进入 context 消息、tool description 或 system prompt；模型可见的政策相关文本只有静态失败 guidance。
 - 旧决策实现、旧测试与 archive 不属于当前依赖边界，也不是 parity oracle。Static Flow、Explanation Replay 与 Runtime Content Flow 不属于 T-069。
 
@@ -67,6 +68,7 @@
 - [D-060 受保护 Canonical 制品、窄 Admission 投影与有界求值](docs/decisions.md#d-060-受保护-canonical-制品窄-admission-投影与有界求值)
 - [D-061 T-069 Slice 0 外部边界冻结](docs/decisions.md#d-061-t-069-slice-0-外部边界冻结)
 - [D-062 新 Policy 文件加载边界](docs/decisions.md#d-062-新-policy-文件加载边界)
+- [D-064 会话级 Policy Preset 定位](docs/decisions.md#d-064-会话级-policy-preset-定位)
 
 ## Negative Space
 
@@ -75,7 +77,8 @@
 - 不承诺 pathname check 与实际文件操作之间的 TOCTOU 消除；gate 只做纯决策，不执行文件操作或传递 fd。
 - 不拦截 `user_bash`、`shellCommandPrefix`、Bash `spawnHook`、tool override、custom tool backend、未知 Direct tool surface 或其他 Extension 的直接操作。
 - 审批后的实际文件操作由操作系统权限决定；gate 不控制执行后的行为，也不提供完整 security log scrubbing。
-- 不提供 `/profile` 命令、Profile Footer、policy-selection UI 或 AKeel 管理的 subagent tier/parent-tier 钳制；这些能力需后续独立重建。
+- 不提供旧式 `/profile` 命令或 Profile Footer；Policy Preset 使用 `/policy` 命令和 host status，不提供独立的旧 Profile UI。
+- 不提供 AKeel 管理的 subagent tier/parent-tier 钳制或子代理 preset 继承；这些能力仍属候选范围。
 - 旧 `config.yaml`、Profile、命令覆盖、继承和子代理字段不属于新 Policy Snapshot 输入；当前只读取全局 `policy.yaml` 的 `paths` 与 `commands`。
 - Shell 只支持显式定义、可静态证明且资源有界的子集；不可证明形态 fail-closed。未建模的命令副作用不单独建模。
 - 不把短期 Task Record、实施过程或审查报告作为永久项目知识。

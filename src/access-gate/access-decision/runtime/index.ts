@@ -1,7 +1,7 @@
 export { handlePiToolCall } from "./host-composition";
 export { installGlobalPiAccessDecision, installPiAccessDecision } from "./pi-composition";
 export { createDecisionService } from "./service";
-export { createPolicyState } from "./policy-state";
+export { activatePolicyPreset, createPolicyState } from "./policy-state";
 export { createProjectContext } from "./project-context";
 export { renderHostBlock, renderHostFacingDecision } from "./host-render";
 export { createProjectLifecycle } from "./project-lifecycle";

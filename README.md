@@ -25,25 +25,52 @@ The global policy input is:
 A missing policy file denies all managed operations. The file is a new schema and is not compatible with the former `config.yaml` or Profile configuration.
 
 ```yaml
-paths:
-  read: allow
-  write: ask
-  edit: allow
-  list: allow
-  search: allow
-  allowedRoots:
-    - /workspace/project
-commands:
-  inspect: allow
-  modify: ask
-  execute: deny
-  destroy: deny
-  unknown: deny
+presets:
+  review:
+    paths:
+      read: allow
+      write: deny
+      edit: deny
+      list: allow
+      search: allow
+    commands:
+      inspect: allow
+      modify: deny
+      execute: deny
+      destroy: deny
+      unknown: deny
+  guided:
+    paths:
+      read: allow
+      write: ask
+      edit: ask
+      list: allow
+      search: allow
+    commands:
+      inspect: allow
+      modify: ask
+      execute: ask
+      destroy: deny
+      unknown: deny
+  develop:
+    paths:
+      read: allow
+      write: allow
+      edit: allow
+      list: allow
+      search: allow
+    commands:
+      inspect: allow
+      modify: allow
+      execute: allow
+      destroy: ask
+      unknown: ask
+activePreset: develop
 ```
 
-Path modes for `read`, `write`, `edit` (defaults to `write` if omitted), `list`, and `search` are `allow`, `ask`, or `deny`; command modes are `allow`, `ask`, or `deny`. The policy may narrow access with `allowedRoots`, `blockedRoots`, and `blockedPaths`. `ask` requires an interactive host confirmation and never executes automatically. Confirmation summaries are bounded, include the literal Shell command form, and omit file content. The policy file is validated when loaded; malformed YAML, unknown fields, and legacy fields fail closed.
+The supported named presets are `review`, `guided`, and `develop`. Each preset is complete and independent; omitted modes deny by default, and `edit` never inherits `write`. A flat `paths`/`commands` policy remains valid as a single static policy without runtime switching. Use `/policy` to show the active preset or `/policy review`, `/policy guided`, or `/policy develop` to switch it for the current session. Path modes for `read`, `write`, `edit`, `list`, and `search` are `allow`, `ask`, or `deny`; command modes are `allow`, `ask`, or `deny`. The policy may narrow access with `allowedRoots`, `blockedRoots`, and `blockedPaths`, which presets cannot widen. `ask` requires an interactive host confirmation and never executes automatically. Confirmation summaries are bounded, include the literal Shell command form, and omit file content. The policy file is validated when loaded; malformed YAML, unknown fields, incomplete presets, and legacy fields fail closed.
 
-The current release does not provide `/profile`, a Profile Footer, policy-selection UI, or AKeel-managed subagent permission tiers. These capabilities require separate future work.
+The current release does not provide the legacy `/profile` command, a Profile Footer, or AKeel-managed subagent permission tiers. Subagent policy management remains a separate candidate; use `/policy` for the three implemented session presets.
 
 ## Companion packages
 

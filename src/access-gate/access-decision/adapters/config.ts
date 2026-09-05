@@ -10,7 +10,10 @@ import type {
   ShellPolicySnapshot,
 } from "../core/index";
 
-export type PolicyConfig = Readonly<{
+export const POLICY_PRESET_NAMES = ["review", "guided", "develop"] as const;
+export type PolicyPresetName = (typeof POLICY_PRESET_NAMES)[number];
+
+type PolicyDefinition = Readonly<{
   readonly paths?: Readonly<{
     readonly read?: PolicyMode;
     readonly write?: PolicyMode;
@@ -30,9 +33,19 @@ export type PolicyConfig = Readonly<{
   }>;
 }>;
 
+export type PolicyConfig = PolicyDefinition & Readonly<{
+  readonly presets?: Readonly<Record<PolicyPresetName, PolicyDefinition>>;
+  readonly activePreset?: PolicyPresetName;
+}>;
+
 export type PolicySnapshot = Readonly<{
   readonly direct: DirectPolicySnapshot;
   readonly shell: ShellPolicySnapshot;
+}>;
+
+export type PolicyPresetSet = Readonly<{
+  readonly active: PolicyPresetName;
+  readonly snapshots: Readonly<Record<PolicyPresetName, PolicySnapshot>>;
 }>;
 
 const POLICY_MODES = ["allow", "ask", "deny"] as const;
@@ -47,6 +60,8 @@ const PATH_FIELDS = [
   "blockedPaths",
 ] as const;
 const COMMAND_FIELDS = ["inspect", "modify", "execute", "destroy", "unknown"] as const;
+const DEFINITION_FIELDS = ["paths", "commands"] as const;
+const CONFIG_FIELDS = ["paths", "commands", "presets", "activePreset"] as const;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -56,22 +71,18 @@ function hasOnlyKeys(value: Record<string, unknown>, allowed: readonly string[])
   return Reflect.ownKeys(value).every((key) => typeof key === "string" && allowed.includes(key));
 }
 
-function isMode(value: unknown): value is PolicyMode {
-  return (POLICY_MODES as readonly unknown[]).includes(value);
-}
-
 function modeOrDefault(value: unknown, fallback: PolicyMode): PolicyMode {
   if (value === undefined) return fallback;
-  if (!isMode(value)) throw invalidConfig();
-  return value;
+  if (!(POLICY_MODES as readonly unknown[]).includes(value)) throw invalidConfig();
+  return value as PolicyMode;
 }
 
 function isAbsolutePolicyPath(value: unknown): value is string {
   return typeof value === "string" && value.length > 0 && value.startsWith("/") && !value.includes("\u0000");
 }
 
-function normalizePolicyPath(path: string): string {
-  return path;
+function invalidConfig(): TypeError {
+  return new TypeError("invalid policy config");
 }
 
 function readPaths(value: unknown): {
@@ -106,20 +117,17 @@ function readPaths(value: unknown): {
     }
     arrays[field] = Object.freeze(
       (candidate === undefined ? [] : candidate.map((path) => {
-        const normalized = resolveExistingPath(normalizePolicyPath(path));
+        const normalized = resolveExistingPath(path);
         if (normalized === undefined) throw invalidConfig();
         return normalized;
       })),
     );
   }
 
-  const writeMode = modeOrDefault(value.write, "deny");
-  const editMode = value.edit === undefined ? writeMode : modeOrDefault(value.edit, "deny");
-
   return {
     read: modeOrDefault(value.read, "deny"),
-    write: writeMode,
-    edit: editMode,
+    write: modeOrDefault(value.write, "deny"),
+    edit: modeOrDefault(value.edit, "deny"),
     list: modeOrDefault(value.list, "deny"),
     search: modeOrDefault(value.search, "deny"),
     ...arrays,
@@ -133,9 +141,7 @@ function readCommands(value: unknown): {
   readonly destroy: ShellPolicyMode;
   readonly unknown: ShellPolicyMode;
 } {
-  if (value === undefined) {
-    return { inspect: "deny", modify: "deny", execute: "deny", destroy: "deny", unknown: "deny" };
-  }
+  if (value === undefined) return { inspect: "deny", modify: "deny", execute: "deny", destroy: "deny", unknown: "deny" };
   if (!isRecord(value) || !hasOnlyKeys(value, COMMAND_FIELDS)) throw invalidConfig();
   return {
     inspect: modeOrDefault(value.inspect, "deny"),
@@ -146,14 +152,38 @@ function readCommands(value: unknown): {
   };
 }
 
-function invalidConfig(): TypeError {
-  return new TypeError("invalid policy config");
+function readDefinition(value: unknown, requireSections: boolean): PolicyDefinition {
+  if (!isRecord(value) || !hasOnlyKeys(value, DEFINITION_FIELDS)) throw invalidConfig();
+  if (requireSections && (value.paths === undefined || value.commands === undefined)) throw invalidConfig();
+  if (value.paths !== undefined) readPaths(value.paths);
+  if (value.commands !== undefined) readCommands(value.commands);
+  return value as PolicyDefinition;
 }
 
-export function adaptPolicyConfig(input: unknown): PolicySnapshot {
-  if (!isRecord(input) || !hasOnlyKeys(input, ["paths", "commands"])) throw invalidConfig();
-  const paths = readPaths(input.paths);
-  const commands = readCommands(input.commands);
+type ParsedPolicy = Readonly<{
+  readonly flat?: PolicyDefinition;
+  readonly presets?: Readonly<Record<PolicyPresetName, PolicyDefinition>>;
+  readonly activePreset?: PolicyPresetName;
+}>;
+
+function readConfig(input: unknown): ParsedPolicy {
+  if (!isRecord(input) || !hasOnlyKeys(input, CONFIG_FIELDS)) throw invalidConfig();
+  if (input.presets !== undefined) {
+    if (input.paths !== undefined || input.commands !== undefined || !isRecord(input.presets) || !hasOnlyKeys(input.presets, POLICY_PRESET_NAMES)) {
+      throw invalidConfig();
+    }
+    if (typeof input.activePreset !== "string" || !POLICY_PRESET_NAMES.includes(input.activePreset as PolicyPresetName)) throw invalidConfig();
+    const presets = {} as Record<PolicyPresetName, PolicyDefinition>;
+    for (const name of POLICY_PRESET_NAMES) presets[name] = readDefinition(input.presets[name], true);
+    return Object.freeze({ presets: Object.freeze(presets), activePreset: input.activePreset as PolicyPresetName });
+  }
+  if (input.activePreset !== undefined) throw invalidConfig();
+  return Object.freeze({ flat: readDefinition(input, false) });
+}
+
+function snapshotFor(definition: PolicyDefinition): PolicySnapshot {
+  const paths = readPaths(definition.paths);
+  const commands = readCommands(definition.commands);
   const direct = freezePolicySnapshot({
     read: paths.read,
     write: paths.write,
@@ -177,4 +207,35 @@ export function adaptPolicyConfig(input: unknown): PolicySnapshot {
     blockedPaths: paths.blockedPaths,
   });
   return Object.freeze({ direct, shell });
+}
+
+function samePaths(left: readonly string[], right: readonly string[]): boolean {
+  return left.length === right.length && left.every((value, index) => value === right[index]);
+}
+
+function presetSetFrom(parsed: ParsedPolicy): PolicyPresetSet | undefined {
+  if (parsed.presets === undefined) return undefined;
+  const snapshots = {} as Record<PolicyPresetName, PolicySnapshot>;
+  for (const name of POLICY_PRESET_NAMES) snapshots[name] = snapshotFor(parsed.presets[name]);
+  const baseline = snapshots.review.direct;
+  for (const name of POLICY_PRESET_NAMES.slice(1)) {
+    const current = snapshots[name].direct;
+    if (!samePaths(baseline.allowedRoots, current.allowedRoots) ||
+      !samePaths(baseline.blockedRoots, current.blockedRoots) ||
+      !samePaths(baseline.blockedPaths, current.blockedPaths)) {
+      throw invalidConfig();
+    }
+  }
+  return Object.freeze({ active: parsed.activePreset!, snapshots: Object.freeze(snapshots) });
+}
+
+export function adaptPolicyConfig(input: unknown): PolicySnapshot {
+  const parsed = readConfig(input);
+  if (parsed.flat !== undefined) return snapshotFor(parsed.flat);
+  const presets = presetSetFrom(parsed);
+  return presets!.snapshots[presets!.active];
+}
+
+export function adaptPolicyPresets(input: unknown): PolicyPresetSet | undefined {
+  return presetSetFrom(readConfig(input));
 }

@@ -34,4 +34,4 @@
 4. 确认 `Lokyael/akeel` 为空后，只推送 `main`，不得使用 `git push --mirror`。
 5. 从新仓库 clone 验证后，再将旧 `Lokyael/pi-keel` 设为 Private 并 Archive。
 
-## T-072: 待创建
+## T-073: 待创建

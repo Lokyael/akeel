@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { parse as parseYaml } from "yaml";
-import { adaptPolicyConfig } from "./config";
+import { adaptPolicyConfig, adaptPolicyPresets } from "./config";
 import type { PolicyConfig } from "./config";
 
 export type PolicyFileLoad =
@@ -34,6 +34,7 @@ export function loadPolicyFile(agentDir = defaultAgentDir()): PolicyFileLoad {
   try {
     value = parseYaml(readFileSync(path, "utf8"));
     adaptPolicyConfig(value);
+    adaptPolicyPresets(value);
   } catch {
     return error();
   }

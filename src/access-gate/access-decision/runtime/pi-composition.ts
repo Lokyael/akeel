@@ -1,6 +1,6 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { adaptPiToolCall, loadPolicyFile } from "../adapters/index";
-import { createPolicyState } from "./policy-state";
+import { activatePolicyPreset, createPolicyState } from "./policy-state";
 import { createProjectContext } from "./project-context";
 import { createProjectLifecycle } from "./project-lifecycle";
 import type { PolicyState } from "./policy-state";
@@ -29,9 +29,14 @@ type SessionProject = Readonly<{
 }>;
 
 const INITIALIZATION_FAILURE_REASON = "Blocked because the decision service is not initialized.";
+const POLICY_STATUS_ID = "akeel-policy";
 
 function initializationFailure(): PiToolCallHandlerResult {
   return Object.freeze({ block: true, reason: INITIALIZATION_FAILURE_REASON });
+}
+
+function notifyPolicy(context: { readonly ui: { readonly notify: (message: string, level?: "info" | "warning" | "error") => void } }, message: string, level: "info" | "warning" | "error" = "info"): void {
+  context.ui.notify(message, level);
 }
 
 function policyStateFrom(config: unknown): PolicyState | undefined {
@@ -42,34 +47,74 @@ function policyStateFrom(config: unknown): PolicyState | undefined {
   }
 }
 
+function policyStatus(state: PolicyState | undefined): string {
+  return state?.activePreset ?? "static";
+}
+
 function installComposition(
   pi: ExtensionAPI,
-  policyState: PolicyState | undefined,
+  initialPolicyState: PolicyState | undefined,
   createSessionProject: (cwd: string) => SessionProject,
 ): void {
+  let policyState = initialPolicyState;
   let service: ReturnType<typeof createDecisionService> | undefined;
   let project: ProjectLifecycle | undefined;
+  let projectContext: ProjectContext | undefined;
+
+  const updateStatus = (context: { readonly hasUI: boolean; readonly ui: { readonly setStatus?: (id: string, text: string | undefined) => void } }): void => {
+    if (context.hasUI) context.ui.setStatus?.(POLICY_STATUS_ID, policyStatus(policyState));
+  };
+
+  pi.registerCommand("policy", {
+    description: "Show or switch the active AKeel policy preset.",
+    handler: async (args, context) => {
+      const requested = args.trim();
+      if (policyState?.presets === undefined) {
+        notifyPolicy(context, "No Policy Presets are configured; the static policy remains active.", "warning");
+        return;
+      }
+      if (requested.length === 0) {
+        notifyPolicy(context, `Active AKeel policy: ${policyStatus(policyState)}.`);
+        updateStatus(context);
+        return;
+      }
+      try {
+        policyState = activatePolicyPreset(policyState, requested);
+        service = projectContext === undefined ? undefined : createDecisionService(policyState, projectContext);
+        updateStatus(context);
+        notifyPolicy(context, `Active AKeel policy: ${policyStatus(policyState)}.`);
+      } catch {
+        notifyPolicy(context, `Unknown AKeel policy preset: ${requested}.`, "error");
+      }
+    },
+  });
 
   pi.on("session_start", (_event, context) => {
     project?.dispose();
     project = undefined;
-    if (!policyState) {
-      service = undefined;
-      return;
-    }
+    projectContext = undefined;
+    service = undefined;
+    policyState = initialPolicyState;
+    updateStatus(context);
+    if (!policyState) return;
     try {
       const sessionProject = createSessionProject(context.cwd);
+      projectContext = sessionProject.context;
       if ("dispose" in sessionProject) project = sessionProject as ProjectLifecycle;
-      service = createDecisionService(policyState, sessionProject.context);
+      service = createDecisionService(policyState, projectContext);
+      updateStatus(context);
     } catch {
       service = undefined;
+      projectContext = undefined;
     }
   });
 
-  pi.on("session_shutdown", () => {
+  pi.on("session_shutdown", (_event, context) => {
     project?.dispose();
     project = undefined;
+    projectContext = undefined;
     service = undefined;
+    if (context.hasUI) context.ui.setStatus?.(POLICY_STATUS_ID, undefined);
   });
 
   pi.on("tool_call", async (event, context) => {
