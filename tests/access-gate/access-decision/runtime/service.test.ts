@@ -35,7 +35,7 @@ test("rejects a structurally copied project context", () => {
 test("injects project and staging roots into Direct path authorization", () => {
   const service = createDecisionService(
     createPolicyState({ paths: { read: "allow" } }),
-    createProjectContext({ cwd: "/workspace/project", projectRoot: "/workspace/project", stagingRoot: "/tmp/pi-work" }),
+    createProjectContext({ cwd: "/workspace/project", projectRoot: "/workspace/project", stagingRoot: "/tmp/akeel" }),
   );
   const inside: DirectRequest = {
     surface: "read",
@@ -60,7 +60,7 @@ test("accepts a runtime policy state produced by the new config adapter", () => 
 test("routes a host Shell call through canonical compilation and shell policy", () => {
   const service = createDecisionService(
     createPolicyState({ paths: { read: "allow", write: "ask" }, commands: { modify: "ask" } }),
-    createProjectContext({ cwd: "/workspace/project", projectRoot: "/workspace/project", stagingRoot: "/tmp/pi-work" }),
+    createProjectContext({ cwd: "/workspace/project", projectRoot: "/workspace/project", stagingRoot: "/tmp/akeel" }),
   );
 
   assert.deepEqual(
@@ -87,7 +87,7 @@ test("routes a real Pi tool-call event through the same trusted host context sea
 test("renders Shell host approvals with a bounded summary and literal command text", () => {
   const service = createDecisionService(
     createPolicyState({ paths: { read: "allow", write: "ask" }, commands: { modify: "ask" } }),
-    createProjectContext({ cwd: "/workspace/project", projectRoot: "/workspace/project", stagingRoot: "/tmp/pi-work" }),
+    createProjectContext({ cwd: "/workspace/project", projectRoot: "/workspace/project", stagingRoot: "/tmp/akeel" }),
   );
 
   const result = service.decideToolCall(
@@ -142,7 +142,7 @@ test("renders Shell canonical rejects with static bounded text and no command te
 test("renders Shell host denials with static bounded text and no command text", () => {
   const service = createDecisionService(
     createPolicyState({ paths: { read: "allow", write: "ask" }, commands: { modify: "deny" } }),
-    createProjectContext({ cwd: "/workspace/project", projectRoot: "/workspace/project", stagingRoot: "/tmp/pi-work" }),
+    createProjectContext({ cwd: "/workspace/project", projectRoot: "/workspace/project", stagingRoot: "/tmp/akeel" }),
   );
 
   const result = service.decideToolCall(
@@ -208,7 +208,7 @@ test("observes one canonical compile and one projection per managed Shell tool c
   const events: string[] = [];
   const service = createDecisionService(
     createPolicyState({ paths: { read: "allow", write: "ask" }, commands: { modify: "ask" } }),
-    createProjectContext({ cwd: "/workspace/project", projectRoot: "/workspace/project", stagingRoot: "/tmp/pi-work" }),
+    createProjectContext({ cwd: "/workspace/project", projectRoot: "/workspace/project", stagingRoot: "/tmp/akeel" }),
     { record: (event: string) => events.push(event) },
   );
 

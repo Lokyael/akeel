@@ -95,7 +95,7 @@ export const PROBES: readonly ContractProbe[] = Object.freeze([
     id: "policy-hard-boundary",
     source: "new-policy",
     referenceStatus: "newly-adopted",
-    statement: "A hard boundary remains a denial regardless of profile widening or approval availability.",
+    statement: "A hard boundary remains a denial regardless of policy preset widening or approval availability.",
   },
   {
     id: "policy-no-ui",

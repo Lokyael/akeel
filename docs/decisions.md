@@ -282,7 +282,7 @@
 
 **Out of Scope:**
 
-- **handoff-session 定位**（跨环境交接 + 本地蒸馏交接）：不可替代价值是向“无法获得、或不想全量重放本会话上下文的接收方”提供状态摘要——跨环境（非 pi、跨机器）读不到 session 文件；本地开新会话且原会话过长时，`/resume` 全量重放不合用、`/compact` 只在同一会话内压缩，蒸馏 handoff 是合法路径。同 pi 且会话可用时仍由 `/resume`/`/tree` 与 `survey-context` 覆盖，摘要不增加保真度。**交接自足判据（2026-08-25）**：文档 + 仓库内容必须足以让接收方完全继续；**提前中止语义（2026-08-26）**——仓库是自足载体，handoff 文档不弥补未落档内容，交接前必须完成未落档决策落档（domain-modeling 入 `docs/decisions.md`）与未决工作；识别到自足缺口（未落档决策/未落代码/上下文依赖）即**中止 handoff 流程**返回本会话解决——不产出半成品交接文档（提前中止而非写残再补），也避免 handoff 处理到中途才发现缺口导致的上下文污染。**不采用“先 /compact 收尾再 handoff 交接”的接力设计（2026-08-26 否决）**：handoff 是一次性完整交接，缺什么先在本会话补齐，不以部分交接/接力方式交付。**交付规则与场景无关**：默认写约定路径 `/tmp/pi-work/handoffs/handoff-<时间戳>.md` 并向用户显示，用户可覆盖为任意路径或拒绝文件，无用户同意不落盘（`/tmp` 根在默认 keel-plan 写面之外，`/tmp/pi-work/**` 全 profile 放行，D-049）——原实现默认写 `$TMPDIR` 是缺陷（重启即清理、跨机器不可达、默认落盘未经用户选择）。未沉淀决策不写入 handoff，先经 domain-modeling 入 `docs/decisions.md` 再引用路径（防双源，D-028）。**Revisit 已满足（2026-08-25：原会话过长→本地新会话为真实高频场景）。**
+- **handoff-session 定位**（跨环境交接 + 本地蒸馏交接）：不可替代价值是向“无法获得、或不想全量重放本会话上下文的接收方”提供状态摘要——跨环境（非 pi、跨机器）读不到 session 文件；本地开新会话且原会话过长时，`/resume` 全量重放不合用、`/compact` 只在同一会话内压缩，蒸馏 handoff 是合法路径。同 pi 且会话可用时仍由 `/resume`/`/tree` 与 `survey-context` 覆盖，摘要不增加保真度。**交接自足判据（2026-08-25）**：文档 + 仓库内容必须足以让接收方完全继续；**提前中止语义（2026-08-26）**——仓库是自足载体，handoff 文档不弥补未落档内容，交接前必须完成未落档决策落档（domain-modeling 入 `docs/decisions.md`）与未决工作；识别到自足缺口（未落档决策/未落代码/上下文依赖）即**中止 handoff 流程**返回本会话解决——不产出半成品交接文档（提前中止而非写残再补），也避免 handoff 处理到中途才发现缺口导致的上下文污染。**不采用“先 /compact 收尾再 handoff 交接”的接力设计（2026-08-26 否决）**：handoff 是一次性完整交接，缺什么先在本会话补齐，不以部分交接/接力方式交付。**交付规则与场景无关**：默认写约定路径 `/tmp/akeel/handoffs/handoff-<时间戳>.md` 并向用户显示，用户可覆盖为任意路径或拒绝文件，无用户同意不落盘（`/tmp` 根在默认 keel-plan 写面之外，`/tmp/akeel/**` 全 profile 放行，D-049）——原实现默认写 `$TMPDIR` 是缺陷（重启即清理、跨机器不可达、默认落盘未经用户选择）。未沉淀决策不写入 handoff，先经 domain-modeling 入 `docs/decisions.md` 再引用路径（防双源，D-028）。**Revisit 已满足（2026-08-25：原会话过长→本地新会话为真实高频场景）。**
 
 ## D-037: 解析器拥有 wrapper 链（IR 契约：executable 永不承载 wrapper）
 
@@ -319,7 +319,7 @@
 **Decision:** 取值选项按 `kind` 分类——`file`（值是文件路径，产生 read/write 路径 intent）与 `expression`（值是程序/表达式，消费但不产生 intent），sed `-e`/`--expression`、awk `-e` 为 expression，`-f`/`--file` 为 file；inline 后缀（`sed -i.bak`、`--in-place=.bak`）视为与 `-i` 相同的 conservative write intent，不降级为 opaque。位置参数是输入文件，必须产生路径 intent：sed/awk 出现写选项（-i）时 positional 升级为 write，否则为 read。实现分三项：
 
 1. **GIT_CLASSIFY 表（token 级）**：git.ts 的正则 pattern 改为声明式数据表——首 token 匹配 + 选项调节（升级优先，fail-closed），负前瞻/锚定/`-c` 跳过删除；finder 保留 `-C`/`-c`/`--git-dir` 跳过（token 正确性必需）；调节 flag 支持 `prefix` 匹配（`-o` 命中 `-oFILE`）；多 class 子命令族（stash/bundle）入 `GIT_SUBCOMMAND_PARSERS` 注册表，表与注册表边界由数据形状决定。
-2. **统一选项引擎 option-parse**：`parseOptions(args, schema)` 深模块收敛四套选项遍历，schema 制度化值性质分类（`kind: file|expression|flag`，见上）与位置参数性质（`positional: file|program-first|set`），并表达四形态 `forms` 与 `-exec` 终止符 `consumeUntil`；opaque 策略由命令级 `opaqueOnUnknown` 显式声明——text-transform/search/filesystem/read 收紧为 true（未知选项 opaque 硬拒），git 的 `-o` 提取为 false（合法选项静默），并补全高频 flag 建模防误拒。
+2. **统一选项引擎 option-parse**：`parseOptions(args, schema)` 深模块收敛四套选项遍历，schema 制度化值性质分类（`kind: file|expression|flag`，见上）与位置参数性质（`positional: file|program-first|set`），并表达四形态 `forms` 与 `-exec` 终止符 `consumeUntil`；opaque 策略由命令级 `opaqueOnUnknown` 显式声明——text-transform/search/filesystem/read 收紧为 true（未知选项 opaque 硬拒），git 的 `-o` 提取为 false（合法选项静默），并补全高频 flag 建模防误拒。T-078 当前先在 bounded Git/npm/uv/Python slice 中落地 `scanOptionWords`，统一 token 消费、等号/分离值、attached short value 和缺失值的 fail-closed 判定；该窄 scanner 是当前实现 seam，不宣称取代本条定义的完整 schema engine。
 3. **config-parse 独立**：读写轴 + 配置目标解析是分类策略领域（非值消费遍历），不并入引擎。
 
 **延伸（T-059，D-040 补记）：**
@@ -346,7 +346,7 @@
 
 **Out of Scope:**
 
-- `git -c`/`-C` 之外的 git 全局选项（`--no-pager` 等）token 化；现行为不变。
+- T-078 已覆盖的 Git 全局选项（`-c`、`-C`、`--git-dir`、`--work-tree`、`--no-pager`、`--paginate`、`--literal-pathspecs`）之外的剩余全局选项 token 化；未建模选项继续 fail-closed。
 - overrides 层 reclassify 的字符串 pattern 迁移到 token 级（用户 YAML 兼容性，D-024）。
 - `git stash --help` 类分类修正（过拒方向，fail-safe，未立项）。
 
@@ -467,16 +467,16 @@ T-069 的 Greenfield Semantic Rebuild 不继承该算法，而重新建立条件
 **Decision:** 内置 profile 从 9 个收敛为 6 个：移除 `keel-code`（仅写 `project/src/**`、`project/tests/**` 的代码编辑档）、`keel-query`（项目写 ask 的审批中档）与 `keel-subagent-scratch`（T0）。
 
 - `keel-query` 合并进 `keel-develop`：develop 改 `extends: [keel-plan]`，显式补 `execute: ask` 与 `project/** write: allow`，resolve 结果与改前完全一致（原 query 的 `project/** write: ask` 规则本就因首匹配被 develop 的 allow 规则 shadow，是死规则）。
-- `keel-subagent-scratch` 合并进 `keel-explore`：explore 增加 `/tmp/pi-work/**` 写规则后与 T0 解析完全一致（实现前验证）；T0 档位映射改为 `keel-explore`，T1 改 `extends: [keel-explore]` 后解析不变；plan/develop 自带的重叠 `/tmp/pi-work` 规则删除——scratch 规则单一来源在 explore。
+- `keel-subagent-scratch` 合并进 `keel-explore`：explore 增加 `/tmp/akeel/**` 写规则后与 T0 解析完全一致（实现前验证）；T0 档位映射改为 `keel-explore`，T1 改 `extends: [keel-explore]` 后解析不变；plan/develop 自带的重叠 `/tmp/akeel` 规则删除——scratch 规则单一来源在 explore。
 
-**Why:** `keel-code` 零实际使用（仓库内无任何运行时引用，只有测试自引用），且语义残缺——真实代码编辑必然触碰 `package.json`/`tsconfig.json` 等项目根配置文件，该档只允许写 src/tests，无法承载“写代码”这一实际用途；真实代码编辑由 `keel-develop`（项目全写）覆盖。结构上它是 `keel-read` 的未用分支，无任何 profile extends 它，删除不改变继承拓扑。`keel-query` 同样零运行时引用，且 ask-first 是“审批哲学”而非能力档——选择 develop 即接受项目写，需要“写前全审”的用户自配 profile（配方：`extends: [keel-plan]` + `project/** write: ask` + `execute: ask`）比内置默认档位更适合表达该偏好。`keel-subagent-scratch` 解析后 = explore + 一条 `/tmp/pi-work` 写规则，是重复档；explore 作为主档的“纯只读”承诺（writes denied）没有安全相关性——`/tmp/pi-work` 是 AKeel 自有 scratch 约定目录（非用户数据、ephemeral），其余可写档（plan/develop/build）本就全带此规则。合并后主链梯子每级严格递增：read（零写）→ explore（+scratch）→ plan（+docs）→ develop（+项目写）→ build（全信任）。
+**Why:** `keel-code` 零实际使用（仓库内无任何运行时引用，只有测试自引用），且语义残缺——真实代码编辑必然触碰 `package.json`/`tsconfig.json` 等项目根配置文件，该档只允许写 src/tests，无法承载“写代码”这一实际用途；真实代码编辑由 `keel-develop`（项目全写）覆盖。结构上它是 `keel-read` 的未用分支，无任何 profile extends 它，删除不改变继承拓扑。`keel-query` 同样零运行时引用，且 ask-first 是“审批哲学”而非能力档——选择 develop 即接受项目写，需要“写前全审”的用户自配 profile（配方：`extends: [keel-plan]` + `project/** write: ask` + `execute: ask`）比内置默认档位更适合表达该偏好。`keel-subagent-scratch` 解析后 = explore + 一条 `/tmp/akeel` 写规则，是重复档；explore 作为主档的“纯只读”承诺（writes denied）没有安全相关性——`/tmp/akeel` 是 AKeel 自有 scratch 约定目录（非用户数据、ephemeral），其余可写档（plan/develop/build）本就全带此规则。合并后主链梯子每级严格递增：read（零写）→ explore（+scratch）→ plan（+docs）→ develop（+项目写）→ build（全信任）。
 
 **Impact:** `/profile` 可选项 9→6（主链 5：read/explore/plan/develop/build + T1 `keel-subagent-project`）；子代理 T0 复用 explore（footer 显示 explore）；既有配置若 `extends: [keel-code]`/`keel-query`/`keel-subagent-scratch` 将解析失败并 fail-closed 到 `keel-read`（三档均无任何文档化使用，爆炸半径为零）；安全梯度与其余档位语义不变（plan/develop/build 逐项 resolve 验证相同）。
 
 **Rejected:**
 
 - **移除 keel-explore**：read-anywhere + scratch 默认需内联进 plan 与 T1 两处，造成配置重复，且失去“全盘只读”主档位。
-- **把 explore 的写面放宽到 `/tmp/**`**：共享目录任意路径写有 symlink/交叉用户风险；合并只用 AKeel 自有约定 `/tmp/pi-work/**`（build 的 `/tmp/**` 是另一档语义，不受影响）。
+- **把 explore 的写面放宽到 `/tmp/**`**：共享目录任意路径写有 symlink/交叉用户风险；合并只用 AKeel 自有约定 `/tmp/akeel/**`（build 的 `/tmp/**` 是另一档语义，不受影响）。
 - **合并 keel-develop 与 keel-build**：build 的 modify/execute allow 是全信任语义，与 develop 的 ask 是安全梯度实质差异；合并会让 develop 默认允许执行，是危险默认。
 - **程序化合成子代理档位**：把 T0/T1 从 profile 数据改为运行时合成，增加运行时复杂度并失去配置层可测试性；本次未采用该历史方案。
 
@@ -526,10 +526,10 @@ T-069 的 Greenfield Semantic Rebuild 不继承该算法，而重新建立条件
 
 - len==2 门控是 fail-closed 不变量：任何解析异常（如未建模 separated 取值选项的值泄漏进位置参数 → ≥3）一律放弃提取、回退保守行为——提取只能把决策收窄，不能放宽。
 - 未建模 equals/attached 形式选项整 token 原子跳过，无值泄漏——取值选项表完整性只影响覆盖率，不影响安全。
-- `--separate-git-dir` 值只消费、不产生 intent：归因会使无 `<dir>` 的 clone intents 非空、抑制 cwd fallback（fail-open）。
+- `--separate-git-dir` 值必须消费，且在 command-local git-dir 尚未 canonicalize 前发行 hard-boundary，不产生可放行的 path intent；直接把该值归因成普通 target 会使无 `<dir>` 的 clone intents 非空、抑制 cwd fallback（fail-open）。
 - 无 `<dir>` 时的 ==2 泄漏签名（`[泄漏值, <repo>]`）会令提取指向 `<repo>` 并抑制 cwd fallback——当前不可达（表覆盖 git-clone(1) 全部取值选项，未知选项 git 在写盘前报错），未来新增取值选项须先复核此签名再改表。
 
-**Why:** clone 此前是 modify 命令中少数无路径提取的子命令，写面 fallback 钉在 cwd（项目根）——显式克隆到 `/tmp/pi-work/**`（keel-plan/keel-explore 写面内）被误拒为 write path denied。目标目录是静态可析取的位置参数，与 archive -o / bundle create 同级。
+**Why:** clone 此前是 modify 命令中少数无路径提取的子命令，写面 fallback 钉在 cwd（项目根）——显式克隆到 `/tmp/akeel/**`（keel-plan/keel-explore 写面内）被误拒为 write path denied。目标目录是静态可析取的位置参数，与 archive -o / bundle create 同级。
 
 **Impact:** 显式目标落在 scratch/docs 写面内的 clone 从误拒转为放行（路径维度；命令级 shellPolicy 仍按档位裁决，keel-plan 下 modify 审批一次）；项目内显式目标按精确路径走既有规则（与 mkdir/cp 一致）；无 `<dir>` 的 clone 行为不变（cwd 回退）。`--template`/`--reference` 的读取从此受 PathPolicy 读轴治理。既有语义用例 `git clone <url>`（无 dir）不变。
 
@@ -815,4 +815,29 @@ preset 的会话切换属于 runtime/adapters 外围能力；Policy Kernel 仍�
 
 **Out of Scope:** OS sandbox、容器、按工具/路径粒度的开关、会话内热切换、子代理策略传播和替代性安全审计层。
 
-## D-067: 待创建
+## D-067: Canonical 程序语义族与委托执行边界
+
+**Status:** active
+**Reversal surface:** engineering
+
+**Decision:** Canonical Shell 在词法与 flow 解析之后增加独立的 `core/program-semantics/` 语义层。该层只把已扫描的程序调用转换为命令分类、effects、路径事实和 bounded/opaque 路径知识；registry 只负责可执行文件分派，Policy、配置和 host 不进入该层。Git、解释器、Python 工具、uv 与 npm/pnpm/yarn/npx 使用各自的声明表和少量专用分析器；未知程序和未知子命令保持 `unknown + opaque`。
+
+已知且路径访问可完整证明的命令可进入普通 `inspect`/`modify`/`execute` 策略。解释器脚本、`uv run`、`pytest`、`npm/pnpm/yarn` 的脚本或安装执行、`npx` 以及含未建模运行期访问的命令标记 opaque；配置了显式 `allowedRoots`、`blockedRoots` 或 `blockedPaths` 时由 hard boundary 优先拒绝。`develop` 的 command mode 不扩大该边界。程序语义不递归解释委托的子命令或脚本内容。
+
+路径选项和隐式 repository/project scope 必须进入 Canonical 统一解析；Admission 只消费已解析的路径候选，不重新理解程序参数。Git `-C`、`--git-dir` 和 `--work-tree` 已在 Canonical command-local cwd seam 中按 token 顺序解析，后续 repository、基本 path candidate、output 候选和显式项目内 `file://` remote 使用所得 cwd；完整 Git pathspec 语法、HTTPS/SSH 等外部 transport、hosted `file://`、alias、间接 config remote、`clone --separate-git-dir` 及其他尚未形成 Canonical seam 的 location 选项继续 fail-closed。当前不增加 network policy 轴；网络、Git hooks、npm lifecycle 与执行期沙箱需要独立合同。
+
+**Why:** Git、包管理器和语言运行时共享“程序自有参数语言 + 子命令分类 + 路径/委托执行”的结构，但把它们塞进 Shell lexer 或 Policy Kernel 会造成职责泄漏和重复解析。统一的 bounded/opaque 事实同时允许安全的高频检查命令恢复可用性，并阻止 `develop` 把脚本、下载和未知行为误当成项目内安全操作。
+
+**Impact:** 生产入口仍只切换新 Canonical pipeline；新增命令族只需增加 core 语义模块和 public seam 测试，不恢复旧 `command-semantics` 依赖。当前覆盖 Git 常用 inspect/modify/destroy 分类、解释器信息命令、Python 质量工具、uv 基础分类和 npm 族常用分类；Git `-C`、`--git-dir`、`--work-tree` 和项目内显式 `file://` remote 的 command-local location 已覆盖，完整 CLI 方言、完整 Git pathspec 语法、HTTPS/SSH 等外部 transport、hosted `file://`、alias/间接 config remote、`clone --separate-git-dir` 和网络/执行隔离不在本条内。
+
+**Rejected:**
+
+- **把所有程序加入 `shell-words.ts` 的 Set：** 无法表达选项值、子命令和委托执行边界，继续扩大单一解析器。
+- **在 adapters/runtime 中解析程序语义：** 违反 core ← adapters ← runtime 依赖方向，并让 Policy/host 重新接触原始命令。
+- **递归解析 `uv run`、`npm run`、`npx` 或解释器脚本：** 脚本和依赖内容不是本次 Canonical 输入的可证明静态事实。
+- **用 `unknown: allow` 或删除 path boundary 放宽 opaque 命令：** 会把不可证明访问变成未声明的安全保证。
+- **直接移植旧 command-semantics adapter：** 违反 D-059 的 Greenfield 边界；旧实现仅提供待重新证明的场景线索。
+
+**Out of Scope:** 网络独立授权、OS sandbox、Git hooks/npm lifecycle 的执行期拦截、完整 Git pathspec、远程/容器工具链方言、命令执行后的审计和旧配置兼容。
+
+## D-068: 待创建

@@ -40,13 +40,14 @@ test("project lifecycle rejects a cwd outside a discoverable project", () => {
 
 test("project lifecycle rejects relative cwd before creating staging", () => {
   const fixture = project();
-  const before = readdirSync(tmpdir()).filter((entry) => entry.startsWith("pi-access-decision-"));
+  const stagingParent = join(tmpdir(), "akeel");
+  const entries = (): string[] => existsSync(stagingParent)
+    ? readdirSync(stagingParent).filter((entry) => entry.startsWith("access-decision-"))
+    : [];
+  const before = entries();
   try {
     assert.throws(() => createProjectLifecycle(relative(process.cwd(), fixture.nested)), /invalid project lifecycle/);
-    assert.deepEqual(
-      readdirSync(tmpdir()).filter((entry) => entry.startsWith("pi-access-decision-")),
-      before,
-    );
+    assert.deepEqual(entries(), before);
   } finally {
     fixture.cleanup();
   }

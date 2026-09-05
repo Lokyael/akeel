@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, realpathSync, rmSync, statSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { createProjectContext } from "./project-context";
@@ -31,7 +31,9 @@ export function createProjectLifecycle(cwd: string): ProjectLifecycle {
     throw new TypeError("invalid project lifecycle");
   }
   const root = projectRoot(cwd);
-  const stagingRoot = mkdtempSync(join(tmpdir(), "pi-access-decision-"));
+  const stagingParent = join(tmpdir(), "akeel");
+  mkdirSync(stagingParent, { recursive: true });
+  const stagingRoot = mkdtempSync(join(stagingParent, "access-decision-"));
   let disposed = false;
   return Object.freeze({
     context: createProjectContext({ cwd, projectRoot: root, stagingRoot }),

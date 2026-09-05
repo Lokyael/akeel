@@ -1,7 +1,11 @@
 import { canonicalFacts } from "./canonical";
 import { shellCompilationFacts } from "./shell-compile";
 import type { DirectSurface } from "./types";
-import { shellCommandHasOpaquePathAccess, shellCommandIsRecursive } from "./shell-words";
+import {
+  shellCommandHasHardBoundary,
+  shellCommandHasOpaquePathAccess,
+  shellCommandIsRecursive,
+} from "./shell-words";
 import type { ShellCommandClass, ShellEffect } from "./shell-words";
 
 type AdmissionFacts = Readonly<{
@@ -44,6 +48,7 @@ type ShellAdmissionPath = Readonly<{
 
 type ShellAdmissionOperation = Readonly<{
   readonly commandClass: ShellCommandClass;
+  readonly hardBoundary: boolean;
   readonly opaquePathAccess: boolean;
   readonly recursive: boolean;
   readonly interactive: boolean;
@@ -99,6 +104,7 @@ export function projectShellAdmission(compilation: unknown): ShellAdmissionPlan 
     const recursive = shellCommandIsRecursive(analysis);
     operations.push(Object.freeze({
       commandClass: analysis.commandClass,
+      hardBoundary: shellCommandHasHardBoundary(analysis),
       opaquePathAccess: shellCommandHasOpaquePathAccess(analysis),
       recursive,
       interactive: facts.hasUI,

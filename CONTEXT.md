@@ -26,8 +26,8 @@
 ## Architecture
 
 - `src/bootstrap/` 在 Session 启动和 compaction 后注入工程原则。
-- `src/access-gate/access-decision/` 是当前唯一决策实现：`core/` 负责 Pi host/config 无关的语义与策略，Linux pathname lookup 属于该语义域的外部合同；`adapters/` 转换 Pi 和 policy.yaml 输入，`runtime/` 负责 project/staging 生命周期和 host composition。
-- Access Decision Pipeline（D-059/D-060）已完成 Greenfield trust path 与原子生产切换。Canonical 只解释一次；Admission 与 Display 按需投影；Policy Kernel 不读取配置或重新解析请求。Canonical path resolution 同时保留 lexical 与 symlink-target traversal prefixes，Direct search 与 Shell recursive path 均在 blocked descendants 上 fail-closed；有显式 path boundary 时，unknown/unbounded Shell path access 也不得放行。
+- `src/access-gate/access-decision/` 是当前唯一决策实现：`core/` 负责 Pi host/config 无关的语义与策略，Linux pathname lookup 属于该语义域的外部合同；`core/program-semantics/` 负责 Git、解释器、Python 工具、uv 和 npm 族的程序分类与路径事实，Git `-C`、`--git-dir` 和 `--work-tree` 已通过 Canonical command-local cwd seam 解析；`adapters/` 转换 Pi 和 policy.yaml 输入，`runtime/` 负责 project/staging 生命周期和 host composition。
+- Access Decision Pipeline（D-059/D-060）已完成 Greenfield trust path 与原子生产切换。Canonical 只解释一次；Admission 与 Display 按需投影；Policy Kernel 不读取配置或重新解析请求。Canonical path resolution 同时保留 lexical 与 symlink-target traversal prefixes，Direct search 与 Shell recursive path 均在 blocked descendants 上 fail-closed；有显式 path boundary 时，unknown/unbounded Shell path access 也不得放行。Git 显式项目内 `file://` remote 也在 Canonical 阶段转为 path fact；host、alias 和间接 config remote 保持 fail-closed。
 - 受管辖 surface 为 Direct `read`、`write`、`edit`、`find`、`grep`、`ls` 与 Shell `bash`。无效 host context、unsupported syntax、硬安全边界和损坏政策 fail-closed；未拥有的工具 passthrough。
 - 生产入口只读取 `$PI_CODING_AGENT_DIR/akeel/policy.yaml`（默认 `~/.pi/agent/akeel/policy.yaml`）。缺失文件是 deny-by-default；旧 config/Profile schema 不读取、不转换、不 fallback。
 - Policy Preset 的三种定位已由 D-064 冻结并实现：`policy.yaml` 可加载完整的 `review`、`guided`、`develop` 集合，`/policy` 可在会话边界切换并按需查询，策略状态不常驻 UI；AKeel 管理的 subagent tier/parent-tier 注册和子代理策略管理仍属候选范围。
@@ -73,6 +73,7 @@
 - [D-064 会话级 Policy Preset 定位](docs/decisions.md#d-064-会话级-policy-preset-定位)
 - [D-065 只读策略下的修改提醒与静态 Guidance 边界](docs/decisions.md#d-065-只读策略下的修改提醒与静态-guidance-边界)
 - [D-066 Access Gate 显式禁用与仅技能运行模式](docs/decisions.md#d-066-access-gate-显式禁用与仅技能运行模式)
+- [D-067 Canonical 程序语义族与委托执行边界](docs/decisions.md#d-067-canonical-程序语义族与委托执行边界)
 
 ## Negative Space
 
@@ -85,7 +86,7 @@
 - 不提供 AKeel 管理的 subagent tier/parent-tier 钳制或子代理 preset 继承；这些能力仍属候选范围。
 - Access Gate 可由用户显式禁用；禁用时不拦截 managed tool call，故不提供路径、Shell 或操作准入保证。bootstrap 与 skills 仍然分发和运行。
 - 旧 `config.yaml`、Profile、命令覆盖、继承和子代理字段不属于新 Policy Snapshot 输入；当前只读取全局 `policy.yaml` 的静态策略字段、preset 绑定或显式 `accessGate` 禁用标志。
-- Shell 只支持显式定义、可静态证明且资源有界的子集；不可证明形态 fail-closed。未建模的命令副作用不单独建模。
+- Shell 只支持显式定义、可静态证明且资源有界的子集；不可证明形态 fail-closed。`core/program-semantics/` 中的已知程序仍需提供 bounded path 事实；解释器脚本、uv run、npm/pnpm/yarn 执行、npx、pytest 和未知子命令等委托执行保持 opaque，在显式 path boundary 下 hard-deny。Git local transport 仅接受可解析的项目内 `file://` path；HTTPS/SSH 等外部 transport、host、alias、间接 config、ext transport 和其他未建模形态继续 hard-boundary。未建模的命令副作用不单独建模。
 - 不把短期 Task Record、实施过程或审查报告作为永久项目知识。
 - 不在 T-069 实现 Static Flow Graph、Explanation Replay、Runtime Audit Event 或 Runtime Content Flow。
 - 不把旧实现结果当作正确性 oracle；旧代码、旧测试和 archive 只提供待重新证明的历史线索。

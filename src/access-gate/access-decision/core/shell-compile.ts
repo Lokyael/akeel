@@ -3,7 +3,12 @@ import {
   MAX_SHELL_COMMANDS,
   MAX_SHELL_CWD_STATES,
 } from "./limits";
-import { analyzeShellCommandWords, shellCommandIsRecursive, shellCommandOutcomes } from "./shell-words";
+import {
+  analyzeShellCommandWords,
+  shellCommandIsRecursive,
+  shellCommandOutcomes,
+  shellCommandSemanticFacts,
+} from "./shell-words";
 import { resolveShellPathWithTraversal } from "./shell-paths";
 import type { ResolvedShellPath } from "./shell-paths";
 import type { ShellCommandAnalysis } from "./shell-words";
@@ -128,17 +133,51 @@ export function compileShell(request: unknown): ShellCompilation | ShellReject {
   const resolvedPaths: Array<readonly ResolvedShellPath[]> = [];
   for (const state of cwdStates) {
     const analysis = analyses[state.commandIndex]!;
+    const semanticFacts = shellCommandSemanticFacts(analysis);
+    const pathBases = semanticFacts?.pathBases ?? [];
+    if (pathBases.length !== analysis.paths.length) {
+      return reject("invalid-request", { start: 0, end: request.arguments.command.length }, "input");
+    }
+    let commandCwd = state.cwd;
+    const resolvedCwdChanges = new Map<number, ResolvedShellPath>();
+    const commandCwdTimeline: Array<Readonly<{ readonly start: number; readonly cwd: string }>> = [];
+    for (const change of semanticFacts?.cwdChanges ?? []) {
+      const baseCwd = change.base === "invocation-cwd" ? state.cwd : commandCwd;
+      const resolved = resolveShellPathWithTraversal(baseCwd, change.path.text, {
+        home: request.home,
+        pathKind: change.path.pathKind,
+      });
+      if (resolved === undefined) {
+        return reject("invalid-request", { start: 0, end: request.arguments.command.length }, "input");
+      }
+      resolvedCwdChanges.set(change.start, resolved);
+      commandCwd = resolved.candidate;
+      commandCwdTimeline.push(Object.freeze({ start: change.start, cwd: commandCwd }));
+    }
+    const hasImplicitPath = analysis.paths.length === 0 &&
+      (shellCommandIsRecursive(analysis) || analysis.executable === "ls" || analysis.executable === "find");
     const paths = analysis.paths.length > 0
       ? analysis.paths
-      : shellCommandIsRecursive(analysis) || analysis.executable === "ls" || analysis.executable === "find"
-        ? [{ text: ".", role: "source" as const }]
+      : hasImplicitPath
+        ? [{ text: ".", role: "source" as const, pathKind: undefined }]
         : [];
     const resolved = [] as ResolvedShellPath[];
-    for (const path of paths) {
-      const candidate = resolveShellPathWithTraversal(state.cwd, path.text, {
-        home: request.home,
-        pathKind: path.pathKind,
-      });
+    for (let pathIndex = 0; pathIndex < paths.length; pathIndex += 1) {
+      const path = paths[pathIndex]!;
+      const base = pathBases[pathIndex] ?? "invocation-cwd";
+      const pathStart = semanticFacts?.pathStarts[pathIndex] ?? -1;
+      const cwdChange = resolvedCwdChanges.get(pathStart);
+      const pathCommandCwd = pathStart === 0 && path.text === "."
+        ? commandCwd
+        : commandCwdTimeline.reduce((cwd, entry) => entry.start < pathStart ? entry.cwd : cwd, state.cwd);
+      const candidate = cwdChange ?? resolveShellPathWithTraversal(
+        base === "command-cwd" ? pathCommandCwd : state.cwd,
+        path.text,
+        {
+          home: request.home,
+          pathKind: path.pathKind,
+        },
+      );
       if (candidate === undefined) {
         return reject("invalid-request", { start: 0, end: request.arguments.command.length }, "input");
       }

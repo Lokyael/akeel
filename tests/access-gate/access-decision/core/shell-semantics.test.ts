@@ -1,14 +1,26 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  analyzeProgramCommand,
   analyzeShellCommand,
   shellCommandOutcomes,
 } from "../../../../src/access-gate/access-decision/core/index";
+import type { ShellWord } from "../../../../src/access-gate/access-decision/core/index";
 
 const policyContract = {
   source: "new-policy",
   referenceStatus: "newly-adopted",
 } as const;
+
+function word(text: string, start: number): ShellWord {
+  return Object.freeze({ text, start, end: start + text.length, quote: "bare" as const });
+}
+
+function complete(command: string) {
+  const analysis = analyzeShellCommand(command);
+  assert.equal(analysis.kind, "complete");
+  return analysis;
+}
 
 test("true and false have deterministic command outcomes without execution", () => {
   assert.deepEqual(shellCommandOutcomes(analyzeShellCommand("true")), ["success"]);
@@ -75,6 +87,19 @@ test("an input redirection contributes a read source path", () => {
   assert.equal(policyContract.source, "new-policy");
 });
 
+test("read-write redirection is governed by the write-side target contract", () => {
+  for (const command of ["printf x <> output.txt", "printf x 2<> output.txt"]) {
+    assert.deepEqual(analyzeShellCommand(command), {
+      kind: "complete",
+      executable: "printf",
+      wrappers: [],
+      commandClass: "inspect",
+      effects: ["write"],
+      paths: [{ text: "output.txt", role: "target" }],
+    }, command);
+  }
+});
+
 test("source and target paths retain their command order", () => {
   assert.deepEqual(analyzeShellCommand("cat input.txt > output.txt"), {
     kind: "complete",
@@ -88,4 +113,184 @@ test("source and target paths retain their command order", () => {
     ],
   });
   assert.equal(policyContract.referenceStatus, "newly-adopted");
+});
+
+test("Git inspect commands are bounded repository reads", () => {
+  assert.deepEqual(analyzeShellCommand("git status"), {
+    kind: "complete",
+    executable: "git",
+    wrappers: [],
+    commandClass: "inspect",
+    effects: ["read"],
+    paths: [{ text: ".", role: "source" }],
+  });
+  assert.deepEqual(analyzeShellCommand("git diff -- src/app.ts"), {
+    kind: "complete",
+    executable: "git",
+    wrappers: [],
+    commandClass: "inspect",
+    effects: ["read"],
+    paths: [
+      { text: ".", role: "source" },
+      { text: "src/app.ts", role: "source" },
+    ],
+  });
+});
+
+test("Git command-local cwd facts keep token order and path bases", () => {
+  const semantic = analyzeProgramCommand({
+    executable: "git",
+    arguments: [word("-C", 0), word("a", 3), word("--git-dir=.git", 5), word("-C", 19), word("b", 22), word("status", 24)],
+  });
+
+  assert.deepEqual(semantic?.cwdChanges, [
+    { path: { text: "a", role: "source" }, start: 0, base: "invocation-cwd" },
+    { path: { text: "b", role: "source" }, start: 19, base: "command-cwd" },
+  ]);
+  assert.deepEqual(semantic?.paths.map((entry) => ({ text: entry.path.text, role: entry.path.role, base: entry.base })), [
+    { text: "a", role: "source", base: "invocation-cwd" },
+    { text: ".git", role: "source", base: "command-cwd" },
+    { text: "b", role: "source", base: "command-cwd" },
+    { text: ".", role: "source", base: "command-cwd" },
+  ]);
+});
+
+test("Git mutating commands expose their file paths and risk class", () => {
+  assert.deepEqual(analyzeShellCommand("git add src/app.ts"), {
+    kind: "complete",
+    executable: "git",
+    wrappers: [],
+    commandClass: "modify",
+    effects: ["read", "write"],
+    paths: [
+      { text: ".", role: "source" },
+      { text: "src/app.ts", role: "source" },
+    ],
+  });
+  assert.equal(analyzeShellCommand("git reset --hard HEAD").kind, "complete");
+  assert.equal((analyzeShellCommand("git reset --hard HEAD") as { commandClass: string }).commandClass, "destroy");
+});
+
+test("Python tool option values do not hide the semantic subcommand", () => {
+  assert.equal((analyzeShellCommand("ruff --config pyproject.toml format") as { commandClass: string }).commandClass, "modify");
+});
+
+test("Python, uv, Node and package runners use explicit family semantics", () => {
+  assert.equal((analyzeShellCommand("ruff check src") as { commandClass: string }).commandClass, "inspect");
+  assert.equal((analyzeShellCommand("black src") as { commandClass: string }).commandClass, "modify");
+  assert.equal((analyzeShellCommand("pytest tests") as { commandClass: string }).commandClass, "execute");
+  assert.equal((analyzeShellCommand("npm view react") as { commandClass: string }).commandClass, "inspect");
+  assert.equal((analyzeShellCommand("npm run test") as { commandClass: string }).commandClass, "execute");
+  assert.equal((analyzeShellCommand("npm --prefix /tmp/deps ci") as { commandClass: string }).commandClass, "execute");
+  assert.equal((analyzeShellCommand("uv --directory project run pytest tests") as { commandClass: string }).commandClass, "execute");
+  assert.equal((analyzeShellCommand("npx --version") as { commandClass: string }).commandClass, "inspect");
+  assert.equal((analyzeShellCommand("npx vite") as { commandClass: string }).commandClass, "execute");
+});
+
+test("Git option values and revisions are not mistaken for file paths", () => {
+  assert.deepEqual(analyzeShellCommand("git archive --output=/tmp/out.tar HEAD"), {
+    kind: "complete",
+    executable: "git",
+    wrappers: [],
+    commandClass: "modify",
+    effects: ["read", "write"],
+    paths: [
+      { text: ".", role: "source" },
+      { text: "/tmp/out.tar", role: "target" },
+    ],
+  });
+  assert.deepEqual(analyzeShellCommand("git diff HEAD"), {
+    kind: "complete",
+    executable: "git",
+    wrappers: [],
+    commandClass: "inspect",
+    effects: ["read"],
+    paths: [{ text: ".", role: "source" }],
+  });
+  assert.equal((analyzeShellCommand("git branch") as { commandClass: string }).commandClass, "inspect");
+  assert.equal((analyzeShellCommand("git clean --dry-run") as { commandClass: string }).commandClass, "inspect");
+  assert.equal((analyzeShellCommand("git stash list") as { commandClass: string }).commandClass, "inspect");
+  assert.equal((analyzeShellCommand("git config --list") as { commandClass: string }).commandClass, "inspect");
+  for (const command of ["git diff --output=/tmp/out HEAD", "git show --output=/tmp/out HEAD", "git log --output /tmp/out"]) {
+    assert.deepEqual(analyzeShellCommand(command), {
+      kind: "complete",
+      executable: "git",
+      wrappers: [],
+      commandClass: "inspect",
+      effects: ["read", "write"],
+      paths: [
+        { text: ".", role: "source" },
+        { text: "/tmp/out", role: "target" },
+      ],
+    }, command);
+  }
+  assert.deepEqual(analyzeShellCommand("git commit --file=/etc/msg"), {
+    kind: "complete",
+    executable: "git",
+    wrappers: [],
+    commandClass: "modify",
+    effects: ["read", "write"],
+    paths: [
+      { text: ".", role: "source" },
+      { text: "/etc/msg", role: "source" },
+    ],
+  });
+  assert.deepEqual(complete("git init /tmp/repo").paths, [
+    { text: ".", role: "target" },
+    { text: "/tmp/repo", role: "target" },
+  ]);
+  assert.deepEqual(complete("git clone /etc/repo /workspace/project/clone").paths, [
+    { text: "/etc/repo", role: "source" },
+    { text: "/workspace/project/clone", role: "target" },
+  ]);
+  assert.deepEqual(complete("git clone file:///etc/repo /workspace/project/clone").paths, [
+    { text: "/etc/repo", role: "source" },
+    { text: "/workspace/project/clone", role: "target" },
+  ]);
+  assert.deepEqual(complete("git clone FILE:///etc/repo /workspace/project/clone").paths, [
+    { text: "/etc/repo", role: "source" },
+    { text: "/workspace/project/clone", role: "target" },
+  ]);
+  assert.deepEqual(complete("git submodule add --reference=/etc/repo file:///workspace/project/remote vendor/repo").paths, [
+    { text: ".", role: "source" },
+    { text: "add", role: "source" },
+    { text: "/etc/repo", role: "source" },
+    { text: "/workspace/project/remote", role: "source" },
+    { text: "vendor/repo", role: "source" },
+  ]);
+  assert.deepEqual(complete("git fetch file:///workspace/project/remote").paths, [
+    { text: ".", role: "source" },
+    { text: "/workspace/project/remote", role: "source" },
+  ]);
+  assert.deepEqual(complete("git fetch --depth 1 file:///workspace/project/remote").paths, [
+    { text: ".", role: "source" },
+    { text: "/workspace/project/remote", role: "source" },
+  ]);
+  assert.deepEqual(complete("git push file:///workspace/project/remote main").paths, [
+    { text: ".", role: "source" },
+    { text: "/workspace/project/remote", role: "target" },
+  ]);
+  assert.deepEqual(complete("git clone --depth 1 https://host/repo.git").paths, [
+    { text: ".", role: "target" },
+  ]);
+  assert.deepEqual(complete("git clone --template /tmp/template --reference=/tmp/reference https://host/repo.git /workspace/project/clone").paths, [
+    { text: "/tmp/template", role: "source" },
+    { text: "/tmp/reference", role: "source" },
+    { text: "/workspace/project/clone", role: "target" },
+  ]);
+  assert.equal(complete("git clone --separate-git-dir=/tmp/repo.git https://host/repo.git /workspace/project/clone").commandClass, "modify");
+  assert.deepEqual(complete("git config --file=/etc/gitconfig user.name attacker").paths, [
+    { text: ".", role: "source" },
+    { text: "/etc/gitconfig", role: "target" },
+  ]);
+  assert.deepEqual(complete("uv --directory=/tmp help").paths, [{ text: "/tmp", role: "source" }]);
+  assert.deepEqual(complete("ruff format --check").paths, [{ text: ".", role: "source" }]);
+  assert.deepEqual(complete("ruff clean"), {
+    kind: "complete",
+    executable: "ruff",
+    wrappers: [],
+    commandClass: "destroy",
+    effects: ["delete", "write"],
+    paths: [{ text: ".", role: "target" }],
+  });
 });

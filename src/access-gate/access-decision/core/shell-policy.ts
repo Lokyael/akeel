@@ -148,7 +148,7 @@ export function evaluateShellAdmission(
   if (!facts) return { kind: "deny", code: "invalid-admission" };
 
   for (const operation of facts.operations) {
-    if (operation.commandClass === "destroy" || operation.effects.includes("delete")) {
+    if (operation.commandClass === "destroy" || operation.effects.includes("delete") || operation.hardBoundary) {
       return { kind: "deny", code: "hard-boundary" };
     }
     if ((operation.opaquePathAccess && hasPathBoundary(policy)) ||

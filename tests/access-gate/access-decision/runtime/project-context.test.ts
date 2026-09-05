@@ -6,13 +6,13 @@ test("project context freezes cwd, project root, and staging root", () => {
   const context = createProjectContext({
     cwd: "/workspace/project/src",
     projectRoot: "/workspace/project",
-    stagingRoot: "/tmp/pi-work",
+    stagingRoot: "/tmp/akeel",
   });
 
   assert.deepEqual(context, {
     cwd: "/workspace/project/src",
     projectRoot: "/workspace/project",
-    stagingRoot: "/tmp/pi-work",
+    stagingRoot: "/tmp/akeel",
   });
   assert.equal(Object.isFrozen(context), true);
 });

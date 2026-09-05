@@ -11,10 +11,10 @@ Write a handoff document summarising the current conversation so another agent c
 Include:
 - **Goal**: What we're trying to accomplish
 - **Current state**: Where we are in the process
-- **Decisions**: references only — link the relevant `D-xxx` entries in `docs/decisions.md` and the relevant sections of the active Task Record. Never restate decision content: its single authoritative home is the container (per principles.md Project Records — Project Record Authority). If a decision from this session is not yet recorded, record it first (domain-modeling) before handing off.
-- **Files involved**: Paths to relevant files, `CONTEXT.md`, `docs/decisions.md`, or the active Task Record (`docs/task.md` or `docs/task-<topic>.md`)
+- **Decisions**: references only — link `D-xxx` entries and active Task sections with repo-relative paths (`docs/decisions.md#...`, `docs/task.md#...`). Never restate decision content: its single authoritative home is the container (per principles.md Project Records — Project Record Authority). If a decision from this session is not yet recorded, record it first (domain-modeling) before handing off.
+- **Files involved**: Use repo-relative paths for repo files. Use `/tmp/akeel/...` for AKeel scratch artifacts. Do not write installed skill paths; use skill names and let the next session resolve them from `<available_skills>`.
 - **Next steps**: What to do next
-- **Suggested skills**: Which skills to recommend to the user for the next session
+- **Suggested skills**: Skill names only.
 
 ## What NOT to Include
 
@@ -25,4 +25,4 @@ Include:
 
 If the user passed arguments, treat them as a description of what the next session will focus on and tailor the document accordingly.
 
-Write the document to `/tmp/pi-work/handoffs/handoff-<timestamp>.md`. Reply with the file path and a brief summary.
+Write the document to `/tmp/akeel/handoffs/handoff-<timestamp>.md` unless the user requested another path. Reply with the file path and a brief summary.

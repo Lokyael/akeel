@@ -31,7 +31,7 @@
 - mattpocock 上游实际文件是 `skills/productivity/handoff/SKILL.md`（该名自 2026-07-02 起存在，`handoff-session` 从未存在），初始记录的路径是本地改名误转写。
 - obra/superpowers 在核查时 HEAD `b36e0829` 全树与提交历史中均无 handoff 技能；初始记录归因给它的 redact sensitive information 等内容在 mattpocock 文件中已原生存在，20% 归属无对账文件，故从 superpowers 行的当前映射移除 “handoff”。
 
-当前 handoff-session 在 mattpocock 基线之上经 D-036 重构（交付规则与场景无关：默认约定路径 `/tmp/pi-work/handoffs/` + 用户覆盖；交接自足判据；Decisions 只引用防双源），逐行差异由 Git 历史承载。
+当前 handoff-session 在 mattpocock 基线之上经 D-036 重构（交付规则与场景无关：默认约定路径 `/tmp/akeel/handoffs/` + 用户覆盖；交接自足判据；Decisions 只引用防双源），逐行差异由 Git 历史承载。
 
 ## Access Gate 来源
 

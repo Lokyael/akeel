@@ -9,6 +9,8 @@ export type { DirectDisplayView, ShellDisplayOperation, ShellDisplayView } from 
 export type { Decision, DirectEditEntry, DirectRequest, DirectSurface, PolicyInput, PolicyMode } from "./types";
 export { scanShellWords } from "./shell-language";
 export type { ShellPathKind, ShellQuoteMode, ShellWord, ShellWordScan } from "./shell-language";
+export { analyzeProgramCommand } from "./program-semantics";
+export type { ProgramCwdChange, ProgramPath, ProgramPathBase, ProgramSemantic } from "./program-semantics/types";
 export { analyzeShellCommand, shellCommandOutcomes } from "./shell-words";
 export type {
   ShellCommandAnalysis,

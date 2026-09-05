@@ -30,7 +30,7 @@ Apply the **deletion test**: would deleting this module *concentrate* complexity
 
 ### 2. Present Candidates as HTML Report
 
-Write a self-contained HTML file to `/tmp/pi-work/architecture-review-<timestamp>.html` (per principles.md Quick Reference — Temporary Resources). Open it for the user where a GUI is available (`xdg-open <path>` on Linux); in a headless environment, report the file path and ask the user to open it.
+Write a self-contained HTML file to `/tmp/akeel/architecture-review-<timestamp>.html` (per principles.md Quick Reference — Temporary Resources). Open it for the user where a GUI is available (`xdg-open <path>` on Linux); in a headless environment, report the file path and ask the user to open it.
 
 For each candidate, render a card with:
 - **Files** — which files/modules are involved

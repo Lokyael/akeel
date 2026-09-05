@@ -161,7 +161,7 @@ export function scanShellWords(input: string): ShellWordScan {
 
 function unsupportedRedirectionLength(input: string, index: number): number {
   const pair = input.slice(index, index + 2);
-  if (pair === "<>" || pair === "<<" || pair === ">|" || pair === ">&" || pair === "<&") {
+  if (pair === "<<" || pair === ">|" || pair === ">&" || pair === "<&") {
     return input.slice(index, index + 3) === "<<<" ? 3 : 2;
   }
   return 0;
@@ -169,7 +169,7 @@ function unsupportedRedirectionLength(input: string, index: number): number {
 
 function shellOperatorLength(input: string, index: number): number {
   const pair = input.slice(index, index + 2);
-  if (pair === "&&" || pair === "||" || pair === ">>") return 2;
+  if (pair === "&&" || pair === "||" || pair === ">>" || pair === "<>") return 2;
   return "|;&<>".includes(input[index]!) ? 1 : 0;
 }
 

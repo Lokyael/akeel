@@ -4,6 +4,7 @@ import {
   compileShell,
   isShellReject,
 } from "../../../../src/access-gate/access-decision/core/index";
+import { shellCompilationFacts } from "../../../../src/access-gate/access-decision/core/shell-compile";
 
 const bashContract = {
   source: "bash-manual",
@@ -80,12 +81,16 @@ test("Bash process substitution fails closed before the outer command is admitte
   });
 });
 
-test("compound redirections fail closed instead of dropping a target", () => {
-  for (const command of ["printf x <> .secrets/file", "printf x >| output"]) {
-    const result = compileShell({ ...request, arguments: { command } });
-    if (!isShellReject(result)) assert.fail(`expected rejection for ${command}`);
-    assert.equal(result.code, "unsupported-syntax", command);
-  }
+test("read-write redirection is modeled on the write side while clobber remains unsupported", () => {
+  const result = compileShell({ ...request, arguments: { command: "printf x <> .secrets/file" } });
+  assert.equal(isShellReject(result), false);
+
+  const fdResult = compileShell({ ...request, arguments: { command: "printf x 2<> .secrets/file" } });
+  assert.equal(isShellReject(fdResult), false);
+
+  const clobber = compileShell({ ...request, arguments: { command: "printf x >| output" } });
+  if (!isShellReject(clobber)) assert.fail("expected rejection for >|");
+  assert.equal(clobber.code, "unsupported-syntax");
 });
 
 test("unsupported shell operators fail closed with a source anchor", () => {
@@ -111,6 +116,27 @@ test("control operators are recognized even without surrounding whitespace", () 
     anchor: { start: 13, end: 14 },
     resourceClass: "syntax",
   });
+});
+
+test("Git repository locations resolve against the command cwd at their token position", () => {
+  const compilation = compileShell({
+    ...request,
+    arguments: { command: "git -C a --git-dir=.git -C b status" },
+  });
+  if (isShellReject(compilation)) assert.fail("expected command-local Git locations to compile");
+
+  assert.deepEqual(shellCompilationFacts(compilation)?.resolvedPaths[0]?.map((path) => path.candidate), [
+    "/workspace/project/a/b",
+    "/workspace/project/a",
+    "/workspace/project/a/.git",
+    "/workspace/project/a/b",
+  ]);
+});
+
+test("Git command-local cwd values reject dynamic forms", () => {
+  const dynamic = compileShell({ ...request, arguments: { command: "git -C \"$DIR\" status" } });
+  if (!isShellReject(dynamic)) assert.fail("expected dynamic -C value to fail closed");
+  assert.equal(dynamic.code, "dynamic-value");
 });
 
 test("additional file and execution-valued options fail closed", () => {

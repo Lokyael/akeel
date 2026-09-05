@@ -1,4 +1,6 @@
 import { scanSimpleShellFlow } from "./shell-flow";
+import { analyzeProgramCommand } from "./program-semantics";
+import type { ProgramCwdChange, ProgramPathBase } from "./program-semantics/types";
 import type { ShellWord } from "./shell-language";
 import type { ShellCommandStatus } from "./shell-flow";
 
@@ -48,7 +50,16 @@ const modeledCommandNames = new Set([
   "printf",
 ]);
 const opaquePathAnalyses = new WeakSet<object>();
+const hardBoundaryAnalyses = new WeakSet<object>();
 const recursiveAnalyses = new WeakSet<object>();
+
+type ShellCommandSemanticFacts = Readonly<{
+  readonly pathBases: readonly ProgramPathBase[];
+  readonly pathStarts: readonly number[];
+  readonly cwdChanges: readonly ProgramCwdChange[];
+}>;
+
+const shellCommandSemanticFactsByAnalysis = new WeakMap<object, ShellCommandSemanticFacts>();
 
 export function shellCommandHasOpaquePathAccess(value: unknown): boolean {
   return typeof value === "object" && value !== null && opaquePathAnalyses.has(value);
@@ -56,6 +67,15 @@ export function shellCommandHasOpaquePathAccess(value: unknown): boolean {
 
 export function shellCommandIsRecursive(value: unknown): boolean {
   return typeof value === "object" && value !== null && recursiveAnalyses.has(value);
+}
+
+export function shellCommandHasHardBoundary(value: unknown): boolean {
+  return typeof value === "object" && value !== null && hardBoundaryAnalyses.has(value);
+}
+
+export function shellCommandSemanticFacts(value: unknown): ShellCommandSemanticFacts | undefined {
+  if (typeof value !== "object" || value === null) return undefined;
+  return shellCommandSemanticFactsByAnalysis.get(value);
 }
 
 export function shellCommandOutcomes(analysis: ShellCommandAnalysis): readonly ShellCommandStatus[] {
@@ -285,18 +305,21 @@ export function analyzeShellCommandWords(words: readonly ShellWord[]): ShellComm
   }
 
   const commandWords: ShellWord[] = [];
-  const paths: Array<{ readonly path: ShellPath; readonly start: number }> = [];
+  const paths: Array<{ readonly path: ShellPath; readonly start: number; readonly base: ProgramPathBase }> = [];
+  const addPath = (path: ShellPath, start: number, base: ProgramPathBase = "invocation-cwd"): void => {
+    paths.push({ path, start, base });
+  };
   let redirectRole: ShellPathRole | undefined;
   let hasInputRedirection = false;
   for (let wordIndex = 0; wordIndex < words.length; wordIndex += 1) {
     const word = words[wordIndex]!;
     if (redirectRole !== undefined) {
       if (redirectRole === "source") hasInputRedirection = true;
-      paths.push({ path: pathFromWord(word, redirectRole), start: word.start });
+      addPath(pathFromWord(word, redirectRole), word.start);
       redirectRole = undefined;
       continue;
     }
-    if (word.text === ">" || word.text === ">>") {
+    if (word.text === ">" || word.text === ">>" || word.text === "<>") {
       redirectRole = "target";
       continue;
     }
@@ -310,7 +333,7 @@ export function analyzeShellCommandWords(words: readonly ShellWord[]): ShellComm
       word.quote === "bare" &&
       next !== undefined &&
       next.quote === "bare" &&
-      (next.text === ">" || next.text === ">>" || next.text === "<") &&
+      (next.text === ">" || next.text === ">>" || next.text === "<" || next.text === "<>") &&
       word.end === next.start
     ) {
       continue;
@@ -350,12 +373,11 @@ export function analyzeShellCommandWords(words: readonly ShellWord[]): ShellComm
     return rejectSecurityBoundary(executableWord);
   }
   const commandArguments = commandWords.slice(index + 1);
-  if (executableName === "npx" && commandArguments[0]?.text !== "tsx") return rejectSecurityBoundary(executableWord);
   const scriptOption = unsupportedInterpreterOption(executableName, commandArguments);
   if (scriptOption !== undefined) return rejectSecurityBoundary(scriptOption);
   const scriptPath = interpreterScriptPath(executableName, commandArguments);
   const hasRedirection = words.some((word) =>
-    word.quote === "bare" && (word.text === ">" || word.text === ">>" || word.text === "<")
+    word.quote === "bare" && (word.text === ">" || word.text === ">>" || word.text === "<" || word.text === "<>")
   );
   if (executable === "cd" && (index !== 0 || hasRedirection || commandArguments.length !== 1 || commandArguments[0]!.text.startsWith("-"))) {
     return rejectOperator(commandArguments[0] ?? executableWord);
@@ -371,14 +393,19 @@ export function analyzeShellCommandWords(words: readonly ShellWord[]): ShellComm
   const effects: ShellEffect[] = [];
   if (hasInputRedirection) addEffect(effects, "read");
   if (scriptPath !== undefined) {
-    paths.push({ path: pathFromWord(scriptPath, "source"), start: scriptPath.start });
+    addPath(pathFromWord(scriptPath, "source"), scriptPath.start);
     addEffect(effects, "read");
   }
   if (executable === "cd") {
     addEffect(effects, "cwd-change");
-    paths.push({ path: pathFromWord(commandArguments[0]!, "source"), start: commandArguments[0]!.start });
+    addPath(pathFromWord(commandArguments[0]!, "source"), commandArguments[0]!.start);
   }
-  const classification = commandClass(executable, commandArguments);
+  const programSemantic = analyzeProgramCommand({ executable, arguments: commandArguments });
+  const classification = programSemantic?.commandClass ?? commandClass(executable, commandArguments);
+  if (programSemantic !== undefined) {
+    for (const effect of programSemantic.effects) addEffect(effects, effect);
+    for (const programPath of programSemantic.paths) addPath(programPath.path, programPath.start, programPath.base);
+  }
   if (inspectionCommands.has(executableName)) addEffect(effects, "read");
   if (classification === "modify") addEffect(effects, "write");
   if (classification === "destroy") addEffect(effects, "delete");
@@ -409,10 +436,10 @@ export function analyzeShellCommandWords(words: readonly ShellWord[]): ShellComm
         continue;
       }
       hasPathOperand = true;
-      paths.push({ path: pathFromWord(word, "source"), start: word.start });
+      addPath(pathFromWord(word, "source"), word.start);
     }
-    if ((executableName === "ls" || executableName === "find" || executableName === "rg") && !hasPathOperand) {
-      paths.push({ path: Object.freeze({ text: ".", role: "source" }), start: executableWord.end });
+    if ((executableName === "ls" || executableName === "find" || executableName === "rg" || executableName === "grep") && !hasPathOperand) {
+      addPath(Object.freeze({ text: ".", role: "source" }), executableWord.end);
     }
   }
   if ((executableName === "cp" || executableName === "mv" || executableName === "cd") &&
@@ -420,22 +447,26 @@ export function analyzeShellCommandWords(words: readonly ShellWord[]): ShellComm
     addEffect(effects, "read");
   }
 
+  const orderedPaths = paths.slice().sort((left, right) => left.start - right.start);
   const result = Object.freeze({
     kind: "complete" as const,
     executable,
     wrappers: Object.freeze(wrapperNames),
     commandClass: classification,
     effects: Object.freeze(effects),
-    paths: Object.freeze(
-      paths
-        .sort((left, right) => left.start - right.start)
-        .map(({ path }) => Object.freeze(path)),
-    ),
+    paths: Object.freeze(orderedPaths.map(({ path }) => Object.freeze(path))),
   });
-  if (classification === "unknown" || (executable.includes("/") && !modeledCommandNames.has(executableName)) ||
+  shellCommandSemanticFactsByAnalysis.set(result, Object.freeze({
+    pathBases: Object.freeze(orderedPaths.map(({ base }) => base)),
+    pathStarts: Object.freeze(orderedPaths.map(({ start }) => start)),
+    cwdChanges: Object.freeze([...(programSemantic?.cwdChanges ?? [])]),
+  }));
+  if (programSemantic?.opaque === true || classification === "unknown" ||
+    (executable.includes("/") && !modeledCommandNames.has(executableName)) ||
     (executableName === "uv" && classification === "execute")) {
     opaquePathAnalyses.add(result);
   }
-  if (isRecursiveCommand(executableName, commandWords)) recursiveAnalyses.add(result);
+  if (programSemantic?.hardBoundary === true) hardBoundaryAnalyses.add(result);
+  if (programSemantic?.recursive === true || isRecursiveCommand(executableName, commandWords)) recursiveAnalyses.add(result);
   return result;
 }

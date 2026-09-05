@@ -315,7 +315,7 @@ Records leave the register only via content transfer or abandonment. Every termi
 
 ### Temporary Resources
 
-When the active Profile permits, use `/tmp/pi-work/` to download and inspect
+When the active policy permits, use `/tmp/akeel/` to download and inspect
 external repos or docs. Remove resources when done.
 
 ### CONTEXT.md Structure

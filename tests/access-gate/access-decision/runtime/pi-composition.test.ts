@@ -37,7 +37,7 @@ function context(cwd: string, hasUI: boolean, confirm: (title: string, message: 
 const options: PiCompositionOptions = {
   policyConfig: { paths: { read: "allow", write: "ask" } },
   projectRoot: "/workspace/project",
-  stagingRoot: "/tmp/pi-work",
+  stagingRoot: "/tmp/akeel",
 };
 
 async function invoke(handlers: Map<string, Handler>, name: string, event: unknown, hostContext: ExtensionContext): Promise<unknown> {
@@ -61,7 +61,7 @@ test("explicitly disabled access gate passes managed calls while retaining the e
   installPiAccessDecision(pi, {
     policyConfig: { accessGate: "disabled" },
     projectRoot: "/workspace/project",
-    stagingRoot: "/tmp/pi-work",
+    stagingRoot: "/tmp/akeel",
   });
   const hostContext = context("/workspace/project", false, async () => false);
 
@@ -141,7 +141,7 @@ test("Pi policy command switches presets and keeps the active state visible", as
       activePreset: "review",
     },
     projectRoot: "/workspace/project",
-    stagingRoot: "/tmp/pi-work",
+    stagingRoot: "/tmp/akeel",
   });
   const hostContext = context("/workspace/project", true, async () => true);
   await invoke(handlers, "session_start", {}, hostContext);

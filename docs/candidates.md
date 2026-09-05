@@ -4,7 +4,7 @@
 
 ## C-008: staging scope scratch（子代理 scratch 真隔离）
 
-- **Why Not Now:** `/tmp/pi-work` 约定已够用（Direct write 自动建父目录、与 principles.md 既有约定一致）；staging 需向模型暴露随机路径，提示词面/API 改动面大。
+- **Why Not Now:** `/tmp/akeel` 约定已够用（Direct write 自动建父目录、与 principles.md 既有约定一致）；staging 需向模型暴露随机路径，提示词面/API 改动面大。
 - **Trigger:** 子代理场景出现 `/tmp` 共享目录 symlink 攻击实证，或用户要求子代理 scratch 内容不可被本机其他用户读取。
 ## C-009: execute 档 T2（子代理验证能力）
 
@@ -52,7 +52,7 @@
   - **Worker 强制 Git Worktree 物理隔离（微观全自治）**：严格贯彻有界自治原则，所有涉及代码修改与测试执行的子任务强制声明 `worktree: true`。子代理在独立检出的 Worktree 物理目录内享有 100% 的修改代码、运行编译、执行单测与报错自愈自由，全程零审批弹窗、零工作区踩踏；主 Agent 与人类无需微观干涉，仅在最终提交时做 PR/Diff 宏观验收。
   - **强制默认异步与 Herdr 旁观解耦**：在扩展配置中开启 `asyncByDefault: true` 与 `forceTopLevelAsync: true`，彻底消灭前台同步阻塞（`async: false`）对交互 TUI 的锁死；前台保持低延迟交互心流，后台状态通过 Herdr 原生 Socket 与 `H` 键侧边窗实现全透明旁观与随时干预。
   - **角色精简收敛（消除戏服）**：通过 `disableBuiltins` 停用同质化冗余角色（oracle/researcher/delegate），全生命周期收敛为 3 个生产力核心：`worker`（Worktree 内全自治攻坚与 TDD 自愈）、`scout`（只读快速扫库压缩事实）、`reviewer`（交付前单次对抗性门禁审查）。
-  - **打通 AKeel 空间准入策略**：在 `policy.yaml` 中将 Worktree 专属目录（如 `/tmp/pi-work/**` 或 `.pi/worktrees/**`）配置为 `write: allow`，系统高危操作保持 `deny`，解决后台无头子代理在无 UI 环境下因 `write: ask` 产生权限死锁的结构性矛盾。
+  - **打通 AKeel 空间准入策略**：在 `policy.yaml` 中将 Worktree 专属目录（如 `/tmp/akeel/**` 或 `.pi/worktrees/**`）配置为 `write: allow`，系统高危操作保持 `deny`，解决后台无头子代理在无 UI 环境下因 `write: ask` 产生权限死锁的结构性矛盾。
 - **Trigger:** 用户正式启动需要长周期后台攻坚、复杂并发重构或夜间无人值守的大型特性开发；或用户决定正式应用上述配置对当前 `pi-subagents` 运行环境进行生产级调优。
 - **References:**
   - **pi-subagents**: `NicoBailon/pi-subagents`（Git Worktree 生命周期管理、Manifest 补丁追踪与 Herdr 状态桥接实现）
@@ -67,7 +67,7 @@
     - **严防半途截断**：严禁在代码修改中途、测试未通过或存在编译语法报错时强行打断交接，避免接盘 Agent 面临破碎状态；
     - **原子闭环触发**：当上下文达到软阈值（如 120k~150k 或 70% 窗口）时，Agent 进入收敛模式，不开启新任务，仅等待最近一个**原子闭环点**（当前 Slice 完成、测试全绿、Git 工作区干净或已建立安全保存点）到达。
   - **交接契约生成（Handoff Contract）**：
-    - 自动在 `/tmp/pi-work/handoffs/handoff-<timestamp>.md` 生成标准化交接文件，内容严格结构化：① 当前阶段完成状态与验证证据（如测试日志、commit hash）；② 已定案的核心设计决策与边界；③ 下一个新会话启动后的第一明确动作（Next Action）与启动命令。
+    - 自动在 `/tmp/akeel/handoffs/handoff-<timestamp>.md` 生成标准化交接文件，内容严格结构化：① 当前阶段完成状态与验证证据（如测试日志、commit hash）；② 已定案的核心设计决策与边界；③ 下一个新会话启动后的第一明确动作（Next Action）与启动命令。
   - **优雅停机与终端通知**：
     - 写入交接文档后，Agent 主动停止后续执行，在终端输出明确的交接提示（如果在 Herdr 窗格中，可发送 `herdr notification` 提醒），引导人类新开一个干净的会话加载交接文档继续工作。
 - **Trigger:** 用户确认在大型多阶段特性开发中，上下文膨胀导致的推理退化与循环拉锯成为高频痛点；或用户要求在会话中正式引入自动化水位预警与交接模板生成工具。

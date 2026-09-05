@@ -16,6 +16,8 @@ AKeel includes evidence-first verification, TDD, code review, debugging, securit
 
 AKeel governs the managed `read`, `write`, `edit`, `find`, `grep`, `ls`, and `bash` tool surfaces. Other tool surfaces pass through unchanged. Decisions are made by a Pi-host-neutral canonical pipeline using the supported Linux pathname contract; hard security boundaries and unsupported forms fail closed.
 
+Shell program semantics cover bounded Git operations, interpreter information commands, Python quality tools, and common uv/npm/pnpm/yarn/npx classifications. Commands that delegate to scripts, package lifecycle hooks, downloads, or unknown subcommands remain opaque and are hard-denied when project path boundaries are active; `develop` does not disable that safety boundary. Git `-C`, `--git-dir`, and `--work-tree` paths plus explicit project-local `file://` remotes are canonicalized in the current command-local cwd seam; HTTPS/SSH and other external transports, hosted `file://` forms, aliases, indirect config remotes, `clone --separate-git-dir`, and other unmodeled location forms still fail closed.
+
 The global policy input is:
 
 ```text
