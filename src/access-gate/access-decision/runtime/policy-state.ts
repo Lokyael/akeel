@@ -1,15 +1,21 @@
-import { adaptPolicyConfig, adaptPolicyPresets } from "../adapters/index";
+import { adaptPolicyConfig, adaptPolicyPresets, isAccessGateDisabled } from "../adapters/index";
 import type { PolicyPresetName, PolicyPresetSet, PolicySnapshot } from "../adapters/index";
 
 export type PolicyState = Readonly<{
   readonly snapshot: PolicySnapshot;
   readonly activePreset?: PolicyPresetName;
   readonly presets?: PolicyPresetSet;
+  readonly accessGateDisabled?: true;
 }>;
 
 const ISSUED_STATES = new WeakSet<PolicyState>();
 
 export function createPolicyState(config: unknown): PolicyState {
+  if (isAccessGateDisabled(config)) {
+    const state = Object.freeze({ snapshot: adaptPolicyConfig(config), accessGateDisabled: true as const });
+    ISSUED_STATES.add(state);
+    return state;
+  }
   const presets = adaptPolicyPresets(config);
   const state = presets === undefined
     ? Object.freeze({ snapshot: adaptPolicyConfig(config) })

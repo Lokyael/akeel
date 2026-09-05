@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { adaptPolicyConfig, adaptPolicyPresets } from "../../../../src/access-gate/access-decision";
+import { adaptPolicyConfig, adaptPolicyPresets, isAccessGateDisabled } from "../../../../src/access-gate/access-decision";
 
 test("new config adapts path and command policy into a deeply immutable snapshot", () => {
   const config = {
@@ -96,6 +96,13 @@ test("named presets require all three positions and select the active snapshot",
     },
     activePreset: "review",
   }), /invalid policy config/);
+});
+
+test("recognizes the explicit access-gate disabled configuration", () => {
+  assert.equal(isAccessGateDisabled({ accessGate: "disabled" }), true);
+  assert.equal(isAccessGateDisabled({}), false);
+  assert.throws(() => isAccessGateDisabled({ accessGate: "enabled" }), /invalid policy config/);
+  assert.throws(() => isAccessGateDisabled({ accessGate: "disabled", paths: { read: "allow" } }), /invalid policy config/);
 });
 
 test("omitted policy sections use a closed deny-by-default snapshot", () => {

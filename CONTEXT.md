@@ -8,6 +8,7 @@
 - **Admission Plan**：Canonical Compilation 向授权域投影的最小 sealed 输入，只包含 Policy Kernel 实际消费的事实。
 - **Policy Snapshot**：与配置格式无关、不可变的授权值；只由新 policy.yaml adapter 发行。
 - **Policy Preset**：会话可绑定的完整策略定位；当前采用 `review`、`guided`、`develop` 三种定位，不使用继承式 Profile。
+- **Access Gate Disabled Mode**：用户在 `policy.yaml` 中显式设置 `accessGate: disabled` 后，仅保留 bootstrap 与 skills，Access Gate 不执行 tool-call 准入。
 - **Policy Kernel**：只消费 Admission Plan 与 Policy Snapshot 的同步纯函数，不读取原始请求、配置 loader 或 Shell parser。
 - **Guidance**：从决策代码到静态 bounded host-facing 文案的封闭映射，不携带可执行 Shell。
 - **Project Record**：项目文档中的受控记录总称，分为 Candidate、Task 和 Decision。
@@ -30,6 +31,7 @@
 - 受管辖 surface 为 Direct `read`、`write`、`edit`、`find`、`grep`、`ls` 与 Shell `bash`。无效 host context、unsupported syntax、硬安全边界和损坏政策 fail-closed；未拥有的工具 passthrough。
 - 生产入口只读取 `$PI_CODING_AGENT_DIR/akeel/policy.yaml`（默认 `~/.pi/agent/akeel/policy.yaml`）。缺失文件是 deny-by-default；旧 config/Profile schema 不读取、不转换、不 fallback。
 - Policy Preset 的三种定位已由 D-064 冻结并实现：`policy.yaml` 可加载完整的 `review`、`guided`、`develop` 集合，`/policy` 可在会话边界切换并按需查询，策略状态不常驻 UI；AKeel 管理的 subagent tier/parent-tier 注册和子代理策略管理仍属候选范围。
+- Access Gate 默认启用；D-066 允许用户以唯一配置 `accessGate: disabled` 进入仅 bootstrap/skills 模式。禁用期间 AKeel 不提供 tool-call 操作准入或路径安全保证，重新启用需修改 policy.yaml 并重启会话。
 - Prompt Surface（D-030/D-053/D-065）：Policy Snapshot、policy.yaml 和活动 policy 状态不进入 context 消息、tool description 或 system prompt；模型可见的政策相关文本只有受 D-065 限定的静态失败 Guidance。
 - 旧决策实现、旧测试与 archive 不属于当前依赖边界，也不是 parity oracle。Static Flow、Explanation Replay 与 Runtime Content Flow 不属于 T-069。
 
@@ -70,6 +72,7 @@
 - [D-062 新 Policy 文件加载边界](docs/decisions.md#d-062-新-policy-文件加载边界)
 - [D-064 会话级 Policy Preset 定位](docs/decisions.md#d-064-会话级-policy-preset-定位)
 - [D-065 只读策略下的修改提醒与静态 Guidance 边界](docs/decisions.md#d-065-只读策略下的修改提醒与静态-guidance-边界)
+- [D-066 Access Gate 显式禁用与仅技能运行模式](docs/decisions.md#d-066-access-gate-显式禁用与仅技能运行模式)
 
 ## Negative Space
 
@@ -80,7 +83,8 @@
 - 审批后的实际文件操作由操作系统权限决定；gate 不控制执行后的行为，也不提供完整 security log scrubbing。
 - 不提供旧式 `/profile` 命令或 Profile Footer；Policy Preset 使用 `/policy` 命令和 host status，不提供独立的旧 Profile UI。
 - 不提供 AKeel 管理的 subagent tier/parent-tier 钳制或子代理 preset 继承；这些能力仍属候选范围。
-- 旧 `config.yaml`、Profile、命令覆盖、继承和子代理字段不属于新 Policy Snapshot 输入；当前只读取全局 `policy.yaml` 的 `paths` 与 `commands`。
+- Access Gate 可由用户显式禁用；禁用时不拦截 managed tool call，故不提供路径、Shell 或操作准入保证。bootstrap 与 skills 仍然分发和运行。
+- 旧 `config.yaml`、Profile、命令覆盖、继承和子代理字段不属于新 Policy Snapshot 输入；当前只读取全局 `policy.yaml` 的静态策略字段、preset 绑定或显式 `accessGate` 禁用标志。
 - Shell 只支持显式定义、可静态证明且资源有界的子集；不可证明形态 fail-closed。未建模的命令副作用不单独建模。
 - 不把短期 Task Record、实施过程或审查报告作为永久项目知识。
 - 不在 T-069 实现 Static Flow Graph、Explanation Replay、Runtime Audit Event 或 Runtime Content Flow。

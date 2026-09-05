@@ -64,6 +64,10 @@ function installComposition(
     description: "Show or switch the active AKeel policy preset.",
     handler: async (args, context) => {
       const requested = args.trim();
+      if (policyState?.accessGateDisabled) {
+        notifyPolicy(context, "Access Gate is disabled; bootstrap and skills remain active.", "warning");
+        return;
+      }
       if (policyState?.presets === undefined) {
         notifyPolicy(context, "No Policy Presets are configured; the static policy remains active.", "warning");
         return;
@@ -88,7 +92,7 @@ function installComposition(
     projectContext = undefined;
     service = undefined;
     policyState = initialPolicyState;
-    if (!policyState) return;
+    if (!policyState || policyState.accessGateDisabled) return;
     try {
       const sessionProject = createSessionProject(context.cwd);
       projectContext = sessionProject.context;
@@ -108,6 +112,7 @@ function installComposition(
   });
 
   pi.on("tool_call", async (event, context) => {
+    if (policyState?.accessGateDisabled) return undefined;
     if (!service) {
       return adaptPiToolCall(event, context).kind === "passthrough" ? undefined : initializationFailure();
     }

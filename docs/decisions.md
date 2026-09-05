@@ -721,11 +721,11 @@ host-neutral request 的具体归一化字段和受管辖 surface 集合、Canon
 **Status:** active
 **Reversal surface:** engineering
 
-**Decision:** T-069 的用户全局 Policy 输入固定为 `$PI_CODING_AGENT_DIR/akeel/policy.yaml`，默认目录为 `~/.pi/agent`。本条冻结的基础静态形式使用顶层 `paths` 与 `commands`；D-064 在同一文件内增加严格的 `presets` 与 `activePreset` 形式，不改变文件路径或 deny-by-default 原则。旧 `config.yaml`、Profile、继承、命令覆盖和子代理字段均不读取、不转换、不 fallback。缺失文件等价于空新配置，因 `PolicyConfig` 的 deny-by-default 语义而关闭所有受管辖操作；YAML 语法错误、根非 mapping 或任何 schema 错误也必须关闭，不保留旧策略。
+**Decision:** T-069 的用户全局 Policy 输入固定为 `$PI_CODING_AGENT_DIR/akeel/policy.yaml`，默认目录为 `~/.pi/agent`。本条冻结的基础静态形式使用顶层 `paths` 与 `commands`；D-064 在同一文件内增加严格的 `presets` 与 `activePreset` 形式，D-066 增加唯一字段为 `accessGate: disabled` 的显式禁用形式；这些形式均不改变文件路径或损坏配置 fail-closed 原则。旧 `config.yaml`、Profile、继承、命令覆盖和子代理字段均不读取、不转换、不 fallback。缺失文件等价于空新配置，因 `PolicyConfig` 的 deny-by-default 语义而关闭所有受管辖操作；YAML 语法错误、根非 mapping 或任何 schema 错误也必须关闭，不保留旧策略。
 
 **Why:** Policy Snapshot 已有稳定的最小输入合同。独立文件把新格式与旧 `config.yaml` 的名称和 schema 隔离，避免任何兼容读取、隐式迁移或旧字段塑造新内核；缺失和损坏均从同一 closed default 进入决策链。
 
-**Impact:** 新 loader 位于 `access-decision/adapters/`，只解析 YAML 并将未知值交给新 `adaptPolicyConfig` 验证；它不 import 既有 `agent-dir`、`config` 或 Profile 模块。production composition 只消费该 loader 发行的 policy state；D-064 的 preset 集合仍由同一 loader 验证。README 说明新文件和旧配置不兼容。
+**Impact:** 新 loader 位于 `access-decision/adapters/`，只解析 YAML 并将未知值交给新 `adaptPolicyConfig` 验证；它不 import 既有 `agent-dir`、`config` 或 Profile 模块。production composition 只消费该 loader 发行的 policy state；D-064 的 preset 集合与 D-066 的显式禁用形式仍由同一 loader 验证。README 说明新文件和旧配置不兼容。
 
 **Rejected:**
 
@@ -733,7 +733,7 @@ host-neutral request 的具体归一化字段和受管辖 surface 集合、Canon
 - **读取旧 Profiles 并投影：** 这是被 D-059 禁止的兼容 adapter，且旧结果不是新 Policy 规格。
 - **缺失配置自动宽松：** 会使首次安装或路径错误成为 silent allow，违反 fail-closed。
 
-**Out of Scope:** 多个 policy 文件、项目级配置、配置迁移、旧 Profile UI 与子代理策略；D-064 的同文件 preset 和会话 `/policy` 切换不属于多个 policy 文件或旧 Profile 兼容。
+**Out of Scope:** 多个 policy 文件、项目级配置、配置迁移、旧 Profile UI 与子代理策略；D-064 的同文件 preset、会话 `/policy` 切换和 D-066 的显式禁用形式不属于多个 policy 文件或旧 Profile 兼容。
 
 ## D-063: Direct edit 独立策略与显式本地配置
 
@@ -796,4 +796,23 @@ preset 的会话切换属于 runtime/adapters 外围能力；Policy Kernel 仍�
 
 **Out of Scope:** 自动判断“规划是否完成”、自动切换 preset、Shell/未知命令的动态解释、完整 Policy 展示、子代理策略管理。
 
-## D-066: 待创建
+## D-066: Access Gate 显式禁用与仅技能运行模式
+
+**Status:** active
+**Reversal surface:** user-boundary
+
+**Decision:** 用户可在新的 `policy.yaml` 中以唯一配置 `accessGate: disabled` 显式关闭 AKeel Access Gate。该模式不建立或执行 Operation Admission 决策，所有 Pi `tool_call` 直接 passthrough；`src/bootstrap/` 注入的原则与已声明 `skills/` 继续可用。缺失该字段时 Gate 默认启用；禁用形式不得与 `paths`、`commands` 或 `presets` 混用，未知值和损坏配置仍 fail-closed。
+
+**Why:** 某些工作流需要保留工程原则与按需技能，但不希望 AKeel 对工具调用施加操作准入。将选择放在用户明确管理的全局 `policy.yaml` 中，避免异常阻断时依赖隐式环境变量或临时绕过。
+
+**Impact:** Access Gate 禁用期间，AKeel 不提供 Direct/Shell 操作授权、路径边界或确认门禁；这不是更宽的 Policy Preset，也不绕过后再声称安全边界仍受保护。重新启用需移除 `accessGate: disabled` 并重启会话；本决策不改变 bootstrap、skills、Pi host 自身或其他 extension 的行为。
+
+**Rejected:**
+
+- **只绕过 `policy-denied`：** 无法覆盖异常阻断的其他 Gate 拒绝路径，且会制造未声明的部分安全保证。
+- **把禁用状态建成 `unrestricted` preset：** 会与 Policy Preset 的授权语义混淆，并破坏 D-064 对硬边界的约束。
+- **隐式环境变量或命令开关：** 不属于 policy.yaml 单一配置来源，难以审计且容易误用。
+
+**Out of Scope:** OS sandbox、容器、按工具/路径粒度的开关、会话内热切换、子代理策略传播和替代性安全审计层。
+
+## D-067: 待创建

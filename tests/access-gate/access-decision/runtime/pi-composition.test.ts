@@ -56,6 +56,31 @@ test("Pi production composition fails closed before session initialization", asy
   );
 });
 
+test("explicitly disabled access gate passes managed calls while retaining the extension", async () => {
+  const { handlers, pi } = fakePi();
+  installPiAccessDecision(pi, {
+    policyConfig: { accessGate: "disabled" },
+    projectRoot: "/workspace/project",
+    stagingRoot: "/tmp/pi-work",
+  });
+  const hostContext = context("/workspace/project", false, async () => false);
+
+  await invoke(handlers, "session_start", {}, hostContext);
+
+  assert.equal(
+    await invoke(handlers, "tool_call", { toolName: "write", input: "not-an-object" }, hostContext),
+    undefined,
+  );
+  assert.equal(
+    await invoke(handlers, "tool_call", { toolName: "bash", input: { command: "not statically safe" } }, hostContext),
+    undefined,
+  );
+  assert.equal(
+    await invoke(handlers, "tool_call", { toolName: "web_search", input: { query: "skills" } }, hostContext),
+    undefined,
+  );
+});
+
 test("Pi production composition creates the service at session start and routes tool calls", async () => {
   const { handlers, pi } = fakePi();
   installPiAccessDecision(pi, options);

@@ -12,6 +12,7 @@ import type {
 
 export const POLICY_PRESET_NAMES = ["review", "guided", "develop"] as const;
 export type PolicyPresetName = (typeof POLICY_PRESET_NAMES)[number];
+export type AccessGateMode = "disabled";
 
 type PolicyDefinition = Readonly<{
   readonly paths?: Readonly<{
@@ -36,6 +37,7 @@ type PolicyDefinition = Readonly<{
 export type PolicyConfig = PolicyDefinition & Readonly<{
   readonly presets?: Readonly<Record<PolicyPresetName, PolicyDefinition>>;
   readonly activePreset?: PolicyPresetName;
+  readonly accessGate?: AccessGateMode;
 }>;
 
 export type PolicySnapshot = Readonly<{
@@ -61,7 +63,7 @@ const PATH_FIELDS = [
 ] as const;
 const COMMAND_FIELDS = ["inspect", "modify", "execute", "destroy", "unknown"] as const;
 const DEFINITION_FIELDS = ["paths", "commands"] as const;
-const CONFIG_FIELDS = ["paths", "commands", "presets", "activePreset"] as const;
+const CONFIG_FIELDS = ["paths", "commands", "presets", "activePreset", "accessGate"] as const;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -164,10 +166,15 @@ type ParsedPolicy = Readonly<{
   readonly flat?: PolicyDefinition;
   readonly presets?: Readonly<Record<PolicyPresetName, PolicyDefinition>>;
   readonly activePreset?: PolicyPresetName;
+  readonly disabled?: true;
 }>;
 
 function readConfig(input: unknown): ParsedPolicy {
   if (!isRecord(input) || !hasOnlyKeys(input, CONFIG_FIELDS)) throw invalidConfig();
+  if (input.accessGate !== undefined) {
+    if (input.accessGate !== "disabled" || Reflect.ownKeys(input).length !== 1) throw invalidConfig();
+    return Object.freeze({ disabled: true });
+  }
   if (input.presets !== undefined) {
     if (input.paths !== undefined || input.commands !== undefined || !isRecord(input.presets) || !hasOnlyKeys(input.presets, POLICY_PRESET_NAMES)) {
       throw invalidConfig();
@@ -231,6 +238,7 @@ function presetSetFrom(parsed: ParsedPolicy): PolicyPresetSet | undefined {
 
 export function adaptPolicyConfig(input: unknown): PolicySnapshot {
   const parsed = readConfig(input);
+  if (parsed.disabled) return snapshotFor({});
   if (parsed.flat !== undefined) return snapshotFor(parsed.flat);
   const presets = presetSetFrom(parsed);
   return presets!.snapshots[presets!.active];
@@ -238,4 +246,8 @@ export function adaptPolicyConfig(input: unknown): PolicySnapshot {
 
 export function adaptPolicyPresets(input: unknown): PolicyPresetSet | undefined {
   return presetSetFrom(readConfig(input));
+}
+
+export function isAccessGateDisabled(input: unknown): boolean {
+  return readConfig(input).disabled === true;
 }

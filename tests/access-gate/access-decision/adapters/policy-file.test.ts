@@ -78,6 +78,19 @@ test("loads the three named policy presets and active selection", () => {
   }
 });
 
+test("loads the explicit access-gate disabled mode", () => {
+  const agent = agentDir();
+  try {
+    writeFileSync(join(agent.path, "akeel", "policy.yaml"), "accessGate: disabled\n");
+    assert.deepEqual(loadPolicyFile(agent.path), { kind: "ok", value: { accessGate: "disabled" } });
+
+    writeFileSync(join(agent.path, "akeel", "policy.yaml"), "accessGate: disabled\npaths:\n  read: allow\n");
+    assert.deepEqual(loadPolicyFile(agent.path), { kind: "error" });
+  } finally {
+    agent.cleanup();
+  }
+});
+
 test("missing policy.yaml supplies the closed empty new policy", () => {
   const agent = agentDir();
   try {

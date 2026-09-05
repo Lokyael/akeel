@@ -72,6 +72,14 @@ The supported named presets are `review`, `guided`, and `develop`. Each preset i
 
 The current release does not provide the legacy `/profile` command, a Profile Footer, or AKeel-managed subagent permission tiers. Subagent policy management remains a separate candidate; use `/policy` for the three implemented session presets.
 
+For a session that should retain only AKeel's bootstrap principles and skills, explicitly disable the Access Gate in `policy.yaml`:
+
+```yaml
+accessGate: disabled
+```
+
+This form must be the only policy field. After restarting the session, all Pi `tool_call` requests pass through without AKeel operation or path admission. Bootstrap and skills remain active, but AKeel provides no tool-call security, path-boundary, Shell, or approval guarantee while disabled. Remove the setting and restart the session to re-enable the Gate.
+
 ## Companion packages
 
 Recommended third-party packages that pair well with AKeel:

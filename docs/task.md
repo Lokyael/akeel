@@ -55,4 +55,25 @@ Guidance 只在 runtime host-facing 渲染层根据已冻结的 active preset �
 - [x] `npm test`
 - [x] `git diff --check`
 
-## T-074: 待创建
+## T-075: Access Gate 显式禁用模式
+
+**Kind:** feature
+**Status:** done
+**Goal:** 允许用户在 `policy.yaml` 中显式关闭 AKeel Access Gate，同时保留 bootstrap 原则与 skills。
+
+### Architecture
+
+新增严格的 `accessGate: disabled` policy 形式；缺省仍启用 Gate，禁用形式不得与 `paths`、`commands` 或 `presets` 混用。Runtime 在识别到已验证的禁用状态后不建立 Project/Decision service，并让所有 `tool_call` passthrough；`src/bootstrap/` 与 `skills/` 不受影响。
+
+### Out of Scope
+
+- **部分绕过**：不增加按工具、按路径或按拒绝码的软绕过；需要禁用时由用户显式关闭整个 Gate。
+- **安全替代品**：不提供 OS sandbox、容器或新的运行时安全层；Gate 禁用期间 AKeel 不提供操作准入保证。
+- **运行时热切换**：不在会话中动态开关 Gate；修改配置后重新启动会话。
+
+### Evidence
+
+- [x] `npm test`
+- [x] `git diff --check`
+
+## T-076: 待创建
