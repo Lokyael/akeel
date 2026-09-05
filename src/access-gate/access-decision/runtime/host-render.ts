@@ -15,7 +15,8 @@ export type HostFacingBlockCode =
   | "unsupported-syntax"
   | "dynamic-value"
   | "invalid-host-context"
-  | "unsupported-surface";
+  | "unsupported-surface"
+  | "read-only-policy-switch-required";
 
 type DisplayView = DirectDisplayView | ShellDisplayView;
 
@@ -33,6 +34,7 @@ const DENY_REASONS: Readonly<Record<HostFacingBlockCode, string>> = Object.freez
   "dynamic-value": "Blocked because the shell command contains dynamic values.",
   "invalid-host-context": "Blocked because the host context is invalid.",
   "unsupported-surface": "Blocked because this governed tool surface is unsupported.",
+  "read-only-policy-switch-required": "The current session is read-only; switch policy with /policy before retrying this modification.",
 });
 
 export function renderHostBlock(code: HostFacingBlockCode): HostFacingDecision {

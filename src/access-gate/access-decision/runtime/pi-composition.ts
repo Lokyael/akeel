@@ -29,7 +29,6 @@ type SessionProject = Readonly<{
 }>;
 
 const INITIALIZATION_FAILURE_REASON = "Blocked because the decision service is not initialized.";
-const POLICY_STATUS_ID = "akeel-policy";
 
 function initializationFailure(): PiToolCallHandlerResult {
   return Object.freeze({ block: true, reason: INITIALIZATION_FAILURE_REASON });
@@ -61,10 +60,6 @@ function installComposition(
   let project: ProjectLifecycle | undefined;
   let projectContext: ProjectContext | undefined;
 
-  const updateStatus = (context: { readonly hasUI: boolean; readonly ui: { readonly setStatus?: (id: string, text: string | undefined) => void } }): void => {
-    if (context.hasUI) context.ui.setStatus?.(POLICY_STATUS_ID, policyStatus(policyState));
-  };
-
   pi.registerCommand("policy", {
     description: "Show or switch the active AKeel policy preset.",
     handler: async (args, context) => {
@@ -75,13 +70,11 @@ function installComposition(
       }
       if (requested.length === 0) {
         notifyPolicy(context, `Active AKeel policy: ${policyStatus(policyState)}.`);
-        updateStatus(context);
         return;
       }
       try {
         policyState = activatePolicyPreset(policyState, requested);
         service = projectContext === undefined ? undefined : createDecisionService(policyState, projectContext);
-        updateStatus(context);
         notifyPolicy(context, `Active AKeel policy: ${policyStatus(policyState)}.`);
       } catch {
         notifyPolicy(context, `Unknown AKeel policy preset: ${requested}.`, "error");
@@ -95,26 +88,23 @@ function installComposition(
     projectContext = undefined;
     service = undefined;
     policyState = initialPolicyState;
-    updateStatus(context);
     if (!policyState) return;
     try {
       const sessionProject = createSessionProject(context.cwd);
       projectContext = sessionProject.context;
       if ("dispose" in sessionProject) project = sessionProject as ProjectLifecycle;
       service = createDecisionService(policyState, projectContext);
-      updateStatus(context);
     } catch {
       service = undefined;
       projectContext = undefined;
     }
   });
 
-  pi.on("session_shutdown", (_event, context) => {
+  pi.on("session_shutdown", (_event, _context) => {
     project?.dispose();
     project = undefined;
     projectContext = undefined;
     service = undefined;
-    if (context.hasUI) context.ui.setStatus?.(POLICY_STATUS_ID, undefined);
   });
 
   pi.on("tool_call", async (event, context) => {

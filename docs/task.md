@@ -34,4 +34,25 @@
 4. 确认 `Lokyael/akeel` 为空后，只推送 `main`，不得使用 `git push --mirror`。
 5. 从新仓库 clone 验证后，再将旧 `Lokyael/pi-keel` 设为 Private 并 Archive。
 
-## T-073: 待创建
+## T-073: 只读策略修改提醒 Guidance
+
+**Kind:** feature
+**Status:** done
+**Goal:** 在只读 `review` preset 下拦截普通 Direct 修改时返回静态切换 Guidance，同时保持硬边界和其他拒绝路径不被弱化。
+
+### Architecture
+
+Guidance 只在 runtime host-facing 渲染层根据已冻结的 active preset 与 `policy-denied` 结果选择；Canonical、Admission 和 Policy Kernel 不读取提示文案，也不自动批准或切换策略。Shell、硬边界、敏感路径、破坏性和未知操作继续使用原有 fail-closed 文案。
+
+### Out of Scope
+
+- **自动识别规划是否完成**：Gate 不解释对话阶段或任务意图。
+- **自动切换或覆盖 deny**：策略切换仍需用户显式执行 `/policy`。
+- **Shell 动态提醒**：等待更细粒度的 Shell 拒绝原因合同。
+
+### Evidence
+
+- [x] `npm test`
+- [x] `git diff --check`
+
+## T-074: 待创建

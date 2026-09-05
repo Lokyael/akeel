@@ -66,10 +66,22 @@ function trace(observer: RuntimeObserver | undefined, event: RuntimeTraceEvent):
   observer?.record(event);
 }
 
+function renderManagedDecision(
+  decision: ReturnType<typeof evaluateShellAdmission> | Decision,
+  display: Parameters<typeof renderHostFacingDecision>[1],
+  readOnlyModificationGuidance: boolean,
+): RuntimeResult {
+  if (readOnlyModificationGuidance && decision.kind === "deny" && decision.code === "policy-denied") {
+    return renderHostBlock("read-only-policy-switch-required");
+  }
+  return renderHostFacingDecision(decision, display);
+}
+
 function evaluateManagedRequest(
   request: DirectRequest | ShellRequest,
   directPolicy: ReturnType<typeof freezePolicySnapshot>,
   shellPolicy: ReturnType<typeof freezeShellPolicySnapshot>,
+  readOnlyModificationGuidance: boolean,
   observer: RuntimeObserver | undefined,
 ): RuntimeResult {
   if (request.surface === "bash") {
@@ -88,7 +100,7 @@ function evaluateManagedRequest(
       ? (trace(observer, "project-shell-display"), projectShellDisplay(compilation))
       : undefined;
     trace(observer, "render-host-facing");
-    return renderHostFacingDecision(decision, display);
+    return renderManagedDecision(decision, display, false);
   }
 
   trace(observer, "compile-direct");
@@ -106,7 +118,7 @@ function evaluateManagedRequest(
     ? (trace(observer, "project-direct-display"), projectDisplay(compilation))
     : undefined;
   trace(observer, "render-host-facing");
-  return renderHostFacingDecision(decision, display);
+  return renderManagedDecision(decision, display, readOnlyModificationGuidance);
 }
 
 export function createDecisionService(state: PolicyState, context?: ProjectContext, observer?: RuntimeObserver): DecisionService {
@@ -143,7 +155,13 @@ export function createDecisionService(state: PolicyState, context?: ProjectConte
         return renderHostBlock(adapted.code);
       }
       trace(observer, "adapt-managed");
-      return evaluateManagedRequest(adapted.request, directPolicy, shellPolicy, observer);
+      return evaluateManagedRequest(
+        adapted.request,
+        directPolicy,
+        shellPolicy,
+        state.activePreset === "review" && (adapted.request.surface === "write" || adapted.request.surface === "edit"),
+        observer,
+      );
     },
 
     decidePiToolCall(event: unknown, hostContext: unknown): RuntimeResult {
@@ -158,7 +176,13 @@ export function createDecisionService(state: PolicyState, context?: ProjectConte
         return renderHostBlock(adapted.code);
       }
       trace(observer, "adapt-managed");
-      return evaluateManagedRequest(adapted.request, directPolicy, shellPolicy, observer);
+      return evaluateManagedRequest(
+        adapted.request,
+        directPolicy,
+        shellPolicy,
+        state.activePreset === "review" && (adapted.request.surface === "write" || adapted.request.surface === "edit"),
+        observer,
+      );
     },
   };
 }

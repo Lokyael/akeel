@@ -29,8 +29,8 @@
 - Access Decision Pipeline（D-059/D-060）已完成 Greenfield trust path 与原子生产切换。Canonical 只解释一次；Admission 与 Display 按需投影；Policy Kernel 不读取配置或重新解析请求。Canonical path resolution 同时保留 lexical 与 symlink-target traversal prefixes，Direct search 与 Shell recursive path 均在 blocked descendants 上 fail-closed；有显式 path boundary 时，unknown/unbounded Shell path access 也不得放行。
 - 受管辖 surface 为 Direct `read`、`write`、`edit`、`find`、`grep`、`ls` 与 Shell `bash`。无效 host context、unsupported syntax、硬安全边界和损坏政策 fail-closed；未拥有的工具 passthrough。
 - 生产入口只读取 `$PI_CODING_AGENT_DIR/akeel/policy.yaml`（默认 `~/.pi/agent/akeel/policy.yaml`）。缺失文件是 deny-by-default；旧 config/Profile schema 不读取、不转换、不 fallback。
-- Policy Preset 的三种定位已由 D-064 冻结并实现：`policy.yaml` 可加载完整的 `review`、`guided`、`develop` 集合，`/policy` 可在会话边界切换，当前状态通过 host UI status 显示；AKeel 管理的 subagent tier/parent-tier 注册和子代理策略管理仍属候选范围。
-- Prompt Surface（D-030/D-053）：Policy Snapshot、policy.yaml 和活动 policy 状态不进入 context 消息、tool description 或 system prompt；模型可见的政策相关文本只有静态失败 guidance。
+- Policy Preset 的三种定位已由 D-064 冻结并实现：`policy.yaml` 可加载完整的 `review`、`guided`、`develop` 集合，`/policy` 可在会话边界切换并按需查询，策略状态不常驻 UI；AKeel 管理的 subagent tier/parent-tier 注册和子代理策略管理仍属候选范围。
+- Prompt Surface（D-030/D-053/D-065）：Policy Snapshot、policy.yaml 和活动 policy 状态不进入 context 消息、tool description 或 system prompt；模型可见的政策相关文本只有受 D-065 限定的静态失败 Guidance。
 - 旧决策实现、旧测试与 archive 不属于当前依赖边界，也不是 parity oracle。Static Flow、Explanation Replay 与 Runtime Content Flow 不属于 T-069。
 
 ## Active Decisions
@@ -69,6 +69,7 @@
 - [D-061 T-069 Slice 0 外部边界冻结](docs/decisions.md#d-061-t-069-slice-0-外部边界冻结)
 - [D-062 新 Policy 文件加载边界](docs/decisions.md#d-062-新-policy-文件加载边界)
 - [D-064 会话级 Policy Preset 定位](docs/decisions.md#d-064-会话级-policy-preset-定位)
+- [D-065 只读策略下的修改提醒与静态 Guidance 边界](docs/decisions.md#d-065-只读策略下的修改提醒与静态-guidance-边界)
 
 ## Negative Space
 

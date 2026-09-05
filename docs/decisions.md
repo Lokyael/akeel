@@ -765,7 +765,7 @@ preset 的会话切换属于 runtime/adapters 外围能力；Policy Kernel 仍�
 
 **Why:** 三个定位覆盖只读审查、人工把关和日常开发三种稳定用户意图，避免恢复旧 Profile 的继承和隐式覆盖。完整策略值使本地 policy 的权限意图可审计；独立的 preset 语义允许未来在会话边界原子替换 snapshot，而不污染 Kernel。
 
-**Impact:** `policy.yaml` 已承载具名 preset 与显式 active binding；runtime 在会话边界替换当前不可变 snapshot，`/policy` 命令切换并通过 host status 显示当前定位。任何新增 preset 都必须保留硬边界。
+**Impact:** `policy.yaml` 已承载具名 preset 与显式 active binding；runtime 在会话边界替换当前不可变 snapshot，`/policy` 命令按需查询或切换当前定位，不设置常驻 UI 状态。任何新增 preset 都必须保留硬边界。
 
 **Rejected:**
 
@@ -775,4 +775,25 @@ preset 的会话切换属于 runtime/adapters 外围能力；Policy Kernel 仍�
 
 **Out of Scope:** 历史审计、子代理权限管理、父子 preset 继承、独立的旧 Profile UI、OS sandbox 和网络隔离。
 
-## D-065: 待创建
+## D-065: 只读策略下的修改提醒与静态 Guidance 边界
+
+**Status:** active
+**Reversal surface:** user-boundary
+
+**Decision:** Policy 默认对模型不可见；策略状态、策略内容和权限范围不进入 context、tool description 或 system prompt。唯一的产品级例外是：当会话处于只读定位，且 Agent 在规划完成后忘记切换策略而尝试执行普通修改时，允许返回一条静态、类别化的 Guidance，提醒用户通过 `/policy` 切换到适当的策略后重试。
+
+该 Guidance 是失败后的提示，不是授权、审批替代或自动提权机制。用户确认不能覆盖 `deny`，策略切换必须由用户显式完成；硬安全边界、敏感路径、破坏性操作、未知或不可证明的命令继续使用普通 fail-closed 拒绝，不借“忘记切换”解释。
+
+**Why:** 只读审查与规划完成后切换到开发策略是常见的连续工作流；完全沉默会让 Agent 难以区分“忘记切换”与真正的安全拒绝。将例外限制为静态 Guidance，既保留 Policy 的上下文隔离，又提供最小的恢复方向，不把动态权限事实扩散到模型提示面。
+
+**Impact:** Guidance 只表达“当前修改未执行，用户可通过 `/policy` 选择允许修改的策略后重试”这一固定意图，不携带路径、命令、策略字段或用户派生值。具体操作分类、渲染接缝和测试矩阵属于实现任务，不在本决策中预先冻结。
+
+**Rejected:**
+
+- **所有策略信息都沉默：** 会把可恢复的“忘记切换”与不可恢复的硬拒绝混为一谈。
+- **通过用户审批直接覆盖只读 deny：** 会把只读定位变成可被单次确认绕过的软门禁。
+- **把完整 Policy 或当前 preset 注入上下文：** 扩大提示词面并泄漏不必要的授权细节。
+
+**Out of Scope:** 自动判断“规划是否完成”、自动切换 preset、Shell/未知命令的动态解释、完整 Policy 展示、子代理策略管理。
+
+## D-066: 待创建

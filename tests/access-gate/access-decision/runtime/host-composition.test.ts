@@ -18,6 +18,47 @@ test("Pi host composition blocks rendered denials with static reason", async () 
   assert.deepEqual(result, { block: true, reason: "Blocked by access policy." });
 });
 
+test("Pi host composition gives read-only guidance for a denied direct modification", async () => {
+  const service = createDecisionService(createPolicyState({
+    presets: {
+      review: { paths: { read: "allow", write: "deny", edit: "deny" }, commands: { inspect: "allow", modify: "deny", execute: "deny", destroy: "deny", unknown: "deny" } },
+      guided: { paths: { read: "allow", write: "ask", edit: "ask" }, commands: { inspect: "allow", modify: "ask", execute: "ask", destroy: "deny", unknown: "deny" } },
+      develop: { paths: { read: "allow", write: "allow", edit: "allow" }, commands: { inspect: "allow", modify: "allow", execute: "allow", destroy: "ask", unknown: "ask" } },
+    },
+    activePreset: "review",
+  }));
+
+  const result = await handlePiToolCall(
+    service,
+    { toolName: "edit", input: { path: "notes.md", edits: [{ oldText: "a", newText: "b" }] } },
+    { cwd: "/workspace/project", hasUI: true, ui: {} },
+  );
+
+  assert.deepEqual(result, {
+    block: true,
+    reason: "The current session is read-only; switch policy with /policy before retrying this modification.",
+  });
+});
+
+test("Pi host composition keeps hard boundaries on generic guidance", async () => {
+  const service = createDecisionService(createPolicyState({
+    presets: {
+      review: { paths: { read: "allow", write: "deny", edit: "deny", blockedPaths: ["/workspace/project/notes.md"] }, commands: { inspect: "allow", modify: "deny", execute: "deny", destroy: "deny", unknown: "deny" } },
+      guided: { paths: { read: "allow", write: "ask", edit: "ask", blockedPaths: ["/workspace/project/notes.md"] }, commands: { inspect: "allow", modify: "ask", execute: "ask", destroy: "deny", unknown: "deny" } },
+      develop: { paths: { read: "allow", write: "allow", edit: "allow", blockedPaths: ["/workspace/project/notes.md"] }, commands: { inspect: "allow", modify: "allow", execute: "allow", destroy: "ask", unknown: "ask" } },
+    },
+    activePreset: "review",
+  }));
+
+  const result = await handlePiToolCall(
+    service,
+    { toolName: "write", input: { path: "notes.md", content: "secret\n" } },
+    { cwd: "/workspace/project", hasUI: true, ui: {} },
+  );
+
+  assert.deepEqual(result, { block: true, reason: "Blocked by a security boundary." });
+});
+
 test("Pi host composition executes only after explicit approval", async () => {
   const service = createDecisionService(createPolicyState({ paths: { read: "allow", write: "ask" } }));
   let confirmation: { title: string; message: string } | undefined;
