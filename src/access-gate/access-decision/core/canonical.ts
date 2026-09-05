@@ -1,4 +1,4 @@
-import { exceedsDirectTextBudget } from "./limits";
+import { exceedsDirectTextBudget, MAX_DIRECT_EDIT_ENTRIES } from "./limits";
 import { resolveExistingPathWithTraversal } from "./shell-paths";
 import type { DirectSurface } from "./types";
 
@@ -59,6 +59,7 @@ export function compileDirect(request: unknown): CanonicalCompilation | Canonica
   if (
     request.surface !== "read" &&
     request.surface !== "write" &&
+    request.surface !== "edit" &&
     request.surface !== "list" &&
     request.surface !== "search"
   ) {
@@ -73,6 +74,8 @@ export function compileDirect(request: unknown): CanonicalCompilation | Canonica
   } else {
     if (request.surface === "write") {
       expectedArgumentKeys = ["path", "content"];
+    } else if (request.surface === "edit") {
+      expectedArgumentKeys = ["path", "edits"];
     } else if (request.surface === "search") {
       expectedArgumentKeys = hasPath ? ["path", "pattern"] : ["pattern"];
     } else {
@@ -91,6 +94,16 @@ export function compileDirect(request: unknown): CanonicalCompilation | Canonica
     return invalidRequest();
   }
   if (request.surface === "write" && typeof request.arguments.content !== "string") return invalidRequest();
+  if (request.surface === "edit") {
+    const edits = request.arguments.edits;
+    if (!Array.isArray(edits) || edits.length === 0) return invalidRequest();
+    if (edits.length > MAX_DIRECT_EDIT_ENTRIES) return resourceLimit();
+    for (const item of edits) {
+      if (!isRecord(item) || !hasExactKeys(item, ["oldText", "newText"])) return invalidRequest();
+      if (typeof item.oldText !== "string" || item.oldText.includes("\u0000")) return invalidRequest();
+      if (typeof item.newText !== "string" || item.newText.includes("\u0000")) return invalidRequest();
+    }
+  }
   if (
     request.surface === "read" &&
     ((actualKeys.includes("offset") && !isPositiveInteger(request.arguments.offset)) ||
@@ -109,6 +122,12 @@ export function compileDirect(request: unknown): CanonicalCompilation | Canonica
   const textValues = [path, request.cwd];
   if (request.surface === "search") textValues.push(request.arguments.pattern as string);
   if (request.surface === "write") textValues.push(request.arguments.content as string);
+  if (request.surface === "edit") {
+    const edits = request.arguments.edits as readonly { oldText: string; newText: string }[];
+    for (const edit of edits) {
+      textValues.push(edit.oldText, edit.newText);
+    }
+  }
   if (exceedsDirectTextBudget(textValues)) return resourceLimit();
 
   const resolvedPath = resolveExistingPathWithTraversal(normalizePath(request.cwd, path));

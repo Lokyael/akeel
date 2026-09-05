@@ -9,6 +9,7 @@ test("policy state publishes one immutable adapted snapshot", () => {
   assert.deepEqual(state.snapshot.direct, {
     read: "allow",
     write: "deny",
+    edit: "deny",
     list: "deny",
     search: "deny",
     allowedRoots: [],

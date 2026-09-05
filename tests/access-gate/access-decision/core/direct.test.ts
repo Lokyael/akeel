@@ -265,3 +265,133 @@ test("rejects a Direct path containing a NUL byte", () => {
 
   assert.deepEqual(service.decide(request), { kind: "deny", code: "invalid-request" });
 });
+
+test("admits a Direct edit request with path and valid edits", () => {
+  const service = testService({ read: "allow", write: "deny", edit: "allow" });
+  const request: DirectRequest = {
+    surface: "edit",
+    arguments: {
+      path: "src/index.ts",
+      edits: [{ oldText: "const a = 1;", newText: "const a = 2;" }],
+    },
+    cwd: "/workspace/project",
+    hasUI: false,
+  };
+
+  assert.deepEqual(service.decide(request), { kind: "allow" });
+});
+
+test("distinguishes edit policy mode from write policy mode", () => {
+  const editAllowedService = testService({ read: "allow", write: "deny", edit: "allow" });
+  const writeRequest: DirectRequest = {
+    surface: "write",
+    arguments: { path: "src/index.ts", content: "export default {};" },
+    cwd: "/workspace/project",
+    hasUI: true,
+  };
+  const editRequest: DirectRequest = {
+    surface: "edit",
+    arguments: {
+      path: "src/index.ts",
+      edits: [{ oldText: "foo", newText: "bar" }],
+    },
+    cwd: "/workspace/project",
+    hasUI: true,
+  };
+
+  assert.deepEqual(editAllowedService.decide(writeRequest), { kind: "deny", code: "policy-denied" });
+  assert.deepEqual(editAllowedService.decide(editRequest), { kind: "allow" });
+
+  const writeAllowedService = testService({ read: "allow", write: "allow", edit: "ask" });
+  assert.deepEqual(writeAllowedService.decide(writeRequest), { kind: "allow" });
+  assert.deepEqual(writeAllowedService.decide(editRequest), { kind: "ask", executed: false });
+
+  const noUiEditRequest: DirectRequest = { ...editRequest, hasUI: false };
+  assert.deepEqual(writeAllowedService.decide(noUiEditRequest), { kind: "deny", code: "no-ui" });
+});
+
+test("rejects a Direct edit request with empty edits array or non-array", () => {
+  const service = testService({ read: "allow", write: "allow", edit: "allow" });
+
+  assert.deepEqual(service.decide({
+    surface: "edit",
+    arguments: { path: "src/index.ts", edits: [] },
+    cwd: "/workspace/project",
+    hasUI: false,
+  } as never), { kind: "deny", code: "invalid-request" });
+
+  assert.deepEqual(service.decide({
+    surface: "edit",
+    arguments: { path: "src/index.ts", edits: "not-an-array" },
+    cwd: "/workspace/project",
+    hasUI: false,
+  } as never), { kind: "deny", code: "invalid-request" });
+});
+
+test("rejects a Direct edit request with malformed edit entries or NUL byte", () => {
+  const service = testService({ read: "allow", write: "allow", edit: "allow" });
+
+  assert.deepEqual(service.decide({
+    surface: "edit",
+    arguments: { path: "src/index.ts", edits: [{ oldText: "a" }] },
+    cwd: "/workspace/project",
+    hasUI: false,
+  } as never), { kind: "deny", code: "invalid-request" });
+
+  assert.deepEqual(service.decide({
+    surface: "edit",
+    arguments: { path: "src/index.ts", edits: [{ oldText: "a\u0000b", newText: "c" }] },
+    cwd: "/workspace/project",
+    hasUI: false,
+  } as never), { kind: "deny", code: "invalid-request" });
+
+  assert.deepEqual(service.decide({
+    surface: "edit",
+    arguments: { path: "src/index.ts", edits: [{ oldText: "a", newText: 123 }] },
+    cwd: "/workspace/project",
+    hasUI: false,
+  } as never), { kind: "deny", code: "invalid-request" });
+});
+
+test("rejects a Direct edit request exceeding max edit entries limit", () => {
+  const service = testService({ read: "allow", write: "allow", edit: "allow" });
+  const edits = Array.from({ length: 65 }, (_, i) => ({ oldText: `a${i}`, newText: `b${i}` }));
+
+  assert.deepEqual(service.decide({
+    surface: "edit",
+    arguments: { path: "src/index.ts", edits },
+    cwd: "/workspace/project",
+    hasUI: false,
+  }), { kind: "deny", code: "resource-limit" });
+});
+
+test("rejects a Direct edit request whose edits exceed the text budget", () => {
+  const service = testService({ read: "allow", write: "allow", edit: "allow" });
+  const edits = [{ oldText: "x".repeat(10_000), newText: "y".repeat(10_000) }];
+
+  assert.deepEqual(service.decide({
+    surface: "edit",
+    arguments: { path: "src/index.ts", edits },
+    cwd: "/workspace/project",
+    hasUI: false,
+  }), { kind: "deny", code: "resource-limit" });
+});
+
+test("Direct edit rejects modifications in a blocked component", () => {
+  const service = testService({
+    read: "allow",
+    write: "allow",
+    edit: "allow",
+    blockedRoots: ["/workspace/project/.git"],
+  });
+
+  assert.deepEqual(service.decide({
+    surface: "edit",
+    arguments: {
+      path: ".git/config",
+      edits: [{ oldText: "a", newText: "b" }],
+    },
+    cwd: "/workspace/project",
+    hasUI: false,
+  }), { kind: "deny", code: "hard-boundary" });
+});

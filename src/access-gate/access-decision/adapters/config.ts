@@ -14,6 +14,7 @@ export type PolicyConfig = Readonly<{
   readonly paths?: Readonly<{
     readonly read?: PolicyMode;
     readonly write?: PolicyMode;
+    readonly edit?: PolicyMode;
     readonly list?: PolicyMode;
     readonly search?: PolicyMode;
     readonly allowedRoots?: readonly string[];
@@ -38,6 +39,7 @@ const POLICY_MODES = ["allow", "ask", "deny"] as const;
 const PATH_FIELDS = [
   "read",
   "write",
+  "edit",
   "list",
   "search",
   "allowedRoots",
@@ -75,6 +77,7 @@ function normalizePolicyPath(path: string): string {
 function readPaths(value: unknown): {
   readonly read: PolicyMode;
   readonly write: PolicyMode;
+  readonly edit: PolicyMode;
   readonly list: PolicyMode;
   readonly search: PolicyMode;
   readonly allowedRoots: readonly string[];
@@ -85,6 +88,7 @@ function readPaths(value: unknown): {
     return {
       read: "deny",
       write: "deny",
+      edit: "deny",
       list: "deny",
       search: "deny",
       allowedRoots: [],
@@ -109,9 +113,13 @@ function readPaths(value: unknown): {
     );
   }
 
+  const writeMode = modeOrDefault(value.write, "deny");
+  const editMode = value.edit === undefined ? writeMode : modeOrDefault(value.edit, "deny");
+
   return {
     read: modeOrDefault(value.read, "deny"),
-    write: modeOrDefault(value.write, "deny"),
+    write: writeMode,
+    edit: editMode,
     list: modeOrDefault(value.list, "deny"),
     search: modeOrDefault(value.search, "deny"),
     ...arrays,
@@ -149,6 +157,7 @@ export function adaptPolicyConfig(input: unknown): PolicySnapshot {
   const direct = freezePolicySnapshot({
     read: paths.read,
     write: paths.write,
+    edit: paths.edit,
     list: paths.list,
     search: paths.search,
     allowedRoots: paths.allowedRoots,

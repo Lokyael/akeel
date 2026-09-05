@@ -1,9 +1,14 @@
-export type DirectSurface = "read" | "write" | "list" | "search";
+export type DirectSurface = "read" | "write" | "edit" | "list" | "search";
 export type PolicyMode = "allow" | "ask" | "deny";
 
 type DirectRequestBase = Readonly<{
   readonly cwd: string;
   readonly hasUI: boolean;
+}>;
+
+export type DirectEditEntry = Readonly<{
+  readonly oldText: string;
+  readonly newText: string;
 }>;
 
 export type DirectRequest =
@@ -14,6 +19,10 @@ export type DirectRequest =
   | (DirectRequestBase & Readonly<{
       readonly surface: "write";
       readonly arguments: Readonly<{ path: string; content: string }>;
+    }>)
+  | (DirectRequestBase & Readonly<{
+      readonly surface: "edit";
+      readonly arguments: Readonly<{ path: string; edits: readonly DirectEditEntry[] }>;
     }>)
   | (DirectRequestBase & Readonly<{
       readonly surface: "list";
@@ -27,6 +36,7 @@ export type DirectRequest =
 export interface PolicyInput {
   readonly read: PolicyMode;
   readonly write: PolicyMode;
+  readonly edit?: PolicyMode;
   readonly list?: PolicyMode;
   readonly search?: PolicyMode;
   readonly allowedRoots?: readonly string[];

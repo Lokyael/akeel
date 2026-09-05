@@ -6,7 +6,7 @@ export { renderDecision } from "./render";
 export type { PolicySnapshot } from "./policy";
 export type { CanonicalReject } from "./canonical";
 export type { DirectDisplayView, ShellDisplayOperation, ShellDisplayView } from "./display";
-export type { Decision, DirectRequest, DirectSurface, PolicyInput, PolicyMode } from "./types";
+export type { Decision, DirectEditEntry, DirectRequest, DirectSurface, PolicyInput, PolicyMode } from "./types";
 export { scanShellWords } from "./shell-language";
 export type { ShellPathKind, ShellQuoteMode, ShellWord, ShellWordScan } from "./shell-language";
 export { analyzeShellCommand, shellCommandOutcomes } from "./shell-words";

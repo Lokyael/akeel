@@ -46,7 +46,7 @@ export type HostDecision =
     }>;
 
 const MANAGED_SURFACES = new Set(["read", "write", "edit", "ls", "grep", "find", "bash"]);
-const DIRECT_SURFACES = new Set(["read", "write", "ls", "grep", "find"]);
+const DIRECT_SURFACES = new Set(["read", "write", "edit", "ls", "grep", "find"]);
 const DECISION_CODES = new Set([
   "invalid-request",
   "resource-limit",
@@ -82,7 +82,7 @@ function validToolInput(value: unknown): value is Record<string, unknown> {
 }
 
 function directRequest(
-  surface: "read" | "write" | "ls" | "grep" | "find",
+  surface: "read" | "write" | "edit" | "ls" | "grep" | "find",
   input: Record<string, unknown>,
   context: HostContext,
 ): DirectRequest {
@@ -106,11 +106,10 @@ export function adaptHostToolCall(toolName: unknown, input: unknown, context: un
   }
   if (!MANAGED_SURFACES.has(toolName)) return { kind: "passthrough", toolName };
   if (!validHostContext(context)) return { kind: "reject", code: "invalid-host-context" };
-  if (toolName === "edit") return { kind: "reject", code: "unsupported-surface" };
   if (!validToolInput(input)) return { kind: "reject", code: "unsupported-surface" };
 
   if (DIRECT_SURFACES.has(toolName)) {
-    return { kind: "managed", request: directRequest(toolName as "read" | "write" | "ls" | "grep" | "find", input, context) };
+    return { kind: "managed", request: directRequest(toolName as "read" | "write" | "edit" | "ls" | "grep" | "find", input, context) };
   }
   return {
     kind: "managed",

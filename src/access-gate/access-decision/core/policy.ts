@@ -11,6 +11,7 @@ export function freezePolicySnapshot(input: PolicyInput): PolicySnapshot {
     !Reflect.ownKeys(candidate).every((key) =>
       key === "read" ||
       key === "write" ||
+      key === "edit" ||
       key === "list" ||
       key === "search" ||
       key === "allowedRoots" ||
@@ -24,6 +25,7 @@ export function freezePolicySnapshot(input: PolicyInput): PolicySnapshot {
   const values = candidate as {
     read?: unknown;
     write?: unknown;
+    edit?: unknown;
     list?: unknown;
     search?: unknown;
     allowedRoots?: unknown;
@@ -33,6 +35,7 @@ export function freezePolicySnapshot(input: PolicyInput): PolicySnapshot {
   if (
     !isPolicyMode(values.read) ||
     !isPolicyMode(values.write) ||
+    (values.edit !== undefined && !isPolicyMode(values.edit)) ||
     (values.list !== undefined && !isPolicyMode(values.list)) ||
     (values.search !== undefined && !isPolicyMode(values.search)) ||
     !isPathList(values.allowedRoots) ||
@@ -44,6 +47,7 @@ export function freezePolicySnapshot(input: PolicyInput): PolicySnapshot {
   return Object.freeze({
     read: values.read,
     write: values.write,
+    edit: values.edit ?? values.write,
     list: values.list ?? "deny",
     search: values.search ?? "deny",
     allowedRoots: Object.freeze([...(values.allowedRoots ?? [])]),

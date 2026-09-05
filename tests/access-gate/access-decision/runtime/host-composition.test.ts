@@ -78,11 +78,23 @@ test("Pi host composition blocks unsupported governed surfaces with static text"
 
   const result = await handlePiToolCall(
     service,
-    { toolName: "edit", input: { path: "private.md", edits: [] } },
+    { toolName: "read", input: "not-an-object" },
     { cwd: "/workspace/project", hasUI: true, ui: {} },
   );
 
   assert.deepEqual(result, { block: true, reason: "Blocked because this governed tool surface is unsupported." });
+});
+
+test("Pi host composition routes edit tool through policy", async () => {
+  const service = createDecisionService(createPolicyState({ paths: { read: "allow", write: "ask" } }));
+
+  const result = await handlePiToolCall(
+    service,
+    { toolName: "edit", input: { path: "notes.md", edits: [{ oldText: "a", newText: "b" }] } },
+    { cwd: "/workspace/project", hasUI: true, ui: {} },
+  );
+
+  assert.deepEqual(result, { block: true, reason: "Blocked because approval UI is unavailable." });
 });
 
 test("Pi host composition blocks invalid host contexts with static text", async () => {

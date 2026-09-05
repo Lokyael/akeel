@@ -1,4 +1,5 @@
 export const MAX_DIRECT_TEXT_BYTES = 16_384;
+export const MAX_DIRECT_EDIT_ENTRIES = 64;
 export const MAX_SHELL_COMMAND_BYTES = 16_384;
 export const MAX_SHELL_COMMANDS = 128;
 export const MAX_SHELL_CWD_STATES = 256;

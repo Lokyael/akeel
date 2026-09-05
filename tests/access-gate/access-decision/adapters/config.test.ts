@@ -28,6 +28,7 @@ test("new config adapts path and command policy into a deeply immutable snapshot
     direct: {
       read: "allow",
       write: "ask",
+      edit: "ask",
       list: "allow",
       search: "allow",
       allowedRoots: ["/workspace/project", "/tmp/pi-work"],
@@ -53,11 +54,26 @@ test("new config adapts path and command policy into a deeply immutable snapshot
   assert.equal(Object.isFrozen(snapshot.shell.allowedRoots), true);
 });
 
+test("explicit edit mode overrides write mode and fallback preserves write mode", () => {
+  const custom = adaptPolicyConfig({
+    paths: { read: "allow", write: "ask", edit: "allow" },
+  });
+  assert.equal(custom.direct.write, "ask");
+  assert.equal(custom.direct.edit, "allow");
+
+  const fallback = adaptPolicyConfig({
+    paths: { read: "allow", write: "ask" },
+  });
+  assert.equal(fallback.direct.write, "ask");
+  assert.equal(fallback.direct.edit, "ask");
+});
+
 test("omitted policy sections use a closed deny-by-default snapshot", () => {
   assert.deepEqual(adaptPolicyConfig({}), {
     direct: {
       read: "deny",
       write: "deny",
+      edit: "deny",
       list: "deny",
       search: "deny",
       allowedRoots: [],

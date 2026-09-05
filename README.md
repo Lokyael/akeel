@@ -28,6 +28,7 @@ A missing policy file denies all managed operations. The file is a new schema an
 paths:
   read: allow
   write: ask
+  edit: allow
   list: allow
   search: allow
   allowedRoots:
@@ -40,7 +41,7 @@ commands:
   unknown: deny
 ```
 
-Path modes are `allow`, `ask`, or `deny`; command modes are `allow`, `ask`, or `deny`. The policy may narrow access with `allowedRoots`, `blockedRoots`, and `blockedPaths`. `ask` requires an interactive host confirmation and never executes automatically. Confirmation summaries are bounded, include the literal Shell command form, and omit file content. The policy file is validated when loaded; malformed YAML, unknown fields, and legacy fields fail closed.
+Path modes for `read`, `write`, `edit` (defaults to `write` if omitted), `list`, and `search` are `allow`, `ask`, or `deny`; command modes are `allow`, `ask`, or `deny`. The policy may narrow access with `allowedRoots`, `blockedRoots`, and `blockedPaths`. `ask` requires an interactive host confirmation and never executes automatically. Confirmation summaries are bounded, include the literal Shell command form, and omit file content. The policy file is validated when loaded; malformed YAML, unknown fields, and legacy fields fail closed.
 
 The current release does not provide `/profile`, a Profile Footer, policy-selection UI, or AKeel-managed subagent permission tiers. These capabilities require separate future work.
 

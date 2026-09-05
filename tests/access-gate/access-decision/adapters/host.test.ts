@@ -49,14 +49,31 @@ test("host adapter closes governed surfaces and passes through unowned tools", (
   });
 });
 
-test("invalid host context and unsupported governed surfaces fail closed", () => {
+test("invalid host context and unsupported inputs fail closed", () => {
   assert.deepEqual(adaptHostToolCall("read", { path: "a" }, { cwd: "relative", hasUI: true }), {
     kind: "reject",
     code: "invalid-host-context",
   });
-  assert.deepEqual(adaptHostToolCall("edit", { path: "a" }, { cwd: "/", hasUI: true }), {
+  assert.deepEqual(adaptHostToolCall("edit", "not-an-object", { cwd: "/", hasUI: true }), {
     kind: "reject",
     code: "unsupported-surface",
+  });
+});
+
+test("host adapter maps edit tool calls to managed direct requests", () => {
+  const result = adaptHostToolCall(
+    "edit",
+    { path: "src/index.ts", edits: [{ oldText: "a", newText: "b" }] },
+    { cwd: "/workspace/project", hasUI: true },
+  );
+  assert.deepEqual(result, {
+    kind: "managed",
+    request: {
+      surface: "edit",
+      arguments: { path: "src/index.ts", edits: [{ oldText: "a", newText: "b" }] },
+      cwd: "/workspace/project",
+      hasUI: true,
+    },
   });
 });
 
