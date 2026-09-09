@@ -1,11 +1,11 @@
 ---
 name: domain-modeling
-description: Use when the user wants to pin down domain terminology or record a load-bearing decision — challenge terms, stress-test edge cases, and update records after adoption; prepared Grill Agents return verified candidates for main-session import.
+description: Use when the user wants to pin down domain terminology or record a load-bearing decision — challenge terms, stress-test edge cases, and update records after adoption; prepared Grill Agents return verified candidates for Task Owner import.
 ---
 
 # Domain Modeling
 
-Actively build and sharpen the project's domain model as you design. This is the *active* discipline — challenge terms, stress-test with scenarios, and record adopted conclusions when they crystallise. A prepared Grill Agent returns `verified-candidate.md`; the main-session coordinator performs the authoritative import described below.
+Actively build and sharpen the project's domain model as you design. This is the *active* discipline — challenge terms, stress-test with scenarios, and record adopted conclusions when they crystallise. A prepared Grill Agent returns `verified-candidate.md`; the Task Owner coordinator performs the authoritative import described below.
 
 ## File Structure
 
@@ -71,4 +71,4 @@ history and the ID is never reused.
 
 ## Integration
 
-The main-session coordinator applies this discipline during section 6 of `/skill:grill-docs`, after the user confirms importing the verified candidate. Project Record updates follow the main-session import.
+The Task Owner coordinator applies this discipline during section 6 of `/skill:grill-docs`, after the user confirms importing the verified candidate. Project Record updates follow the Task Owner import.

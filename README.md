@@ -86,9 +86,9 @@ This form must be the only policy field. After restarting the session, all Pi `t
 
 ## Companion tools
 
-AKeel does not depend on a delegation runtime. Work stays in the main session when it needs no process-context isolation. Isolated work whose result returns for parent/user judgment uses Herdr. A delegated agent with effective write/edit/file-modifying Shell capability must run in an independently owned Git worktree. Unattended automatic multi-agent pipelines are not part of the current workflow.
+AKeel does not depend on a delegation runtime. Each task has one Task Owner Session. Work stays there when it needs no process-context isolation; isolated work whose result still needs that Owner's judgment uses a synchronous Herdr child and a prearranged result artifact. Long-lived work becomes another Task Owner only when the user explicitly grants a mutually exclusive scope and independent acceptance authority. Any delegated agent with effective write/edit/file-modifying Shell capability must run in an independently owned Git worktree; an additional parallel Task Owner with those capabilities must likewise use a checkout not shared with another Owner. Unattended asynchronous child pipelines are not part of the current workflow.
 
-`/skill:grill-docs` coordinates a separate Herdr worktree and Grill Agent, then returns `verified-candidate.md` to the main session for confirmed record updates.
+`/skill:grill-docs` coordinates a separate Herdr worktree and Grill Agent, waits for it to settle, then pulls `verified-candidate.md` from its reserved path for Task Owner-confirmed record updates. The child does not push a completion prompt or its transcript into the Owner context.
 
 | Companion | Source | Bounded role |
 |-----------|--------|--------------|

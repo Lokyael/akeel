@@ -1,27 +1,27 @@
 ---
 name: grill-docs
-description: Use /skill:grill-docs when a plan, decision, or idea needs an isolated Herdr discussion to resolve open decisions, verify factual claims, and return a verified candidate for main-session project-record import.
+description: Use /skill:grill-docs when a plan, decision, or idea needs an isolated Herdr discussion to resolve open decisions, verify factual claims, and return a verified candidate for Task Owner project-record import.
 disable-model-invocation: true
 ---
 
 # Grill a Proposal Against Evidence
 
-Resolve the proposal's open decisions in a Herdr Agent, verify its factual claims, and return a verified candidate for main-session import into the project's existing record containers. The Agent produces the verified candidate and result-necessary evidence; the main-session coordinator owns import acceptance and Project Record updates. Do not implement the proposal during this workflow.
+Resolve the proposal's open decisions in a Herdr Agent, verify its factual claims, and return a verified candidate for Task Owner import into the project's existing record containers. The Agent produces the verified candidate and result-necessary evidence; the Task Owner coordinator owns import acceptance and Project Record updates. Do not implement the proposal during this workflow.
 
 ## 0. Choose the Role and Execution Surface
 
 If the appended user arguments contain `--role grill-agent --packet <path>`, this is the prepared Grill Agent: read that exact packet, follow sections 1–5, and never launch another agent.
 
-Otherwise, run the coordinator in the main session with Herdr as the fixed execution surface:
+Otherwise, run the coordinator in the Task Owner Session with Herdr as the fixed execution surface:
 
-1. Capture `HERDR_PANE_ID` as the return target.
+1. Reserve a unique run ID under `/tmp/akeel/grill/<run-id>/` and the exact `verified-candidate.md` path before starting the Agent.
 2. Fix the source snapshot. Record the base ref; if relevant state is uncommitted, create a bounded diff artifact and include it explicitly. A new worktree never silently inherits dirty state.
-3. Under `/tmp/akeel/grill/<session-id>/`, write a packet and reserve a distinct `verified-candidate.md`. The packet contains only the goal, authoritative record paths, base ref and optional diff artifact, settled constraints, open decisions, verified-candidate path, parent pane ID, and this return protocol. Do not copy the full main-session transcript.
-4. Use `herdr worktree create ... --no-focus` before starting the Agent whenever its effective tools contain `write`, `edit`, or a file-modifying Shell. Never add `--trust-repository` unless the user has verified and approved that repository. Parse the returned workspace and root-pane IDs; Herdr owns this worktree lifecycle.
-5. Start one uniquely named Agent with `herdr agent start <agent> --kind pi --pane <root-pane-id> --timeout 30000`. Relay the user's explicit invocation with `herdr agent prompt <agent> "/skill:grill-docs --role grill-agent --packet <path>" --wait --timeout 120000`. This is continuation of the user's manual workflow, not permission for the model to invoke unrelated manual skills.
-6. Follow the Agent until it settles as `idle`, `done`, or `blocked` for user input. After the verified candidate is complete, the Agent sends the parent pane the completion state, exact path, and source snapshot, then focuses the parent pane.
+3. Use `herdr worktree create ... --no-focus` before starting the Agent whenever its effective tools contain `write`, `edit`, or a file-modifying Shell. Never add `--trust-repository` unless the user has verified and approved that repository. Parse the returned workspace and root-pane IDs; Herdr owns this worktree lifecycle.
+4. Write the packet after the Herdr topology is known. Include only the run ID, goal, authoritative record paths, base ref and optional diff artifact, settled constraints, open decisions, verified-candidate path, child Agent/workspace/pane IDs, and trace protocol. Do not copy the full Task Owner transcript.
+5. Start one uniquely named Agent with `herdr agent start <agent> --kind pi --pane <root-pane-id> --timeout 30000`. Relay the user's explicit invocation with `herdr agent prompt <agent> "/skill:grill-docs --role grill-agent --packet <path>" --wait --timeout 120000`. This is continuation of the user's manual workflow, not permission for the model to invoke unrelated manual skills. Store successful Herdr JSON responses in the run directory and expose only parsed required IDs and terminal state to the Owner context; on failure expose the bounded error code needed for recovery, not terminal history.
+6. Follow the Agent until it settles as `idle`, `done`, or `blocked` for user input. On `idle` or `done`, read the already-reserved verified-candidate path; a missing or incomplete artifact is a failed handoff. A timeout does not prove that the prompt was not delivered, so inspect the Agent before retrying. Focus changes are optional human navigation and never carry the result.
 
-The coordinator reads the verified candidate after the Agent returns and completes the import protocol in section 6.
+The coordinator reads the verified candidate after the Agent settles and completes the import protocol in section 6. The child does not send a completion prompt to the Owner.
 
 ## 1. Read Current Evidence
 
@@ -48,7 +48,7 @@ For each question:
 - Give a recommended answer; do not ask the user to choose without explaining the current best option.
 - Look up facts available from files, tools, source, tests, or documentation instead of asking the user to supply them.
 - Ask the user to decide product, scope, architecture, and policy choices.
-- Keep the user's answer in the candidate and verified candidate, while the main-session coordinator reserves Project Record updates for section 6.
+- Keep the user's answer in the candidate and verified candidate, while the Task Owner coordinator reserves Project Record updates for section 6.
 - Do not introduce a new question unless its answer could change the current proposal.
 
 Continue until every identified decision has an answer or is explicitly listed as unresolved.
@@ -65,7 +65,7 @@ Present one candidate containing:
 - Out of Scope items per principles.md §8;
 - unresolved questions, if any.
 
-Ask the user to confirm that this candidate is the input to factual verification. Record the confirmation in the verified candidate; the main-session coordinator performs import acceptance in section 6. If the user does not confirm it, change only the parts they identify and repeat this step. Do not start verification while a decision required for the candidate remains unresolved.
+Ask the user to confirm that this candidate is the input to factual verification. Record the confirmation in the verified candidate; the Task Owner coordinator performs import acceptance in section 6. If the user does not confirm it, change only the parts they identify and repeat this step. Do not start verification while a decision required for the candidate remains unresolved.
 
 ## 4. Verify Factual Claims
 
@@ -101,16 +101,17 @@ Write `verified-candidate.md` atomically with:
 - result-necessary context: material reasoning, rejected alternatives that affect the result, and facts corrected during grilling;
 - confirmed, corrected, and uncertain claims with citations;
 - constraints, verification expectations, Out of Scope, unresolved questions, and residual risks;
+- the run ID, Herdr child Agent/workspace/pane IDs, and `PI_SESSION_ID` plus `PI_SESSION_FILE` when available; identify an ephemeral Pi session explicitly instead of inventing a trace path;
 - the base ref plus optional diff artifact and digest;
 - recommended Task, CONTEXT, and Decision updates.
 
-Do not include search trails, full logs, repeated failures, immaterial hypotheses, tool chronology, or intermediate drafts. Do not modify authoritative project records from the Grill worktree.
+Do not include search trails, full logs, repeated failures, immaterial hypotheses, tool chronology, or intermediate drafts. Session references are forensic pointers; do not copy or automatically load the child transcript. Do not modify authoritative project records from the Grill worktree.
 
-After `verified-candidate.md` is complete, send the parent pane one concise `herdr agent prompt` containing only the completion state, exact final path, and source snapshot, then run `herdr agent focus <parent-pane-id>`.
+After `verified-candidate.md` is complete, finish the response so Herdr can observe the Agent settle. Do not prompt or focus the Task Owner as a completion channel, and do not remove the child pane, workspace, or worktree.
 
-## 6. Import and Record in the Main Session
+## 6. Import and Record in the Task Owner Session
 
-On return, the coordinator reads the exact `verified-candidate.md`, verifies its source snapshot and result-necessary context, presents an import summary, and asks the user once whether to import the verified candidate. Do not reopen the grilling discussion unless the artifact is incomplete or contradicts current evidence.
+After the Agent settles, the coordinator reads the exact `verified-candidate.md`, verifies its run and child identity, source snapshot, and result-necessary context, presents an import summary, and asks the user once whether to import the verified candidate. Do not load the child session transcript by default or reopen the grilling discussion unless the artifact is incomplete or contradicts current evidence.
 
 After confirmation, apply the domain-modeling discipline:
 
@@ -121,4 +122,4 @@ After confirmation, apply the domain-modeling discipline:
 - keep format and lifecycle rules in their existing authoritative containers;
 - include genuine Out of Scope items where applicable.
 
-Report updated record paths, unresolved questions, and the exact next action. Ask before removing the Herdr worktree; the main session remains responsible for inspection, import, merge, and cleanup decisions.
+Report updated record paths, unresolved questions, and the exact next action. Ask before removing the Herdr worktree; the surviving Task Owner remains responsible for inspection, import, merge, and cleanup decisions.

@@ -7,7 +7,7 @@
 - **Tilde Expansion Authority**：Shell 中受限 tilde expansion 使用的唯一 home 来源；当前为会话初始化时 Pi 进程的 `$HOME`，不是额外的 Pi `home` 字段。
 - **Greenfield Semantic Rebuild**：新决策链只从 Pi/Bash/Linux 外部合同、明确政策语义和安全不变量设计；旧实现仅保留为 Git 历史参考。
 - **Canonical Compilation**：对一个请求执行一次有界解释后发行的 opaque、不可变、可验真的编译制品；内部事实不作为公共 DTO 暴露。
-- **Verified Candidate**：Herdr 讨论完成问题处理与事实核对后生成、等待主会话导入确认的临时候选制品。
+- **Verified Candidate**：Herdr 讨论完成问题处理与事实核对后生成、等待 Task Owner Session 导入确认的临时候选制品。
 - **Admission Plan**：Canonical Compilation 向授权域投影的最小 sealed 输入，只包含 Policy Kernel 实际消费的事实。
 - **Policy Snapshot**：与配置格式无关、不可变的授权值；只由新 policy.yaml adapter 发行。
 - **Policy Preset**：会话可绑定的完整策略定位；内置 `review`、`guided`、`develop`，并可加载合法的自定义 preset；不使用继承式 Profile，`status` 是命令保留字。
@@ -22,7 +22,8 @@
 - **Decision**：需要长期保留的架构、领域或安全取舍，记录在 `docs/decisions.md`。
 - **Reversal surface**：每条 Decision 显式声明的逆转批准面；`user-boundary` 需用户显式批准，`engineering` 可经正式生命周期 supersede。
 - **Durable Content**：工作结束后仍成立且承载约束的事实、取舍与承诺；过程产物不进入权威容器。
-- **Authority Context**：由主会话持有的用户原始意图、Requirements、已采纳的范围/架构/政策决策、finding disposition、最终验收、发布决定与 Project Record 更新。
+- **Task Owner Session**：对一个 Task 的用户意图、Requirements、已采纳裁决、finding disposition、最终验收、发布和 Project Record 更新持有唯一权威的会话；多个 Owner 只承载互斥、可独立验收的范围。
+- **Authority Context**：由 Task Owner Session 持有的用户原始意图、Requirements、已采纳的范围/架构/政策决策、finding disposition、最终验收、发布决定与 Project Record 更新。
 - **Result-Necessary Context**：理解、审计、质疑或继续 child 定稿所必需的推理、实质被拒方案、引用证据、变更、验证、未决问题和残余风险。
 - **Quarantined Process Context**：探索期有用但不具结果准入资格的搜索轨迹、完整日志、重复失败、无影响假设、工具时间线和中间草稿；留在隔离会话或 artifact。
 - **Direct-first**：文件检查优先使用 Direct `read`、`grep`、`find`、`ls`；新 pipeline 不因存在 Direct 等价入口自动拒绝安全可分析的 Shell。
@@ -34,8 +35,8 @@
 
 ## Architecture
 
-- `src/bootstrap/` 在 Session 启动和 compaction 后注入工程原则；通用 fresh-evidence 门禁属于该恒定面。Skills 只保留 `disciplines/` 可复用方法与 `workflows/` 端到端编排两个作者职责根。Grilling 只由用户手动调用的 `grill-docs` 承载，按未决问题处理、候选方案确认、事实核对、verified candidate 交接和主会话导入的固定顺序执行。
-- 委托按 D-075/D-076 执行上下文准入和封闭路由：主会话保留 Authority Context；需要隔离过程上下文且由父级/用户裁决的工作通过 Herdr 执行。有效能力含写入或文件修改 Shell 的 delegated agent 强制进入由其执行面单独拥有的 worktree。`grill-docs` 通过独立 Herdr Grill Agent 完成讨论并生成 verified candidate，再回主会话确认导入并落档。
+- `src/bootstrap/` 在 Session 启动和 compaction 后注入工程原则；通用 fresh-evidence 门禁属于该恒定面。Skills 只保留 `disciplines/` 可复用方法与 `workflows/` 端到端编排两个作者职责根。Grilling 只由用户手动调用的 `grill-docs` 承载，按未决问题处理、候选方案确认、事实核对、verified candidate 交接和 Task Owner 导入的固定顺序执行。
+- 委托按 D-075/D-076 执行上下文准入和封闭路由：Task Owner Session 保留 Authority Context；需要隔离过程上下文且结果仍由该 Owner 裁决的工作通过 Herdr child 同步执行，Owner 预定 artifact、等待 settle 后按路径拉取，child 不发送完成 prompt。可独立验收的长期工作只有经用户明确授权才进入范围互斥的新 Task Owner Session。有效能力含写入或文件修改 Shell 的 delegated agent 强制进入独立 worktree，新增的并行 Owner 也必须拥有不与其他 Owner 共享的 checkout；child 不自清理，由存活 Owner 负责检查、集成与明确批准后的回收。
 - `src/access-gate/access-decision/` 是当前唯一决策实现：`core/` 负责 Pi host/config 无关的语义与策略，Linux pathname lookup 属于该语义域的外部合同；`core/program-semantics/` 负责 Git、解释器、Python 工具、uv 和 npm 族的程序分类与路径事实，Git `-C`、`--git-dir` 和 `--work-tree` 已通过 Canonical command-local cwd seam 解析，helper-capable Git 操作及 `git config` hard-deny；`adapters/` 转换 Pi 和 policy.yaml 输入，`runtime/` 负责 project/staging 生命周期和 host composition。运行时以 session-start cwd 作为固定 Access Root，不要求 Git root；Shell tilde expansion 使用会话初始化时的 `$HOME`。
 - Access Decision Pipeline（D-059/D-060）已完成 Greenfield trust path 与原子生产切换。Canonical 只解释一次；Admission 与 Display 按需投影；Policy Kernel 不读取配置或重新解析请求。Canonical path resolution 同时保留 lexical 与 symlink-target traversal prefixes，Direct search 与 Shell recursive path 均在 blocked descendants 上 fail-closed；有显式 path boundary 时，unknown/unbounded Shell path access 也不得放行。path-form executable 不因已知 basename 获得 inspect/modify 语义，非破坏性形式统一按 opaque execute 处理。Git 显式项目内 `file://` remote 也在 Canonical 阶段转为 path fact；helper-capable Git 操作与 `git config` 保持 hard-deny，host、alias 和间接 config remote 继续 fail-closed。
 - 受管辖 surface 为 Direct `read`、`write`、`edit`、`find`、`grep`、`ls` 与 Shell `bash`。无效 host context、unsupported syntax 和硬安全边界 fail-closed；外置 `policy.yaml` 缺失、为空或不可用时整体忽略并使用内置 `review` 基线，不部分采用无效内容；未拥有的工具 passthrough。
@@ -77,7 +78,7 @@
 - [D-072 Session 启动 cwd 作为访问根与 `$HOME` 的受限 tilde 语义](docs/decisions.md#d-072-session-启动-cwd-作为访问根与-home-的受限-tilde-语义)
 - [D-073 Skill 作者职责与恒定不变量归属](docs/decisions.md#d-073-skill-作者职责与恒定不变量归属)
 - [D-074 单一 grill-docs 分阶段工作流](docs/decisions.md#d-074-单一-grill-docs-分阶段工作流)
-- [D-075 上下文准入、Herdr 优先委托与写能力 Worktree 隔离](docs/decisions.md#d-075-上下文准入herdr-优先委托与写能力-worktree-隔离)
+- [D-075 Task Owner 上下文准入、Herdr 同步委托与 Worktree 隔离](docs/decisions.md#d-075-task-owner-上下文准入herdr-同步委托与-worktree-隔离)
 - [D-076 Herdr 统一委托执行面](docs/decisions.md#d-076-herdr-统一委托执行面)
 - [D-077 Decision 寄存器的轻量 hygiene 校验](docs/decisions.md#d-077-decision-寄存器的轻量-hygiene-校验)
 
@@ -100,7 +101,7 @@
 - Shell tilde expansion 只把受支持 Shell word 开头的未引用、未转义裸 `~` 或 `~/` 映射到会话初始化时的 `$HOME`；普通文件名、引用/转义形式、`~user`、动态或未建模形式不映射为 home。Direct path 不继承该 Shell 语义。
 - 不自动识别或写入用户项目的自有文档体系；非标准体系由用户显式声明。
 - 不分发独立 `grill-plan` 或响应自然语言 grill 触发词；grilling 只由用户手动调用 `grill-docs`。
-- 不把 Herdr 声明为 AKeel runtime dependency；`grill-docs` 使用 Herdr 固定执行面，结果通过 verified candidate 返回主会话。
+- 不把 Herdr 声明为 AKeel runtime dependency；`grill-docs` 使用 Herdr 固定执行面和同步 artifact pull。当前不提供异步 child mailbox、receipt、自动续跑、结果聚合或自动 worktree 回收；长期独立工作使用用户授权、范围互斥的 Task Owner Session。
 
 ## Project Documents
 

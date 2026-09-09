@@ -196,27 +196,33 @@ dropped. Nothing dangles.
 
 ### 11. Bound Delegation, Context, and Isolation
 
-*Delegate authority never grows; only result-necessary context returns.*
+*Delegate authority never grows; one Task Owner decides what returns.*
 
-- A delegated task has at most the permissions of your current session. Never
+- A delegated task has at most the permissions of its Task Owner Session. Never
   route around a restriction; stay within your bounds or ask the user to approve it.
-- Keep the user's original intent, committed requirements, adopted scope,
-  architecture and policy decisions, accepted findings, final acceptance,
-  publication, and Project Record updates in the main session. A Herdr
-  discussion may resolve open questions within those constraints and return a
-  verified candidate. A child returns its result plus only the context necessary
-  to understand, audit, challenge, or continue it: material reasoning and
-  rejected alternatives, cited evidence, changes, validation, unresolved
-  questions, and residual risks. Search trails, full logs, repeated failures,
-  immaterial hypotheses, tool chronology, and intermediate drafts stay in the
-  isolated session or artifact.
-- Work directly when the task does not generate that quarantined process
-  context. When isolation is required, use Herdr so a parent or user can read
-  and decide on the result.
+- A Task Owner Session is the sole session that owns a given Task's user intent,
+  committed requirements, adopted scope, architecture and policy decisions,
+  accepted findings, final acceptance, publication, and Project Record updates.
+  The user may authorize separate Task Owners only for mutually exclusive scopes
+  with independent acceptance; an integration owner resolves cross-task results. A session
+  whose result still returns to an existing Owner for judgment is a child, not a
+  second Owner.
+- Work directly when no quarantined process context is produced. Otherwise use
+  a synchronous Herdr child: reserve its result artifact, wait for it to settle,
+  then pull the result by path. The child does not prompt its Owner with a
+  completion message. It returns only the result and context needed to
+  understand, audit, challenge, or continue it: material reasoning and rejected
+  alternatives, cited evidence, changes, validation, unresolved questions, and
+  residual risks. Search trails, full logs, repeated failures, immaterial
+  hypotheses, tool chronology, and intermediate drafts stay isolated; session
+  history references are forensic pointers and are not loaded by default.
 - Any delegated agent whose effective tools include `write`, `edit`, or a Shell
-  capable of modifying files runs in an independent worktree. Capability, not a
-  prompt promise to avoid edits, controls this rule. Herdr manages only
-  worktrees it created; one worktree has one lifecycle owner.
+  capable of modifying files runs in an independent worktree. An additional
+  parallel Task Owner with those capabilities also owns a checkout not shared
+  with another Owner. Capability, not a prompt promise to avoid edits, controls
+  this rule. Herdr manages only worktrees it created; one worktree has one
+  lifecycle owner. A child does not remove itself; its surviving Owner inspects,
+  integrates, and explicitly approves cleanup.
 
 ---
 

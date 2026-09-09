@@ -235,14 +235,14 @@
 - **Out of Scope:** 在本候选明确采纳前，不恢复运行时 glob 兼容，不提供静默迁移或迁移期 fallback，不恢复旧 Profile/config schema，不改变 D-025 的 Shell glob 边界，不把旧 matcher 测试直接当作当前合同，也不创建实现 Task。
 - **Origin:** C-025
 
-## C-031: 无人值守自动多代理流水线
+## C-031: 异步 child 与无人值守自动多代理流水线
 
-> 本条只记录未来对无人值守自动多代理流水线的独立探索，不构成当前支持、实现承诺或 Herdr 执行面的选择。
+> 本条只记录未来对异步 child 和无人值守自动多代理流水线的独立探索，不构成当前支持、实现承诺或 Herdr 执行面的选择。
 
-- **Why Not Now:** 当前需求是由主会话或用户监督的隔离工作；Herdr 的可见 Agent、pane、worktree、状态和文件交接已经可以直接满足该目标。引入无人值守编排还需要额外定义自动分支、结果聚合、预算、权限、失败恢复和验收 gate，复杂度与风险超过当前收益。
-- **Exploration Direction:** 若未来出现长时间后台攻坚、夜间运行或必须在父级裁决前自动消费 child 结果的真实需求，再独立设计最小的工作流、结构化结果、资源预算、lane 失败恢复、权限边界和验证 gate；先以 Herdr 的可见执行面和持久 handoff 作为外部合同，不默认恢复旧实现或引入新的运行时依赖。
-- **Trigger:** 用户明确启动无人值守自动流水线；或出现真实的长周期后台任务，证明人工监督与手动交接无法满足吞吐或时效要求。
-- **Out of Scope:** 在本候选被明确采纳前，不提供无人值守自动多代理流水线、自动 child 编排、自动结果聚合、自动重试、定时任务、token/cost budget 或基于 child verdict 的自动发布/合并；当前隔离工作使用主会话加 Herdr，并由主会话保留最终裁决。
+- **Why Not Now:** 当前结果仍需既有 Task Owner 裁决的隔离工作可由同步 Herdr child 加预定 artifact 直接满足；可独立验收的长期工作由用户授权新的范围互斥 Task Owner Session，不需要回灌旧 Owner。异步 child 还需额外定义 mailbox、结果发布、重复通知去重、跨重启恢复、资源预算、权限、失败恢复、验收和回收状态，复杂度与上下文成本超过当前收益。
+- **Exploration Direction:** 若未来出现必须从属于既有 Task、但 Owner 又不能等待的长周期后台工作，再设计最小的异步合同：稳定 run/attempt ID，原子结果与 digest，completion mailbox，ACK/receipt，parent restart 恢复，重复交付去重，abandoned lease，bounded 状态与错误输出，以及由存活 owner 或外部 lifecycle owner 执行的 clean/non-force 回收。只有多个 child、自动重试或自动结果消费成为真实需求后，才增加 Herdr event subscriber、可信固定 callback、lane 聚合和确定性 orchestration extension；child verdict 不自动获得验收、记录、合并或发布权。
+- **Trigger:** 用户明确启动异步从属工作或无人值守自动流水线；或出现真实长周期后台任务，证明同步 join 与独立 Task Owner Session 都无法满足吞吐、时效或跨重启要求。
+- **Out of Scope:** 在本候选被明确采纳前，不提供 detached child、completion mailbox、自动 callback/续跑/重试/结果聚合/worktree 回收、定时任务、token/cost budget 或基于 child verdict 的自动发布/合并；当前委托使用同步 Herdr artifact pull，并由唯一 Task Owner 保留最终裁决。
 
 ## C-032: 用户项目 Project Record 容器校验
 

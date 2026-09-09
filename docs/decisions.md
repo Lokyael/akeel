@@ -630,42 +630,47 @@ Tilde expansion 仅适用于受支持 Shell word 中位于开头、未引用、�
 
 **Out of Scope:** Herdr、worktree、独立会话、子代理路由和其他委托机制；这些执行面边界由 D-075/D-076 独立规定，本条不重复定义。
 
-## D-075: 上下文准入、Herdr 优先委托与写能力 Worktree 隔离
+## D-075: Task Owner 上下文准入、Herdr 同步委托与 Worktree 隔离
 
 **Reversal surface:** user-boundary
 
-**Decision:** 委托同时受上下文准入、执行面路由与 checkout 隔离约束。主会话持有用户原始意图、Requirements、已采纳的范围/架构/政策裁决、finding disposition、最终验收、发布与 Project Record 更新等权威上下文。Herdr 讨论可在已定约束内处理开放问题并形成 verified candidate；child 只返回 verified candidate 及理解、审计、质疑或继续该结果所必需的结果必要上下文：影响结论的推理与被拒方案、引用证据、变更、验证、未决问题和残余风险；搜索轨迹、完整日志、重复失败、未影响结论的假设、工具时间线和中间草稿留在隔离会话或 artifact。
+**Decision:** 委托同时受权威所有权、上下文准入、执行面路由与 checkout 隔离约束。**Task Owner Session** 是对一个 Task 持有用户原始意图、Requirements、已采纳范围/架构/政策裁决、finding disposition、最终验收、发布与 Project Record 更新权的唯一会话；同一 Task 或 Decision 同时只有一个 Owner。用户可把互斥、可独立验收的长期工作明确授权给新的 Task Owner Session；若新会话仍需把结果交回既有 Owner 裁决，它在语义上仍是 delegated child，而不是第二个 Owner。
+
+Herdr child 可在已定约束内处理开放问题并形成 verified candidate。当前 child 委托只使用同步 fork-join：Owner 预定结果 artifact，等待 child settle 后按路径拉取，不要求 child 通过 prompt 把完成状态或结果推回 Owner。Artifact 承载 verified candidate 及理解、审计、质疑或继续结果所必需的上下文：影响结论的推理与被拒方案、引用证据、变更、验证、未决问题和残余风险；搜索轨迹、完整日志、重复失败、未影响结论的假设、工具时间线和中间草稿留在隔离会话或 artifact。可得的 child session 引用只作按需 forensic 追踪，不自动载入 Owner 上下文。
 
 **Routing:** 用户未指定执行面时，按以下封闭顺序决定：
 
-1. 不产生隔离过程上下文的任务由主 Agent 直接完成；用户确认、Project Record 更新、finding 裁决和最终验收始终留在主会话。
-2. repo-wide/跨模块探索、多来源比较、多假设调查、重复实验、完整日志分析、独立审查、交互式方案讨论、跨项目工作和替代 CLI 等会产生隔离过程上下文的任务，通过 Herdr 独立 Agent 执行；结果交回父级或用户裁决。
+1. 不产生隔离过程上下文的工作由当前 Task Owner 直接完成；用户确认、Project Record 更新、finding 裁决和最终验收留在该 Owner。
+2. repo-wide/跨模块探索、多来源比较、多假设调查、重复实验、完整日志分析、独立审查、交互式方案讨论、跨项目工作和替代 CLI 等会产生隔离过程上下文、且结果仍需当前 Owner 裁决的工作，通过 Herdr child 同步执行并在预定 artifact 上 join。
+3. 长期工作只有在用户明确授予互斥范围和独立验收权时才进入新的 Task Owner Session；多个 Owner 不共同修改同一 Task/Decision 或 checkout，跨 Task 结果由明确的 integration owner 集成。没有该授权时，不把后台运行或新开会话解释为新的 Owner。
 
-任何 delegated agent 的有效工具只要包含 `write`、`edit` 或可修改文件的 Shell，就必须位于独立 Git worktree；按能力而非“不要编辑”的提示词承诺分类。真正只读的 delegated agent 可共享 checkout。测试若可能修改源码或生成受跟踪文件，按写能力任务处理。Herdr 只管理自己创建的 worktree，同一 worktree 只有一个生命周期 owner，不跨执行面清理、合并或复用。
+任何 delegated agent 的有效工具只要包含 `write`、`edit` 或可修改文件的 Shell，就必须位于独立 Git worktree；新增的并行 Task Owner 具备这些能力时，也必须拥有不与其他 Owner 共享的 checkout。按能力而非“不要编辑”的提示词承诺分类。真正只读的 delegated agent 可共享 checkout；测试若可能修改源码或生成受跟踪文件，按写能力任务处理。Herdr 只管理自己创建的 worktree，同一 worktree 只有一个生命周期 owner，不跨执行面清理、合并或复用。Child 不删除自身 pane/workspace/worktree；存活的 Owner 负责检查、导入、合并和经明确批准的清理。
 
 具体的 grilling、packet、Agent 生命周期和 verified candidate 交接步骤由 [`skills/workflows/grill-docs/SKILL.md`](../skills/workflows/grill-docs/SKILL.md) 承载。
 
-**Why:** “主 Agent 技术上能完成”不能判断原始探索是否值得污染长期主上下文；独立 Agent 的价值包括上下文隔离，而不只包括并发。Herdr 已提供可见、可接管的 Agent/pane/worktree/focus 合同，适合父级或用户参与裁决的隔离工作。按有效写能力强制 worktree 则避免只读提示词与真实工具权限不一致时污染主 checkout。
+**Why:** “主 Agent 技术上能完成”不能判断原始探索是否值得污染长期 Owner 上下文；独立 Agent 的价值包括上下文隔离，而不只包括并发。同步 artifact pull 避免 child 自由文本 callback 形成重复 user-role 消息、额外上下文和交付竞态；长期独立工作直接拥有自己的 Owner，则无需把全过程回灌旧会话。唯一 Owner 与互斥范围防止多个会话对 Requirements、验收和权威记录形成 split-brain。Herdr 已提供可见、可接管的 Agent、pane、worktree 和 focus 合同；按有效写能力强制 worktree 可避免真实工具权限污染共享 checkout。
 
-**Impact:** `principles.md` 恒定注入上下文准入、路由和 worktree 不变量；`grill-docs` 使用 Herdr 完成交互式讨论和结果交接。AKeel 不把 Herdr 声明为 runtime dependency，也不新增自动编排运行时。
+**Impact:** `principles.md` 恒定注入 Task Owner、同步委托路由和 worktree 不变量；`grill-docs` 通过预定 verified candidate 完成交互式讨论和结果拉取，不发送完成 prompt。AKeel 不把 Herdr 声明为 runtime dependency，也不新增自动编排运行时。独立 Task Owner Session 是用户授权与记录所有权边界，不是新的 Herdr primitive。
 
-**Rejected:** 以“可能更快/多一个视角/适合时”触发委托（不可判定且扩大调用）；主会话可完成即一律直接执行（忽略上下文污染）；所有隔离工作无条件创建 worktree（应按有效写能力与 tracked side effect 判断）；worktree 内“100% 自由/零审批”（隔离不产生授权）；由 Grill Agent 直接写权威记录（跨 worktree 制造第二 writer 与未经主会话导入的权威变更）。
+**Rejected:** 以“可能更快/多一个视角/适合时”触发委托（不可判定且扩大调用）；当前 Owner 可完成即一律直接执行（忽略上下文污染）；同步 child 向 Owner prompt 完成状态或结果（重复交付、增加上下文且不是处理 ACK）；把长任务默认变成异步 child（增加 mailbox、恢复和去重状态而无当前需求）；把同一 Task 交给多个 Owner（权威 split-brain）；child literal self-delete（会使 join 失去正常 settle 结果，且 child 无法确认自身清理成功）；所有隔离工作无条件创建 worktree（应按有效写能力与 tracked side effect 判断）；worktree 内“100% 自由/零审批”（隔离不产生授权）；由 Grill Agent 直接写权威记录（跨 worktree 制造第二 writer 与未经 Owner 导入的权威变更）。
 
 **Out of Scope:**
 
-- **确定性 Herdr orchestration extension:** 当前由 skill 调用既有 CLI，不新增 TypeScript 自动化层。Revisit when 出现可复现的协议执行偏差。
-- **Access Gate 父子 Policy Snapshot 传播:** 当前只定义 prompt/workflow 与 checkout 边界，不改变准入实现。Revisit when 独立任务验证 child-runtime policy seam。
+- **异步 child 与无人值守 orchestration:** mailbox、receipt、跨重启恢复、重复通知去重、自动续跑、聚合和自动回收由 C-031 保持为未采纳候选；出现真实长周期从属任务后再评估。
+- **渐进式多文件结果协议与确定性 Herdr extension:** 当前单一 verified candidate 没有可复现的体积或协议偏差，不新增 TypeScript 自动化层；出现不可接受的上下文负载或可复现执行偏差时再评估。
+- **自动 worktree 回收:** 当前不把结果保存和破坏边界委托给无人值守清理；只有独立证明 clean/non-force 生命周期合同并获得用户批准后再评估。
+- **Access Gate 父子 Policy Snapshot 传播:** 当前只定义 workflow 与 checkout 边界，不改变准入实现。Revisit when 独立任务验证 child-runtime policy seam。
 - **模型行为基准:** 当前没有固定模型与 consuming-agent 评测 harness，不以字符串存在测试冒充行为证明。Revisit when 项目采纳可重复的 prompt 行为评测。
 
 ## D-076: Herdr 统一委托执行面
 
 **Reversal surface:** user-boundary
 
-**Decision:** AKeel 将所有需要隔离过程上下文的委托统一交给 Herdr；主会话保留用户意图、Requirements、finding disposition、最终验收、发布和 Project Record 更新。
+**Decision:** AKeel 将所有需要隔离过程上下文、且结果返回既有 Task Owner 裁决的委托统一交给 Herdr；Task Owner Session 保留用户意图、Requirements、finding disposition、最终验收、发布和 Project Record 更新。
 
 **Why:** 当前工作需要可见的 Agent、pane、worktree、状态和人工裁决，Herdr 已直接覆盖这些目标。统一执行面可以保持上下文、交接和生命周期合同的一致性。
 
-**Impact:** `src/bootstrap/principles.md`、README、CONTEXT、skills 和委托相关 Decision 统一描述 Herdr 执行面；当前工作流通过 Herdr 完成 Agent 启动、状态观察、worktree 管理和结果交接。
+**Impact:** `src/bootstrap/principles.md`、README、CONTEXT、skills 和委托相关 Decision 统一描述 Herdr 执行面；当前委托通过 Herdr 完成 Agent 启动、状态观察、worktree 管理和同步 artifact 交接。用户授权的独立 Task Owner Session 仍可运行在 Herdr 中，但不因使用 Herdr 而成为 delegated child。
 
 **Rejected:** 维护第二套委托执行面（当前没有真实需求证明其额外编排能力值得承担独立的上下文、结果和生命周期合同）。
 

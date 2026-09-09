@@ -6,7 +6,7 @@ disable-model-invocation: true
 
 # Improve Codebase Architecture
 
-Surface architectural friction and propose **deepening opportunities** — refactors that make modules deeper (more behaviour behind a smaller interface). Uses the vocabulary from `codebase-design`: module, interface, depth, seam, adapter, leverage, locality. A mid-task friction **proposal** (per principles.md Proposal signals) is a one-line report, not this skill — it enters here only after the user approves it, and this skill's full scan turns it into **candidates**. Run the repository-wide exploration in a Herdr Agent; the main-session coordinator receives its result, writes the HTML report, and presents it to the user.
+Surface architectural friction and propose **deepening opportunities** — refactors that make modules deeper (more behaviour behind a smaller interface). Uses the vocabulary from `codebase-design`: module, interface, depth, seam, adapter, leverage, locality. A mid-task friction **proposal** (per principles.md Proposal signals) is a one-line report, not this skill — it enters here only after the user approves it, and this skill's full scan turns it into **candidates**. Run the repository-wide exploration in a Herdr Agent; the Task Owner coordinator waits for its result artifact, writes the HTML report, and presents it to the user.
 
 ## Process
 
