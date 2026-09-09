@@ -1,6 +1,7 @@
 import {
   compileDirect,
   compileShell,
+  directAdmissionHitsCredentialBoundary,
   evaluateAdmission,
   evaluateShellAdmission,
   freezePolicySnapshot,
@@ -12,11 +13,15 @@ import {
   projectShellAdmission,
   projectShellDisplay,
   renderDecision,
+  shellAdmissionHitsCredentialBoundary,
 } from "../core/index";
-import type { Decision, DirectRequest, ShellRequest } from "../core/index";
+import type { CredentialBoundary, Decision, DirectRequest, ShellRequest } from "../core/index";
 import { renderHostBlock, renderHostFacingDecision } from "./host-render";
 import type { HostFacingDecision } from "./host-render";
-import { adaptHostToolCall, adaptPiToolCall } from "../adapters/index";
+import {
+  adaptHostToolCall,
+  adaptPiToolCall,
+} from "../adapters/index";
 import { isPolicyState } from "./policy-state";
 import type { PolicyState } from "./policy-state";
 import { isProjectContext } from "./project-context";
@@ -54,8 +59,17 @@ export interface DecisionService {
 }
 
 function mergeRoots(roots: readonly string[], context: ProjectContext | undefined): readonly string[] {
-  if (context === undefined) return roots;
-  return [...new Set([...roots, context.projectRoot, context.stagingRoot])];
+  if (context === undefined || roots.length > 0) return roots;
+  return [context.projectRoot, context.stagingRoot];
+}
+
+function validSessionHome(home: unknown): home is string {
+  return typeof home === "string" && home.length > 0 && home.startsWith("/") && !home.includes("\u0000");
+}
+
+function withSessionHome(request: DirectRequest | ShellRequest, sessionHome: string | undefined): DirectRequest | ShellRequest {
+  if (request.surface !== "bash") return request;
+  return { ...request, home: sessionHome };
 }
 
 function rejectResult(code: "invalid-request" | "resource-limit" | "security-boundary" | "unsupported-syntax" | "dynamic-value"): HostFacingDecision {
@@ -83,6 +97,7 @@ function evaluateManagedRequest(
   shellPolicy: ReturnType<typeof freezeShellPolicySnapshot>,
   readOnlyModificationGuidance: boolean,
   observer: RuntimeObserver | undefined,
+  credentialBoundary: CredentialBoundary,
 ): RuntimeResult {
   if (request.surface === "bash") {
     trace(observer, "compile-shell");
@@ -95,7 +110,9 @@ function evaluateManagedRequest(
     const admission = projectShellAdmission(compilation);
     const decision = admission === undefined
       ? { kind: "deny", code: "invalid-admission" } as const
-      : (trace(observer, "evaluate-shell-policy"), evaluateShellAdmission(admission, shellPolicy));
+      : (trace(observer, "evaluate-shell-policy"), shellAdmissionHitsCredentialBoundary(admission, credentialBoundary)
+        ? { kind: "deny", code: "hard-boundary" } as const
+        : evaluateShellAdmission(admission, shellPolicy));
     const display = decision.kind === "ask"
       ? (trace(observer, "project-shell-display"), projectShellDisplay(compilation))
       : undefined;
@@ -113,7 +130,9 @@ function evaluateManagedRequest(
   const admission = projectAdmission(compilation);
   if (!admission) return renderHostFacingDecision({ kind: "deny", code: "invalid-request" });
   trace(observer, "evaluate-direct-policy");
-  const decision = evaluateAdmission(admission, directPolicy);
+  const decision = directAdmissionHitsCredentialBoundary(admission, credentialBoundary)
+    ? { kind: "deny", code: "hard-boundary" } as const
+    : evaluateAdmission(admission, directPolicy);
   const display = decision.kind === "ask"
     ? (trace(observer, "project-direct-display"), projectDisplay(compilation))
     : undefined;
@@ -121,9 +140,16 @@ function evaluateManagedRequest(
   return renderManagedDecision(decision, display, readOnlyModificationGuidance);
 }
 
-export function createDecisionService(state: PolicyState, context?: ProjectContext, observer?: RuntimeObserver): DecisionService {
+export function createDecisionService(
+  state: PolicyState,
+  context: ProjectContext | undefined,
+  observer: RuntimeObserver | undefined,
+  credentialBoundary: CredentialBoundary,
+  sessionHome?: string,
+): DecisionService {
   if (!isPolicyState(state)) throw new TypeError("invalid policy state");
   if (context !== undefined && !isProjectContext(context)) throw new TypeError("invalid project context");
+  const resolvedSessionHome = validSessionHome(sessionHome) ? sessionHome : undefined;
   const directPolicy = freezePolicySnapshot({
     ...state.snapshot.direct,
     allowedRoots: mergeRoots(state.snapshot.direct.allowedRoots, context),
@@ -140,7 +166,11 @@ export function createDecisionService(state: PolicyState, context?: ProjectConte
 
       const admission = projectAdmission(compilation);
       if (!admission) return { kind: "deny", code: "invalid-request" };
-      return renderDecision(evaluateAdmission(admission, directPolicy));
+      return renderDecision(
+        directAdmissionHitsCredentialBoundary(admission, credentialBoundary)
+          ? { kind: "deny", code: "hard-boundary" }
+          : evaluateAdmission(admission, directPolicy),
+      );
     },
 
     decideToolCall(toolName: unknown, input: unknown, hostContext: unknown): RuntimeResult {
@@ -156,11 +186,12 @@ export function createDecisionService(state: PolicyState, context?: ProjectConte
       }
       trace(observer, "adapt-managed");
       return evaluateManagedRequest(
-        adapted.request,
+        withSessionHome(adapted.request, resolvedSessionHome),
         directPolicy,
         shellPolicy,
         state.activePreset === "review" && (adapted.request.surface === "write" || adapted.request.surface === "edit"),
         observer,
+        credentialBoundary,
       );
     },
 
@@ -177,11 +208,12 @@ export function createDecisionService(state: PolicyState, context?: ProjectConte
       }
       trace(observer, "adapt-managed");
       return evaluateManagedRequest(
-        adapted.request,
+        withSessionHome(adapted.request, resolvedSessionHome),
         directPolicy,
         shellPolicy,
         state.activePreset === "review" && (adapted.request.surface === "write" || adapted.request.surface === "edit"),
         observer,
+        credentialBoundary,
       );
     },
   };

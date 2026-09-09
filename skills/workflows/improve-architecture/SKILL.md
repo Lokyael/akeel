@@ -6,7 +6,7 @@ disable-model-invocation: true
 
 # Improve Codebase Architecture
 
-Surface architectural friction and propose **deepening opportunities** — refactors that make modules deeper (more behaviour behind a smaller interface). Uses the vocabulary from `codebase-design`: module, interface, depth, seam, adapter, leverage, locality. A mid-task friction **proposal** (per principles.md Proposal signals) is a one-line report, not this skill — it enters here only after the user approves it, and this skill's full scan turns it into **candidates**.
+Surface architectural friction and propose **deepening opportunities** — refactors that make modules deeper (more behaviour behind a smaller interface). Uses the vocabulary from `codebase-design`: module, interface, depth, seam, adapter, leverage, locality. A mid-task friction **proposal** (per principles.md Proposal signals) is a one-line report, not this skill — it enters here only after the user approves it, and this skill's full scan turns it into **candidates**. Run the repository-wide exploration in a Herdr Agent; the main-session coordinator receives its result, writes the HTML report, and presents it to the user.
 
 ## Process
 
@@ -44,6 +44,6 @@ End with a **Top recommendation** — which to tackle first and why.
 
 ### 3. Grilling Loop
 
-Once the user picks a candidate, run the `/skill:grill-plan` skill to walk the decision tree — constraints, dependencies, the shape of the deepened module, what tests survive.
+Once the user picks a candidate, tell them to run `/skill:grill-docs` to resolve its open decisions, verify it against project evidence and applicable external documentation, and record the final result.
 
-Side effects happen inline as decisions crystallise: update `CONTEXT.md` for new terms and record load-bearing decisions in `docs/decisions.md` (per principles.md Next-ID slots).
+Do not record the selected candidate as an adopted conclusion in this workflow. `grill-docs` updates `CONTEXT.md`, the active Task Record, and `docs/decisions.md` only after the user confirms the candidate and its factual claims are checked.

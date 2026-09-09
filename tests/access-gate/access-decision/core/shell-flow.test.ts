@@ -85,6 +85,18 @@ test("a sequence always reaches the next command while retaining its own status"
   assert.deepEqual(reachableShellCommands(flow, [["failure"], ["success"]]), [0, 1]);
 });
 
+test("mixed and-or reachability retains a direct left-success path", () => {
+  const flow = parseShellFlow("cat input || false && printf done");
+  if (flow.kind === "reject") {
+    assert.fail(`unexpected flow rejection: ${flow.code}`);
+  }
+
+  assert.deepEqual(
+    reachableShellCommands(flow, [["success", "failure"], ["failure"], ["success", "failure"]]),
+    [0, 1, 2],
+  );
+});
+
 test("an unexecuted cd does not change the cwd of an or fallback", () => {
   const flow = parseShellFlow("false && cd /tmp || printf done");
   if (flow.kind === "reject") {

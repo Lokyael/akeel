@@ -45,12 +45,12 @@ export const FORBIDDEN_ADMISSION_FACTS = Object.freeze([
 ] as const);
 export const DISPLAY_FACTS = Object.freeze(["source-coordinate", "bounded-text", "decision-code"] as const);
 
-export const POLICY_DECISIONS = Object.freeze(["hard-deny", "profile-deny", "ask", "allow"] as const);
+export const POLICY_DECISIONS = Object.freeze(["hard-deny", "policy-deny", "ask", "allow"] as const);
 export const POLICY_OPERATIONS = Object.freeze(["read", "write", "execute", "inspect"] as const);
 export const POLICY_CLASSES = Object.freeze(["file", "directory", "command", "path"] as const);
 export const POLICY_MONOTONICITY_CASES = Object.freeze([
   { name: "hard-boundary", narrow: "hard-deny", wide: "hard-deny" },
-  { name: "profile-rule", narrow: "profile-deny", wide: "allow" },
+  { name: "policy-rule", narrow: "policy-deny", wide: "allow" },
 ] as const);
 export const REJECT_FIELDS = Object.freeze(["code", "source-anchor", "resource-class"] as const);
 

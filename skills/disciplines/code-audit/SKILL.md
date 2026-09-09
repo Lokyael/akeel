@@ -48,6 +48,9 @@ For a deep security scan instead of this spot-check, run `/skill:security-review
 - [ ] Tests verify behavior through public interfaces
 - [ ] Tests are F.I.R.S.T compliant: Fast, Independent, Repeatable, Self-Validating, Timely
 
+### Delivery Evidence
+- [ ] Before commit or push, rerun the relevant tests, typecheck, build, and other required checks after the final change; name the exact commands and results. Earlier or partial runs do not qualify.
+
 ### SOLID
 - [ ] Single Responsibility: no function/module doing two unrelated things
 - [ ] Open/Closed: extended through interfaces, not by modifying stable code

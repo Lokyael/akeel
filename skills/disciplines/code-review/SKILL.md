@@ -10,7 +10,7 @@ Two-axis review of the diff between `HEAD` and a fixed point the user supplies:
 - **Standards** — does the code conform to this repo's documented coding standards?
 - **Requirements** — does the code faithfully implement the originating issue, expected behavior, or Task Record?
 
-Both axes run as **parallel analyses** so they don't pollute each other's context, then results are aggregated.
+Run both axes as parallel independent Herdr analyses so they don't pollute each other's context. The main-session coordinator reads both returned results, aggregates the review, and owns final finding disposition.
 
 ## Process
 

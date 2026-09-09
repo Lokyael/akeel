@@ -26,11 +26,19 @@ function fakePi(): { readonly handlers: Map<string, Handler>; readonly commands:
   return { handlers, commands, pi };
 }
 
-function context(cwd: string, hasUI: boolean, confirm: (title: string, message: string) => Promise<boolean>): ExtensionContext {
+function context(
+  cwd: string,
+  hasUI: boolean,
+  confirm: (title: string, message: string) => Promise<boolean>,
+  mode?: ExtensionContext["mode"],
+  select: (prompt: string, options: string[], settings?: unknown) => Promise<string | undefined> = async () => undefined,
+  notify: (message: string, level?: "info" | "warning" | "error") => void = () => {},
+): ExtensionContext {
   return {
     cwd,
+    mode,
     hasUI,
-    ui: { confirm, notify(): void {}, setStatus(): void {} },
+    ui: { confirm, select, notify, setStatus(): void {} },
   } as unknown as ExtensionContext;
 }
 
@@ -39,6 +47,12 @@ const options: PiCompositionOptions = {
   projectRoot: "/workspace/project",
   stagingRoot: "/tmp/akeel",
 };
+
+const builtinPresets = {
+  review: { paths: { read: "allow" }, commands: { inspect: "allow" } },
+  guided: { paths: { read: "allow", write: "ask", edit: "ask" }, commands: { inspect: "allow", modify: "ask", execute: "ask" } },
+  develop: { paths: { read: "allow", write: "allow", edit: "allow" }, commands: { inspect: "allow", modify: "allow", execute: "allow" } },
+} as const;
 
 async function invoke(handlers: Map<string, Handler>, name: string, event: unknown, hostContext: ExtensionContext): Promise<unknown> {
   const handler = handlers.get(name);
@@ -56,16 +70,37 @@ test("Pi production composition fails closed before session initialization", asy
   );
 });
 
-test("explicitly disabled access gate passes managed calls while retaining the extension", async () => {
+test("Pi composition rejects a project root that differs from the session cwd", async () => {
   const { handlers, pi } = fakePi();
+  installPiAccessDecision(pi, { ...options, projectRoot: "/workspace/other" });
+  const hostContext = context("/workspace/project", false, async () => false);
+
+  await invoke(handlers, "session_start", {}, hostContext);
+
+  assert.deepEqual(
+    await invoke(handlers, "tool_call", { toolName: "read", input: { path: "README.md" } }, hostContext),
+    { block: true, reason: "Blocked because the decision service is not initialized." },
+  );
+});
+
+test("explicitly disabled access gate passes managed calls while retaining the extension", async () => {
+  const { handlers, commands, pi } = fakePi();
   installPiAccessDecision(pi, {
     policyConfig: { accessGate: "disabled" },
     projectRoot: "/workspace/project",
     stagingRoot: "/tmp/akeel",
   });
-  const hostContext = context("/workspace/project", false, async () => false);
+  let notification = "";
+  const hostContext = context("/workspace/project", false, async () => false, undefined, async () => undefined, (message) => {
+    notification = message;
+  });
 
   await invoke(handlers, "session_start", {}, hostContext);
+
+  const policyCommand = commands.get("policy");
+  assert.ok(policyCommand);
+  await policyCommand!("develop", hostContext);
+  assert.equal(notification, "Access Gate is disabled; bootstrap and skills remain active.");
 
   assert.equal(
     await invoke(handlers, "tool_call", { toolName: "write", input: "not-an-object" }, hostContext),
@@ -79,6 +114,28 @@ test("explicitly disabled access gate passes managed calls while retaining the e
     await invoke(handlers, "tool_call", { toolName: "web_search", input: { query: "skills" } }, hostContext),
     undefined,
   );
+  assert.equal(await invoke(handlers, "tool_call", null, hostContext), undefined);
+});
+
+test("Pi composition hard-denies an agent credential variant under an allowing policy", async () => {
+  const agentDir = mkdtempSync(join(tmpdir(), "akeel-credential-boundary-"));
+  const { handlers, pi } = fakePi();
+  try {
+    installPiAccessDecision(pi, {
+      ...options,
+      agentDir,
+      policyConfig: { paths: { read: "allow", write: "allow", edit: "allow", list: "allow", search: "allow" } },
+    });
+    const hostContext = context("/workspace/project", false, async () => false);
+    await invoke(handlers, "session_start", {}, hostContext);
+
+    assert.deepEqual(
+      await invoke(handlers, "tool_call", { toolName: "read", input: { path: join(agentDir, "auth.json.bak") } }, hostContext),
+      { block: true, reason: "Blocked by a security boundary." },
+    );
+  } finally {
+    rmSync(agentDir, { recursive: true, force: true });
+  }
 });
 
 test("Pi production composition creates the service at session start and routes tool calls", async () => {
@@ -98,7 +155,33 @@ test("Pi production composition creates the service at session start and routes 
   );
 });
 
-test("Pi global composition loads only the new policy.yaml and denies when absent", async () => {
+test("Pi composition uses the session-start HOME instead of host-context home", async () => {
+  const previousHome = process.env.HOME;
+  process.env.HOME = "/workspace/project/session-home";
+  try {
+    const { handlers, pi } = fakePi();
+    installPiAccessDecision(pi, {
+      policyConfig: { paths: { read: "allow" }, commands: { inspect: "allow" } },
+      projectRoot: "/workspace/project",
+      stagingRoot: "/tmp/akeel",
+    });
+    const hostContext = {
+      ...context("/workspace/project", false, async () => false),
+      home: "/outside/host-home",
+    } as ExtensionContext;
+    await invoke(handlers, "session_start", {}, hostContext);
+
+    assert.equal(
+      await invoke(handlers, "tool_call", { toolName: "bash", input: { command: "cat ~/input.txt" } }, hostContext),
+      undefined,
+    );
+  } finally {
+    if (previousHome === undefined) delete process.env.HOME;
+    else process.env.HOME = previousHome;
+  }
+});
+
+test("Pi global composition uses the built-in review policy when external policy is absent", async () => {
   const agentDir = mkdtempSync(join(tmpdir(), "akeel-global-policy-"));
   const projectRoot = mkdtempSync(join(tmpdir(), "akeel-global-project-"));
   mkdirSync(join(agentDir, "akeel"), { recursive: true });
@@ -108,9 +191,13 @@ test("Pi global composition loads only the new policy.yaml and denies when absen
     installGlobalPiAccessDecision(blocked.pi, { agentDir });
     const hostContext = context(projectRoot, false, async () => false);
     await invoke(blocked.handlers, "session_start", {}, hostContext);
-    assert.deepEqual(
+    assert.equal(
       await invoke(blocked.handlers, "tool_call", { toolName: "read", input: { path: "README.md" } }, hostContext),
-      { block: true, reason: "Blocked by access policy." },
+      undefined,
+    );
+    assert.deepEqual(
+      await invoke(blocked.handlers, "tool_call", { toolName: "write", input: { path: "notes.md", content: "updated\n" } }, hostContext),
+      { block: true, reason: "The current session is read-only; switch policy with /policy before retrying this modification." },
     );
 
     writeFileSync(join(agentDir, "akeel", "policy.yaml"), "paths:\n  read: allow\n");
@@ -129,15 +216,177 @@ test("Pi global composition loads only the new policy.yaml and denies when absen
   }
 });
 
-test("Pi policy command switches presets and keeps the active state visible", async () => {
+test("native TUI policy command presents presets and applies the selected preset", async () => {
   const { handlers, commands, pi } = fakePi();
   installPiAccessDecision(pi, {
     policyConfig: {
       presets: {
-        review: { paths: { read: "allow" }, commands: { inspect: "allow" } },
-        guided: { paths: { read: "allow", write: "ask", edit: "ask" }, commands: { inspect: "allow", modify: "ask", execute: "ask" } },
-        develop: { paths: { read: "allow", write: "allow", edit: "allow" }, commands: { inspect: "allow", modify: "allow", execute: "allow" } },
+        ...builtinPresets,
+        audit: {
+          paths: { read: "allow", write: "deny", edit: "deny", list: "allow", search: "allow" },
+          commands: { inspect: "allow", modify: "deny", execute: "deny", destroy: "deny", unknown: "deny" },
+        },
       },
+      activePreset: "review",
+    },
+    projectRoot: "/workspace/project",
+    stagingRoot: "/tmp/akeel",
+  });
+  let prompt = "";
+  let options: string[] = [];
+  const hostContext = context(
+    "/workspace/project",
+    true,
+    async () => true,
+    "tui",
+    async (receivedPrompt, receivedOptions) => {
+      prompt = receivedPrompt;
+      options = receivedOptions;
+      return "develop — Daily development";
+    },
+  );
+  await invoke(handlers, "session_start", {}, hostContext);
+  const command = commands.get("policy");
+  assert.ok(command);
+
+  await command!("", hostContext);
+
+  assert.equal(prompt, "Select AKeel policy preset:");
+  assert.deepEqual(options, [
+    "review — Read-only review",
+    "guided — Interactive approval",
+    "develop — Daily development",
+    "audit",
+  ]);
+  assert.equal(
+    await invoke(handlers, "tool_call", { toolName: "write", input: { path: "notes.md", content: "updated\\n" } }, hostContext),
+    undefined,
+  );
+});
+
+test("explicit policy command switches to a custom preset", async () => {
+  const { handlers, commands, pi } = fakePi();
+  installPiAccessDecision(pi, {
+    policyConfig: {
+      presets: {
+        audit: {
+          paths: { read: "allow", write: "allow", edit: "allow", list: "allow", search: "allow" },
+          commands: { inspect: "allow", modify: "allow", execute: "deny", destroy: "deny", unknown: "deny" },
+        },
+      },
+      activePreset: "review",
+    },
+    projectRoot: "/workspace/project",
+    stagingRoot: "/tmp/akeel",
+  });
+  const hostContext = context("/workspace/project", true, async () => true);
+  await invoke(handlers, "session_start", {}, hostContext);
+  const command = commands.get("policy");
+  assert.ok(command);
+
+  await command!("audit", hostContext);
+
+  assert.deepEqual(
+    await invoke(handlers, "tool_call", { toolName: "write", input: { path: "notes.md", content: "updated\\n" } }, hostContext),
+    undefined,
+  );
+});
+
+test("cancelling the native TUI policy selector keeps the active preset", async () => {
+  const { handlers, commands, pi } = fakePi();
+  installPiAccessDecision(pi, {
+    policyConfig: {
+      presets: builtinPresets,
+      activePreset: "review",
+    },
+    projectRoot: "/workspace/project",
+    stagingRoot: "/tmp/akeel",
+  });
+  const hostContext = context("/workspace/project", true, async () => true, "tui", async () => undefined);
+  await invoke(handlers, "session_start", {}, hostContext);
+  const command = commands.get("policy");
+  assert.ok(command);
+
+  await command!("", hostContext);
+
+  assert.deepEqual(
+    await invoke(handlers, "tool_call", { toolName: "write", input: { path: "notes.md", content: "updated\\n" } }, hostContext),
+    { block: true, reason: "The current session is read-only; switch policy with /policy before retrying this modification." },
+  );
+});
+
+test("non-TUI policy command does not open a native selector", async () => {
+  const { handlers, commands, pi } = fakePi();
+  installPiAccessDecision(pi, {
+    policyConfig: {
+      presets: builtinPresets,
+      activePreset: "review",
+    },
+    projectRoot: "/workspace/project",
+    stagingRoot: "/tmp/akeel",
+  });
+  let selectCalls = 0;
+  const hostContext = context(
+    "/workspace/project",
+    true,
+    async () => true,
+    "rpc",
+    async () => {
+      selectCalls++;
+      return "develop — Daily development";
+    },
+  );
+  await invoke(handlers, "session_start", {}, hostContext);
+  const command = commands.get("policy");
+  assert.ok(command);
+
+  await command!("", hostContext);
+
+  assert.equal(selectCalls, 0);
+  assert.deepEqual(
+    await invoke(handlers, "tool_call", { toolName: "write", input: { path: "notes.md", content: "updated\\n" } }, hostContext),
+    { block: true, reason: "The current session is read-only; switch policy with /policy before retrying this modification." },
+  );
+});
+
+test("policy status reports the active preset without opening the selector", async () => {
+  const { handlers, commands, pi } = fakePi();
+  installPiAccessDecision(pi, {
+    policyConfig: {
+      presets: builtinPresets,
+      activePreset: "review",
+    },
+    projectRoot: "/workspace/project",
+    stagingRoot: "/tmp/akeel",
+  });
+  let selectCalls = 0;
+  let notification = "";
+  const hostContext = context(
+    "/workspace/project",
+    true,
+    async () => true,
+    "tui",
+    async () => {
+      selectCalls++;
+      return undefined;
+    },
+    (message) => { notification = message; },
+  );
+  await invoke(handlers, "session_start", {}, hostContext);
+  const command = commands.get("policy");
+  assert.ok(command);
+
+  await command!("status", hostContext);
+
+  assert.equal(selectCalls, 0);
+  assert.equal(notification, "Active AKeel policy: review.");
+});
+
+test("Pi policy command switches presets and keeps the active state visible", async () => {
+  const { handlers, commands, pi } = fakePi();
+  installPiAccessDecision(pi, {
+    policyConfig: {
+      presets: builtinPresets,
       activePreset: "review",
     },
     projectRoot: "/workspace/project",

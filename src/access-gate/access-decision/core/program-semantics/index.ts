@@ -44,6 +44,35 @@ const GIT_MODIFY = new Set([
   "fetch", "pull", "clone", "init", "remote", "mv", "cherry-pick", "revert", "apply", "gc", "submodule",
   "stash", "format-patch", "archive", "config",
 ]);
+const GIT_HELPER_COMMANDS = new Set([
+  "status",
+  "diff",
+  "log",
+  "show",
+  "add",
+  "commit",
+  "push",
+  "fetch",
+  "pull",
+  "clone",
+  "init",
+  "checkout",
+  "switch",
+  "restore",
+  "merge",
+  "rebase",
+  "tag",
+  "reset",
+  "cherry-pick",
+  "revert",
+  "stash",
+  "submodule",
+  "config",
+  "help",
+  "grep",
+  "blame",
+  "gc",
+]);
 const GIT_GLOBAL_VALUE_OPTIONS = new Set(["-C", "-c", "--git-dir", "--work-tree"]);
 const GIT_REMOTE_VALUE_OPTIONS = new Set(["--upload-pack", "-u", "--depth", "--shallow-since", "--shallow-exclude", "--negotiation-tip", "--server-option", "--filter"]);
 const GIT_SAFE_OPTIONS = new Set([
@@ -358,7 +387,7 @@ function analyzeGit(args: readonly ShellWord[]): ProgramSemantic {
     index += 1;
   }
   const subcommand = args[index]?.text;
-  if (!subcommand) return result("unknown", [], globalPaths, { cwdChanges, opaque: true });
+  if (!subcommand) return result("unknown", [], globalPaths, { cwdChanges, opaque: true, hardBoundary: true });
   if (globalPaths.some((entry) => isFileTransportReference(entry.path.text))) hardBoundary = true;
   const rest = args.slice(index + 1);
   const missingOptionValue = scanOptionWords(rest, { valueOptions: GIT_VALUE_OPTIONS })
@@ -376,13 +405,15 @@ function analyzeGit(args: readonly ShellWord[]): ProgramSemantic {
     hardBoundary = true;
   }
   const known = GIT_INSPECT.has(subcommand) || GIT_MODIFY.has(subcommand) || subcommand === "clean" || subcommand === "branch";
-  if (!known) return result("unknown", [], globalPaths, { cwdChanges, opaque: true, hardBoundary });
+  if (!known) return result("unknown", [], globalPaths, { cwdChanges, opaque: true, hardBoundary: true });
+  if (GIT_HELPER_COMMANDS.has(subcommand)) hardBoundary = true;
 
   let commandClass: ProgramSemantic["commandClass"] = GIT_INSPECT.has(subcommand) ? "inspect" : "modify";
   if (subcommand === "branch" && !rest.some((word) => ["-d", "-D", "--delete", "-f", "--force", "-m", "-M", "--move", "--rename", "-c", "-C", "--copy"].includes(word.text))) {
     commandClass = rest.some((word) => !word.text.startsWith("-")) ? "modify" : "inspect";
   }
   if (subcommand === "clean") commandClass = rest.some((word) => ["-n", "--dry-run"].includes(word.text)) ? "inspect" : "destroy";
+  if (subcommand === "rm") commandClass = "destroy";
   if (subcommand === "stash" && ["list", "show"].includes(rest.find((word) => !word.text.startsWith("-"))?.text ?? "")) commandClass = "inspect";
   if (subcommand === "config" && rest.some((word) => ["--list", "-l", "--get", "--get-all", "--get-regexp"].includes(word.text))) commandClass = "inspect";
   if (subcommand === "config" && rest.some((word) => ["--global", "--system"].includes(word.text))) hardBoundary = true;
@@ -531,5 +562,9 @@ const PROGRAM_ANALYZERS: ReadonlyMap<string, ProgramAnalyzer> = new Map([
 
 export function analyzeProgramCommand(invocation: ProgramInvocation): ProgramSemantic | undefined {
   const name = commandName(invocation.executable).toLowerCase();
-  return PROGRAM_ANALYZERS.get(name)?.(name, invocation.arguments);
+  const analyzer = PROGRAM_ANALYZERS.get(name);
+  if (analyzer === undefined) return undefined;
+  const semantic = analyzer(name, invocation.arguments);
+  if (!invocation.executable.includes("/") || semantic.commandClass === "destroy") return semantic;
+  return result("execute", ["execute"], [], { opaque: true, hardBoundary: semantic.hardBoundary });
 }

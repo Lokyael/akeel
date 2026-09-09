@@ -2,7 +2,7 @@ export { adaptHostDecision, adaptHostToolCall, adaptPiToolCall, adaptPolicyConfi
 export { activatePolicyPreset, createDecisionService, createPolicyState, createProjectContext, createProjectLifecycle, handlePiToolCall, installGlobalPiAccessDecision, installPiAccessDecision } from "./runtime/index";
 export { projectShellAdmission } from "./core/index";
 export { evaluateShellAdmission, freezeShellPolicySnapshot } from "./core/index";
-export type { AccessGateMode, HostContext, HostDecision, HostToolCall, PolicyConfig, PolicyFileLoad, PolicyPresetName, PolicyPresetSet, PolicySnapshot } from "./adapters/index";
+export type { AccessGateMode, HostContext, HostDecision, HostToolCall, PolicyConfig, PolicyPresetName, PolicyPresetSet, PolicySnapshot } from "./adapters/index";
 export type { GlobalPiCompositionOptions, PolicyState, ProjectContext, ProjectLifecycle, PiCompositionOptions } from "./runtime/index";
 export type { DecisionService, PiToolCallHandlerResult, RuntimeObserver, RuntimeResult, RuntimeTraceEvent } from "./runtime/index";
 export type { Decision, DirectEditEntry, DirectRequest, DirectSurface, PolicyInput, PolicyMode } from "./core/index";

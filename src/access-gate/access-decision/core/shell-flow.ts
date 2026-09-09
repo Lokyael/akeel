@@ -99,21 +99,18 @@ export function reachableShellCommands(
 ): readonly number[] {
   if (flow.commands.length === 0 || outcomes.length === 0) return Object.freeze([]);
 
-  const reachable: number[] = [0];
-  let statuses = new Set(outcomes[0]);
-  for (let index = 0; index < flow.operators.length; index += 1) {
-    const operator = flow.operators[index]!;
-    const reachesNext =
-      operator.kind === "sequence" ||
-      (operator.kind === "and" && statuses.has("success")) ||
-      (operator.kind === "or" && statuses.has("failure"));
-    if (!reachesNext) continue;
-
-    const nextIndex = index + 1;
-    reachable.push(nextIndex);
-    statuses = new Set(outcomes[nextIndex] ?? []);
+  const reachable = new Set<number>([0]);
+  const pending = [0];
+  while (pending.length > 0) {
+    const commandIndex = pending.shift()!;
+    for (const status of outcomes[commandIndex] ?? []) {
+      const nextIndex = nextReachableCommand(flow, commandIndex, status);
+      if (nextIndex === undefined || reachable.has(nextIndex)) continue;
+      reachable.add(nextIndex);
+      pending.push(nextIndex);
+    }
   }
-  return Object.freeze(reachable);
+  return Object.freeze([...reachable].sort((left, right) => left - right));
 }
 
 function cdTarget(command: ShellFlowCommand): ShellWord | undefined {

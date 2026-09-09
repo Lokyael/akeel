@@ -21,7 +21,6 @@
       "./src/access-gate"
     ],
     "skills": [
-      "./skills/foundations",
       "./skills/disciplines",
       "./skills/workflows"
     ]

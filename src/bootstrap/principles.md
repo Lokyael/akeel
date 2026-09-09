@@ -194,14 +194,29 @@ dropped. Nothing dangles.
   force-push, deletion), name the exact operation and confirm the user's
   intent — a fuzzy trigger word is not consent.
 
-### 11. Delegation Never Exceeds Your Own Authority
+### 11. Bound Delegation, Context, and Isolation
 
-*What you delegate is bounded by what you can do yourself.*
+*Delegate authority never grows; only result-necessary context returns.*
 
-- A subagent or delegated task has at most the permissions of your current
-  session — you can't delegate an operation the active Profile denies.
-- Never use delegation to route around a restriction; do the operation within
-  your own bounds or ask the user to approve it.
+- A delegated task has at most the permissions of your current session. Never
+  route around a restriction; stay within your bounds or ask the user to approve it.
+- Keep the user's original intent, committed requirements, adopted scope,
+  architecture and policy decisions, accepted findings, final acceptance,
+  publication, and Project Record updates in the main session. A Herdr
+  discussion may resolve open questions within those constraints and return a
+  verified candidate. A child returns its result plus only the context necessary
+  to understand, audit, challenge, or continue it: material reasoning and
+  rejected alternatives, cited evidence, changes, validation, unresolved
+  questions, and residual risks. Search trails, full logs, repeated failures,
+  immaterial hypotheses, tool chronology, and intermediate drafts stay in the
+  isolated session or artifact.
+- Work directly when the task does not generate that quarantined process
+  context. When isolation is required, use Herdr so a parent or user can read
+  and decide on the result.
+- Any delegated agent whose effective tools include `write`, `edit`, or a Shell
+  capable of modifying files runs in an independent worktree. Capability, not a
+  prompt promise to avoid edits, controls this rule. Herdr manages only
+  worktrees it created; one worktree has one lifecycle owner.
 
 ---
 

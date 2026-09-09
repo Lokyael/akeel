@@ -1,5 +1,10 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { adaptPiToolCall, loadPolicyFile } from "../adapters/index";
+import {
+  adaptPiToolCall,
+  createCredentialBoundaryForAgentDir,
+  loadPolicyFile,
+  resolveAgentDir,
+} from "../adapters/index";
 import { activatePolicyPreset, createPolicyState } from "./policy-state";
 import { createProjectContext } from "./project-context";
 import { createProjectLifecycle } from "./project-lifecycle";
@@ -17,6 +22,7 @@ type ProjectLifecycleOptions = Readonly<{
 
 export type PiCompositionOptions = ProjectLifecycleOptions & Readonly<{
   readonly policyConfig: unknown;
+  readonly agentDir?: string;
 }>;
 
 export type GlobalPiCompositionOptions = Readonly<{
@@ -29,6 +35,18 @@ type SessionProject = Readonly<{
 }>;
 
 const INITIALIZATION_FAILURE_REASON = "Blocked because the decision service is not initialized.";
+const BUILTIN_POLICY_PRESET_LABELS: Readonly<Record<string, string>> = Object.freeze({
+  review: "review — Read-only review",
+  guided: "guided — Interactive approval",
+  develop: "develop — Daily development",
+});
+
+function captureSessionHome(): string | undefined {
+  const home = process.env.HOME;
+  return typeof home === "string" && home.length > 0 && home.startsWith("/") && !home.includes("\u0000")
+    ? home
+    : undefined;
+}
 
 function initializationFailure(): PiToolCallHandlerResult {
   return Object.freeze({ block: true, reason: INITIALIZATION_FAILURE_REASON });
@@ -50,15 +68,47 @@ function policyStatus(state: PolicyState | undefined): string {
   return state?.activePreset ?? "static";
 }
 
+type PolicyPresetOption = Readonly<{ readonly name: string; readonly label: string }>;
+
+function policyPresetOptions(state: PolicyState): readonly PolicyPresetOption[] {
+  return Object.keys(state.presets?.snapshots ?? {}).map((name) => ({
+    name,
+    label: BUILTIN_POLICY_PRESET_LABELS[name] ?? name,
+  }));
+}
+
+function presetNameForLabel(options: readonly PolicyPresetOption[], label: string | undefined): string | undefined {
+  return options.find((option) => option.label === label)?.name;
+}
+
 function installComposition(
   pi: ExtensionAPI,
   initialPolicyState: PolicyState | undefined,
   createSessionProject: (cwd: string) => SessionProject,
+  credentialBoundary: ReturnType<typeof createCredentialBoundaryForAgentDir>,
 ): void {
   let policyState = initialPolicyState;
   let service: ReturnType<typeof createDecisionService> | undefined;
   let project: ProjectLifecycle | undefined;
   let projectContext: ProjectContext | undefined;
+  let sessionHome: string | undefined;
+
+  function setPolicyPreset(name: string): boolean {
+    if (policyState === undefined) return false;
+    try {
+      policyState = activatePolicyPreset(policyState, name);
+      service = projectContext === undefined ? undefined : createDecisionService(
+        policyState,
+        projectContext,
+        undefined,
+        credentialBoundary,
+        sessionHome,
+      );
+      return true;
+    } catch {
+      return false;
+    }
+  }
 
   pi.registerCommand("policy", {
     description: "Show or switch the active AKeel policy preset.",
@@ -72,15 +122,28 @@ function installComposition(
         notifyPolicy(context, "No Policy Presets are configured; the static policy remains active.", "warning");
         return;
       }
-      if (requested.length === 0) {
+      if (requested.length === 0 && context.mode === "tui") {
+        const options = policyPresetOptions(policyState);
+        const selected = await context.ui.select(
+          "Select AKeel policy preset:",
+          options.map((option) => option.label),
+        );
+        const selectedPreset = presetNameForLabel(options, selected);
+        if (selectedPreset === undefined) return;
+        if (setPolicyPreset(selectedPreset)) {
+          notifyPolicy(context, `Active AKeel policy: ${policyStatus(policyState)}.`);
+        } else {
+          notifyPolicy(context, "Unknown AKeel policy preset selection.", "error");
+        }
+        return;
+      }
+      if (requested.length === 0 || requested === "status") {
         notifyPolicy(context, `Active AKeel policy: ${policyStatus(policyState)}.`);
         return;
       }
-      try {
-        policyState = activatePolicyPreset(policyState, requested);
-        service = projectContext === undefined ? undefined : createDecisionService(policyState, projectContext);
+      if (setPolicyPreset(requested)) {
         notifyPolicy(context, `Active AKeel policy: ${policyStatus(policyState)}.`);
-      } catch {
+      } else {
         notifyPolicy(context, `Unknown AKeel policy preset: ${requested}.`, "error");
       }
     },
@@ -91,13 +154,14 @@ function installComposition(
     project = undefined;
     projectContext = undefined;
     service = undefined;
+    sessionHome = captureSessionHome();
     policyState = initialPolicyState;
     if (!policyState || policyState.accessGateDisabled) return;
     try {
       const sessionProject = createSessionProject(context.cwd);
       projectContext = sessionProject.context;
       if ("dispose" in sessionProject) project = sessionProject as ProjectLifecycle;
-      service = createDecisionService(policyState, projectContext);
+      service = createDecisionService(policyState, projectContext, undefined, credentialBoundary, sessionHome);
     } catch {
       service = undefined;
       projectContext = undefined;
@@ -108,6 +172,7 @@ function installComposition(
     project?.dispose();
     project = undefined;
     projectContext = undefined;
+    sessionHome = undefined;
     service = undefined;
   });
 
@@ -121,16 +186,26 @@ function installComposition(
 }
 
 export function installPiAccessDecision(pi: ExtensionAPI, options: PiCompositionOptions): void {
-  installComposition(pi, policyStateFrom(options.policyConfig), (cwd) => ({
-    context: createProjectContext({
-      cwd,
-      projectRoot: options.projectRoot,
-      stagingRoot: options.stagingRoot,
-    }),
-  }));
+  const agentDir = resolveAgentDir(options.agentDir);
+  installComposition(pi, policyStateFrom(options.policyConfig), (cwd) => {
+    if (options.projectRoot !== cwd) throw new TypeError("project root must match session cwd");
+    return {
+      context: createProjectContext({
+        cwd,
+        projectRoot: cwd,
+        stagingRoot: options.stagingRoot,
+      }),
+    };
+  }, createCredentialBoundaryForAgentDir(agentDir));
 }
 
 export function installGlobalPiAccessDecision(pi: ExtensionAPI, options: GlobalPiCompositionOptions): void {
-  const loaded = loadPolicyFile(options.agentDir);
-  installComposition(pi, loaded.kind === "ok" ? policyStateFrom(loaded.value) : undefined, createProjectLifecycle);
+  const agentDir = resolveAgentDir(options.agentDir);
+  const loaded = loadPolicyFile(agentDir);
+  installComposition(
+    pi,
+    policyStateFrom(loaded),
+    createProjectLifecycle,
+    createCredentialBoundaryForAgentDir(agentDir),
+  );
 }

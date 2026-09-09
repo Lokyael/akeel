@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
-  createDecisionService,
   createPolicyState,
   handlePiToolCall,
 } from "../../../../src/access-gate/access-decision";
+import { createTestDecisionService as createDecisionService } from "./test-fixtures";
 
 test("Pi host composition blocks rendered denials with static reason", async () => {
   const service = createDecisionService(createPolicyState({ paths: { read: "allow", write: "deny" } }));
@@ -23,7 +23,7 @@ test("Pi host composition gives read-only guidance for a denied direct modificat
     presets: {
       review: { paths: { read: "allow", write: "deny", edit: "deny" }, commands: { inspect: "allow", modify: "deny", execute: "deny", destroy: "deny", unknown: "deny" } },
       guided: { paths: { read: "allow", write: "ask", edit: "ask" }, commands: { inspect: "allow", modify: "ask", execute: "ask", destroy: "deny", unknown: "deny" } },
-      develop: { paths: { read: "allow", write: "allow", edit: "allow" }, commands: { inspect: "allow", modify: "allow", execute: "allow", destroy: "ask", unknown: "ask" } },
+      develop: { paths: { read: "allow", write: "allow", edit: "allow" }, commands: { inspect: "allow", modify: "allow", execute: "allow", destroy: "deny", unknown: "ask" } },
     },
     activePreset: "review",
   }));
@@ -45,7 +45,7 @@ test("Pi host composition keeps hard boundaries on generic guidance", async () =
     presets: {
       review: { paths: { read: "allow", write: "deny", edit: "deny", blockedPaths: ["/workspace/project/notes.md"] }, commands: { inspect: "allow", modify: "deny", execute: "deny", destroy: "deny", unknown: "deny" } },
       guided: { paths: { read: "allow", write: "ask", edit: "ask", blockedPaths: ["/workspace/project/notes.md"] }, commands: { inspect: "allow", modify: "ask", execute: "ask", destroy: "deny", unknown: "deny" } },
-      develop: { paths: { read: "allow", write: "allow", edit: "allow", blockedPaths: ["/workspace/project/notes.md"] }, commands: { inspect: "allow", modify: "allow", execute: "allow", destroy: "ask", unknown: "ask" } },
+      develop: { paths: { read: "allow", write: "allow", edit: "allow", blockedPaths: ["/workspace/project/notes.md"] }, commands: { inspect: "allow", modify: "allow", execute: "allow", destroy: "deny", unknown: "ask" } },
     },
     activePreset: "review",
   }));

@@ -68,7 +68,7 @@ test("explicit edit mode is independent and omission denies by default", () => {
   assert.equal(fallback.direct.edit, "deny");
 });
 
-test("named presets require all three positions and select the active snapshot", () => {
+test("named presets preserve built-in semantics and select the active snapshot", () => {
   const config = {
     presets: {
       review: { paths: { read: "allow" }, commands: { inspect: "allow" } },
@@ -84,15 +84,78 @@ test("named presets require all three positions and select the active snapshot",
   assert.equal(presets.snapshots.review.direct.write, "deny");
   assert.equal(presets.snapshots.guided.direct.edit, "ask");
   assert.equal(presets.snapshots.develop.direct.edit, "allow");
-  assert.throws(() => adaptPolicyPresets({
-    presets: { review: config.presets.review, guided: config.presets.guided },
+  assert.equal(presets.snapshots.develop.shell.destroy, "deny");
+  const builtinsDefaulted = adaptPolicyPresets({
+    presets: {
+      audit: {
+        paths: { read: "allow", write: "deny", edit: "deny", list: "allow", search: "allow" },
+        commands: { inspect: "allow", modify: "deny", execute: "deny", destroy: "deny", unknown: "deny" },
+      },
+    },
     activePreset: "review",
-  }), /invalid policy config/);
-  assert.throws(() => adaptPolicyPresets({
+  });
+  assert.ok(builtinsDefaulted);
+  assert.deepEqual(Object.keys(builtinsDefaulted.snapshots), ["review", "guided", "develop", "audit"]);
+  const scoped = adaptPolicyPresets({
     presets: {
       review: { ...config.presets.review, paths: { ...config.presets.review.paths, allowedRoots: ["/workspace/project"] } },
       guided: config.presets.guided,
       develop: config.presets.develop,
+    },
+    activePreset: "review",
+  });
+  assert.ok(scoped);
+  assert.deepEqual(scoped.snapshots.review.direct.allowedRoots, ["/workspace/project"]);
+  assert.deepEqual(scoped.snapshots.guided.direct.allowedRoots, []);
+  assert.throws(() => adaptPolicyPresets({ ...config, activePreset: "status" }), /invalid policy config/);
+  assert.throws(() => adaptPolicyPresets({
+    ...config,
+    presets: { ...config.presets, status: config.presets.review },
+  }), /invalid policy config/);
+});
+
+test("named presets merge builtins with custom presets", () => {
+  const presets = adaptPolicyPresets({
+    presets: {
+      audit: {
+        paths: {
+          read: "allow",
+          write: "deny",
+          edit: "deny",
+          list: "allow",
+          search: "allow",
+          allowedRoots: ["/workspace/audit"],
+          blockedRoots: ["/workspace/audit/private"],
+          blockedPaths: ["/workspace/audit/.env"],
+        },
+        commands: {
+          inspect: "allow",
+          modify: "deny",
+          execute: "deny",
+          destroy: "allow",
+          unknown: "deny",
+        },
+      },
+    },
+    activePreset: "audit",
+  });
+
+  assert.ok(presets);
+  assert.deepEqual(Object.keys(presets.snapshots), ["review", "guided", "develop", "audit"]);
+  assert.equal(presets.active, "audit");
+  assert.equal(presets.snapshots.review.direct.read, "allow");
+  assert.equal(presets.snapshots.develop.direct.write, "allow");
+  assert.deepEqual(presets.snapshots.audit.direct.allowedRoots, ["/workspace/audit"]);
+  assert.deepEqual(presets.snapshots.audit.direct.blockedRoots, ["/workspace/audit/private"]);
+  assert.equal(presets.snapshots.audit.shell.destroy, "allow");
+});
+
+test("built-in preset semantics cannot be overridden", () => {
+  assert.throws(() => adaptPolicyPresets({
+    presets: {
+      review: { paths: { read: "allow", write: "allow" }, commands: { inspect: "allow" } },
+      guided: { paths: { read: "allow" }, commands: { inspect: "allow" } },
+      develop: { paths: { read: "allow" }, commands: { inspect: "allow" } },
     },
     activePreset: "review",
   }), /invalid policy config/);
@@ -151,4 +214,35 @@ test("malformed modes and non-absolute policy paths are rejected", () => {
   assert.throws(() => adaptPolicyConfig({ paths: { read: "maybe" } }), /invalid policy config/);
   assert.throws(() => adaptPolicyConfig({ paths: { allowedRoots: ["project"] } }), /invalid policy config/);
   assert.throws(() => adaptPolicyConfig({ paths: { blockedPaths: ["/safe/\u0000path"] } }), /invalid policy config/);
+});
+
+test("rejects write modes that are wider than the read mode", () => {
+  for (const [read, write] of [["deny", "ask"], ["deny", "allow"], ["ask", "allow"]] as const) {
+    assert.throws(
+      () => adaptPolicyConfig({ paths: { read, write } }),
+      /invalid policy config/,
+      `${read}/${write}`,
+    );
+  }
+});
+
+test("rejects malformed lower-kebab-case custom preset names", () => {
+  for (const name of ["audit-", "audit--logs", "Audit", "audit_logs"]) {
+    assert.throws(() => adaptPolicyPresets({
+      presets: { [name]: { paths: { read: "allow" }, commands: { inspect: "allow" } } },
+      activePreset: name,
+    }), /invalid policy config/, name);
+  }
+});
+
+test("rejects incomplete custom presets through the direct adapter", () => {
+  assert.throws(() => adaptPolicyPresets({
+    presets: {
+      audit: {
+        paths: { read: "allow" },
+        commands: { inspect: "allow" },
+      },
+    },
+    activePreset: "audit",
+  }), /invalid policy config/);
 });

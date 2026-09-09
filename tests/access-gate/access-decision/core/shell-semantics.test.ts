@@ -39,6 +39,44 @@ test("filesystem-dependent commands retain both possible outcomes", () => {
   assert.equal(policyContract.referenceStatus, "newly-adopted");
 });
 
+test("path-form interpreter information calls remain executable and opaque", () => {
+  for (const executable of ["./python", "/tmp/node"]) {
+    const semantic = analyzeProgramCommand({ executable, arguments: [word("--version", 0)] });
+    assert.ok(semantic);
+    assert.equal(semantic.commandClass, "execute", executable);
+    assert.equal(semantic.opaque, true, executable);
+  }
+});
+
+test("Git helper-capable commands remain hard-boundary", () => {
+  for (const subcommand of ["status", "diff", "add", "commit", "push", "config", "help", "grep", "blame", "gc"]) {
+    const semantic = analyzeProgramCommand({ executable: "git", arguments: [word(subcommand, 0)] });
+    assert.ok(semantic);
+    assert.equal(semantic.hardBoundary, true, subcommand);
+  }
+  const grepWithTextconv = analyzeProgramCommand({ executable: "git", arguments: [word("grep", 0), word("--textconv", 5)] });
+  assert.ok(grepWithTextconv);
+  assert.equal(grepWithTextconv.hardBoundary, true);
+  const unknownGit = analyzeProgramCommand({ executable: "git", arguments: [word("mystery", 0)] });
+  assert.ok(unknownGit);
+  assert.equal(unknownGit.hardBoundary, true);
+});
+
+test("Git rm is a destructive operation", () => {
+  const semantic = analyzeProgramCommand({ executable: "git", arguments: [word("rm", 0), word("file.txt", 3)] });
+  assert.ok(semantic);
+  assert.equal(semantic.commandClass, "destroy");
+  assert.deepEqual(semantic.effects, ["delete"]);
+});
+
+test("path-form Git helper boundaries are retained as opaque execution", () => {
+  const semantic = analyzeProgramCommand({ executable: "/usr/bin/git", arguments: [word("status", 0)] });
+  assert.ok(semantic);
+  assert.equal(semantic.commandClass, "execute");
+  assert.equal(semantic.opaque, true);
+  assert.equal(semantic.hardBoundary, true);
+});
+
 test("a supported inspection command has explicit class and read effect", () => {
   assert.deepEqual(analyzeShellCommand("cat README.md"), {
     kind: "complete",

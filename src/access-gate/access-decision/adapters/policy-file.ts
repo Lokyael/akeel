@@ -1,16 +1,21 @@
 import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { join, resolve as resolvePath } from "node:path";
 import { parse as parseYaml } from "yaml";
-import { adaptPolicyConfig, adaptPolicyPresets } from "./config";
+import { validateExternalPolicyConfig } from "./config";
 import type { PolicyConfig } from "./config";
 
-export type PolicyFileLoad =
-  | Readonly<{ readonly kind: "ok"; readonly value: PolicyConfig }>
-  | Readonly<{ readonly kind: "error" }>;
+const BUILTIN_REVIEW_POLICY: PolicyConfig = Object.freeze({
+  presets: Object.freeze({ review: Object.freeze({}) }),
+  activePreset: "review",
+});
 
 function defaultAgentDir(): string {
   return process.env.PI_CODING_AGENT_DIR || join(homedir(), ".pi", "agent");
+}
+
+export function resolveAgentDir(agentDir = defaultAgentDir()): string {
+  return resolvePath(agentDir);
 }
 
 function deepFreeze(value: unknown): unknown {
@@ -22,21 +27,20 @@ function deepFreeze(value: unknown): unknown {
   return typeof value === "object" && value !== null ? Object.freeze(value) : value;
 }
 
-function error(): PolicyFileLoad {
-  return Object.freeze({ kind: "error" });
+function builtinReviewPolicy(): PolicyConfig {
+  return BUILTIN_REVIEW_POLICY;
 }
 
-export function loadPolicyFile(agentDir = defaultAgentDir()): PolicyFileLoad {
-  const path = join(agentDir, "akeel", "policy.yaml");
-  if (!existsSync(path)) return Object.freeze({ kind: "ok", value: Object.freeze({}) });
+export function loadPolicyFile(agentDir = defaultAgentDir()): PolicyConfig {
+  const path = join(resolveAgentDir(agentDir), "akeel", "policy.yaml");
+  if (!existsSync(path)) return builtinReviewPolicy();
 
   let value: unknown;
   try {
     value = parseYaml(readFileSync(path, "utf8"));
-    adaptPolicyConfig(value);
-    adaptPolicyPresets(value);
+    validateExternalPolicyConfig(value);
   } catch {
-    return error();
+    return builtinReviewPolicy();
   }
-  return Object.freeze({ kind: "ok", value: deepFreeze(value) as PolicyConfig });
+  return deepFreeze(value) as PolicyConfig;
 }

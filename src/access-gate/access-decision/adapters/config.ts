@@ -11,7 +11,8 @@ import type {
 } from "../core/index";
 
 export const POLICY_PRESET_NAMES = ["review", "guided", "develop"] as const;
-export type PolicyPresetName = (typeof POLICY_PRESET_NAMES)[number];
+export type BuiltinPolicyPresetName = (typeof POLICY_PRESET_NAMES)[number];
+export type PolicyPresetName = string;
 export type AccessGateMode = "disabled";
 
 type PolicyDefinition = Readonly<{
@@ -47,7 +48,7 @@ export type PolicySnapshot = Readonly<{
 
 export type PolicyPresetSet = Readonly<{
   readonly active: PolicyPresetName;
-  readonly snapshots: Readonly<Record<PolicyPresetName, PolicySnapshot>>;
+  readonly snapshots: Readonly<Record<string, PolicySnapshot>>;
 }>;
 
 const POLICY_MODES = ["allow", "ask", "deny"] as const;
@@ -64,6 +65,25 @@ const PATH_FIELDS = [
 const COMMAND_FIELDS = ["inspect", "modify", "execute", "destroy", "unknown"] as const;
 const DEFINITION_FIELDS = ["paths", "commands"] as const;
 const CONFIG_FIELDS = ["paths", "commands", "presets", "activePreset", "accessGate"] as const;
+const REQUIRED_PATH_MODES = ["read", "write", "edit", "list", "search"] as const;
+const REQUIRED_COMMAND_MODES = ["inspect", "modify", "execute", "destroy", "unknown"] as const;
+const PRESET_NAME_PATTERN = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
+const RESERVED_PRESET_NAMES = new Set([...POLICY_PRESET_NAMES, "status"]);
+
+const BUILTIN_POLICY_DEFINITIONS: Readonly<Record<BuiltinPolicyPresetName, PolicyDefinition>> = Object.freeze({
+  review: Object.freeze({
+    paths: Object.freeze({ read: "allow", list: "allow", search: "allow", write: "deny", edit: "deny" }),
+    commands: Object.freeze({ inspect: "allow", modify: "deny", execute: "deny", destroy: "deny", unknown: "deny" }),
+  }),
+  guided: Object.freeze({
+    paths: Object.freeze({ read: "allow", list: "allow", search: "allow", write: "ask", edit: "ask" }),
+    commands: Object.freeze({ inspect: "allow", modify: "ask", execute: "ask", destroy: "deny", unknown: "deny" }),
+  }),
+  develop: Object.freeze({
+    paths: Object.freeze({ read: "allow", list: "allow", search: "allow", write: "allow", edit: "allow" }),
+    commands: Object.freeze({ inspect: "allow", modify: "allow", execute: "allow", destroy: "deny", unknown: "ask" }),
+  }),
+});
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -79,6 +99,10 @@ function modeOrDefault(value: unknown, fallback: PolicyMode): PolicyMode {
   return value as PolicyMode;
 }
 
+function modeRank(mode: PolicyMode): number {
+  return mode === "allow" ? 2 : mode === "ask" ? 1 : 0;
+}
+
 function isAbsolutePolicyPath(value: unknown): value is string {
   return typeof value === "string" && value.length > 0 && value.startsWith("/") && !value.includes("\u0000");
 }
@@ -87,7 +111,19 @@ function invalidConfig(): TypeError {
   return new TypeError("invalid policy config");
 }
 
-function readPaths(value: unknown): {
+function isBuiltinPresetName(name: string): name is BuiltinPolicyPresetName {
+  return POLICY_PRESET_NAMES.includes(name as BuiltinPolicyPresetName);
+}
+
+function isValidPresetName(name: string): boolean {
+  return PRESET_NAME_PATTERN.test(name) && (isBuiltinPresetName(name) || !RESERVED_PRESET_NAMES.has(name));
+}
+
+function requireFields(value: Record<string, unknown>, fields: readonly string[]): void {
+  if (!fields.every((field) => Object.hasOwn(value, field) && value[field] !== undefined)) throw invalidConfig();
+}
+
+function readPaths(value: unknown, requireCompleteModes = false): {
   readonly read: PolicyMode;
   readonly write: PolicyMode;
   readonly edit: PolicyMode;
@@ -98,6 +134,7 @@ function readPaths(value: unknown): {
   readonly blockedPaths: readonly string[];
 } {
   if (value === undefined) {
+    if (requireCompleteModes) throw invalidConfig();
     return {
       read: "deny",
       write: "deny",
@@ -110,6 +147,7 @@ function readPaths(value: unknown): {
     };
   }
   if (!isRecord(value) || !hasOnlyKeys(value, PATH_FIELDS)) throw invalidConfig();
+  if (requireCompleteModes) requireFields(value, REQUIRED_PATH_MODES);
 
   const arrays = {} as Record<"allowedRoots" | "blockedRoots" | "blockedPaths", readonly string[]>;
   for (const field of ["allowedRoots", "blockedRoots", "blockedPaths"] as const) {
@@ -126,9 +164,13 @@ function readPaths(value: unknown): {
     );
   }
 
+  const read = modeOrDefault(value.read, "deny");
+  const write = modeOrDefault(value.write, "deny");
+  if (modeRank(write) > modeRank(read)) throw invalidConfig();
+
   return {
-    read: modeOrDefault(value.read, "deny"),
-    write: modeOrDefault(value.write, "deny"),
+    read,
+    write,
     edit: modeOrDefault(value.edit, "deny"),
     list: modeOrDefault(value.list, "deny"),
     search: modeOrDefault(value.search, "deny"),
@@ -136,15 +178,19 @@ function readPaths(value: unknown): {
   };
 }
 
-function readCommands(value: unknown): {
+function readCommands(value: unknown, requireCompleteModes = false): {
   readonly inspect: ShellPolicyMode;
   readonly modify: ShellPolicyMode;
   readonly execute: ShellPolicyMode;
   readonly destroy: ShellPolicyMode;
   readonly unknown: ShellPolicyMode;
 } {
-  if (value === undefined) return { inspect: "deny", modify: "deny", execute: "deny", destroy: "deny", unknown: "deny" };
+  if (value === undefined) {
+    if (requireCompleteModes) throw invalidConfig();
+    return { inspect: "deny", modify: "deny", execute: "deny", destroy: "deny", unknown: "deny" };
+  }
   if (!isRecord(value) || !hasOnlyKeys(value, COMMAND_FIELDS)) throw invalidConfig();
+  if (requireCompleteModes) requireFields(value, REQUIRED_COMMAND_MODES);
   return {
     inspect: modeOrDefault(value.inspect, "deny"),
     modify: modeOrDefault(value.modify, "deny"),
@@ -154,38 +200,46 @@ function readCommands(value: unknown): {
   };
 }
 
-function readDefinition(value: unknown, requireSections: boolean): PolicyDefinition {
+function readDefinition(value: unknown, requireSections: boolean, requireCompleteModes = false): PolicyDefinition {
   if (!isRecord(value) || !hasOnlyKeys(value, DEFINITION_FIELDS)) throw invalidConfig();
-  if (requireSections && (value.paths === undefined || value.commands === undefined)) throw invalidConfig();
-  if (value.paths !== undefined) readPaths(value.paths);
-  if (value.commands !== undefined) readCommands(value.commands);
+  if ((requireSections || requireCompleteModes) && (value.paths === undefined || value.commands === undefined)) throw invalidConfig();
+  if (value.paths !== undefined) readPaths(value.paths, requireCompleteModes);
+  if (value.commands !== undefined) readCommands(value.commands, requireCompleteModes);
   return value as PolicyDefinition;
 }
 
 type ParsedPolicy = Readonly<{
   readonly flat?: PolicyDefinition;
-  readonly presets?: Readonly<Record<PolicyPresetName, PolicyDefinition>>;
+  readonly presets?: Readonly<Record<string, PolicyDefinition>>;
   readonly activePreset?: PolicyPresetName;
   readonly disabled?: true;
 }>;
 
-function readConfig(input: unknown): ParsedPolicy {
+function readConfig(input: unknown, requireCompleteExternalModes = false): ParsedPolicy {
   if (!isRecord(input) || !hasOnlyKeys(input, CONFIG_FIELDS)) throw invalidConfig();
   if (input.accessGate !== undefined) {
     if (input.accessGate !== "disabled" || Reflect.ownKeys(input).length !== 1) throw invalidConfig();
     return Object.freeze({ disabled: true });
   }
   if (input.presets !== undefined) {
-    if (input.paths !== undefined || input.commands !== undefined || !isRecord(input.presets) || !hasOnlyKeys(input.presets, POLICY_PRESET_NAMES)) {
+    if (input.paths !== undefined || input.commands !== undefined || !isRecord(input.presets)) throw invalidConfig();
+    const presets = {} as Record<string, PolicyDefinition>;
+    for (const [name, value] of Object.entries(input.presets)) {
+      if (!isValidPresetName(name)) throw invalidConfig();
+      presets[name] = readDefinition(
+        value,
+        !isBuiltinPresetName(name),
+        requireCompleteExternalModes && !isBuiltinPresetName(name),
+      );
+    }
+    if (typeof input.activePreset !== "string" ||
+      (!isBuiltinPresetName(input.activePreset) && !Object.hasOwn(presets, input.activePreset))) {
       throw invalidConfig();
     }
-    if (typeof input.activePreset !== "string" || !POLICY_PRESET_NAMES.includes(input.activePreset as PolicyPresetName)) throw invalidConfig();
-    const presets = {} as Record<PolicyPresetName, PolicyDefinition>;
-    for (const name of POLICY_PRESET_NAMES) presets[name] = readDefinition(input.presets[name], true);
-    return Object.freeze({ presets: Object.freeze(presets), activePreset: input.activePreset as PolicyPresetName });
+    return Object.freeze({ presets: Object.freeze(presets), activePreset: input.activePreset });
   }
   if (input.activePreset !== undefined) throw invalidConfig();
-  return Object.freeze({ flat: readDefinition(input, false) });
+  return Object.freeze({ flat: readDefinition(input, false, requireCompleteExternalModes) });
 }
 
 function snapshotFor(definition: PolicyDefinition): PolicySnapshot {
@@ -216,22 +270,38 @@ function snapshotFor(definition: PolicyDefinition): PolicySnapshot {
   return Object.freeze({ direct, shell });
 }
 
-function samePaths(left: readonly string[], right: readonly string[]): boolean {
-  return left.length === right.length && left.every((value, index) => value === right[index]);
+function mergeBuiltinDefinition(name: BuiltinPolicyPresetName, supplied: PolicyDefinition | undefined): PolicyDefinition {
+  const builtin = BUILTIN_POLICY_DEFINITIONS[name];
+  if (supplied === undefined) return builtin;
+  const merged = {
+    paths: { ...builtin.paths, ...supplied.paths },
+    commands: { ...builtin.commands, ...supplied.commands },
+  };
+  const expected = snapshotFor(builtin);
+  const actual = snapshotFor(merged);
+  if (actual.direct.read !== expected.direct.read ||
+    actual.direct.write !== expected.direct.write ||
+    actual.direct.edit !== expected.direct.edit ||
+    actual.direct.list !== expected.direct.list ||
+    actual.direct.search !== expected.direct.search ||
+    actual.shell.inspect !== expected.shell.inspect ||
+    actual.shell.modify !== expected.shell.modify ||
+    actual.shell.execute !== expected.shell.execute ||
+    actual.shell.destroy !== expected.shell.destroy ||
+    actual.shell.unknown !== expected.shell.unknown) {
+    throw invalidConfig();
+  }
+  return merged;
 }
 
 function presetSetFrom(parsed: ParsedPolicy): PolicyPresetSet | undefined {
   if (parsed.presets === undefined) return undefined;
-  const snapshots = {} as Record<PolicyPresetName, PolicySnapshot>;
-  for (const name of POLICY_PRESET_NAMES) snapshots[name] = snapshotFor(parsed.presets[name]);
-  const baseline = snapshots.review.direct;
-  for (const name of POLICY_PRESET_NAMES.slice(1)) {
-    const current = snapshots[name].direct;
-    if (!samePaths(baseline.allowedRoots, current.allowedRoots) ||
-      !samePaths(baseline.blockedRoots, current.blockedRoots) ||
-      !samePaths(baseline.blockedPaths, current.blockedPaths)) {
-      throw invalidConfig();
-    }
+  const snapshots: Record<string, PolicySnapshot> = {};
+  for (const name of POLICY_PRESET_NAMES) {
+    snapshots[name] = snapshotFor(mergeBuiltinDefinition(name, parsed.presets[name]));
+  }
+  for (const [name, definition] of Object.entries(parsed.presets)) {
+    if (!isBuiltinPresetName(name)) snapshots[name] = snapshotFor(definition);
   }
   return Object.freeze({ active: parsed.activePreset!, snapshots: Object.freeze(snapshots) });
 }
@@ -245,7 +315,18 @@ export function adaptPolicyConfig(input: unknown): PolicySnapshot {
 }
 
 export function adaptPolicyPresets(input: unknown): PolicyPresetSet | undefined {
-  return presetSetFrom(readConfig(input));
+  const parsed = readConfig(input);
+  if (parsed.presets === undefined) return undefined;
+  return presetSetFrom(readConfig(input, true));
+}
+
+export function validateExternalPolicyConfig(input: unknown): void {
+  const parsed = readConfig(input, true);
+  if (parsed.presets !== undefined) {
+    presetSetFrom(parsed);
+  } else if (parsed.flat !== undefined) {
+    snapshotFor(parsed.flat);
+  }
 }
 
 export function isAccessGateDisabled(input: unknown): boolean {

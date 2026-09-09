@@ -11,14 +11,49 @@ import {
 } from "../../../../src/access-gate/access-decision";
 import {
   compileDirect,
+  createCredentialBoundary,
+  directAdmissionHitsCredentialBoundary,
   evaluateAdmission,
   freezePolicySnapshot,
   projectAdmission,
 } from "../../../../src/access-gate/access-decision/core/index";
 
+const testBoundary = createCredentialBoundary(["/__test-agent-dir__"]);
+
 function testService(paths: NonNullable<PolicyConfig["paths"]>): ReturnType<typeof createDecisionService> {
-  return createDecisionService(createPolicyState({ paths }));
+  return createDecisionService(createPolicyState({ paths }), undefined, undefined, testBoundary);
 }
+
+test("credential artifact paths remain hard boundaries under an allowing Direct policy", () => {
+  const compilation = compileDirect({
+    surface: "read",
+    arguments: { path: "/home/user/.pi/agent/auth.json.bak" },
+    cwd: "/workspace/project",
+    hasUI: false,
+  });
+  const admission = projectAdmission(compilation);
+  assert.ok(admission);
+  assert.equal(directAdmissionHitsCredentialBoundary(
+    admission,
+    createCredentialBoundary(["/home/user/.pi/agent"]),
+  ), true);
+});
+
+test("Policy Kernel evaluates a non-credential admission from only policy inputs", () => {
+  const compilation = compileDirect({
+    surface: "read",
+    arguments: { path: "README.md" },
+    cwd: "/workspace/project",
+    hasUI: false,
+  });
+  const admission = projectAdmission(compilation);
+  assert.ok(admission);
+
+  assert.deepEqual(
+    evaluateAdmission(admission, freezePolicySnapshot({ read: "allow", write: "deny" })),
+    { kind: "allow" },
+  );
+});
 
 test("Direct path policy follows existing symlink components", () => {
   const root = mkdtempSync(join(tmpdir(), "akeel-direct-path-"));
@@ -103,6 +138,75 @@ test("Direct path policy retains blocked components hidden by a symlink target",
   }
 });
 
+test("all Direct credential artifact surfaces remain hard boundaries", () => {
+  const service = testService({
+    read: "allow",
+    write: "allow",
+    edit: "allow",
+    list: "allow",
+    search: "allow",
+  });
+
+  assert.deepEqual(service.decide({
+    surface: "read",
+    arguments: { path: "/__test-agent-dir__/auth.json" },
+    cwd: "/workspace/project",
+    hasUI: false,
+  }), { kind: "deny", code: "hard-boundary" });
+  assert.deepEqual(service.decide({
+    surface: "write",
+    arguments: { path: "/__test-agent-dir__/auth.json.bak", content: "secret" },
+    cwd: "/workspace/project",
+    hasUI: false,
+  }), { kind: "deny", code: "hard-boundary" });
+  assert.deepEqual(service.decide({
+    surface: "edit",
+    arguments: { path: "/__test-agent-dir__/auth.json.old", edits: [{ oldText: "old", newText: "new" }] },
+    cwd: "/workspace/project",
+    hasUI: false,
+  }), { kind: "deny", code: "hard-boundary" });
+  assert.deepEqual(service.decide({
+    surface: "list",
+    arguments: { path: "/__test-agent-dir__/auth.json~" },
+    cwd: "/workspace/project",
+    hasUI: false,
+  }), { kind: "deny", code: "hard-boundary" });
+  assert.deepEqual(service.decide({
+    surface: "search",
+    arguments: { path: "/__test-agent-dir__/auth.json.2025", pattern: "token" },
+    cwd: "/workspace/project",
+    hasUI: false,
+  }), { kind: "deny", code: "hard-boundary" });
+});
+
+test("credential templates and parent directory searches remain policy-governed", () => {
+  const service = testService({
+    read: "allow",
+    write: "allow",
+    list: "allow",
+    search: "allow",
+  });
+
+  assert.deepEqual(service.decide({
+    surface: "read",
+    arguments: { path: "/__test-agent-dir__/auth.json.template" },
+    cwd: "/workspace/project",
+    hasUI: false,
+  }), { kind: "allow" });
+  assert.deepEqual(service.decide({
+    surface: "list",
+    arguments: { path: "/__test-agent-dir__" },
+    cwd: "/workspace/project",
+    hasUI: false,
+  }), { kind: "allow" });
+  assert.deepEqual(service.decide({
+    surface: "search",
+    arguments: { path: "/__test-agent-dir__", pattern: "needle" },
+    cwd: "/workspace/project",
+    hasUI: false,
+  }), { kind: "allow" });
+});
+
 test("Direct search cannot recurse into a blocked descendant", () => {
   const service = testService({
     read: "allow",
@@ -145,7 +249,7 @@ test("admits a Direct read request with bounded line selection", () => {
 });
 
 test("admits a Direct write request with its required content", () => {
-  const service = testService({ read: "deny", write: "allow", list: "deny", search: "deny" });
+  const service = testService({ read: "allow", write: "allow", list: "deny", search: "deny" });
   const request: DirectRequest = {
     surface: "write",
     arguments: { path: "notes.md", content: "hello\n" },

@@ -41,14 +41,6 @@ const unsupportedCommandWords = new Set([
   "case", "do", "done", "elif", "else", "esac", "fi", "for", "function", "if", "in", "select", "then", "time", "until", "while",
 ]);
 const wrappers = new Set(["env", "timeout", "command", "nohup", "exec"]);
-const modeledCommandNames = new Set([
-  ...inspectionCommands,
-  ...modificationCommands,
-  ...destructionCommands,
-  ...executionCommands,
-  "echo",
-  "printf",
-]);
 const opaquePathAnalyses = new WeakSet<object>();
 const hardBoundaryAnalyses = new WeakSet<object>();
 const recursiveAnalyses = new WeakSet<object>();
@@ -406,16 +398,17 @@ export function analyzeShellCommandWords(words: readonly ShellWord[]): ShellComm
     for (const effect of programSemantic.effects) addEffect(effects, effect);
     for (const programPath of programSemantic.paths) addPath(programPath.path, programPath.start, programPath.base);
   }
-  if (inspectionCommands.has(executableName)) addEffect(effects, "read");
+  const opaquePathForm = executable.includes("/") && classification !== "destroy";
+  if (!opaquePathForm && inspectionCommands.has(executableName)) addEffect(effects, "read");
   if (classification === "modify") addEffect(effects, "write");
   if (classification === "destroy") addEffect(effects, "delete");
   if (classification === "execute") addEffect(effects, "execute");
   if (paths.some(({ path }) => path.role === "target")) addEffect(effects, "write");
-  if (
+  if (!opaquePathForm && (
     inspectionCommands.has(executableName) ||
     modificationCommands.has(executableName) ||
     destructionCommands.has(executableName)
-  ) {
+  )) {
     let optionsEnded = false;
     let hasPathOperand = false;
     let patternSeen = executableName !== "rg" && executableName !== "grep";
@@ -462,7 +455,7 @@ export function analyzeShellCommandWords(words: readonly ShellWord[]): ShellComm
     cwdChanges: Object.freeze([...(programSemantic?.cwdChanges ?? [])]),
   }));
   if (programSemantic?.opaque === true || classification === "unknown" ||
-    (executable.includes("/") && !modeledCommandNames.has(executableName)) ||
+    (executable.includes("/") && classification !== "destroy") ||
     (executableName === "uv" && classification === "execute")) {
     opaquePathAnalyses.add(result);
   }

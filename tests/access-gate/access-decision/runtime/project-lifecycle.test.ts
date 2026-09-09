@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import { tmpdir } from "node:os";
 import { createProjectLifecycle } from "../../../../src/access-gate/access-decision";
@@ -13,13 +13,13 @@ function project(): { readonly root: string; readonly nested: string; readonly c
   return { root, nested, cleanup: () => rmSync(root, { recursive: true, force: true }) };
 }
 
-test("project lifecycle discovers the enclosing Git root and owns a staging directory", () => {
+test("project lifecycle uses the session cwd as access root and owns staging", () => {
   const fixture = project();
   try {
     const lifecycle = createProjectLifecycle(fixture.nested);
 
     assert.equal(lifecycle.context.cwd, fixture.nested);
-    assert.equal(lifecycle.context.projectRoot, fixture.root);
+    assert.equal(lifecycle.context.projectRoot, fixture.nested);
     assert.equal(existsSync(lifecycle.context.stagingRoot), true);
 
     lifecycle.dispose();
@@ -29,12 +29,53 @@ test("project lifecycle discovers the enclosing Git root and owns a staging dire
   }
 });
 
-test("project lifecycle rejects a cwd outside a discoverable project", () => {
+test("project lifecycle accepts a non-Git cwd as access root", () => {
   const cwd = mkdtempSync(join(tmpdir(), "akeel-no-project-"));
   try {
-    assert.throws(() => createProjectLifecycle(cwd), /invalid project lifecycle/);
+    const lifecycle = createProjectLifecycle(cwd);
+    assert.equal(lifecycle.context.projectRoot, cwd);
+    lifecycle.dispose();
   } finally {
     rmSync(cwd, { recursive: true, force: true });
+  }
+});
+
+test("project lifecycle keeps a multi-repository parent as access root", () => {
+  const root = mkdtempSync(join(tmpdir(), "akeel-workspace-"));
+  try {
+    mkdirSync(join(root, "app", ".git"), { recursive: true });
+    mkdirSync(join(root, "tools", ".git"), { recursive: true });
+    const lifecycle = createProjectLifecycle(root);
+    assert.equal(lifecycle.context.projectRoot, root);
+    lifecycle.dispose();
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("project lifecycle ignores symlinked Git metadata", () => {
+  const root = mkdtempSync(join(tmpdir(), "akeel-symlinked-git-"));
+  const target = mkdtempSync(join(tmpdir(), "akeel-git-target-"));
+  try {
+    symlinkSync(target, join(root, ".git"), "dir");
+    const lifecycle = createProjectLifecycle(root);
+    assert.equal(lifecycle.context.projectRoot, root);
+    lifecycle.dispose();
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+    rmSync(target, { recursive: true, force: true });
+  }
+});
+
+test("project lifecycle ignores Git file metadata", () => {
+  const root = mkdtempSync(join(tmpdir(), "akeel-gitfile-"));
+  try {
+    writeFileSync(join(root, ".git"), "gitdir: /outside/repository\n");
+    const lifecycle = createProjectLifecycle(root);
+    assert.equal(lifecycle.context.projectRoot, root);
+    lifecycle.dispose();
+  } finally {
+    rmSync(root, { recursive: true, force: true });
   }
 });
 

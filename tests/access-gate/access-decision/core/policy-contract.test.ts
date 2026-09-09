@@ -13,13 +13,13 @@ test("policy snapshot vocabulary is closed and non-empty", () => {
   assert.equal(hasUniqueValues(POLICY_OPERATIONS), true);
   assert.equal(hasUniqueValues(POLICY_CLASSES), true);
   assert.equal(hasUniqueValues(POLICY_DECISIONS), true);
-  assert.deepEqual(POLICY_DECISIONS, ["hard-deny", "profile-deny", "ask", "allow"]);
+  assert.deepEqual(POLICY_DECISIONS, ["hard-deny", "policy-deny", "ask", "allow"]);
 });
 
-test("policy precedence keeps hard boundaries ahead of profile and approval", () => {
+test("policy precedence keeps hard boundaries ahead of policy denial and approval", () => {
   const precedence = new Map(POLICY_DECISIONS.map((decision, index) => [decision, index]));
-  assert.ok(precedence.get("hard-deny")! < precedence.get("profile-deny")!);
-  assert.ok(precedence.get("profile-deny")! < precedence.get("ask")!);
+  assert.ok(precedence.get("hard-deny")! < precedence.get("policy-deny")!);
+  assert.ok(precedence.get("policy-deny")! < precedence.get("ask")!);
   assert.ok(precedence.get("ask")! < precedence.get("allow")!);
 });
 

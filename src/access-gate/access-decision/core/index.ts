@@ -1,4 +1,11 @@
 export { projectAdmission, projectShellAdmission } from "./admission";
+export {
+  createCredentialBoundary,
+  directAdmissionHitsCredentialBoundary,
+  pathHitsCredentialBoundary,
+  shellAdmissionHitsCredentialBoundary,
+} from "./credential-boundary";
+export type { CredentialBoundary } from "./credential-boundary";
 export { compileDirect, isCanonicalReject } from "./canonical";
 export { freezePolicySnapshot, evaluateAdmission } from "./policy";
 export { projectDisplay, projectShellDisplay } from "./display";

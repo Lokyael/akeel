@@ -1,6 +1,6 @@
 /**
- * bootstrap — Injects core behavioral principles + evidence-first verification at
- * session start and after every compaction. Soft enforcement (recommend, not demand).
+ * bootstrap — Injects core behavioral principles at session start and after every
+ * compaction. Soft enforcement (recommend, not demand).
  */
 
 import { readFileSync } from "node:fs";

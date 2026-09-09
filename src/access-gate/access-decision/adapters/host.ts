@@ -4,7 +4,6 @@ import type { ShellRequest } from "../core/index";
 export type HostContext = Readonly<{
   readonly cwd: string;
   readonly hasUI: boolean;
-  readonly home?: string;
 }>;
 
 type ManagedRequest = Readonly<{
@@ -71,9 +70,7 @@ function validHostContext(value: unknown): value is HostContext {
     value.cwd.length > 0 &&
     value.cwd.startsWith("/") &&
     !value.cwd.includes("\u0000") &&
-    typeof value.hasUI === "boolean" &&
-    (value.home === undefined ||
-      (typeof value.home === "string" && value.home.length > 0 && value.home.startsWith("/") && !value.home.includes("\u0000")))
+    typeof value.hasUI === "boolean"
   );
 }
 
@@ -118,7 +115,6 @@ export function adaptHostToolCall(toolName: unknown, input: unknown, context: un
       arguments: input,
       cwd: context.cwd,
       hasUI: context.hasUI,
-      ...(context.home === undefined ? {} : { home: context.home }),
     } as ShellRequest,
   };
 }

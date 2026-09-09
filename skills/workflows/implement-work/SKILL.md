@@ -6,7 +6,7 @@ disable-model-invocation: true
 
 # Implement Task
 
-If you are still in a restrictive profile (e.g. `keel-plan`), tell the user: "Switch to a permissive profile with `/profile keel-build` first." Do not proceed without sufficient permissions.
+If the current policy does not permit the required writes, tell the user: "Switch to a writable policy with `/policy develop` first." Do not proceed without sufficient permissions.
 
 ## Process
 
@@ -14,7 +14,7 @@ If you are still in a restrictive profile (e.g. `keel-plan`), tell the user: "Sw
 
 Use `/skill:test-driven-development` where possible, at pre-agreed seams (confirm seams with the user before writing tests).
 
-Run typechecking and tests: single test files while iterating, then the full test suite before finishing.
+Run typechecking and tests: single test files while iterating, then the full test suite before finishing. Re-read every Task Requirement and verify it with concrete evidence; passing tests alone does not prove the Task complete.
 
 Once done, use `/skill:code-audit` to self-review, then `/skill:code-review` for independent review.
 Finally, apply `doc-sync`: verify that project documentation reflects the current code. Fix stale counts, broken references, and outdated architecture descriptions.

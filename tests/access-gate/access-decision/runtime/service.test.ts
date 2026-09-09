@@ -1,11 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
-  createDecisionService,
   createPolicyState,
   createProjectContext,
   type DirectRequest,
 } from "../../../../src/access-gate/access-decision";
+import { createTestDecisionService as createDecisionService } from "./test-fixtures";
 
 const request = (hasUI: boolean): DirectRequest => ({
   surface: "write",
@@ -55,6 +55,44 @@ test("accepts a runtime policy state produced by the new config adapter", () => 
   );
 
   assert.deepEqual(service.decide(request(true)), { kind: "ask", executed: false });
+});
+
+test("explicit allowed roots do not gain implicit project access", () => {
+  const service = createDecisionService(
+    createPolicyState({ paths: { read: "allow", allowedRoots: ["/srv/audit"] } }),
+    createProjectContext({ cwd: "/workspace/project", projectRoot: "/workspace/project", stagingRoot: "/tmp/akeel" }),
+  );
+
+  assert.deepEqual(service.decide({
+    surface: "read",
+    arguments: { path: "/workspace/project/README.md" },
+    cwd: "/workspace/project",
+    hasUI: false,
+  }), { kind: "deny", code: "hard-boundary" });
+});
+
+test("explicit allowed roots constrain Shell access independently", () => {
+  const service = createDecisionService(
+    createPolicyState({ paths: { read: "allow", allowedRoots: ["/srv/audit"] }, commands: { inspect: "allow" } }),
+    createProjectContext({ cwd: "/workspace/project", projectRoot: "/workspace/project", stagingRoot: "/tmp/akeel" }),
+  );
+
+  assert.deepEqual(service.decideToolCall("bash", { command: "cat /workspace/project/README.md" }, {
+    cwd: "/workspace/project",
+    hasUI: false,
+  }), { kind: "block", code: "hard-boundary", reason: "Blocked by a security boundary." });
+});
+
+test("path-form interpreter information calls remain hard-denied", () => {
+  const service = createDecisionService(
+    createPolicyState({ paths: { read: "allow" }, commands: { inspect: "allow" } }),
+    createProjectContext({ cwd: "/workspace/project", projectRoot: "/workspace/project", stagingRoot: "/tmp/akeel" }),
+  );
+
+  assert.deepEqual(
+    service.decideToolCall("bash", { command: "./python --version" }, { cwd: "/workspace/project", hasUI: false }),
+    { kind: "block", code: "hard-boundary", reason: "Blocked by a security boundary." },
+  );
 });
 
 test("routes a host Shell call through canonical compilation and shell policy", () => {

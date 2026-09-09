@@ -16,7 +16,7 @@ import { join } from "node:path";
 import { parseDocument } from "yaml";
 
 const SKILLS_ROOT = join(import.meta.dirname!, "..", "skills");
-const SKILL_LAYERS = ["foundations", "disciplines", "workflows"] as const;
+const SKILL_LAYERS = ["disciplines", "workflows"] as const;
 
 /** 触发句前缀（disciplines 强制 + 模型可调用 workflow 告警共用）。 */
 const TRIGGER_PREFIXES = ["Use when", "Use before", "Use after", "Use during"] as const;
@@ -29,7 +29,7 @@ interface FrontmatterResult {
 export interface SkillMeta {
   /** Directory name (e.g. "codebase-design") */
   dirName: string;
-  /** Layer: foundations, disciplines, or workflows */
+  /** Authoring responsibility: disciplines or workflows */
   layer: string;
   /** Frontmatter parsing error, if present */
   frontmatterError?: string;
@@ -152,8 +152,6 @@ export function checkDescriptionConvention(skill: SkillMeta): CheckResult {
       );
     }
   }
-
-  // Foundations: should be descriptive, no strict format enforcement
 
   // Workflows with disable-model-invocation: manual-only skills — description MUST be an
   // explicit invocation guide, not a model-facing trigger promise that can never fire.

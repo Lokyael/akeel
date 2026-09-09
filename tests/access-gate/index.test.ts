@@ -50,36 +50,54 @@ test("unowned tools pass through even before the managed decision service initia
   });
 });
 
-test("legacy config cannot initialize authorization without the new policy file", async () => {
+test("legacy config is ignored and the built-in review policy remains active", async () => {
   await withAgentFiles(
     undefined,
     "paths:\n  read: allow\n",
     async (_agentDir, harness) => {
       await harness.handlers.get("session_start")!(undefined, harness.ctx);
+      assert.equal(await invoke(harness, { toolName: "read", input: { path: "README.md" } }), undefined);
       assert.deepEqual(
-        await invoke(harness, { toolName: "read", input: { path: "README.md" } }),
-        { block: true, reason: "Blocked by access policy." },
+        await invoke(harness, { toolName: "write", input: { path: "notes.md", content: "updated\n" } }),
+        { block: true, reason: "The current session is read-only; switch policy with /policy before retrying this modification." },
       );
     },
   );
 });
 
-test("missing policy fails closed while malformed policy fails before service initialization", async () => {
+test("missing and malformed external policy use the built-in review baseline", async () => {
   await withAgentFiles(undefined, undefined, async (_agentDir, harness) => {
     await harness.handlers.get("session_start")!(undefined, harness.ctx);
+    assert.equal(await invoke(harness, { toolName: "read", input: { path: "README.md" } }), undefined);
     assert.deepEqual(
-      await invoke(harness, { toolName: "read", input: { path: "README.md" } }),
-      { block: true, reason: "Blocked by access policy." },
+      await invoke(harness, { toolName: "write", input: { path: "notes.md", content: "updated\n" } }),
+      { block: true, reason: "The current session is read-only; switch policy with /policy before retrying this modification." },
     );
   });
 
   await withAgentFiles("paths: [", undefined, async (_agentDir, harness) => {
     await harness.handlers.get("session_start")!(undefined, harness.ctx);
+    assert.equal(await invoke(harness, { toolName: "read", input: { path: "README.md" } }), undefined);
     assert.deepEqual(
-      await invoke(harness, { toolName: "read", input: { path: "README.md" } }),
-      { block: true, reason: "Blocked because the decision service is not initialized." },
+      await invoke(harness, { toolName: "write", input: { path: "notes.md", content: "updated\n" } }),
+      { block: true, reason: "The current session is read-only; switch policy with /policy before retrying this modification." },
     );
   });
+});
+
+test("an invalid external policy is ignored as a whole", async () => {
+  await withAgentFiles(
+    "paths:\n  read: allow\n  write: allow\nunknown: value\n",
+    undefined,
+    async (_agentDir, harness) => {
+      await harness.handlers.get("session_start")!(undefined, harness.ctx);
+      assert.equal(await invoke(harness, { toolName: "read", input: { path: "README.md" } }), undefined);
+      assert.deepEqual(
+        await invoke(harness, { toolName: "write", input: { path: "notes.md", content: "updated\n" } }),
+        { block: true, reason: "The current session is read-only; switch policy with /policy before retrying this modification." },
+      );
+    },
+  );
 });
 
 test("managed calls use the new allow, confirm, and deny host contract exactly once", async () => {
@@ -87,10 +105,15 @@ test("managed calls use the new allow, confirm, and deny host contract exactly o
     "paths:",
     "  read: allow",
     "  write: ask",
+    "  edit: deny",
+    "  list: allow",
+    "  search: allow",
     "commands:",
     "  inspect: allow",
     "  modify: deny",
+    "  execute: deny",
     "  destroy: deny",
+    "  unknown: deny",
     "",
   ].join("\n");
 

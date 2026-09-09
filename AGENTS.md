@@ -10,21 +10,22 @@ AKeel 是 [pi](https://pi.dev) 的插件包：以 **扩展（extensions）** 注
 
 | 类别 | 位置 | 是什么 | 分发方式 | 维护对象 |
 |------|------|--------|----------|----------|
-| **扩展（插件）** | `src/bootstrap/`、`src/access-gate/` | Session 启动注入的原则（`principles.md`）与 Profile 驱动的访问控制代码 | `package.json` 的 `pi.extensions` | 运行时行为；改动需同步测试与文档 |
-| **Skills** | `skills/foundations/`、`skills/disciplines/`、`skills/workflows/` | 按需加载的技能，含 SKILL.md 与配套文件；三目录表达加载时机（D-005） | `package.json` 的 `pi.skills` | 技能内容与流程；只引用权威文档，不重复定义规则 |
+| **扩展（插件）** | `src/bootstrap/`、`src/access-gate/` | Session 启动注入的原则（`principles.md`）与 `policy.yaml` 驱动的访问控制代码 | `package.json` 的 `pi.extensions` | 运行时行为；改动需同步测试与文档 |
+| **Skills** | `skills/disciplines/`、`skills/workflows/` | 按需加载的技能，含 SKILL.md 与配套文件；两目录表达作者职责，不定义 Pi 加载机制（D-073） | `package.json` 的 `pi.skills` | 技能内容与流程；只引用权威文档，不重复定义规则 |
 | **开发内容（dev）** | `tests/`、`scripts/`、`types/`、`tsconfig.json`、`package.json` 脚本 | AKeel 自身的构建、测试、类型声明与技能校验 | 不进入用户项目分发 | 开发质量；改动随对应功能同步 |
 
 ## 目录速查
 
 ```
 src/bootstrap/          # 扩展：Session 注入原则（principles.md + index.ts）
-src/access-gate/        # 扩展：集中配置（config/）、Profile、Shell IR、命令语义、路径策略、Gate、Session、Footer
-  gate/                 #   Gate 内部：plan/（编译器+验证）、decision/（内核+渲染）、共享根（host/decision-types/decision-code-catalog）
+src/access-gate/        # 扩展：policy.yaml adapter、Canonical access-decision 与 Pi runtime composition
+  access-decision/core/ #   Pi host/config 无关的 Canonical、Admission、Policy 与 renderer
+  access-decision/adapters/ # 外部 Pi/tool/policy.yaml 合同适配
+  access-decision/runtime/  # Project/Policy 生命周期与 host composition
   */index.ts            #   目录公共表面：跨目录引用统一走目录 index，不深入实现文件
-skills/                 # skills：三目录按加载时机组织（D-005）
-  foundations/          #   基础约束（evidence-first）
-  disciplines/          #   工程纪律（TDD、代码审查、领域建模等）
-  workflows/            #   工作流（survey-context、implement-work 等）
+skills/                 # skills：两目录按作者职责组织（D-073）
+  disciplines/          #   可复用工程方法（TDD、代码审查、领域建模等）
+  workflows/            #   端到端编排（survey-context、implement-work 等）
 tests/                  # dev：访问控制测试（按 src/access-gate 镜像分层）+ 技能校验规则测试（validate-skills.test.ts）；npm test 入口
 scripts/                # dev：validate-skills.ts 等校验脚本
 types/                  # dev：pi 宿主类型声明
