@@ -270,7 +270,7 @@ Classify new information in this order:
 3. Uncommitted candidate with a concrete revisit condition → Candidate Record.
 4. Otherwise, do not create a project record.
 
-Requirements, Design, and Plan are Task Record sections, not standalone document types. **Durable Content**: facts, tradeoffs, and commitments that remain load-bearing after the current work or session ends (adopted conclusions, security invariants, external ownership boundaries, rejected alternatives); process artifacts (implementation steps, test logs, review reports) are not durable content and never enter these containers. When a record changes type, move its durable content instead of copying it and remove the source in the same change so two authority levels cannot coexist; optional `Origin: C-xxx` / `T-xxx` preserves the transition reference for type transitions. Pruned decisions carry no source annotation — Git retains history.
+Requirements, Design, and Plan are Task Record sections, not standalone document types. **Durable Content**: facts, tradeoffs, and commitments that remain load-bearing after the current work or session ends (adopted conclusions, security invariants, external ownership boundaries, rejected alternatives); process artifacts (implementation steps, test logs, review reports) are not durable content and never enter these containers. When a record changes type, move its durable content instead of copying it and remove the source in the same change so two authority levels cannot coexist. A Task promoted from a Candidate may carry optional `Origin: C-xxx` while that Task remains active; Decision Records carry no `Origin` or other process provenance because Git retains permanent history.
 
 ### Document Set
 
@@ -288,20 +288,31 @@ Use `docs/task-<topic>.md` only for genuinely independent tasks with separate li
 ```
 Candidate: parked → promoted (→ T-xxx / D-xxx / other authority) | dismissed (no durable content)
 Task:      draft → in-progress → verified → cleared
-Decision:  active → superseded (→ absorbing D-xxx) | retired (→ Negative Space / boundary D-xxx) → pruned
+Decision:  present (= active) → superseded (→ absorbing D-xxx) | retired (→ Negative Space / boundary D-xxx) → pruned
 Context:   current truth, no status transition
 ```
 
-Decision Records may carry an optional **Reversal surface** — the approval
-surface for reversal: `user-boundary` (security invariants, ownership
-boundaries, explicit user commitments — reverse only with explicit user
-approval; update security docs / Negative Space in the same change) or
-`engineering` (module-level implementation choices — may be superseded
-formally during refactor via the lifecycle above). Default is
-`user-boundary` (fail-safe: unmarked entries are reported conservatively).
-The attribute is surfacing information, not permission: a recorded
-decision changes only through the lifecycle above, and any material
-deviation is reported, never applied silently.
+Every Decision Record declares a **Reversal surface** — the approval surface
+for reversal: `user-boundary` (security invariants, ownership boundaries,
+explicit user commitments — reverse only with explicit user approval; update
+security docs / Negative Space in the same change) or `engineering`
+(module-level implementation choices — may be superseded formally during
+refactor via the lifecycle above). The attribute is surfacing information,
+not permission: a recorded decision changes only through the lifecycle above,
+and any material deviation is reported, never applied silently.
+
+### Decision Record Format
+
+A Decision's presence in the register means `active`; do not add `Status`,
+`Origin`, task references, process dates, or other process metadata. Use this order:
+
+Structure: heading `## D-xxx: <title>` → `Reversal surface` → `Decision` →
+optional specification sections → `Why` → optional `Impact` → optional
+`Rejected` → optional `Out of Scope`.
+
+`Reversal surface`, `Decision`, and `Why` are required and unique. Optional
+specification sections occur only between `Decision` and `Why`; omit empty
+optional sections rather than generating filler.
 
 `Trigger` records evidence that may justify asking the user whether to review; it never activates a Candidate Record automatically.
 
@@ -313,9 +324,10 @@ Kind: `feature | bug | refactor | investigation | maintenance`. A Task Record co
 
 | Transition | Move | Source handling | Origin |
 |---|---|---|---|
-| C → T / D / other authority | durable content | remove C entry in the same change | `Origin: C-xxx` |
+| C → T | durable content | remove C entry in the same change | optional `Origin: C-xxx` on the active Task |
+| C → D / other authority | durable content | remove C entry in the same change | — (Git retains history) |
 | C → dismissed | — (no durable content) | remove C entry in the same change | — |
-| T → D / CONTEXT | extracted long-term info | clear T section in the same change | `Origin: T-xxx` |
+| T → D / CONTEXT | extracted long-term info | clear T section in the same change | — (Git retains history) |
 | D → superseded | full conclusion + rationale + rejected alternatives | prune after absorbing D-xxx fully lands | — (Git retains history) |
 | D → retired (withdrawn) | residual durable claims → Negative Space | prune once destination is in place | — (Git retains history) |
 | D → retired (external handoff) | ownership boundary → new boundary decision / CONTEXT | prune once destination is in place | — (Git retains history) |

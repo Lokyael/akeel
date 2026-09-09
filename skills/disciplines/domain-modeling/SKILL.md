@@ -58,15 +58,16 @@ principles.md Project Records — Migration Protocol).
 
 ### Record Load-Bearing Decisions
 
-Offer: "Want me to record this in `docs/decisions.md`?" only after the user has adopted a hard, contentious, or future-explorer-relevant conclusion. Record a precise `D-xxx: <decision>` entry (per principles.md Next-ID slots) — with the decision, reasons, rejected alternatives, consequences, and genuine Out of Scope items. Do not record exploratory steps or uncommitted candidates as Decisions, and do not create one file per decision.
+Offer: "Want me to record this in `docs/decisions.md`?" only after the user has adopted a hard, contentious, or future-explorer-relevant conclusion. Record a precise `D-xxx: <decision>` entry using the approval classification in principles.md Project Records — Record Lifecycle, the structure in principles.md Project Records — Decision Record Format, and principles.md Next-ID slots. Do not record exploratory steps or uncommitted candidates as Decisions, generate empty optional sections, or create one file per decision.
 
 ### Retire a Decision
 
 When a decision's capability is withdrawn or handed to an external owner,
-record it as `retired`, not `superseded` — `superseded` requires an absorbing
-successor. Record the retirement in the same change: move residual durable
-claims to `CONTEXT.md` Negative Space or a new boundary decision, then prune
-the old entry. Git retains history and the ID is never reused.
+classify the transition as `retired`, not `superseded` — `superseded` requires
+an absorbing successor. In the same change, move residual durable claims to
+`CONTEXT.md` Negative Space or a new boundary decision, then prune the old
+entry; do not leave terminal status metadata in the live register. Git retains
+history and the ID is never reused.
 
 ## Integration
 

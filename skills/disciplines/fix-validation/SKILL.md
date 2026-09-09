@@ -15,7 +15,7 @@ description: 'Use after fixing a bug or implementing a feature, before code-revi
 Run the exact test that was failing before the fix:
 
 ```bash
-npm test path/to/failing-test.test.ts
+npm run test:file -- path/to/failing-test.test.ts
 ```
 
 Expected: PASS. If it fails, the fix is incomplete. Return to debugging.
@@ -30,14 +30,11 @@ npm test
 
 Expected: All tests pass. If any fail, fix the regression before proceeding.
 
-### 3. Run Build and Lint
+### 3. Check Repository Validation Gates
 
-```bash
-npm run build   # or appropriate build command
-npm run lint    # or appropriate lint command
-```
+The full `npm test` command already runs `validate-docs`, `validate-skills`, TypeScript checking, and the complete test suite. This repository has no separate `build` or `lint` scripts.
 
-Expected: Exit 0 for both. No new warnings.
+Expected: `npm test` exits 0 with no new warnings.
 
 ### 4. Manual Verification (if applicable)
 
@@ -59,8 +56,7 @@ Confirm: only the files you intended to change are modified. No stray files.
 
 - [ ] Original failing test passes
 - [ ] Full test suite passes (0 failures)
-- [ ] Build succeeds (exit 0)
-- [ ] Lint clean (exit 0, no new warnings)
+- [ ] Repository validation gates and TypeScript check pass via `npm test`
 - [ ] No unintended files changed
 - [ ] Bug no longer reproduces manually (if applicable)
 

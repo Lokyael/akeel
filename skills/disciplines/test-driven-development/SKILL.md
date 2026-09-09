@@ -58,7 +58,7 @@ Write one minimal test showing what should happen.
 **MANDATORY. Never skip.**
 
 ```bash
-npm test path/to/test.test.ts
+npm run test:file -- path/to/test.test.ts
 ```
 
 Confirm:
@@ -78,7 +78,7 @@ Write simplest code to pass the test. Don't add features, don't refactor other c
 **MANDATORY.**
 
 ```bash
-npm test path/to/test.test.ts
+npm run test:file -- path/to/test.test.ts
 ```
 
 Confirm: test passes, other tests still pass, output pristine.

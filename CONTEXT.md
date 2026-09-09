@@ -20,7 +20,7 @@
 - **Task Record**：具有目标、范围、验收和验证边界的 `T-xxx` 短期任务。
 - **Slot（待创建占位）**：容器文末承载 C/T/D 序列下一可用编号的占位，不是记录类型；创建时填充并追加新占位。
 - **Decision**：需要长期保留的架构、领域或安全取舍，记录在 `docs/decisions.md`。
-- **Reversal surface**：Decision 逆转所需的批准面；`user-boundary` 需用户显式批准，`engineering` 可经正式生命周期 supersede。
+- **Reversal surface**：每条 Decision 显式声明的逆转批准面；`user-boundary` 需用户显式批准，`engineering` 可经正式生命周期 supersede。
 - **Durable Content**：工作结束后仍成立且承载约束的事实、取舍与承诺；过程产物不进入权威容器。
 - **Authority Context**：由主会话持有的用户原始意图、Requirements、已采纳的范围/架构/政策决策、finding disposition、最终验收、发布决定与 Project Record 更新。
 - **Result-Necessary Context**：理解、审计、质疑或继续 child 定稿所必需的推理、实质被拒方案、引用证据、变更、验证、未决问题和残余风险。
@@ -79,6 +79,7 @@
 - [D-074 单一 grill-docs 分阶段工作流](docs/decisions.md#d-074-单一-grill-docs-分阶段工作流)
 - [D-075 上下文准入、Herdr 优先委托与写能力 Worktree 隔离](docs/decisions.md#d-075-上下文准入herdr-优先委托与写能力-worktree-隔离)
 - [D-076 Herdr 统一委托执行面](docs/decisions.md#d-076-herdr-统一委托执行面)
+- [D-077 Decision 寄存器的轻量 hygiene 校验](docs/decisions.md#d-077-decision-寄存器的轻量-hygiene-校验)
 
 ## Negative Space
 

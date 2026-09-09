@@ -1,5 +1,5 @@
 /**
- * validate-docs.ts — Next-ID slots 不变量结构校验 + 决策 ID 引用存活校验
+ * validate-docs.ts — Project Record 槽位、Decision 引用和 Decision hygiene 校验
  *
  * 一、记录容器（docs/candidates.md、docs/task.md、docs/decisions.md）：
  *   1. 恰有一个占位槽位行 `## X-0NN: 待创建`
@@ -12,6 +12,9 @@
  *   存活标题（`## D-NNN:`，排除待创建槽位）。决策合并/剪除后引用即悬空——
  *   Git 保留历史是溯源手段，不是保留悬空引用的理由；剪除时应在同一变更内
  *   把引用更新到吸收条目。
+ *
+ * 三、Decision hygiene：存活 Decision 的顶层字段顺序、Reversal surface 值和明显过程历史标记。
+ * 该检查只覆盖可确定的结构，不替代人工的语义零损失审计。
  *
  * 只做结构性校验，不做编号 vs Git 历史的比对——编号可被合法重编号（如连续任务压缩），
  * 历史比对会对合法操作误报。
@@ -28,10 +31,10 @@ const CONTAINERS: ReadonlyArray<{ file: string; prefix: "C" | "T" | "D" }> = [
 ];
 
 const SLOT_RE = /^## ([CTD])-0\d{2,}: 待创建$/;
-const DECISION_HEADING_RE = /^## (D-\d{3}): /;
+const DECISION_HEADING_RE = /^## (D-\d{3}): (.+)$/;
 const DECISION_REF_RE = /\bD-\d{3}\b/g;
 
-interface CheckResult {
+export interface CheckResult {
   ok: boolean;
   errors: string[];
 }
@@ -165,6 +168,191 @@ function selfCheck(): void {
   }
 }
 
+// ─── Decision hygiene ───
+
+const TOP_LEVEL_FIELD_RE = /^\*\*([^*\n]+):\*\*(?:\s.*)?$/;
+const REVERSAL_RE = /^\*\*Reversal surface:\*\* (?:user-boundary|engineering)$/;
+const TASK_REF_RE = /\bT-\d{3}\b/;
+const PROCESS_WORD_RE = /\bdismiss(?:ed|al)?\s*(?:\(|（)?C-\d{3}\b|\b(?:migrated|promoted|moved)\s+from\s+[CT]-\d{3}\b|(?:从|由)\s*[CT]-\d{3}\s*(?:迁移|提升|移入|转入)/i;
+const PROCESS_FIELDS = new Set([
+  "status",
+  "origin",
+  "created",
+  "created by",
+  "created on",
+  "updated",
+  "updated by",
+  "updated on",
+  "date",
+  "timestamp",
+  "author",
+  "history",
+  "progress",
+  "evidence",
+  "plan",
+  "verification",
+  "implementation",
+  "migration",
+  "migration history",
+  "transition",
+  "transition history",
+  "review",
+  "review on",
+  "reviewed by",
+  "reviewed on",
+  "reviewer",
+  "commit",
+  "pr",
+  "日期",
+  "时间戳",
+  "作者",
+  "创建日期",
+  "更新时间",
+  "迁移历史",
+  "评审人",
+]);
+const TRAILING_SECTION_RANK = new Map([
+  ["Impact", 0],
+  ["Rejected", 1],
+  ["Out of Scope", 2],
+]);
+
+interface DecisionEntry {
+  id: string;
+  title: string;
+  lines: string[];
+}
+
+interface MarkdownFence {
+  marker: "`" | "~";
+  length: number;
+}
+
+function openingFence(line: string): MarkdownFence | undefined {
+  const match = /^ {0,3}(`{3,}|~{3,})(.*)$/.exec(line);
+  if (!match || (match[1]![0] === "`" && match[2]!.includes("`"))) return undefined;
+  return { marker: match[1]![0] as MarkdownFence["marker"], length: match[1]!.length };
+}
+
+function closesFence(line: string, fence: MarkdownFence): boolean {
+  const content = line.replace(/^ {0,3}/, "");
+  let markerLength = 0;
+  while (content[markerLength] === fence.marker) markerLength++;
+  return markerLength >= fence.length && /^[ \t]*$/.test(content.slice(markerLength));
+}
+
+function structuralLines(content: string): string[] {
+  let fence: MarkdownFence | undefined;
+  return content.split(/\r?\n/).map((line) => {
+    if (fence) {
+      if (closesFence(line, fence)) fence = undefined;
+      return "";
+    }
+    const opening = openingFence(line);
+    if (!opening) return line;
+    fence = opening;
+    return "";
+  });
+}
+
+function decisionEntries(content: string): { entries: DecisionEntry[]; errors: string[] } {
+  const lines = structuralLines(content);
+  const entries: DecisionEntry[] = [];
+  const errors: string[] = [];
+  for (let index = 0; index < lines.length; index++) {
+    const line = lines[index]!;
+    if (!/^## /.test(line)) continue;
+    if (SLOT_RE.test(line)) continue;
+
+    const heading = DECISION_HEADING_RE.exec(line);
+    if (!heading || heading[2]!.trim().length === 0) {
+      errors.push(`docs/decisions.md:${index + 1}: malformed Decision heading: ${line}`);
+      continue;
+    }
+    const end = lines.findIndex((candidate, candidateIndex) => candidateIndex > index && /^## /.test(candidate));
+    entries.push({
+      id: heading[1]!,
+      title: heading[2]!,
+      lines: lines.slice(index + 1, end === -1 ? lines.length : end),
+    });
+  }
+  return { entries, errors };
+}
+
+function normalizedField(label: string): string {
+  return label.trim().replace(/\s+/g, " ").toLowerCase();
+}
+
+/** Check only deterministic Decision hygiene; semantic pruning remains a human decision. */
+export function checkDecisionHygiene(content: string): CheckResult {
+  const parsed = decisionEntries(content);
+  const errors = [...parsed.errors];
+  for (const entry of parsed.entries) {
+    const seen = new Set<string>();
+    let hasDecision = false;
+    let hasWhy = false;
+    let trailingRank = -1;
+
+    for (const line of [entry.title, ...entry.lines]) {
+      if (TASK_REF_RE.test(line)) {
+        errors.push(`${entry.id}: task reference is process history: ${line.trim()}`);
+      }
+      if (PROCESS_WORD_RE.test(line)) {
+        errors.push(`${entry.id}: process-history marker is not allowed: ${line.trim()}`);
+      }
+
+      const label = TOP_LEVEL_FIELD_RE.exec(line)?.[1];
+      if (!label) continue;
+      if (PROCESS_FIELDS.has(normalizedField(label))) {
+        errors.push(`${entry.id}: process-history metadata is not allowed: ${line.trim()}`);
+        continue;
+      }
+
+      if (label === "Reversal surface") {
+        if (seen.has(label)) errors.push(`${entry.id}: duplicate Decision field: ${label}`);
+        if (hasDecision) errors.push(`${entry.id}: Reversal surface must appear before Decision`);
+        if (!REVERSAL_RE.test(line)) errors.push(`${entry.id}: Reversal surface must be user-boundary or engineering`);
+        seen.add(label);
+        continue;
+      }
+
+      if (label === "Decision") {
+        if (seen.has(label)) errors.push(`${entry.id}: duplicate Decision field: ${label}`);
+        if (hasWhy) errors.push(`${entry.id}: Decision section order is invalid`);
+        seen.add(label);
+        hasDecision = true;
+        continue;
+      }
+
+      if (label === "Why") {
+        if (seen.has(label)) errors.push(`${entry.id}: duplicate Decision field: ${label}`);
+        if (!hasDecision) errors.push(`${entry.id}: Why must appear after Decision`);
+        seen.add(label);
+        hasWhy = true;
+        continue;
+      }
+
+      const rank = TRAILING_SECTION_RANK.get(label);
+      if (rank !== undefined) {
+        if (seen.has(label)) errors.push(`${entry.id}: duplicate Decision field: ${label}`);
+        if (!hasWhy || rank <= trailingRank) errors.push(`${entry.id}: Decision trailing section order is invalid at ${label}`);
+        seen.add(label);
+        trailingRank = Math.max(trailingRank, rank);
+        continue;
+      }
+
+      if (!hasDecision || hasWhy) {
+        errors.push(`${entry.id}: top-level specification section must appear between Decision and Why: ${label}`);
+      }
+    }
+
+    for (const required of ["Reversal surface", "Decision", "Why"] as const) {
+      if (!seen.has(required)) errors.push(`${entry.id}: missing required Decision field: ${required}`);
+    }
+  }
+  return { ok: errors.length === 0, errors };
+}
+
 // ─── main ───
 
 function main(): void {
@@ -181,8 +369,15 @@ function main(): void {
     }
   }
   const decisionsContent = readFileSync(join(import.meta.dirname!, "..", "docs/decisions.md"), "utf-8");
+  const hygieneResult = checkDecisionHygiene(decisionsContent);
+  if (hygieneResult.ok) {
+    console.log("  ✅ docs/decisions.md — Decision hygiene ok");
+  } else {
+    for (const error of hygieneResult.errors) console.log(`  ❌ ${error}`);
+    totalErrors += hygieneResult.errors.length;
+  }
   const liveIds = collectLiveDecisionIds(decisionsContent);
-  // 代码层（src/tests）与文档层（docs/skills + 根文档）全部纳入存活校验
+  // 代码层（src/tests）与文档层（docs/、skills/ + 根文档）全部纳入存活校验
   const refFiles: string[] = [];
   walkTsFiles(join(import.meta.dirname!, "..", "src"), refFiles);
   walkTsFiles(join(import.meta.dirname!, "..", "tests"), refFiles);
@@ -198,12 +393,12 @@ function main(): void {
     for (const e of refResult.errors) console.log(`  ❌ ${e}`);
     totalErrors += refResult.errors.length;
   }
-  console.log(`\n${CONTAINERS.length} containers + decision refs checked. ${totalErrors} error(s).`);
+  console.log(`\n${CONTAINERS.length} containers + Decision hygiene + refs checked. ${totalErrors} error(s).`);
   if (totalErrors > 0) {
     console.log("❌ Validation FAILED — fix before committing.");
     process.exit(1);
   }
-  console.log("✅ All slot invariants and decision refs hold.");
+  console.log("✅ All document validation contracts hold.");
 }
 
-main();
+if (import.meta.main) main();

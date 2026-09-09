@@ -69,7 +69,7 @@ test('specific behavior', () => {
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `npm test tests/path/test.ts`
+Run: `npm run test:file -- tests/path/test.ts`
 Expected: FAIL with "function not defined"
 
 - [ ] **Step 3: Write minimal implementation**
@@ -82,7 +82,7 @@ function function(input: Input): Output {
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `npm test tests/path/test.ts`
+Run: `npm run test:file -- tests/path/test.ts`
 Expected: PASS
 
 - [ ] **Step 5: Commit**

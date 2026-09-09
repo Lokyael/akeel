@@ -244,5 +244,14 @@
 - **Trigger:** 用户明确启动无人值守自动流水线；或出现真实的长周期后台任务，证明人工监督与手动交接无法满足吞吐或时效要求。
 - **Out of Scope:** 在本候选被明确采纳前，不提供无人值守自动多代理流水线、自动 child 编排、自动结果聚合、自动重试、定时任务、token/cost budget 或基于 child verdict 的自动发布/合并；当前隔离工作使用主会话加 Herdr，并由主会话保留最终裁决。
 
-## C-032: 待创建
+## C-032: 用户项目 Project Record 容器校验
+
+> 本条只记录未来把容器结构检查覆盖到用户项目的评估方向，不构成拆分现有 validator、增加 skill、引入 CLI 或自动修改用户文件的承诺。
+
+- **Why Not Now:** 当前 `scripts/validate-docs.ts` 是 AKeel 自仓开发入口，硬编码仓库容器、扫描范围和决策引用合同；直接移入 skill 会混合自仓校验与用户项目能力。Pi skill 虽可携带脚本，但 skill 本身不提供自动执行或 CI 接入，且解释器 helper 在 Access Gate 路径边界下没有可靠的 Agent 执行合同。现有 `doc-sync` 已能用 Direct `grep` 加定点 `read` 低负载检查槽位，不需要为尚无第二个稳定执行方的场景提前抽取脚本。
+- **Exploration Direction:** 优先评估在现有 `doc-sync` 中以近零上下文增量明确 Direct 容器检查流程：只定位槽位并读取槽位至文件末尾，不加载完整记录正文，不新增 skill 或恒注入原则。若出现确定性复用需求，再比较两种边界：①现有 skill 下无依赖、只读、显式接收项目根的可移植 helper，由 AKeel 自仓 wrapper 继续拥有专属引用与 hygiene 检查；②独立、由用户显式接入项目测试或 CI 的 validator。任何提取都以 Project Record 格式权威仍在 `principles.md`、用户项目缺失可选容器时安全跳过、无自动修复为前提。
+- **Trigger:** 至少两个真实用户项目反复出现同类槽位结构漂移；用户明确要求确定性 Project Record 校验或 CI 门禁；或 Pi/AKeel 提供可验证的只读 helper 执行 seam，使 skill 脚本成为稳定的第二个 consumer。
+- **Out of Scope:** 在触发前不移动或复制 `scripts/validate-docs.ts`，不新增 skill、扩展 hook、常驻提示词、项目模板、自动写入或自动修复，也不把 AKeel 专属源码/测试引用扫描包装成通用用户项目合同。
+
+## C-033: 待创建
 

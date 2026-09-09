@@ -39,8 +39,9 @@ For each identified doc, verify:
 6. **Record authority**: Candidate Records remain visibly non-binding; promoted content has one authoritative destination and no duplicate C source
 7. **Task lifecycle**: Task Record status matches reality; verified tasks are either cleared or clearly blocked on a durable documentation update
 8. **Slot invariant**: each container (`docs/candidates.md`, `docs/task.md`, `docs/decisions.md`) has exactly one trailing empty slot (per principles.md Next-ID slots)
-9. **Decision lifecycle**: a superseded decision carries a replacement reference (repoint the link when missing); a retired decision is no longer marked active and has a documented destination (Negative Space entry or boundary decision) — otherwise record the destination or flag the gap
-10. **Zero-loss editing**: merging, compressing, or pruning record content deletes only synonymous repetition — qualifiers, specific terms, enumerations, and terminology are meaning, not filler
+9. **Decision format and lifecycle**: each present Decision follows principles.md Project Records — Decision Record Format; a superseded decision names its replacement and a retired decision names its destination (Negative Space or a boundary decision), then leaves the live register — otherwise complete the transition or flag the gap
+10. **User-project container check**: when the user project explicitly uses the standard `docs/candidates.md`, `docs/task.md`, or `docs/decisions.md` containers, use Direct `find`/`grep` to locate the trailing `## X-0NN: 待创建` slot and Direct `read` only from that slot to end-of-file; confirm exactly one matching slot, matching container prefix, and no non-empty content after it. Missing optional containers are skipped; nonstandard record paths or ambiguous results are reported without guessing or creating files. Do not run the AKeel repository validator against user projects, and do not auto-fix records.
+11. **Zero-loss editing**: merging, compressing, or pruning record content deletes only synonymous repetition — qualifiers, specific terms, enumerations, and terminology are meaning, not filler
 
 ### Step 3: Fix or Flag
 
