@@ -192,25 +192,6 @@ Candidate 是停车记录，不属于常规上下文输入；Candidate review �
 - Windows `\` 路径与 macOS 路径/选项方言：已在 Negative Space，不因 stat/du/df 同为 BSD 方言而把 macOS 纳入支持。
 - 跨宿主场景（ssh、容器）的命令语义方言：静态分类不做执行环境探测（同 D-067 无 filesystem 检查边界）。
 
-## D-036: Workflows 触发模型（手动调用与即时介入）
-
-**Reversal surface:** engineering
-
-**Decision:** workflows 按是否需要即时介入划分触发模型：需要用户明确意图的 workflow 设置 `disable-model-invocation: true`，并以 `Use /skill:<name>` 作为 description 的调用指引；需要模型响应任务启动的 workflow 不设置该字段。当前前者包括 brainstorm-design、draft-spec、draft-tickets、grill-docs、implement-work、improve-architecture、rollback-session 和 handoff-session，后者包括 survey-context。`validate-skills.ts` 对手动 workflow 的 description 约定执行结构检查。
-
-**Why:** 手动 workflow 的自动触发可能误判用户意图，尤其是恢复或交接操作；模型可调用 workflow 才适合无歧义的即时介入。让 description 与宿主的实际调用机制一致，避免形成不可达的触发承诺。
-
-**Impact:** 用户显式调用是恢复、交接、方案处理和实施流程的入口；`survey-context` 可在任务启动时响应。skill 作者职责与目录边界由 D-073 定义，互斥触发场景保持独立。
-
-**Rejected:**
-
-- **移除 rollback-session 的 `disable-model-invocation` 让模型响应 “undo”**：用户说 “undo” 可能是会话导航或小修改，模型自动进入恢复指导会误判与打断；破坏性操作需要用户显式发起。拒绝。
-- **为 workflows 触发模型新增专用配置面或路由系统**：`/skill:` 是 pi 宿主既有机制，自建即重复。拒绝。
-
-**Out of Scope:**
-
-- **handoff-session 的交接内容和安全边界：** 由该 workflow 自身承载，本决策只规定手动触发。
-
 ## D-037: Shell wrapper 链由语义入口统一解析
 
 **Reversal surface:** engineering
@@ -595,7 +576,7 @@ Tilde expansion 仅适用于受支持 Shell word 中位于开头、未引用、�
 
 **Reversal surface:** engineering
 
-**Decision:** `principles.md` 承载跨任务恒定注入的不变量；`skills/disciplines/` 承载可复用工程方法，`skills/workflows/` 承载端到端编排。目录只表达作者职责，不创造 Pi 运行时加载层；运行时发现服从 package manifest，workflow 调用模型由 D-036 定义。Disciplines 使用名词短语，Workflows 使用动词-名词，复合名称使用 kebab-case，避免非必要缩写和人物名。
+**Decision:** `principles.md` 承载跨任务恒定注入的不变量；`skills/disciplines/` 承载可复用工程方法，`skills/workflows/` 承载端到端编排。目录只表达作者职责，不创造 Pi 运行时加载层；运行时发现服从 package manifest，workflow 调用模型由 D-078 定义。Disciplines 使用名词短语，Workflows 使用动词-名词，复合名称使用 kebab-case，避免非必要缩写和人物名。
 
 通用“完成声明前必须取得 fresh evidence”继续只由 `principles.md §6` 定义。独立 `evidence-first` skill 退役，空 `foundations/` 分发根删除；bug/feature 验证、Requirements 核对和提交前检查等具体操作守卫留在 `fix-validation`、`implement-work`、`code-audit` 等对应动作点，不复制通用规则正文。
 
@@ -704,4 +685,23 @@ Herdr child 可在已定约束内处理开放问题并形成 verified candidate�
 - **用户项目 Project Record 自动校验或 CI 接入：** 保持为 C-032，直到出现多个真实项目或明确的确定性复用需求。
 - **完整 Decision 语义审查：** 由人工 code/doc review 完成，不把文本启发式当作语义证明。
 
-## D-078: 待创建
+## D-078: Workflows 触发模型（手动调用与即时介入）
+
+**Reversal surface:** engineering
+
+**Decision:** workflows 按是否需要即时介入划分触发模型：需要用户明确意图的 workflow 设置 `disable-model-invocation: true`，并以 `Use /skill:<name>` 作为 description 的调用指引；需要模型响应任务启动的 workflow 不设置该字段。当前前者包括 brainstorm-design、draft-spec、draft-tickets、grill-docs、implement-work、improve-architecture 和 handoff-session，后者包括 survey-context。恢复文件或会话不再作为 AKeel 独立 workflow 暴露；文件恢复直接遵循 `principles.md §10`，宿主会话导航遵循 Pi 自身合同。`validate-skills.ts` 对手动 workflow 的 description 约定执行结构检查。
+
+**Why:** 手动 workflow 的自动触发可能误判用户意图，尤其是交接和方案处理；模型可调用 workflow 只适合无歧义的即时介入。恢复操作的 skill 只重复 `principles.md §10` 的明确意图要求与 §6 的验证门禁，不能创建快照、提供回滚能力或形成额外安全边界；删除它可降低分发和维护成本，同时保留 AKeel 自身的恢复安全约束。
+
+**Impact:** 用户显式调用是交接、方案处理和实施流程的入口；`survey-context` 可在任务启动时响应。恢复请求不再经过 AKeel 专用 skill 路由，文件操作继续遵守破坏性操作确认规则。skill 作者职责与目录边界由 D-073 定义，互斥触发场景保持独立。
+
+**Rejected:**
+
+- **恢复请求继续保留为独立 workflow：** 没有独特执行能力或持久化产物，且其核心规则已由 `principles.md §10` 承载。拒绝。
+- **为 workflows 触发模型新增专用配置面或路由系统：** `/skill:` 是 pi 宿主既有机制，自建即重复。拒绝。
+
+**Out of Scope:**
+
+- **handoff-session 的交接内容和安全边界：** 由该 workflow 自身承载，本决策只规定手动触发。
+
+## D-079: 待创建

@@ -187,9 +187,8 @@ dropped. Nothing dangles.
 
 *Irreversible operations happen only on the user's explicit request.*
 
-- "Undo", "rollback", or "go back" is ambiguous — it may mean session
-  navigation or a small revert, not a large-scale recovery. Treat it as
-  navigation or a small change until the user says otherwise.
+- A vague "undo", "rollback", or "go back" request does not authorize a
+  broad or irreversible change. Clarify the exact operation and scope first.
 - Before an irreversible command (`git reset --hard`, `checkout --`, `clean`,
   force-push, deletion), name the exact operation and confirm the user's
   intent — a fuzzy trigger word is not consent.

@@ -6,7 +6,7 @@
  *   2. Directory name matches frontmatter "name"
  *   3. description length ≤ 1024 chars
  *   4. SKILL.md line count ≤ 200 (warning only)
- *   5. /skill: body references must never invoke user-invoked skills (D-036)
+ *   5. /skill: body references must never invoke user-invoked skills (D-078)
  *
  * 规则行为测试迁出至 tests/validate-skills.test.ts（node:test）。
  */
@@ -233,7 +233,7 @@ function checkExternalUrls(skill: SkillMeta): CheckResult {
 }
 
 // ─── /skill: 交叉引用检查：user-invoked 目标只能以用户指令形式出现 ───
-// D-036 将 workflows 分为手动调用（disable-model-invocation）与模型调用。
+// D-078 将 workflows 分为手动调用（disable-model-invocation）与模型调用。
 // 手动调用的 skill 只能由用户发起；另一技能正文若用祈使式（hand off to /
 // invoke / run / call）引用它，模型执行时该调用不可达且静默失败——mattpocock
 // 上游同型缺陷（2026-08-15 修复）。正确形态是把动作明确交给用户

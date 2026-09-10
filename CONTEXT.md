@@ -58,7 +58,6 @@
 - [D-028 统一 Project Record 模型与 Candidate 显式复审](docs/decisions.md#d-028-统一-project-record-模型与-candidate-显式复审)
 - [D-030 提示词体系边界与原则部署（Prompt Surface）](docs/decisions.md#d-030-提示词体系边界与原则部署prompt-surface)
 - [D-035 平台边界收窄为仅 Linux](docs/decisions.md#d-035-平台边界收窄为仅-linuxdismiss-c-007)
-- [D-036 Workflows 触发模型](docs/decisions.md#d-036-workflows-触发模型手动调用与即时介入)
 - [D-037 Shell wrapper 链由语义入口统一解析](docs/decisions.md#d-037-shell-wrapper-链由语义入口统一解析)
 - [D-044 测试组织镜像 src 分层](docs/decisions.md#d-044-测试组织镜像-src-分层)
 - [D-045 Shell 条件流的有界 CWD 结果集](docs/decisions.md#d-045-shell-条件流的有界-cwd-结果集)
@@ -81,6 +80,7 @@
 - [D-075 Task Owner 上下文准入、Herdr 同步委托与 Worktree 隔离](docs/decisions.md#d-075-task-owner-上下文准入herdr-同步委托与-worktree-隔离)
 - [D-076 Herdr 统一委托执行面](docs/decisions.md#d-076-herdr-统一委托执行面)
 - [D-077 Decision 寄存器的轻量 hygiene 校验](docs/decisions.md#d-077-decision-寄存器的轻量-hygiene-校验)
+- [D-078 Workflows 触发模型](docs/decisions.md#d-078-workflows-触发模型手动调用与即时介入)
 
 ## Negative Space
 
