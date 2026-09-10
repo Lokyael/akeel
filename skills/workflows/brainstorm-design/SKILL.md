@@ -38,4 +38,4 @@ Break the system into units that each have one clear purpose, communicate throug
 
 ## After the Design
 
-When the user approves the design, remind them: "Design approved. Switch to a writable policy with `/policy develop` and run `/skill:implement-work` to start implementing."
+When the user approves the design, use `implementation-planning` for multi-step work that needs an implementation-ready Plan. When the approved Task is ready to build, tell the user: "Switch to a writable policy with `/policy develop` and run `/skill:implement-work` to start implementing."

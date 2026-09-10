@@ -12,6 +12,8 @@ If the current policy does not permit the required writes, tell the user: "Switc
 
 **Lifecycle:** When starting, update the Task Record in `docs/task.md` or `docs/task-<topic>.md` from `draft` to `in-progress`. After fresh verification and durable documentation updates, set it to `verified` and clear the completed sections (per principles.md Next-ID slots); the file remains a container for future tasks. If no Task Record is found, ask: "Where is the Task Record, or what task should be recorded?"
 
+Use approved Plan Slices as the implementation order and Requirements-to-verification map. A Task that fits one coherent test cycle can proceed directly; multi-step work receives an implementation-ready Plan through `implementation-planning` before code changes.
+
 Use `/skill:test-driven-development` where possible, at pre-agreed seams (confirm seams with the user before writing tests).
 
 Iterate with focused tests, then prepare the complete change in this order:

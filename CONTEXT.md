@@ -38,10 +38,12 @@
 - **Review Surface**：独立代码审查开始时固定的不可变输入，覆盖适用的 branch commits、staged、unstaged、范围内 untracked 内容及其 Requirements；内容变化使旧审查结果失效。
 - **Code Cleanup**：只在用户明确范围或已批准 maintenance scope 内执行的行为保持型深度维护；完成后重新进入文档同步、验证、preflight 与 review。
 - **Reproduction Result**：`bug-reproduction` 交付的反馈信号结果，以 `reliable`、`probabilistic` 或 `blocked` 表示可用性，并携带 runner、症状判定、迭代成本、实测复现率、最小条件、调查工件与下一证据。
+- **Implementation Planning**：把已批准的 Requirements 与 Design 转换为 implementation-ready Task Plan 的 discipline；Task 保持 `draft`，实施生命周期由 `implement-work` 持有。
+- **Plan Slice**：Task Plan 内有序、可独立验证的实施单元，承载 Requirements 覆盖、前置依赖、验收标准、文件与接缝、验证和实施步骤，并共享所属 Task 的权威与生命周期。
 
 ## Architecture
 
-- `src/bootstrap/` 在 Session 启动和 compaction 后注入工程原则；通用 fresh-evidence 门禁属于该恒定面。Skills 只保留 `disciplines/` 可复用方法与 `workflows/` 端到端编排两个作者职责根。`module-design` 处理已知模块或接口设计；手动 `assess-modularity` 只发现仓库或子系统级结构摩擦并交付临时 findings。`implement-work` 在提交前编排 `change-preflight` 清理并核对当前活动变更，`code-review` 对固定 Review Surface 做独立只读审查，`code-cleanup` 只处理明确批准范围内的行为保持型深度维护。`bug-reproduction` 为难以稳定观察的技术问题建立 Reproduction Result，`systematic-debugging` 消费可用信号并以区分性实验确认根因，在授权范围内衔接 TDD 与 fix validation。Grilling 只由用户手动调用的 `grill-docs` 承载，按未决问题处理、候选方案确认、事实核对、verified candidate 交接和 Task Owner 导入的固定顺序执行。
+- `src/bootstrap/` 在 Session 启动和 compaction 后注入工程原则；通用 fresh-evidence 门禁属于该恒定面。Skills 只保留 `disciplines/` 可复用方法与 `workflows/` 端到端编排两个作者职责根。`module-design` 处理已知模块或接口设计；手动 `assess-modularity` 只发现仓库或子系统级结构摩擦并交付临时 findings。`implementation-planning` 把已批准的 Requirements 与 Design 组织为由 Plan Slices 构成的 implementation-ready Task Plan，`implement-work` 持有实施生命周期，并在提交前编排 `change-preflight` 清理和核对当前活动变更；`code-review` 对固定 Review Surface 做独立只读审查，`code-cleanup` 只处理明确批准范围内的行为保持型深度维护。`bug-reproduction` 为难以稳定观察的技术问题建立 Reproduction Result，`systematic-debugging` 消费可用信号并以区分性实验确认根因，在授权范围内衔接 TDD 与 fix validation。Grilling 只由用户手动调用的 `grill-docs` 承载，按未决问题处理、候选方案确认、事实核对、verified candidate 交接和 Task Owner 导入的固定顺序执行。
 - 委托按 D-075/D-076 执行上下文准入和封闭路由：Task Owner Session 保留 Authority Context；需要隔离过程上下文且结果仍由该 Owner 裁决的工作通过 Herdr child 同步执行，Owner 预定 artifact、等待 settle 后按路径拉取，child 不发送完成 prompt。可独立验收的长期工作只有经用户明确授权才进入范围互斥的新 Task Owner Session。有效能力含写入或文件修改 Shell 的 delegated agent 强制进入独立 worktree，新增的并行 Owner 也必须拥有不与其他 Owner 共享的 checkout；child 不自清理，由存活 Owner 负责检查、集成与明确批准后的回收。
 - `src/access-gate/access-decision/` 是当前唯一决策实现：`core/` 负责 Pi host/config 无关的语义与策略，Linux pathname lookup 属于该语义域的外部合同；`core/program-semantics/` 负责 Git、解释器、Python 工具、uv 和 npm 族的程序分类与路径事实，Git `-C`、`--git-dir` 和 `--work-tree` 已通过 Canonical command-local cwd seam 解析，helper-capable Git 操作及 `git config` hard-deny；`adapters/` 转换 Pi 和 policy.yaml 输入，`runtime/` 负责 project/staging 生命周期和 host composition。运行时以 session-start cwd 作为固定 Access Root，不要求 Git root；Shell tilde expansion 使用会话初始化时的 `$HOME`。
 - Access Decision Pipeline（D-059/D-060）已完成 Greenfield trust path 与原子生产切换。Canonical 只解释一次；Admission 与 Display 按需投影；Policy Kernel 不读取配置或重新解析请求。Canonical path resolution 同时保留 lexical 与 symlink-target traversal prefixes，Direct search 与 Shell recursive path 均在 blocked descendants 上 fail-closed；有显式 path boundary 时，unknown/unbounded Shell path access 也不得放行。path-form executable 不因已知 basename 获得 inspect/modify 语义，非破坏性形式统一按 opaque execute 处理。Git 显式项目内 `file://` remote 也在 Canonical 阶段转为 path fact；helper-capable Git 操作与 `git config` 保持 hard-deny，host、alias 和间接 config remote 继续 fail-closed。
@@ -90,6 +92,7 @@
 - [D-079 模块设计方法与模块化评估工作流分界](docs/decisions.md#d-079-模块设计方法与模块化评估工作流分界)
 - [D-080 当前变更预检、独立代码审查与显式深度清理分界](docs/decisions.md#d-080-当前变更预检独立代码审查与显式深度清理分界)
 - [D-081 复现信号与系统化根因调试分界](docs/decisions.md#d-081-复现信号与系统化根因调试分界)
+- [D-082 单一实施规划能力与 Plan Slice](docs/decisions.md#d-082-单一实施规划能力与-plan-slice)
 
 ## Negative Space
 

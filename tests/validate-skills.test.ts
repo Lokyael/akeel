@@ -142,6 +142,43 @@ test("module design and modularity assessment publish distinct invocation contra
   assert.match(assessModularity, /^disable-model-invocation: true$/m);
 });
 
+test("implementation planning publishes an implementation-ready Task Plan contract", () => {
+  const planningUrl = new URL(
+    "../skills/disciplines/implementation-planning/SKILL.md",
+    import.meta.url,
+  );
+  assert.ok(existsSync(planningUrl), "implementation-planning must be distributed");
+
+  const planning = readFileSync(planningUrl, "utf8");
+  const survey = readFileSync(
+    new URL("../skills/workflows/survey-context/SKILL.md", import.meta.url),
+    "utf8",
+  );
+  const design = readFileSync(
+    new URL("../skills/workflows/brainstorm-design/SKILL.md", import.meta.url),
+    "utf8",
+  );
+  const implementation = readFileSync(
+    new URL("../skills/workflows/implement-work/SKILL.md", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(planning, /^name: implementation-planning$/m);
+  assert.match(planning, /^description: Use when approved Requirements and Design need an implementation-ready Plan/m);
+  assert.doesNotMatch(planning, /^disable-model-invocation: true$/m);
+  assert.match(planning, /Plan Slice/);
+  assert.match(planning, /Requirements covered/);
+  assert.match(planning, /Depends on/);
+  assert.match(planning, /Acceptance Criteria/);
+  assert.match(planning, /Files and Seams/);
+  assert.match(planning, /Verification/);
+  assert.match(planning, /Task Record remains `draft`/);
+  assert.match(survey, /`implementation-planning`/);
+  assert.match(design, /`implementation-planning`/);
+  assert.match(implementation, /approved Plan Slices/);
+  assert.match(implementation, /`implementation-planning`/);
+});
+
 test("module design integrates boundary evidence and failure handling", () => {
   const moduleDesign = readFileSync(
     new URL("../skills/disciplines/module-design/SKILL.md", import.meta.url),

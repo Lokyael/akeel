@@ -689,20 +689,13 @@ Herdr child 可在已定约束内处理开放问题并形成 verified candidate�
 
 **Reversal surface:** engineering
 
-**Decision:** workflows 按是否需要即时介入划分触发模型：需要用户明确意图的 workflow 设置 `disable-model-invocation: true`，并以 `Use /skill:<name>` 作为 description 的调用指引；需要模型响应任务启动的 workflow 不设置该字段。当前前者包括 assess-modularity、brainstorm-design、draft-spec、draft-tickets、grill-docs、handoff-session 和 implement-work，后者包括 survey-context。恢复文件或会话不再作为 AKeel 独立 workflow 暴露；文件恢复直接遵循 `principles.md §10`，宿主会话导航遵循 Pi 自身合同。`validate-skills.ts` 对手动 workflow 的 description 约定执行结构检查。
+**Decision:** workflows 按所需介入方式选择触发模型。需要用户明确意图的 workflow 设置 `disable-model-invocation: true`，并以 `Use /skill:<name>` 作为 description 的调用指引；需要模型即时响应任务状态的 workflow 使用 trigger-first description。当前手动 workflows 包括 assess-modularity、brainstorm-design、grill-docs、handoff-session 和 implement-work；survey-context 响应任务启动与状态恢复。文件恢复遵循 `principles.md §10`，宿主会话导航遵循 Pi 自身合同。
 
-**Why:** 手动 workflow 的自动触发可能误判用户意图，尤其是交接和方案处理；模型可调用 workflow 只适合无歧义的即时介入。恢复操作的 skill 只重复 `principles.md §10` 的明确意图要求与 §6 的验证门禁，不能创建快照、提供回滚能力或形成额外安全边界；删除它可降低分发和维护成本，同时保留 AKeel 自身的恢复安全约束。
+**Why:** 显式调用为方案处理、实施和交接提供清晰的用户意图；模型调用适合由当前任务状态直接判定的即时介入。沿用 Pi 的 skill command 与 discovery 合同，可以保持触发描述、实际入口和用户预期一致。
 
-**Impact:** 用户显式调用是交接、方案处理和实施流程的入口；`survey-context` 可在任务启动时响应。恢复请求不再经过 AKeel 专用 skill 路由，文件操作继续遵守破坏性操作确认规则。skill 作者职责与目录边界由 D-073 定义，互斥触发场景保持独立。
+**Impact:** `validate-skills.ts` 校验手动 workflow 的调用指引和模型可调用 workflow 的 trigger-first description。skill 作者职责与目录边界由 D-073 定义，具体 workflow 持有各自的执行合同。
 
-**Rejected:**
-
-- **恢复请求继续保留为独立 workflow：** 没有独特执行能力或持久化产物，且其核心规则已由 `principles.md §10` 承载。拒绝。
-- **为 workflows 触发模型新增专用配置面或路由系统：** `/skill:` 是 pi 宿主既有机制，自建即重复。拒绝。
-
-**Out of Scope:**
-
-- **handoff-session 的交接内容和安全边界：** 由该 workflow 自身承载，本决策只规定手动触发。
+**Out of Scope:** `handoff-session` 的交接内容和安全边界由该 workflow 自身承载。
 
 ## D-079: 模块设计方法与模块化评估工作流分界
 
@@ -777,4 +770,18 @@ Reproduction Result 以症状判定的忠实度、特异性、迭代成本、最
 - **单一 debugging skill：** 可靠复现问题不会消费难复现构造方法，而只构造反馈信号的任务也不需要根因和实施阶段，合并会形成条件模式。
 - **独立 bug intake skill：** 其产物是既有 Project Record，所需技术调查已属于系统化调试；额外入口会复制格式和证据流程。
 
-## D-082: 待创建
+## D-082: 单一实施规划能力与 Plan Slice
+
+**Reversal surface:** engineering
+
+**Decision:** `implementation-planning` 是模型按需加载的实施规划 discipline。它在 Requirements 与必要 Design 已批准、工作需要多步实施时创建或复用对应 Task Record，将规划输入组织为 implementation-ready Plan，并保持 Task 为 `draft`；`implement-work` 持有实施启动、状态推进、验证闭环与 commit。
+
+Plan 使用 `Plan Slice` 作为内部执行单元。每个 Slice 承载目标、Requirements 覆盖、前置依赖、验收标准、文件与公共接缝、验证命令和有序实施步骤；Slice 可独立验证，并共享所属 Task 的 T-ID、生命周期与 Task Owner。依赖只记录 `Depends on`，反向关系按需推导；切分依据是可观察行为、测试闭环和稳定接口，跨层不确定性需要尽早证明时使用 tracer slice。
+
+规划开始时，当前对话或唯一匹配的 Task Record 提供已批准输入；缺少 Task Record 时，明确的用户承诺允许在同一流程建立记录。需求或设计仍需形成时使用 `brainstorm-design`，仅需记录已承诺工作时直接遵循 `principles.md` Project Record 生命周期。
+
+**Why:** 实施规划只有一个稳定产物和下游：可由 `implement-work` 消费的 Task Plan。统一的 Plan 结构集中承载 Requirements 覆盖、垂直切片、依赖、验收与验证，并为内部工作单元提供明确术语，使名称、触发条件、内容与交付物保持一致。
+
+**Impact:** `survey-context` 将明确的多步实施需求导向 `implementation-planning`；`brainstorm-design` 在设计批准后按任务复杂度衔接规划或实施。规划规则、来源映射和技能校验统一使用该能力名称。
+
+## D-083: 待创建

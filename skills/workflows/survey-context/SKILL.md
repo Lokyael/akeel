@@ -48,8 +48,8 @@ git branch --show-current
 
 Based on the project state:
 
-- No active task → suggest `brainstorm-design` for a new feature or `plan-writing` for explicit requirements.
-- Task Record is `draft` → suggest the next design, requirements, planning, or debugging skill based on its `Kind`.
+- No active task → suggest `brainstorm-design` when Requirements or Design need resolution; use `implementation-planning` when the user has committed to explicit, approved input for multi-step implementation.
+- Task Record is `draft` → use `brainstorm-design` for material open Requirements or Design questions, `implementation-planning` for multi-step work that needs an implementation-ready Plan, or tell the user to run `/skill:implement-work` when the approved Task is ready to build.
 - Task Record is `in-progress` → continue it or ask whether to reassess if its evidence is stale.
 - Task Record is `verified` → apply durable updates, then clear the completed Task Record sections.
 - A bug investigation or fix is requested → suggest `systematic-debugging`; when the symptom lacks a reliable agent-runnable signal, start with `bug-reproduction`.
