@@ -27,7 +27,7 @@ interface FrontmatterResult {
 }
 
 export interface SkillMeta {
-  /** Directory name (e.g. "codebase-design") */
+  /** Directory name (e.g. "module-design") */
   dirName: string;
   /** Authoring responsibility: disciplines or workflows */
   layer: string;

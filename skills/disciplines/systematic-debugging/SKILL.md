@@ -77,8 +77,8 @@ Fix the root cause, not the symptom.
 
 **Before writing the fix, verify:** can you write a failing test for this bug?
 If no testable seam exists after trying at least 2 approaches, stop. That IS
-the finding — the architecture prevents locking down this bug. Tell the user to run
-`/skill:improve-architecture`.
+the finding — the module boundary prevents locking down this bug. Apply
+`/skill:module-design` before attempting the fix.
 
 If a seam exists:
 
@@ -92,7 +92,7 @@ If a seam exists:
    - For full verification: `/skill:fix-validation`
    - For broader cleanup: `/skill:code-cleanup`
 5. **Post-Mortem** — Ask: what would have prevented this bug? If the answer is
-   architectural, tell the user to run `/skill:improve-architecture`.
+   a recurring module-boundary problem, tell the user to run `/skill:assess-modularity`.
 6. **If Fix Doesn't Work** — STOP. Count: How many fixes tried?
    - If < 3: Return to Phase 1 with new information.
    - **If ≥ 3: STOP and question the architecture.** Is this pattern fundamentally

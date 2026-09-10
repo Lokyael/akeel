@@ -172,11 +172,12 @@ with evidence:
 - **Shotgun surgery**: one behavior change needs many file edits (3+) and no
   module clearly owns it — the Test above.
 - **Untestable interface**: can't test through the public interface without
-  adding test-only methods (per codebase-design).
+  adding test-only methods (per module-design).
 
 Not for one-offs or user-declared off-limits; urgent fixes defer the report
-to task close. Whole-system signals (deletion test, locality) are for
-/skill:improve-architecture, not mid-task.
+to task close. Repository-wide modularity signals are for
+/skill:assess-modularity, not mid-task; known-boundary design belongs to
+module-design.
 
 At task or session close, every open proposal is named and disposed —
 promoted to a Candidate Record when the friction is structural and likely

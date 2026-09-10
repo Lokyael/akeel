@@ -52,4 +52,4 @@ Follow each step in order.
 
 ## Completion
 
-Commit cleanup changes with meaningful messages. If any step revealed architectural issues beyond cleanup scope, tell the user to run `/skill:improve-architecture`.
+Commit cleanup changes with meaningful messages. If any step revealed recurring module-boundary issues beyond cleanup scope, tell the user to run `/skill:assess-modularity`.

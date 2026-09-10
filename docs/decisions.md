@@ -607,7 +607,7 @@ Tilde expansion 仅适用于受支持 Shell word 中位于开头、未引用、�
 
 **Why:** 当前使用场景都要求事实依据和最终落档；原 `grill-docs` 已调用 `grill-plan` 的全部提问流程，独立 `grill-plan` 只增加第二个触发面和跨 skill 依赖。把提问规则放入唯一工作流后，每次调用会使用全部内容；通过候选确认和证据矛盾回退条件，可以区分提出问题与核对事实，而不依赖抽象阶段描述。
 
-**Impact:** `grill-plan` 目录删除；其一次一问、问题与推荐答案分隔、事实自行查询和用户持有决定权的独特语义迁入 `grill-docs`。`grill-docs` 保持 `disable-model-invocation: true`，自然语言中的 grill 词不再触发独立 workflow；`improve-architecture` 只向用户建议手动运行 `grill-docs`。
+**Impact:** `grill-plan` 目录删除；其一次一问、问题与推荐答案分隔、事实自行查询和用户持有决定权的独特语义迁入 `grill-docs`。`grill-docs` 保持 `disable-model-invocation: true`，自然语言中的 grill 词不再触发独立 workflow；`assess-modularity` 只向用户建议手动运行 `grill-docs`。
 
 **Rejected:** 保留 `grill-plan` 作为无文档变体（没有实际使用场景，且项目事实仍需核对）；在问题处理期间同步写 Decision（候选尚未确认，会产生反复改写）；以固定措辞测试代替行为验证（只能锁文本，不能证明模型按流程执行）。
 
@@ -689,7 +689,7 @@ Herdr child 可在已定约束内处理开放问题并形成 verified candidate�
 
 **Reversal surface:** engineering
 
-**Decision:** workflows 按是否需要即时介入划分触发模型：需要用户明确意图的 workflow 设置 `disable-model-invocation: true`，并以 `Use /skill:<name>` 作为 description 的调用指引；需要模型响应任务启动的 workflow 不设置该字段。当前前者包括 brainstorm-design、draft-spec、draft-tickets、grill-docs、implement-work、improve-architecture 和 handoff-session，后者包括 survey-context。恢复文件或会话不再作为 AKeel 独立 workflow 暴露；文件恢复直接遵循 `principles.md §10`，宿主会话导航遵循 Pi 自身合同。`validate-skills.ts` 对手动 workflow 的 description 约定执行结构检查。
+**Decision:** workflows 按是否需要即时介入划分触发模型：需要用户明确意图的 workflow 设置 `disable-model-invocation: true`，并以 `Use /skill:<name>` 作为 description 的调用指引；需要模型响应任务启动的 workflow 不设置该字段。当前前者包括 assess-modularity、brainstorm-design、draft-spec、draft-tickets、grill-docs、handoff-session 和 implement-work，后者包括 survey-context。恢复文件或会话不再作为 AKeel 独立 workflow 暴露；文件恢复直接遵循 `principles.md §10`，宿主会话导航遵循 Pi 自身合同。`validate-skills.ts` 对手动 workflow 的 description 约定执行结构检查。
 
 **Why:** 手动 workflow 的自动触发可能误判用户意图，尤其是交接和方案处理；模型可调用 workflow 只适合无歧义的即时介入。恢复操作的 skill 只重复 `principles.md §10` 的明确意图要求与 §6 的验证门禁，不能创建快照、提供回滚能力或形成额外安全边界；删除它可降低分发和维护成本，同时保留 AKeel 自身的恢复安全约束。
 
@@ -704,4 +704,30 @@ Herdr child 可在已定约束内处理开放问题并形成 verified candidate�
 
 - **handoff-session 的交接内容和安全边界：** 由该 workflow 自身承载，本决策只规定手动触发。
 
-## D-079: 待创建
+## D-079: 模块设计方法与模块化评估工作流分界
+
+**Reversal surface:** engineering
+
+**Decision:** 保持模块设计方法与仓库级模块化评估为两个 skill，不合并。`module-design` 是可由模型按需加载的 discipline，只处理已知模块或接口问题，以 depth、leverage、locality、testability 和 implementation cost 评估具体设计，并使用 test seam、Deletion Test 和 Design Twice 组织判断；`assess-modularity` 是用户手动调用的 workflow，只扫描指定仓库或子系统中的 shallow module、weak seam 与 scattered responsibility，生成临时、证据化的 findings 和高层 remediation directions，不实施或采纳变更。
+
+`assess-modularity` 的临时报告使用 `finding`，用户选择后才形成供 `grill-docs` 处理的 proposal；只有按 Project Record 生命周期写入 `docs/candidates.md` 的 `C-xxx` 才称为 Candidate Record。评估动作所需的观察问题留在 workflow 动作点，不把 `module-design` 全文作为隐式运行时依赖；具体接口方案才使用 `module-design`。
+
+`module-design` 的方法语义以边界判断为起点：适配器数量是抽取决策的证据而非固定阈值；公共接口是首选测试面，但本质上依赖集成的行为可以使用更高层接缝；无效状态在可行时应不可表示，其余失败必须由明确的失败契约处理。这些取舍属于该 discipline 的统一方法，不是对原有规则逐条追加例外。
+
+**Why:** 模块设计方法集中于模块和接口，而非数据所有权、部署拓扑、可靠性或安全等广义架构；模块化评估工作流只发现并报告结构摩擦，不直接改善架构。按真实对象和产物命名，使已知问题设计与未知问题发现各自全量消费，同时保留 discipline 与手动 workflow 的触发边界。
+
+**Impact:** `module-design` 使用 discipline 的名词短语命名，`assess-modularity` 使用 workflow 的动词—名词命名并保持 `disable-model-invocation: true`。引用、调用指引、临时报告名称和第三方概念映射统一使用新名称。
+
+**Rejected:**
+
+- **合并为单一 architecture skill：** 局部接口设计与仓库扫描具有不同输入、产物和调用模型，合并会形成按模式跳过正文的浅接口。
+- **保留 `codebase-design`：** 名称把实际的模块与接口方法扩大为整个 codebase 的设计。
+- **保留 `improve-architecture`：** 名称暗示实施结果，但工作流只交付评估报告和后续 proposal。
+- **使用 `review-architecture`：** 当前方法只评估模块化结构，广义 architecture 会错误承诺数据、运行时、部署、可靠性和安全维度。
+- **保留旧名兼容别名：** 当前没有已记录的下游依赖证据，别名会延续双重触发面；出现真实兼容需求时再评估。
+
+**Out of Scope:**
+
+- **广义架构评估：** 当前没有覆盖数据所有权、运行时拓扑、部署、可靠性、安全和容量的完整方法。Revisit when 用户采纳这些维度及其证据和输出合同。
+
+## D-080: 待创建

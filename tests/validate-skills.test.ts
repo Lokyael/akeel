@@ -68,6 +68,49 @@ test("model-invocable workflow convention warns on descriptive-first, not trigge
   );
 });
 
+test("module design and modularity assessment publish distinct invocation contracts", () => {
+  const moduleDesign = readFileSync(
+    new URL("../skills/disciplines/module-design/SKILL.md", import.meta.url),
+    "utf8",
+  );
+  const assessModularity = readFileSync(
+    new URL("../skills/workflows/assess-modularity/SKILL.md", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(moduleDesign, /^name: module-design$/m);
+  assert.match(moduleDesign, /^description: Use when designing or revising a known module or interface/m);
+  assert.doesNotMatch(moduleDesign, /^disable-model-invocation: true$/m);
+
+  assert.match(assessModularity, /^name: assess-modularity$/m);
+  assert.match(assessModularity, /^description: Use \/skill:assess-modularity /m);
+  assert.match(assessModularity, /^disable-model-invocation: true$/m);
+});
+
+test("module design integrates boundary evidence and failure handling", () => {
+  const moduleDesign = readFileSync(
+    new URL("../skills/disciplines/module-design/SKILL.md", import.meta.url),
+    "utf8",
+  );
+  assert.match(moduleDesign, /^## Evaluate the Boundary$/m);
+  assert.match(moduleDesign, /^### Test Surface$/m);
+  assert.match(moduleDesign, /Adapter count is evidence, not a rule/);
+  assert.match(moduleDesign, /A second independent consumer is useful evidence, not a prerequisite/);
+  assert.match(moduleDesign, /Prefer testing through the public interface/);
+  assert.match(moduleDesign, /higher-level seam[\s\S]*inherently integration-dependent|inherently integration-dependent[\s\S]*higher-level seam/);
+  assert.match(moduleDesign, /Constrain invalid states[\s\S]*?Handle remaining failures explicitly/);
+  assert.doesNotMatch(moduleDesign, /One Adapter = Hypothetical, Two = Real/);
+});
+
+test("modularity guidance routes known seam failures", () => {
+  const debugging = readFileSync(
+    new URL("../skills/disciplines/systematic-debugging/SKILL.md", import.meta.url),
+    "utf8",
+  );
+  assert.match(debugging, /module boundary prevents locking down this bug[\s\S]*?module-design/);
+  assert.match(debugging, /recurring module-boundary problem[\s\S]*?assess-modularity/);
+});
+
 test("principles anchor rule rejects missing anchors and passes live ones", () => {
   const anchors = loadPrinciplesAnchors();
   const violating = skill({
@@ -106,9 +149,9 @@ test("survey-context keeps Candidate review explicit and bounded", () => {
 
 test("user-invoked reference rule blocks imperatives and passes benign mention forms", () => {
   const userInvoked = skill({
-    dirName: "improve-architecture",
-    name: "improve-architecture",
-    description: "Use /skill:improve-architecture when the codebase feels like a ball of mud.",
+    dirName: "assess-modularity",
+    name: "assess-modularity",
+    description: "Use /skill:assess-modularity to scan a repository for module-boundary friction.",
     disableModelInvocation: true,
   });
   const registry = new Map<string, SkillMeta>([
@@ -128,17 +171,17 @@ test("user-invoked reference rule blocks imperatives and passes benign mention f
   });
   const cases: Array<{ bullet: SkillMeta; violates: boolean }> = [
     // 祈使式 "hand off to" → 违规
-    { bullet: make({ content: "hand off to `/skill:improve-architecture`." }), violates: true },
+    { bullet: make({ content: "hand off to `/skill:assess-modularity`." }), violates: true },
     // 祈使式句首大写 → 违规
-    { bullet: make({ content: "Hand off to `/skill:improve-architecture`." }), violates: true },
+    { bullet: make({ content: "Hand off to `/skill:assess-modularity`." }), violates: true },
     // 用户面向措辞 → 放行
-    { bullet: make({ content: "tell the user to run `/skill:improve-architecture`." }), violates: false },
+    { bullet: make({ content: "tell the user to run `/skill:assess-modularity`." }), violates: false },
     // 描述性提及 → 放行
-    { bullet: make({ content: "invoked automatically when running `/skill:improve-architecture`." }), violates: false },
+    { bullet: make({ content: "invoked automatically when running `/skill:assess-modularity`." }), violates: false },
     // 模型可调用目标 → 放行
     { bullet: make({ content: "run `/skill:fix-validation`." }), violates: false },
     // 自身引用 → 放行
-    { bullet: make({ dirName: "improve-architecture", name: "improve-architecture", content: "Use /skill:improve-architecture when the codebase feels like a ball of mud." }), violates: false },
+    { bullet: make({ dirName: "assess-modularity", name: "assess-modularity", content: "Use /skill:assess-modularity to scan a repository for module-boundary friction." }), violates: false },
   ];
   for (const { bullet, violates } of cases) {
     const result = checkUserInvokedReferences(bullet, registry);

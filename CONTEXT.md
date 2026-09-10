@@ -32,10 +32,12 @@
 - **Skill Responsibility**：`disciplines/` 承载可复用工程方法，`workflows/` 承载端到端编排；目录表达作者职责，不定义 Pi 加载机制。
 - **Skill Single Responsibility**：每个 skill 只做一件事，调用时全量消费；触发场景互斥的 skill 保持独立。
 - **Single Source of Format**：格式与规则只在 `principles.md` 参考节定义一次，技能只引用不复制。
+- **Module Design**：针对已知模块或接口问题，以 depth、leverage、locality、testability、implementation cost 与 test seam 评估具体设计的 discipline。
+- **Modularity Assessment**：用户明确调用后，在指定仓库或子系统中发现 shallow module、weak seam 与 scattered responsibility，并交付临时 findings 的 workflow。
 
 ## Architecture
 
-- `src/bootstrap/` 在 Session 启动和 compaction 后注入工程原则；通用 fresh-evidence 门禁属于该恒定面。Skills 只保留 `disciplines/` 可复用方法与 `workflows/` 端到端编排两个作者职责根。Grilling 只由用户手动调用的 `grill-docs` 承载，按未决问题处理、候选方案确认、事实核对、verified candidate 交接和 Task Owner 导入的固定顺序执行。
+- `src/bootstrap/` 在 Session 启动和 compaction 后注入工程原则；通用 fresh-evidence 门禁属于该恒定面。Skills 只保留 `disciplines/` 可复用方法与 `workflows/` 端到端编排两个作者职责根。`module-design` 处理已知模块或接口设计；手动 `assess-modularity` 只发现仓库或子系统级结构摩擦并交付临时 findings。Grilling 只由用户手动调用的 `grill-docs` 承载，按未决问题处理、候选方案确认、事实核对、verified candidate 交接和 Task Owner 导入的固定顺序执行。
 - 委托按 D-075/D-076 执行上下文准入和封闭路由：Task Owner Session 保留 Authority Context；需要隔离过程上下文且结果仍由该 Owner 裁决的工作通过 Herdr child 同步执行，Owner 预定 artifact、等待 settle 后按路径拉取，child 不发送完成 prompt。可独立验收的长期工作只有经用户明确授权才进入范围互斥的新 Task Owner Session。有效能力含写入或文件修改 Shell 的 delegated agent 强制进入独立 worktree，新增的并行 Owner 也必须拥有不与其他 Owner 共享的 checkout；child 不自清理，由存活 Owner 负责检查、集成与明确批准后的回收。
 - `src/access-gate/access-decision/` 是当前唯一决策实现：`core/` 负责 Pi host/config 无关的语义与策略，Linux pathname lookup 属于该语义域的外部合同；`core/program-semantics/` 负责 Git、解释器、Python 工具、uv 和 npm 族的程序分类与路径事实，Git `-C`、`--git-dir` 和 `--work-tree` 已通过 Canonical command-local cwd seam 解析，helper-capable Git 操作及 `git config` hard-deny；`adapters/` 转换 Pi 和 policy.yaml 输入，`runtime/` 负责 project/staging 生命周期和 host composition。运行时以 session-start cwd 作为固定 Access Root，不要求 Git root；Shell tilde expansion 使用会话初始化时的 `$HOME`。
 - Access Decision Pipeline（D-059/D-060）已完成 Greenfield trust path 与原子生产切换。Canonical 只解释一次；Admission 与 Display 按需投影；Policy Kernel 不读取配置或重新解析请求。Canonical path resolution 同时保留 lexical 与 symlink-target traversal prefixes，Direct search 与 Shell recursive path 均在 blocked descendants 上 fail-closed；有显式 path boundary 时，unknown/unbounded Shell path access 也不得放行。path-form executable 不因已知 basename 获得 inspect/modify 语义，非破坏性形式统一按 opaque execute 处理。Git 显式项目内 `file://` remote 也在 Canonical 阶段转为 path fact；helper-capable Git 操作与 `git config` 保持 hard-deny，host、alias 和间接 config remote 继续 fail-closed。
@@ -81,6 +83,7 @@
 - [D-076 Herdr 统一委托执行面](docs/decisions.md#d-076-herdr-统一委托执行面)
 - [D-077 Decision 寄存器的轻量 hygiene 校验](docs/decisions.md#d-077-decision-寄存器的轻量-hygiene-校验)
 - [D-078 Workflows 触发模型](docs/decisions.md#d-078-workflows-触发模型手动调用与即时介入)
+- [D-079 模块设计方法与模块化评估工作流分界](docs/decisions.md#d-079-模块设计方法与模块化评估工作流分界)
 
 ## Negative Space
 
@@ -102,6 +105,7 @@
 - 不自动识别或写入用户项目的自有文档体系；非标准体系由用户显式声明。
 - 不分发独立 `grill-plan` 或响应自然语言 grill 触发词；grilling 只由用户手动调用 `grill-docs`。
 - 不把 Herdr 声明为 AKeel runtime dependency；`grill-docs` 使用 Herdr 固定执行面和同步 artifact pull。当前不提供异步 child mailbox、receipt、自动续跑、结果聚合或自动 worktree 回收；长期独立工作使用用户授权、范围互斥的 Task Owner Session。
+- `assess-modularity` 不提供覆盖数据所有权、运行时拓扑、部署、可靠性、安全和容量的广义 architecture review，也不实施或采纳其 findings。
 
 ## Project Documents
 
