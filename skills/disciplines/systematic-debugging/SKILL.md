@@ -1,121 +1,71 @@
 ---
 name: systematic-debugging
-description: Use when performing root cause analysis of any technical issue. 4-phase from evidence to fix. Works standalone, or after bug-investigation. If the bug is intermittent, flaky, or cannot be reproduced, use bug-diagnosis first.
+description: Use when investigating the root cause of a technical issue before choosing or implementing a fix — establish a usable signal, test causal hypotheses, state the supported root cause, and apply an authorized regression-tested fix.
 ---
 
 # Systematic Debugging
 
-## Iron Law
+Establish the causal mechanism behind the reported behavior before selecting a durable fix. The method begins with a Task that owns the reported issue or a committed investigation and carries its evidence forward.
 
+## Establish Scope and State
+
+Clarify whether the requested result is a root-cause explanation or an implemented fix. Reuse an active Task Record that owns the reported issue; when the user commits to a separate unrecorded investigation, create the corresponding `Kind: bug` Task and maintain it per principles.md Project Records — Record Lifecycle. Keep Project Record structure in `principles.md` as the single format source.
+
+Capture the exact observed behavior, expected behavior, relevant environment, onset window, and available evidence. These facts define the issue being explained.
+
+## Phase 1: Establish a Usable Signal
+
+Run the existing reproduction and confirm that its verdict matches the reported symptom. A focused failing test, command, request, trace replay, benchmark, or other observable seam is sufficient when it gives causal experiments a clear result.
+
+Use `/skill:bug-reproduction` when the signal is intermittent, environment-dependent, ambiguous, or unavailable, then resume with its `reliable`, `probabilistic`, or `blocked` result. A blocked result completes the current investigation step by naming the next evidence required.
+
+## Phase 2: Locate the Faulty Mechanism
+
+Build a causal path from the symptom toward its source:
+
+1. Read errors and inspect the state immediately before and after the failure.
+2. Trace data and control flow across component boundaries, recording inputs and outputs at the boundary where behavior diverges.
+3. Compare with a working path that shares the relevant contract.
+4. Inspect changes within the evidence-based onset window and affected paths.
+5. Identify assumptions about configuration, state, ordering, dependencies, and execution environment.
+6. When behavior depends on an external library, framework, protocol, or tool, verify the applicable version and authoritative contract per principles.md §6.
+
+Recent changes and working examples are evidence sources. The causal claim comes from an experiment that distinguishes competing explanations.
+
+## Phase 3: Test Causal Hypotheses
+
+Form hypotheses supported by the evidence and identify a plausible alternative when one exists. Select one active hypothesis and state its prediction:
+
+```text
+If [mechanism] causes the symptom, then [controlled experiment] produces [observable result].
 ```
-NO FIXES WITHOUT ROOT CAUSE INVESTIGATION FIRST
-```
 
-If you haven't completed Phase 1, you cannot propose fixes.
+Run the smallest discriminating experiment that changes one causal variable while preserving the symptom seam. Prefer debugger, REPL, fixture substitution, or dependency control; label temporary instrumentation with a unique `[DEBUG-...]` prefix and restore experimental production changes after the observation.
 
-## Before You Start
+A matching result strengthens the hypothesis only when the experiment distinguishes it from the alternatives. A non-matching result becomes new evidence and starts the next hypothesis from the updated causal path.
 
-If a bug-investigation Task Record exists, start from its evidence and
-hypotheses. Otherwise, gather evidence from scratch.
+## Phase 4: State the Root Cause
 
-## When to Use
+Publish one result status:
 
-Use for ANY technical issue: test failures, bugs, unexpected behavior,
-performance problems, build failures, integration issues.
+- **Confirmed:** name the trigger, faulty mechanism, reason it produces this symptom, discriminating evidence, alternatives ruled out, and residual uncertainty.
+- **Likely:** name the best-supported mechanism and the experiment still needed for confirmation.
+- **Blocked:** name the missing signal or evidence and the concrete acquisition step.
 
-**Use ESPECIALLY when:**
-- Under time pressure (emergencies make guessing tempting)
-- "Just one quick fix" seems obvious
-- You've already tried multiple fixes
-- Previous fix didn't work
+Use “supported root cause” only for the Confirmed result. A change that makes the symptom disappear is supporting evidence when the experiment also establishes why that mechanism caused the behavior.
 
-## The Four Phases
+## Phase 5: Apply an Authorized Fix
 
-### Phase 1: Root Cause Investigation
+Phase 5 begins with a `Confirmed` root cause and explicit user authorization. A `Likely` result continues with its named discriminating experiment; a `Blocked` result continues when the required evidence becomes available. Use `/skill:test-driven-development` to establish the regression at an approved seam before production changes, then implement one coherent causal fix containing all necessary coordinated edits and no unrelated cleanup.
 
-Goal: understand WHAT and WHY — do not fix yet.
+Remove investigation instrumentation and classify each harness as a retained regression test or temporary artifact. Use `/skill:fix-validation` for fresh evidence that the original signal passes, the wider suite remains healthy, and the user-visible symptom is resolved.
 
-**BEFORE attempting ANY fix:**
+A failed fix invalidates the assumed mechanism or its implementation. Return to the reproduction and causal evidence, update the hypothesis, and run a new discriminating experiment before selecting another fix.
 
-1. **Read Error Messages Carefully** — Don't skip. They often contain the exact solution.
-2. **Reproduce Consistently** — Can you trigger it reliably? What are exact steps?
-   If the bug is intermittent or flaky, pause and invoke `/skill:bug-diagnosis`
-   to build a feedback loop first, then return here.
-3. **Check Recent Changes** — Git diff, recent commits, new dependencies, config changes.
-4. **Gather Evidence in Multi-Component Systems** — For each boundary, log what enters and exits.
-5. **Trace Data Flow** — Where does the bad value originate? Keep tracing up to the source.
+## Module-Boundary Findings
 
-### Phase 2: Pattern Analysis
+Evidence that the module boundary prevents locking down the issue is a concrete input to `/skill:module-design`. A recurring module-boundary problem is suitable for user-requested `/skill:assess-modularity`; the finding names the affected seam and observed friction.
 
-Find the pattern before fixing:
+## Guardrails
 
-1. **Find Working Examples** — Locate similar working code in same codebase.
-2. **Compare Against References** — Read reference implementation completely. Don't skim.
-3. **Identify Differences** — List every difference, however small. Don't assume "that can't matter."
-4. **Understand Dependencies** — What other components does this need? What assumptions?
-
-### Phase 3: Hypothesis and Testing
-
-Scientific method:
-
-1. **Select or Form Hypothesis:**
-   - If a Task Record exists with ranked hypotheses: select the most promising
-     one. Restate it as a testable prediction: "If [hypothesis] is correct, then
-     [specific change] will [observable effect]."
-   - If no Task Record exists: form a single hypothesis based on available
-     evidence. Before settling, ask: is this the only plausible explanation?
-     If yes, force at least one alternative. The first idea anchors.
-2. **Test Minimally** — Smallest possible change to test hypothesis. One variable
-   at a time. Prefer debugger/REPL over logs. Tag any debug log with a unique
-   prefix like `[DEBUG-a4f2]` for cleanup later.
-3. **Verify Before Continuing** — Did it work? Yes → Phase 4. No → Form NEW hypothesis.
-4. **When You Don't Know** — Say "I don't understand X." Don't pretend.
-
-### Phase 4: Implementation
-
-Fix the root cause, not the symptom.
-
-**Before writing the fix, verify:** can you write a failing test for this bug?
-If no testable seam exists after trying at least 2 approaches, stop. That IS
-the finding — the module boundary prevents locking down this bug. Apply
-`/skill:module-design` before attempting the fix.
-
-If a seam exists:
-
-1. **Create Failing Test** — Simplest reproduction. Automated if possible.
-2. **Implement Single Fix** — Address root cause. ONE change. No "while I'm here."
-3. **Verify Fix** — Test passes? No other tests broken? If yes, continue to step 4.
-   Do NOT declare done yet.
-4. **Clean Up:**
-   - Remove all `[DEBUG-...]` instrumentation (`grep` the prefix to confirm zero matches)
-   - Delete throwaway prototypes and harnesses
-   - For full verification: `/skill:fix-validation`
-   - For broader cleanup: `/skill:code-cleanup`
-5. **Post-Mortem** — Ask: what would have prevented this bug? If the answer is
-   a recurring module-boundary problem, tell the user to run `/skill:assess-modularity`.
-6. **If Fix Doesn't Work** — STOP. Count: How many fixes tried?
-   - If < 3: Return to Phase 1 with new information.
-   - **If ≥ 3: STOP and question the architecture.** Is this pattern fundamentally
-     sound? Discuss with your human partner before attempting more fixes.
-     This is NOT a failed hypothesis — this is a wrong architecture.
-
-## Red Flags — STOP and Follow Process
-
-If you catch yourself thinking:
-- "Quick fix for now, investigate later"
-- "Just try changing X and see"
-- "It's probably X, let me fix that"
-- "I don't fully understand but this might work"
-- "One more fix attempt" (when already tried 2+)
-- Each fix reveals new problem in different place
-
-**ALL mean: STOP. Return to Phase 1.**
-
-## Common Rationalizations
-
-| Excuse | Reality |
-|--------|---------|
-| "Issue is simple, don't need process" | Simple issues have root causes too. |
-| "Emergency, no time for process" | Systematic is FASTER than guess-and-check thrashing. |
-| "Multiple fixes at once saves time" | Can't isolate what worked. Causes new bugs. |
-| "I see the problem, let me fix it" | Seeing symptoms ≠ understanding root cause. |
+Return to the relevant phase when the work starts treating a symptom as a cause, changing several causal variables in one experiment, using a passing result as the complete causal explanation, or repeating a fix without revisiting the evidence. Architectural escalation follows demonstrated seam or responsibility friction rather than a fixed number of unsuccessful attempts.

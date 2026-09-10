@@ -52,7 +52,8 @@ Based on the project state:
 - Task Record is `draft` → suggest the next design, requirements, planning, or debugging skill based on its `Kind`.
 - Task Record is `in-progress` → continue it or ask whether to reassess if its evidence is stale.
 - Task Record is `verified` → apply durable updates, then clear the completed Task Record sections.
-- A bug is reported → suggest `bug-investigation`.
+- A bug investigation or fix is requested → suggest `systematic-debugging`; when the symptom lacks a reliable agent-runnable signal, start with `bug-reproduction`.
+- A bug record is requested without technical investigation → create or update the `Kind: bug` Task directly per principles.md Project Records — Record Lifecycle.
 - A load-bearing decision is unresolved → suggest `domain-modeling` or `grill-docs`.
 - Candidate review is explicitly requested → read the requested Candidate records, list them as not adopted, and wait for the user's choice.
 - No `CONTEXT.md` exists → note that current project knowledge has not yet been centralized.

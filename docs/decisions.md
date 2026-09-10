@@ -758,4 +758,23 @@ Herdr child 可在已定约束内处理开放问题并形成 verified candidate�
 - **模型行为 A/B 基准：** 当前没有固定模型与 consuming-agent harness。Revisit when 项目采纳可重复的 prompt 行为评测。
 - **确定性 commit hook：** Pi 当前没有由本任务采用的 commit lifecycle enforcement seam。Revisit when 宿主提供可测试 hook，或真实工作流证明 skill 编排不足。
 
-## D-081: 待创建
+## D-081: 复现信号与系统化根因调试分界
+
+**Reversal surface:** engineering
+
+**Decision:** 调试能力由两个模型可按需加载的 discipline 承载。`bug-reproduction` 面向缺少可靠反馈信号的 bug、failure 与 performance regression，构造并缩小忠实于用户症状的确定性或可测概率性复现，交付 `reliable`、`probabilistic` 或 `blocked` Reproduction Result 并返回调用方。`systematic-debugging` 面向技术问题的根因调查，在可用信号上追踪故障机制，以能够区分替代解释的实验支持根因结论，并只从 `Confirmed` 根因和用户授权进入 TDD，实施一个连贯的因果修复后进入 fix validation。
+
+Bug Task 的创建和更新直接遵循 `principles.md` Project Record 生命周期：用户已承诺调查时建立或复用 `Kind: bug` Task，格式继续由恒定注入面单源定义。仅记录请求由该生命周期直接处理；`systematic-debugging` 消费现有 Task 或在承诺成立时建立最小 Task，`bug-reproduction` 发行供调用方消费的复现结果。
+
+Reproduction Result 以症状判定的忠实度、特异性、迭代成本、最小条件和实测复现率描述反馈质量。概率性复现只要能在明确预算内支持区分性实验即可成为可用信号；固定运行次数或失败率不作为统一完成阈值。临时 harness 与 instrumentation 保持可识别，适合公共 seam 的复现才成为永久 regression-test 候选。
+
+**Why:** 复现工程和根因调试具有不同输入与交付物：前者把难以观察的症状转成实验 seam，后者利用该 seam 证明因果机制。Project Record 生命周期承载 Bug intake，系统化调试方法承载证据收集和候选假设，使格式、调查步骤和路由各有唯一所有者。两项能力按结果命名后，每次调用都能全量消费其方法，并由原调用方持有后续流程。
+
+**Impact:** `survey-context` 将已承诺的 bug 调查或修复导向 `systematic-debugging`，缺少可用信号时先使用 `bug-reproduction`；仅记录请求直接更新 Bug Task。调试正文保留动作点所需的根因与授权门禁，TDD、fix validation、change preflight 和模块设计继续拥有各自流程。
+
+**Rejected:**
+
+- **单一 debugging skill：** 可靠复现问题不会消费难复现构造方法，而只构造反馈信号的任务也不需要根因和实施阶段，合并会形成条件模式。
+- **独立 bug intake skill：** 其产物是既有 Project Record，所需技术调查已属于系统化调试；额外入口会复制格式和证据流程。
+
+## D-082: 待创建

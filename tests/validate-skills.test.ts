@@ -8,7 +8,7 @@
  *   4. /skill: 交叉引用规则必须拒绝悬空目标与手动 workflow 祈使调用，并放行用户面向 / 描述性 / 自身引用
  */
 
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
@@ -91,6 +91,38 @@ test("review readiness skills publish distinct invocation and authority contract
   assert.doesNotMatch(cleanup, /at the end of a development phase/);
 });
 
+test("debugging skills publish the current reproduction and causal-debugging contracts", () => {
+  const root = new URL("../skills/disciplines/", import.meta.url);
+  const reproductionUrl = new URL("bug-reproduction/SKILL.md", root);
+  const debuggingUrl = new URL("systematic-debugging/SKILL.md", root);
+
+  assert.ok(existsSync(reproductionUrl), "bug-reproduction must provide the feedback-signal capability");
+  const debuggingSkills = readdirSync(root)
+    .filter((name) => name.startsWith("bug-") || name === "systematic-debugging")
+    .sort();
+  assert.deepEqual(debuggingSkills, ["bug-reproduction", "systematic-debugging"]);
+
+  const reproduction = readFileSync(reproductionUrl, "utf8");
+  const debugging = readFileSync(debuggingUrl, "utf8");
+
+  assert.match(reproduction, /^name: bug-reproduction$/m);
+  assert.match(reproduction, /^description: Use when .*lacks a reliable.*signal/m);
+  assert.match(reproduction, /reliable[\s\S]*probabilistic[\s\S]*blocked/);
+  assert.match(reproduction, /iteration cost[\s\S]*observed rate/i);
+  assert.match(reproduction, /Return the result to the caller/);
+
+  assert.match(debugging, /^name: systematic-debugging$/m);
+  assert.match(debugging, /^description: Use when investigating the root cause/m);
+  assert.match(debugging, /principles\.md Project Records — Record Lifecycle/);
+  assert.match(debugging, /\/skill:bug-reproduction/);
+  assert.match(debugging, /discriminating experiment/);
+  assert.match(debugging, /supported root cause/);
+  assert.match(debugging, /Reuse an active Task Record that owns the reported issue/);
+  assert.match(debugging, /Phase 5 begins with a `Confirmed` root cause and explicit user authorization/);
+  assert.match(debugging, /\/skill:test-driven-development/);
+  assert.match(debugging, /\/skill:fix-validation/);
+});
+
 test("module design and modularity assessment publish distinct invocation contracts", () => {
   const moduleDesign = readFileSync(
     new URL("../skills/disciplines/module-design/SKILL.md", import.meta.url),
@@ -130,7 +162,7 @@ test("modularity guidance routes known seam failures", () => {
     new URL("../skills/disciplines/systematic-debugging/SKILL.md", import.meta.url),
     "utf8",
   );
-  assert.match(debugging, /module boundary prevents locking down this bug[\s\S]*?module-design/);
+  assert.match(debugging, /module boundary prevents locking down the issue[\s\S]*?module-design/);
   assert.match(debugging, /recurring module-boundary problem[\s\S]*?assess-modularity/);
 });
 
