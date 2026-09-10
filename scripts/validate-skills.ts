@@ -6,7 +6,7 @@
  *   2. Directory name matches frontmatter "name"
  *   3. description length ≤ 1024 chars
  *   4. SKILL.md line count ≤ 200 (warning only)
- *   5. /skill: body references must never invoke user-invoked skills (D-078)
+ *   5. /skill: body references must resolve and never invoke user-invoked skills (D-078)
  *
  * 规则行为测试迁出至 tests/validate-skills.test.ts（node:test）。
  */
@@ -232,7 +232,7 @@ function checkExternalUrls(skill: SkillMeta): CheckResult {
   return { pass: true, warnings, errors: [] };
 }
 
-// ─── /skill: 交叉引用检查：user-invoked 目标只能以用户指令形式出现 ───
+// ─── /skill: 交叉引用检查：目标必须存在；user-invoked 目标只能以用户指令形式出现 ───
 // D-078 将 workflows 分为手动调用（disable-model-invocation）与模型调用。
 // 手动调用的 skill 只能由用户发起；另一技能正文若用祈使式（hand off to /
 // invoke / run / call）引用它，模型执行时该调用不可达且静默失败——mattpocock
@@ -240,15 +240,22 @@ function checkExternalUrls(skill: SkillMeta): CheckResult {
 // （"tell the user to run /skill:..."）。含 user/human/them 用户面向措辞的行、
 // 描述性提及（when running /skill:X）与自身描述自我引用一律放行。
 
-const USER_INVOKED_IMPERATIVE = /(?:hand off to|invoke|run|call the skills? tool with|call)\s*$/i;
+const USER_INVOKED_IMPERATIVE = /(?:^|[.!?;:,]\s*)\s*(?:(?:[-*+>]|\d+[.)])\s+)*(?:(?:then|please)\s+|(?:you|the\s+(?:workflow|skill|agent|model))\s+(?:should|must|shall|needs?\s+to|has\s+to)\s+)*(?:hand off to|invoke|run|call the skills? tool with|call)\b[^.!?;]*$/i;
 
-export function checkUserInvokedReferences(skill: SkillMeta, registry: Map<string, SkillMeta>): CheckResult {
+export function checkSkillReferences(skill: SkillMeta, registry: Map<string, SkillMeta>): CheckResult {
   const errors: string[] = [];
   const lines = skill.content.split(/\r?\n/);
   for (const [index, line] of lines.entries()) {
     for (const match of line.matchAll(/\/skill:([a-z0-9-]+)/g)) {
-      const target = registry.get(match[1]!);
-      if (!target || !target.disableModelInvocation) continue;
+      const targetName = match[1]!;
+      const target = registry.get(targetName);
+      if (!target) {
+        errors.push(
+          `\`/skill:${targetName}\` target not found in the distributed skill registry. Line ${index + 1}: "${line.trim().slice(0, 80)}"`
+        );
+        continue;
+      }
+      if (!target.disableModelInvocation) continue;
       // 自身描述中的自我引用（user-invoked 约定 "Use /skill:<name>"）不是交叉调用
       if (target.dirName === skill.dirName) continue;
       // 用户面向措辞：动作交给用户（"tell the user to run ..."），不是模型调用
@@ -382,7 +389,7 @@ function main() {
       checkLineCount(skill),
       checkExternalUrls(skill),
       checkPrinciplesRefs(skill, principlesAnchors),
-      checkUserInvokedReferences(skill, skillRegistry),
+      checkSkillReferences(skill, skillRegistry),
     ];
 
     const skillErrors = checks.flatMap((c) => c.errors);

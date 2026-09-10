@@ -1,55 +1,48 @@
 ---
 name: code-cleanup
-description: 'Use when the user says `clean up` or `整理代码`, or at the end of a development phase — systematic deep cleanup: dead code, duplicate logic, long files, module boundaries, test hygiene, and doc sync.'
+description: 'Use when the user explicitly requests cleanup of a named scope or an approved maintenance Task requires it — make behavior-preserving code, test, and documentation improvements.'
 ---
 
-# Clean Up Code
+# Code Cleanup
 
-Systematic deep cleanup at the end of a development phase, before merging or releasing. Run when the user says `clean up` / `整理代码`, or when a milestone is complete.
+Perform deep maintenance only inside an explicitly named scope. Cleanup preserves externally observable behavior; it is not automatic permission to change historical code when an implementation phase ends.
 
-Follow each step in order.
+## 1. Fix Scope and Baseline
 
-## Process
+Name the approved files, module, subsystem, or repository scope before editing. If the request is ambiguous, ask. Read the applicable Requirements, public interfaces, package exports, host/plugin registration, and repository conventions.
 
-### 1. 死代码
+Run the relevant tests, typechecking, build, and repository checks before cleanup. The required baseline must be green before any cleanup edit. If it is not, return `BLOCKED`, record the existing failure, and repair it only under a separately approved Task.
 
-- `npx tsc --noEmit` 确认零错误
-- 对每个 `export` 执行 `grep -rn <name> src/ tests/`，无引用方则删除
-- 检查 import 列表，移除未使用的导入
+## 2. Remove Proven Dead Code
 
-### 2. 重复逻辑
+- Remove unused imports and unreachable private implementation.
+- Treat an export as dead only when repository references, public entry points, package exports, dynamic registration, host contracts, and documented external use jointly prove it unreachable.
+- If external reachability cannot be disproved, report the export instead of deleting it.
 
-- 找相似度高的代码块（相同函数签名、相同控制流结构）
-- 评估：抽取后的接口复杂度 > 节省的代码行数 → 不抽取
-- 仅抽取"改一处即全局生效"的重复
+## 3. Reduce Proven Duplication
 
-### 3. 长文件
+Extract duplication only when the repeated logic represents one behavior that must change together. Do not extract when the new interface costs more than the synchronized behavior it hides or would weaken locality.
 
-- 超过 ~350 行的文件，检查是否有独立职责可拆出
-- 拆分标准：可独立命名、可独立测试、有明确单一职责
-- **不拆的情形（满足任一即保留原样，不限行数）：**
-  - 模块私有状态（WeakSet、闭包变量）被多个函数共享，拆分后必须导出 → 打破安全边界
-  - 多个函数共同守卫一个概念（如 request 构造+验证），拆开后概念散落两处 → 违反 §9
-  - 超出部分来自 import/export 声明、section banner 等结构性开销，核心逻辑在大约 300 行以内
-- 不拆但超过 ~500 行：重新审视模块职责是否过于庞杂，考虑通过重构（而非拆分文件）来简化
+## 4. Improve Local Structure
 
-### 4. 模块边界
+Investigate long functions, files, dependency cycles, and scattered responsibilities as evidence, not numerical violations. Split or move code only when the result has a clear name, stable seam, tighter locality, and independent testability.
 
-- imports 是否形成单向依赖树（不应有循环引用）
-- 同一抽象层级的概念是否放在同一个模块中
-- 路径深度 > 4 层时检查是否可以扁平化
+Do not change a public interface, policy meaning, product behavior, or module ownership under cleanup authority. A recurring or public-boundary problem becomes a separate module-design proposal; repository-wide discovery belongs to `assess-modularity` after the user requests it.
 
-### 5. 测试清理
+## 5. Clean Tests Carefully
 
-- 相同输入 + 相同断言 → 合并为一个参数化用例
-- 断言覆盖唯一路径（equivalence class 每类一个），不重复验证同一行为
-- 删除"为了覆盖率"写的、不测试实际行为的测试
+Parameterize or merge tests only when their behavior seam, setup, side effects, and expected result are equivalent, failure diagnostics remain specific, and bug or Requirement traceability is preserved. Remove tests only when they do not protect an observable contract.
 
-### 6. 文档同步
+## 6. Verify the Cleanup
 
-- 运行 `/skill:doc-sync` 检查过期引用、stale 计数
-- 近期变更的模块、API、配置项是否有对应文档更新
+Work in small batches and run relevant tests after each behavior-sensitive change. At the end:
 
-## Completion
+- run `/skill:doc-sync` for affected documentation and Project Records;
+- run the full repository validation on the resulting final surface;
+- inspect the complete diff for scope and behavior drift;
+- run applicable specialized review, then `/skill:change-preflight`;
+- submit the unchanged READY Review Surface to `/skill:code-review`.
 
-Commit cleanup changes with meaningful messages. If any step revealed recurring module-boundary issues beyond cleanup scope, tell the user to run `/skill:assess-modularity`.
+If documentation synchronization, preflight, a specialized review finding, or any later action changes content, repeat documentation synchronization, full validation, applicable specialized review, and preflight before code review.
+
+Report the cleanup diff, baseline and final evidence, documentation changes, unresolved observations, and residual risks. Do not decide or perform the commit; the outer workflow or Task Owner owns it.

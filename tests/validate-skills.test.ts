@@ -5,16 +5,16 @@
  *   1. 手动调用（disable-model-invocation）描述约定必须拒绝违规
  *   2. 模型可调用 workflow 触发句前置约定必须告警 / 不误报
  *   3. principles.md 锚点规则必须拒绝不存在引用、放行真实引用
- *   4. /skill: 交叉引用规则必须拦截祈使式、放行用户面向 / 描述性 / 自身引用
+ *   4. /skill: 交叉引用规则必须拒绝悬空目标与手动 workflow 祈使调用，并放行用户面向 / 描述性 / 自身引用
  */
 
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
   checkDescriptionConvention,
   checkPrinciplesRefs,
-  checkUserInvokedReferences,
+  checkSkillReferences,
   loadPrinciplesAnchors,
   type SkillMeta,
 } from "../scripts/validate-skills";
@@ -66,6 +66,29 @@ test("model-invocable workflow convention warns on descriptive-first, not trigge
     !ok.warnings.some((w) => w.includes("model-invocable workflow convention")),
     "false positive on trigger-first description"
   );
+});
+
+test("review readiness skills publish distinct invocation and authority contracts", () => {
+  const root = new URL("../skills/disciplines/", import.meta.url);
+  const preflightUrl = new URL("change-preflight/SKILL.md", root);
+  const retiredAuditUrl = new URL("code-audit/SKILL.md", root);
+
+  assert.ok(existsSync(preflightUrl), "change-preflight must be distributed");
+  assert.ok(!existsSync(retiredAuditUrl), "code-audit must not remain as a second trigger surface");
+
+  const preflight = readFileSync(preflightUrl, "utf8");
+  const review = readFileSync(new URL("code-review/SKILL.md", root), "utf8");
+  const cleanup = readFileSync(new URL("code-cleanup/SKILL.md", root), "utf8");
+
+  assert.match(preflight, /^name: change-preflight$/m);
+  assert.match(preflight, /^description: Use before independent review or commit/m);
+  assert.doesNotMatch(preflight, /^disable-model-invocation: true$/m);
+
+  assert.match(review, /^description: .*independent.*fixed Review Surface.*without modifying files/m);
+  assert.doesNotMatch(review, /^disable-model-invocation: true$/m);
+
+  assert.match(cleanup, /^description: .*explicitly requests.*named scope.*behavior-preserving/m);
+  assert.doesNotMatch(cleanup, /at the end of a development phase/);
 });
 
 test("module design and modularity assessment publish distinct invocation contracts", () => {
@@ -147,6 +170,19 @@ test("survey-context keeps Candidate review explicit and bounded", () => {
   assert.match(content, /report a missing ID and keep the remaining requested scope unchanged/);
 });
 
+test("skill reference rule rejects missing targets", () => {
+  const source = skill({
+    dirName: "source",
+    name: "source",
+    content: "run `/skill:missing-skill`.",
+  });
+  const result = checkSkillReferences(source, new Map([[source.dirName, source]]));
+  assert.ok(
+    result.errors.some((error) => error.includes("missing-skill") && error.includes("not found")),
+    `expected a missing-target error, got: ${result.errors.join("; ")}`,
+  );
+});
+
 test("user-invoked reference rule blocks imperatives and passes benign mention forms", () => {
   const userInvoked = skill({
     dirName: "assess-modularity",
@@ -178,13 +214,21 @@ test("user-invoked reference rule blocks imperatives and passes benign mention f
     { bullet: make({ content: "tell the user to run `/skill:assess-modularity`." }), violates: false },
     // 描述性提及 → 放行
     { bullet: make({ content: "invoked automatically when running `/skill:assess-modularity`." }), violates: false },
+    { bullet: make({ content: "A call to `/skill:assess-modularity` is documented here." }), violates: false },
+    { bullet: make({ content: "The command run is represented by `/skill:assess-modularity`." }), violates: false },
     // 模型可调用目标 → 放行
     { bullet: make({ content: "run `/skill:fix-validation`." }), violates: false },
+    // 同一祈使子句中较后的手动目标仍必须被拦截
+    { bullet: make({ content: "run `/skill:fix-validation` and `/skill:assess-modularity`." }), violates: true },
+    // modal 指令与缩进 Markdown 列表同样属于模型调用
+    { bullet: make({ content: "You should run `/skill:assess-modularity`." }), violates: true },
+    { bullet: make({ content: "The workflow must invoke `/skill:assess-modularity`." }), violates: true },
+    { bullet: make({ content: "  - run `/skill:assess-modularity`." }), violates: true },
     // 自身引用 → 放行
     { bullet: make({ dirName: "assess-modularity", name: "assess-modularity", content: "Use /skill:assess-modularity to scan a repository for module-boundary friction." }), violates: false },
   ];
   for (const { bullet, violates } of cases) {
-    const result = checkUserInvokedReferences(bullet, registry);
+    const result = checkSkillReferences(bullet, registry);
     const fired = result.errors.length > 0;
     assert.equal(fired, violates, `content: "${bullet.content}"`);
   }

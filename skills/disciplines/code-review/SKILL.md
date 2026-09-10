@@ -1,75 +1,60 @@
 ---
 name: code-review
-description: 'Use when the user wants to review a branch, a PR, task-in-progress changes, or asks to "review since X" — two-axis parallel review: Standards (conventions?) and Requirements (expected behavior?).'
+description: 'Use when the user wants an independent review of a branch, PR, or task-in-progress change — inspect one fixed Review Surface and report Engineering and Requirements findings without modifying files.'
 ---
 
 # Code Review
 
-Two-axis review of the diff between `HEAD` and a fixed point the user supplies:
+Independently review one fixed change set. Reviewers report evidence-backed findings; they do not edit the reviewed files or decide whether findings are accepted.
 
-- **Standards** — does the code conform to this repo's documented coding standards?
-- **Requirements** — does the code faithfully implement the originating issue, expected behavior, or Task Record?
+## 1. Accept a READY Review Surface
 
-Run both axes as parallel independent Herdr analyses so they don't pollute each other's context. The Task Owner coordinator waits for both, reads their returned artifacts, aggregates the review, and owns final finding disposition; concurrent children still form one synchronous fork-join.
+Require a current `READY` result from `/skill:change-preflight` and the exact change surface it pinned. If the result is missing, blocked, or stale, stop and ask the Task Owner to complete preflight; the reviewer does not perform cleanup.
 
-## Process
+The Task Owner coordinator then captures one bounded review packet before delegation. For a branch or PR, record the fixed point and committed diff from its merge base to `HEAD`. For task-in-progress work, also include:
 
-### 1. Pin the Fixed Point
+- staged changes;
+- unstaged changes;
+- in-scope untracked files;
+- `git status --short`;
+- the authoritative Task Record or other Requirements source;
+- repository standards that govern the changed paths.
 
-Capture the diff: `git diff <fixed-point>...HEAD` (three-dot for merge-base).
-Confirm the fixed point resolves and the diff is non-empty.
+If the fixed point does not resolve, the change set is empty, untracked content cannot be bounded, or the Requirements source is ambiguous, stop and ask. Both review axes must consume the same packet rather than rereading a moving working tree independently.
 
-### 2. Identify the Task Record
+## 2. Run Independent Axes
 
-Look for the originating Task Record:
-1. Issue references in commit messages (`#123`, `Closes #45`)
-2. A path the user passed as an argument
-3. A matching Task Record in `docs/task.md` or `docs/task-<topic>.md`
-4. If nothing is found, ask. If there is no Task Record, the Requirements axis reports "no requirements source available."
+Run both axes as parallel independent Herdr analyses so their contexts do not contaminate each other. The Task Owner waits for both artifacts and owns final finding disposition.
 
-### 3. Identify Standards Sources
+### Engineering
 
-Anything documenting how code should be written: `CODING_STANDARDS.md`, `CONTRIBUTING.md`, `CONVENTIONS.md`, etc.
+Inspect every changed hunk for:
 
-On top of whatever the repo documents, apply the **smell baseline** — a fixed set of Fowler code smells (*Refactoring*, ch.3):
+- correctness, edge cases, error paths, regressions, and unsafe assumptions;
+- resource, concurrency, security, and performance risks supported by concrete evidence;
+- violations of repository standards;
+- maintainability problems at the changed seam.
 
-| Smell | What | Fix |
-|-------|------|-----|
-| **Mysterious Name** | Name doesn't reveal what it does | Rename |
-| **Duplicated Code** | Same logic shape in multiple hunks | Extract shared shape |
-| **Feature Envy** | Method reaches into another object's data more than its own | Move method |
-| **Data Clumps** | Same fields keep travelling together | Bundle into one type |
-| **Primitive Obsession** | Primitive standing in for domain concept | Create small type |
-| **Speculative Generality** | Abstraction for needs the spec doesn't have | Delete, inline |
-| **Message Chains** | Long `a.b().c().d()` navigation | Hide behind one method |
-| **Middle Man** | Class/function that mostly delegates | Cut it, call directly |
+Use documented repository standards first. Baseline smells such as duplicated code, speculative generality, feature envy, data clumps, primitive obsession, message chains, middle men, and mysterious names are heuristics, not automatic violations. Skip checks already enforced by tooling unless the diff demonstrates a gap. A deep vulnerability assessment belongs to `security-review`; do not ignore an obvious security finding while routing the broader scan.
 
-**Rules:**
-- The repo's documented standards override the baseline
-- Each smell is a heuristic ("possible Feature Envy"), never a hard violation
-- Skip anything tooling already enforces
+### Requirements
 
-### 4. Run Both Axes
+Check the authoritative Requirements source for:
 
-**Standards review** — per file/hunk:
-- (a) Every place the diff violates a documented standard — cite the standard
-- (b) Any baseline smell spotted — name it and quote the hunk
+- missing or partial behavior;
+- behavior implemented incorrectly;
+- unmet acceptance criteria;
+- unrequested behavior or scope creep;
+- tests that do not prove the claimed Requirement.
 
-**Requirements review** — against the Task Record:
-- (a) Requirements asked for that are missing or partial
-- (b) Behaviour in the diff that wasn't asked for (scope creep)
-- (c) Requirements that look implemented but the implementation looks wrong — quote the Task Record line
+If no Requirements source exists after asking, report that limitation; do not invent one.
 
-### 5. Aggregate
+## 3. Report Findings
 
-Present under `## Standards` and `## Requirements` headings. Do **not** merge or rerank — the two axes are deliberately separate.
+Keep `## Engineering` and `## Requirements` separate. Each finding includes severity, file and line or other stable anchor, evidence, impact, and the smallest corrective direction. Report the total and worst finding for each axis; do not hide one axis behind an aggregate score.
 
-End with: total findings per axis, and the worst issue within each axis (if any).
+The Task Owner accepts, rejects, or defers findings. Reviewers do not modify files, create cleanup scope, or commit.
 
-## Why Two Axes
+## 4. Check Staleness
 
-A change can pass one axis and fail the other:
-- Code that follows every standard but implements the wrong thing → **Standards pass, Requirements fail**
-- Code that does exactly what the issue asked but breaks conventions → **Requirements pass, Standards fail**
-
-Reporting them separately stops one from masking the other.
+After both analyses settle, compare the current working state with the pinned packet. Any reviewed content change makes the affected result stale. Fixes re-enter preflight and review before final acceptance.

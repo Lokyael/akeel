@@ -578,7 +578,7 @@ Tilde expansion 仅适用于受支持 Shell word 中位于开头、未引用、�
 
 **Decision:** `principles.md` 承载跨任务恒定注入的不变量；`skills/disciplines/` 承载可复用工程方法，`skills/workflows/` 承载端到端编排。目录只表达作者职责，不创造 Pi 运行时加载层；运行时发现服从 package manifest，workflow 调用模型由 D-078 定义。Disciplines 使用名词短语，Workflows 使用动词-名词，复合名称使用 kebab-case，避免非必要缩写和人物名。
 
-通用“完成声明前必须取得 fresh evidence”继续只由 `principles.md §6` 定义。独立 `evidence-first` skill 退役，空 `foundations/` 分发根删除；bug/feature 验证、Requirements 核对和提交前检查等具体操作守卫留在 `fix-validation`、`implement-work`、`code-audit` 等对应动作点，不复制通用规则正文。
+通用“完成声明前必须取得 fresh evidence”继续只由 `principles.md §6` 定义。独立 `evidence-first` skill 退役，空 `foundations/` 分发根删除；bug/feature 验证、Requirements 核对和提交前检查等具体操作守卫留在 `fix-validation`、`implement-work`、`change-preflight` 等对应动作点，不复制通用规则正文。
 
 **Why:** Pi 对 `package.json.pi.skills` 声明的目录统一递归发现，目录名不定义加载时机；把 `foundations/` 描述成常驻层会混淆作者组织与宿主调用合同。`evidence-first` 的通用门禁已经恒定注入，其独立 skill 激活由模型判断、不是可靠 enforcement，并与恒定规则形成双源；只有动作特有的验证步骤具备独立保留价值。
 
@@ -730,4 +730,32 @@ Herdr child 可在已定约束内处理开放问题并形成 verified candidate�
 
 - **广义架构评估：** 当前没有覆盖数据所有权、运行时拓扑、部署、可靠性、安全和容量的完整方法。Revisit when 用户采纳这些维度及其证据和输出合同。
 
-## D-080: 待创建
+## D-080: 当前变更预检、独立代码审查与显式深度清理分界
+
+**Reversal surface:** engineering
+
+**Decision:** 提交前准备、独立 finding 生成与深度维护保持为三个职责，不合并。`change-preflight` 是模型可按需加载的 discipline，收敛宽泛的提交前自审：它只处理当前 Task 的活动变更，自动移除该变更产生的临时文件、调试残留与 orphan，核对 scope、文档、最终验证和适用的专项门禁，并交付 review-ready 或 blocked 状态；它不扫描或修复历史代码卫生与架构问题。
+
+`code-review` 保持独立、只读的 discipline。它把 branch commits、staged、unstaged 与范围内 untracked 内容固定为同一不可变 Review Surface，分别执行 Engineering 与 Requirements 审查；reviewer 只交付证据化 findings，Task Owner 持有 finding disposition，审查期间或修复后 Review Surface 变化会使旧结果失效。
+
+`code-cleanup` 只在用户明确指定范围或已批准 maintenance scope 时执行行为保持型深度维护；阶段结束本身不授予扫描或修改历史代码的权限。它以绿色基线开始，无法证明外部 export 不可达时只报告不删除，测试合并保留场景诊断与追踪语义，公共接口或模块职责变化转入模块设计流程。清理完成后重新同步文档、验证并进入 preflight/review；commit 由外层 workflow 或 Task Owner 决定。
+
+**Why:** 三者分别拥有 current-change preparation、independent finding generation 和 approved-scope mutation 三种不同输入、权限与产物。提交前自动清理是必要守卫，但其授权只来自当前已批准变更；把仓库级 dead-code、重复、测试与模块调整同时自动化会扩大 scope 并使既有验证和审查失效。将自动卫生收敛进 preflight，可保留低成本提交门禁而不新增第四个 skill；固定 Review Surface 与只读 reviewer 则防止审查对象漂移和审查/修复角色混合。
+
+**Impact:** `change-preflight` 承载独特的提交前守卫；通用 fresh-evidence 规则仍只由 `principles.md §6` 定义，动作特有核对留在 preflight。`implement-work` 在最终 commit 前编排文档同步、验证、适用的专项审查、preflight 与独立 code review，任何后续修改重新进入该闭环。技能来源映射、调用引用和 validator 合同统一使用现行名称。
+
+**Rejected:**
+
+- **合并为 `review-work`：** 会混合作者侧修改、独立只读审查和显式深度维护，并形成互斥模式与不完整正文消费。
+- **保留 `code-audit` 名称：** 名称暗示宽泛或独立审计，不能准确表达当前变更限定的作者侧 readiness gate。
+- **提交前自动运行完整 `code-cleanup`：** 当前 Task 不授权修改历史 dead code、既有测试或模块边界，且广泛清理会扩大并重置 Review Surface。
+- **直接删除提交前独立守卫：** `implement-work` 与独立提交准备都需要低成本 readiness gate；把所有卫生问题留给 Herdr reviewer 会浪费独立审查上下文。
+- **新增 `change-cleanup`：** 当前变更卫生是 preflight 的必要阶段，不产生独立触发或交付物，拆出会增加浅 skill。
+- **把 `code-cleanup` 改为手动 workflow：** 明确自然语言请求或已批准 maintenance scope 已提供可判定触发；当前没有必须增加 `/skill:` 调用摩擦的证据。
+
+**Out of Scope:**
+
+- **模型行为 A/B 基准：** 当前没有固定模型与 consuming-agent harness。Revisit when 项目采纳可重复的 prompt 行为评测。
+- **确定性 commit hook：** Pi 当前没有由本任务采用的 commit lifecycle enforcement seam。Revisit when 宿主提供可测试 hook，或真实工作流证明 skill 编排不足。
+
+## D-081: 待创建
