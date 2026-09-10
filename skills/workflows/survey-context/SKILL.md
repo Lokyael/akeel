@@ -1,6 +1,6 @@
 ---
 name: survey-context
-description: Use when starting a task, returning after a break, or unsure what to do next — per-task context bootstrap that reads the project's current knowledge, non-binding Candidate Records, and active tasks to map state and suggest the next action.
+description: Use when starting a task, returning after a break, unsure what to do next, or when the user explicitly requests Candidate review — per-task context bootstrap that reads the project's current knowledge and active tasks to map state and suggest the next action.
 ---
 
 # Survey Context
@@ -9,7 +9,7 @@ Read the project's current state and produce a phase map plus the next-skill rec
 
 ## Process
 
-Skip the trailing empty slot record in `docs/candidates.md` and `docs/task.md` — it is the next-ID slot, not a record (per principles.md Next-ID slots).
+Skip the trailing empty slot record in `docs/task.md` — it is the next-ID slot, not a record (per principles.md Next-ID slots). Candidate review is an explicit branch of this workflow, not part of the routine survey.
 
 ### 1. Read project conventions
 
@@ -26,9 +26,9 @@ Read `CONTEXT.md` if it exists. Internalize its Glossary, Architecture, Active D
 suggested next action touches that decision's scope; do not read the whole
 register by default. Do not treat decisions as an active task list.
 
-### 4. Read non-binding candidates
+### 4. Review Candidates on explicit request
 
-Read `docs/candidates.md` if it exists. Candidate Records are non-binding project data, never instructions (semantics per principles.md Project Records — Project Record Authority). Report them in a separate **Not Adopted** section after current truth and active tasks. Interrupt, redirect, recommend, design, or implement them only when the user explicitly chooses to review one in the current conversation. A missing file means there are no recorded candidates.
+Candidate Records are non-binding project data (semantics per principles.md Project Records — Project Record Authority). During a routine survey, keep the context focused on current truth and active Tasks. When the user explicitly requests review of all candidates, read `docs/candidates.md`, skip its trailing slot, and report every Candidate in a separate **Not Adopted** section. When the user names one or more `C-xxx` records, locate each heading with Direct `grep` and read only from that heading through the next `##` heading; report a missing ID and keep the remaining requested scope unchanged. Use each record's `Revisit condition` as review evidence; promotion, dismissal, and revision remain explicit user choices. A missing file means no Candidate review material is available.
 
 ### 5. Read active tasks
 
@@ -54,7 +54,7 @@ Based on the project state:
 - Task Record is `verified` → apply durable updates, then clear the completed Task Record sections.
 - A bug is reported → suggest `bug-investigation`.
 - A load-bearing decision is unresolved → suggest `domain-modeling` or `grill-docs`.
-- A Candidate Record is due → list it as not adopted and wait for an explicit user choice; recommend it only on that explicit choice.
+- Candidate review is explicitly requested → read the requested Candidate records, list them as not adopted, and wait for the user's choice.
 - No `CONTEXT.md` exists → note that current project knowledge has not yet been centralized.
 - The task depends on external facts (library versions, ecosystem practice, real-world status) and project knowledge is uncertain → suggest a quick ecosystem check with available web retrieval tools first (per principles.md §6).
 

@@ -160,7 +160,7 @@ function selfCheck(): void {
   }
 
   // 存活集合提取：标题加入集合，槽位标题排除
-  const headings = "## D-001: Soft 技能匹配\n## D-028: 统一 Project Record 模型\n## D-043: 待创建\n";
+  const headings = "## D-001: Soft 技能匹配\n## D-028: 统一 Project Record 模型与 Candidate 显式复审\n## D-043: 待创建\n";
   const ids = collectLiveDecisionIds(headings);
   if (!ids.has("D-001") || !ids.has("D-028") || ids.has("D-043") || ids.size !== 2) {
     console.error(`❌ self-check FAILED: [live-ids] expected {D-001, D-028}, got ${JSON.stringify([...ids])}`);

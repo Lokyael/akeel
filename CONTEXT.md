@@ -16,9 +16,9 @@
 - **Policy Kernel**：只消费 Admission Plan 与 Policy Snapshot 的同步纯函数，不读取原始请求、配置 loader 或 Shell parser。
 - **Guidance**：从决策代码到静态 bounded host-facing 文案的封闭映射，不携带可执行 Shell。
 - **Project Record**：项目文档中的受控记录总称，分为 Candidate、Task 和 Decision。
-- **Candidate Record**：未采纳、未承诺实施的 `C-xxx` 数据记录，不构成指令或路线图。
-- **Task Record**：具有目标、范围、验收和验证边界的 `T-xxx` 短期任务。
-- **Slot（待创建占位）**：容器文末承载 C/T/D 序列下一可用编号的占位，不是记录类型；创建时填充并追加新占位。
+- **Candidate Record**：未采纳、未承诺实施的 `C-xxx` 停车记录，不构成指令或路线图。
+- **Task Record**：用户已承诺调查、设计或实施的 `T-xxx` 短期工作记录。
+- **Slot（待创建占位）**：承载 C/T/D 序列下一可用编号的非记录占位。
 - **Decision**：需要长期保留的架构、领域或安全取舍，记录在 `docs/decisions.md`。
 - **Reversal surface**：每条 Decision 显式声明的逆转批准面；`user-boundary` 需用户显式批准，`engineering` 可经正式生命周期 supersede。
 - **Durable Content**：工作结束后仍成立且承载约束的事实、取舍与承诺；过程产物不进入权威容器。
@@ -55,7 +55,7 @@
 - [D-018 Shell 语义与 Access Gate](docs/decisions.md#d-018-shell-语义与-access-gate)
 - [D-023 决策渲染、静态 Guidance 与知情同意（literal form）](docs/decisions.md#d-023-决策渲染静态-guidance-与知情同意literal-form)
 - [D-025 Direct 优先与 Shell 安全子集](docs/decisions.md#d-025-direct-优先与-shell-安全子集)
-- [D-028 统一 Project Record 模型](docs/decisions.md#d-028-统一-project-record-模型)
+- [D-028 统一 Project Record 模型与 Candidate 显式复审](docs/decisions.md#d-028-统一-project-record-模型与-candidate-显式复审)
 - [D-030 提示词体系边界与原则部署（Prompt Surface）](docs/decisions.md#d-030-提示词体系边界与原则部署prompt-surface)
 - [D-035 平台边界收窄为仅 Linux](docs/decisions.md#d-035-平台边界收窄为仅-linuxdismiss-c-007)
 - [D-036 Workflows 触发模型](docs/decisions.md#d-036-workflows-触发模型手动调用与即时介入)

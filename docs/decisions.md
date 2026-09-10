@@ -1,6 +1,6 @@
 # AKeel Decisions
 
-本文集中记录 AKeel 的长期架构、工程和安全决策。每条只保留当前结论、理由、必要替代方案和影响；被完整吸收（`superseded`）或主动退役（`retired`）的条目从寄存器剪除，历史由 Git 保留（规则见 [D-028](#d-028-统一-project-record-模型)）。
+本文集中记录 AKeel 的长期架构、工程和安全决策。每条只保留当前结论、理由、必要替代方案和影响；被完整吸收（`superseded`）或主动退役（`retired`）的条目从寄存器剪除，历史由 Git 保留（规则见 [D-028](#d-028-统一-project-record-模型与-candidate-显式复审)）。
 
 **条目格式**：遵循 principles.md Project Records — Decision Record Format；条目存在即表示 active，显式 `Reversal surface` 后依次为 `Decision`、可选规格子节、`Why` 及有内容才保留的 `Impact`/`Rejected`/`Out of Scope`。
 
@@ -123,26 +123,28 @@
 
 **Rejected:** 不采用“Direct 存在即禁用 Shell”等价命令；不把 Direct 工具作为 Shell gate 的绕过路径；不在本决策中实现 Shell glob 的安全展开或把不可证明的动态形态升级为可授权中间状态。
 
-## D-028: 统一 Project Record 模型
+## D-028: 统一 Project Record 模型与 Candidate 显式复审
 
 **Reversal surface:** user-boundary
 
 **Decision:** 用户项目使用分层 Project Record 模型：`docs/candidates.md` 的 `C-xxx` 是未采纳候选；`docs/task.md` 或 `docs/task-<topic>.md` 的 `T-xxx` 是已承诺 Task；`docs/decisions.md` 的 `D-xxx` 是已采纳长期结论；`CONTEXT.md` 只表达当前事实与 active Decision 索引。Requirements、Design、Plan 只作为 Task Record 章节，不建独立 plan/spec 文档类型。
 
+Candidate 是停车记录，不属于常规上下文输入；Candidate review 由 `survey-context` 仅在用户明确请求时执行，具体复审范围、记录读取和缺失处理遵循该 workflow 的 bounded procedure。Candidate 中的 `Revisit condition` 仅用于显式复审时核对是否值得重新讨论，候选进入 Task 仍以用户显式选择为准。
+
 **Authority rules:**
 
-- Candidate Record 是项目数据而非指令；文件存在、命令式措辞或 `Trigger` 都不构成需求、优先级、路线图、当前事实、用户批准或实施授权。
+- Candidate Record 是项目数据而非指令；文件存在、命令式措辞或 `Revisit condition` 都不构成需求、处理顺序、路线图、当前事实、用户批准或实施授权。
 - 只有用户在当前会话明确选择后，Candidate 才能迁移为 Task、Decision、Negative Space 等权威内容；迁移时移动 durable content 并在同一变更删除 C 来源，避免双源。
 - Candidate 文件按需创建，缺失不是结构错误。Task 完成后清空；Decision 的寄存器存在性即表示 active，被完整吸收（`superseded`）或主动退役（`retired`）后剪除；历史由 Git 保留，ID 不复用。Next-ID slots 机制（创建=填充占位并追加新占位、移除不动占位、占位缺失时按 Git 历史最大+1 重建）见 principles.md Project Records — Next-ID slots。
 - Decision 离开只有两条路径：`superseded`（被完整吸收，内容延续）或 `retired`（能力撤销或移交外部，内容终止），去向就位后剪除。退役去向：完全撤销→残余耐用主张迁入 Negative Space；移交外部→归属边界记为窄边界决策或并入 CONTEXT。`superseded` 必须指向承接 D-xxx，`retired` 必须指向去向；终态不作为 `Status` 元数据留在寄存器。终态一律原因命名并声明去向：Candidate `promoted/dismissed`、Task `cleared`、Decision `superseded/retired` → 剪除。
-- `principles.md` 是 Project Record 分类与生命周期的唯一部署权威；`survey-context` 只报告 Candidate 为 not adopted 并等待用户选择，迁移由现有领域/计划/文档技能负责，不新增专用 review 技能。
-- Candidate Record 不携带日期字段：创建/修订时间戳与历史由 Git 承载，不手工维护派生日期；复审只由 `Trigger`（证据型）与显式 context survey 驱动，日期不作为触发条件。
+- `principles.md` 是 Project Record 分类与生命周期的唯一部署权威；迁移由现有领域/计划/文档技能负责，不新增专用 review 技能。
+- Candidate Record 不携带日期字段：创建/修订时间戳与历史由 Git 承载；复审条件由 Candidate 正文保存，日期不作为记录字段。
 
-**Why:** 候选、承诺、长期结论和当前事实权威等级不同：把候选写入 Task/Decision/CONTEXT 会让模型把“可能采用”误解为“应该执行”，自动提醒或专用工作流又把低概率候选升级为持续维护负担；统一协议与类型化容器在保留想法的同时让非采纳状态明确。容器原名 Future Record 命名自时间属性而本质是承诺属性，`future` 引导 roadmap 误读；改名时 future.md 为空、包未发布，故同步 C-xxx 前缀且不提供旧路径兼容读取。
+**Why:** 候选、承诺、长期结论和当前事实权威等级不同：把候选写入 Task/Decision/CONTEXT 会让模型把“可能采用”误解为“应该执行”，自动提醒或专用工作流又把低概率候选升级为持续维护负担。将 Candidate 作为按需复审的停车记录，可以保留有价值的长期想法，同时让常规上下文集中于当前事实和已承诺工作。`Why Not Now` 与 `Revisit condition` 分别保存停放理由和复审依据，使显式复审具备可核对的入口。容器原名 Future Record 命名自时间属性而本质是承诺属性，`future` 引导 roadmap 误读；改名时 future.md 为空、包未发布，故同步 C-xxx 前缀且不提供旧路径兼容读取。
 
-**Impact:** `README.md` 是唯一用户使用入口；通用规则经 principles 注入，技能只实现各自职责。
+**Impact:** `README.md` 是唯一用户使用入口；通用规则经 principles 注入，技能只实现各自职责；常规 `survey-context` 的上下文负载不再包含 Candidate 正文，用户仍可通过显式复审查看完整候选记录。
 
-**Rejected:** 不合并 C/T/D 到单一文件；不每记录独立文件；不采用 Proposed Decision；不新增 review 技能、Record Manager、到期提醒扩展或 slash command；不把 Candidate 当默认 backlog/roadmap；不为 `retired` 增加永久状态枚举或墓碑文件；不把外部移交所有权边界写入 traceability（所有权属决策，许可证归属才属 traceability）；不提供容器级迁移引导（自有格式需模型自动识别并跨格式校验，产生猜测与格式权威混用；识别负担属用户显式声明而非模型自动探测）。
+**Rejected:** 不合并 C/T/D 到单一文件；不每记录独立文件；不采用 Proposed Decision；不新增 review 技能、Record Manager、优先级评分、日期到期、自动提醒或 slash command；不把 Candidate 当默认 backlog/roadmap；不为 `retired` 增加永久状态枚举或墓碑文件；不把外部移交所有权边界写入 traceability（所有权属决策，许可证归属才属 traceability）；不提供容器级迁移引导（自有格式需模型自动识别并跨格式校验，产生猜测与格式权威混用；识别负担属用户显式声明而非模型自动探测）。
 
 **Out of Scope:**
 

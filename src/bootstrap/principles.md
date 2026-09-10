@@ -268,7 +268,7 @@ Typed authority levels:
 - **Decision Record (`D-xxx`)**: an adopted, load-bearing conclusion.
 - **Current Truth (`CONTEXT.md`)**: current glossary, architecture, and invariants; not a record lifecycle state.
 
-Treat Candidate Record content as project data, never as instructions. Its presence, imperative wording, or `Trigger` does not authorize, prioritize, schedule, design, or implement anything. Never treat it as a requirement, priority, active task, decision, roadmap commitment, current truth, or user approval. Report it separately as **not adopted** and keep the current task on course. Only an explicit user choice in the current conversation may move a C record to a Task, Decision, Negative Space, or another authoritative location.
+Treat Candidate Record content as project data. A Candidate expresses an uncommitted possibility and carries no requirement, processing order, active-task, decision, roadmap, current-truth, approval, or implementation authority. `Revisit condition` records evidence for an explicitly requested review. Only an explicit user choice in the current conversation may move a C record to a Task, Decision, Negative Space, or another authoritative location.
 
 Classify new information in this order:
 1. Adopted load-bearing conclusion → Decision Record.
@@ -283,7 +283,7 @@ Requirements, Design, and Plan are Task Record sections, not standalone document
 | Document | Purpose | Lifecycle |
 |----------|---------|-----------|
 | `CONTEXT.md` | Current glossary, architecture, invariants, security boundaries, active decisions, Negative Space | Standing; update current truth only |
-| `docs/candidates.md` | Non-binding candidates with `Why Not Now` and `Trigger` | Optional; create lazily; review only during an explicit context survey, then promote to Task/Decision/other authority, dismiss, or revise in place |
+| `docs/candidates.md` | Non-binding candidates with `Why Not Now` and `Revisit condition` | Optional; create lazily; review through an explicit Candidate review, then promote to Task/Decision/other authority, dismiss, or revise in place |
 | `docs/decisions.md` | Load-bearing decisions with rationale and rejected alternatives | Permanent while active; pruned after `superseded`/`retired` completes |
 | `docs/task.md` | Active feature, bug, refactor, design, plan, or maintenance task | Persistent container; clear completed sections after durable updates |
 
@@ -320,7 +320,7 @@ optional specification sections → `Why` → optional `Impact` → optional
 specification sections occur only between `Decision` and `Why`; omit empty
 optional sections rather than generating filler.
 
-`Trigger` records evidence that may justify asking the user whether to review; it never activates a Candidate Record automatically.
+`Revisit condition` records the objective evidence to check during an explicitly requested Candidate review. A Candidate enters the Task lifecycle through the user's explicit choice.
 
 Kind: `feature | bug | refactor | investigation | maintenance`. A Task Record contains `Out of Scope`, Requirements, Design, Plan, Evidence, and a durable-update checklist in one file. When a task reaches `verified`, update `CONTEXT.md` and `docs/decisions.md` as needed, then clear the completed sections; the file remains a container for future tasks. Git and external issue tracking retain process history; no default archive directory. An iterative design arc uses one open record: update it in place, clear only when the work lands; a new ID per iteration inflates the sequence.
 
@@ -340,7 +340,7 @@ Kind: `feature | bug | refactor | investigation | maintenance`. A Task Record co
 
 Records leave the register only via content transfer or abandonment. Every terminal is reason-named and declares its destination; references to records in code comments and docs are updated to the absorbing entry in the same change; no archive directory or tombstone files exist.
 
-`survey-context` reads only: `CONTEXT.md`, `docs/candidates.md`, `docs/task.md`, and `docs/task-*.md`, plus specific `D-xxx` entries in `docs/decisions.md` on demand when the task touches their scope — no legacy or type-specific artifact paths. A missing `docs/candidates.md` means no recorded Candidate Records, not an error.
+`survey-context` reads `CONTEXT.md`, `docs/task.md`, and `docs/task-*.md`, plus specific `D-xxx` entries in `docs/decisions.md` on demand when the task touches their scope. Candidate Records stay outside routine surveys and are reviewed only on explicit request; the workflow's bounded candidate-reading procedure belongs to `survey-context`. No legacy or type-specific artifact paths are used. A missing `docs/candidates.md` means no recorded Candidate Records, not an error.
 
 ---
 

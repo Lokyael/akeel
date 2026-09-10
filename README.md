@@ -8,15 +8,13 @@ Engineering skills and a user-space access-decision system for [pi](https://pi.d
 pi install git:github.com/Lokyael/akeel
 ```
 
-Principles and skills activate automatically. Skills load on demand.
-
-AKeel includes always-on evidence-before-assertion principles plus on-demand TDD, code review, debugging, security review, planning, and related engineering skills. Recovery remains outside the package: use version control, editor history, or pi's session tree.
+Principles activate automatically; skills load on demand. The package includes evidence-before-assertion principles plus TDD, review, debugging, security, planning, and related engineering skills. AKeel does not create snapshots or provide a `/rollback` command; recovery uses version control, editor history, or pi's session tree.
 
 ## Access decisions
 
 AKeel governs the managed `read`, `write`, `edit`, `find`, `grep`, `ls`, and `bash` tool surfaces. Other tool surfaces pass through unchanged. Decisions are made by a Pi-host-neutral canonical pipeline using the supported Linux pathname contract; hard security boundaries and unsupported forms fail closed.
 
-Shell program semantics cover bounded Git operations, interpreter information commands, Python quality tools, and common uv/npm/pnpm/yarn/npx classifications. Git operations that may invoke repository/user-configured helpers remain hard-denied; this includes `status`, `diff`, `log`, `show`, `add`, `commit`, fetch/push/clone and related mutation commands. `git config` is also hard-denied to avoid exposing implicit configuration credentials. Path-form executables are treated as opaque `execute` operations even when their basename matches a known non-destructive program; destructive forms remain hard-denied. Commands that delegate to scripts, package lifecycle hooks, downloads, or unknown subcommands remain opaque and are hard-denied when project path boundaries are active; `develop` does not disable that safety boundary. Git `-C`, `--git-dir`, and `--work-tree` paths plus explicit project-local `file://` remotes are canonicalized in the current command-local cwd seam; HTTPS/SSH and other external transports, hosted `file://` forms, aliases, indirect config remotes, `clone --separate-git-dir`, and other unmodeled location forms still fail closed.
+Shell analysis covers bounded Git operations, interpreter information commands, Python quality tools, and common uv/npm/pnpm/yarn/npx classifications. Git operations that may invoke repository or user-configured helpers remain hard-denied, including `status`, `diff`, `log`, `show`, `add`, `commit`, fetch/push/clone, related mutations, and `git config`. Script/package/download delegates and unknown subcommands remain opaque; explicit project path boundaries hard-deny them, and `develop` does not widen that boundary. Path-form executables remain opaque `execute` operations, while destructive forms remain hard-denied. Git `-C`, `--git-dir`, `--work-tree`, and explicit project-local `file://` paths are canonicalized; HTTPS/SSH, hosted `file://`, aliases, indirect config remotes, `clone --separate-git-dir`, and other unmodeled locations fail closed.
 
 The global policy input is:
 
@@ -24,9 +22,9 @@ The global policy input is:
 ~/.pi/agent/akeel/policy.yaml    # $PI_CODING_AGENT_DIR replaces ~/.pi/agent
 ```
 
-The built-in `review`, `guided`, and `develop` presets do not depend on an external policy file. If `policy.yaml` is missing, empty, malformed, legacy, or otherwise unusable, AKeel ignores the entire external file and uses the least-privileged built-in `review` preset; it does not partially apply the file or fall back to the former `config.yaml`/Profile configuration. A valid file may select a built-in preset, define custom presets, or use the explicit `accessGate: disabled` form.
+The built-in `review`, `guided`, and `develop` presets are always available. A missing, empty, malformed, legacy, or otherwise unusable `policy.yaml` is ignored as a whole and falls back to the least-privileged built-in `review`; the former `config.yaml`/Profile configuration has no fallback path. A valid file may select a built-in preset, define complete custom presets, use a flat `paths`/`commands` policy, or select the explicit `accessGate: disabled` form.
 
-AKeel applies a preset-independent hard boundary to identifiable live credential artifacts under the configured agent directory: `auth.json` and its non-template backup/variant paths are denied for managed path operations. Template-class artifacts remain subject to the active preset. Parent-directory listing and recursive or opaque accesses without a concrete credential path are not recursively expanded by this boundary; protection is path-evidence-driven best effort. When `accessGate: disabled`, AKeel provides no credential or tool-call protection guarantee.
+AKeel hard-denies managed path operations on identifiable live credential artifacts under the configured agent directory, including `auth.json` and non-template variants. Template-class artifacts remain policy-governed; parent-directory, recursive, and opaque accesses use path evidence rather than recursive credential expansion. `accessGate: disabled` removes AKeel's credential and tool-call protection guarantee.
 
 ```yaml
 presets:
@@ -72,9 +70,14 @@ presets:
 activePreset: develop
 ```
 
-The built-in named presets are `review`, `guided`, and `develop`. In preset mode they are always available and keep fixed, complete semantics; a valid `policy.yaml` may add custom presets with strict lower-kebab-case names. Custom presets use complete `paths` and `commands` definitions, may have their own `allowedRoots`, `blockedRoots`, and `blockedPaths`, and cannot override built-in semantics or use the reserved name `status`. A flat `paths`/`commands` policy remains valid as a single static policy without runtime switching and uses the same complete `paths`/`commands` schema as custom presets. In native TUI mode, use `/policy` to open the temporary selector for all loaded presets; use `/policy status` to show the active preset, or `/policy <preset>` to switch it explicitly for the current session. Outside native TUI, `/policy` does not open a selector or switch automatically. Path modes for `read`, `write`, `edit`, `list`, and `search` are `allow`, `ask`, or `deny`; command modes are `allow`, `ask`, or `deny`. `commands.destroy` may be set to `allow` in a custom preset, but Canonical `destroy`/`delete` operations are a permanent hard boundary and remain denied; the setting never produces an approval prompt. System hard boundaries remain ahead of every preset. `ask` requires an interactive host confirmation and never executes automatically. Confirmation summaries are bounded, include the literal Shell command form, and omit file content. The policy file is validated when loaded; malformed YAML, unknown fields, incomplete external policies, conflicting names, and legacy fields cause the entire external file to be ignored and the built-in `review` baseline to remain active.
+Policy configuration follows these rules:
 
-The current release does not provide the legacy `/profile` command, a Profile Footer, or AKeel-managed subagent permission tiers. Subagent policy management remains a separate candidate; use `/policy` for the built-in or configured custom session presets.
+- Custom presets use strict lower-kebab-case names, complete `paths`/`commands` definitions, and optional independent `allowedRoots`, `blockedRoots`, and `blockedPaths`. Built-in semantics and the reserved `status` name remain fixed.
+- A flat `paths`/`commands` policy uses the same complete schema as custom presets and is a single static policy without runtime switching. In native TUI mode, `/policy` opens the temporary selector for all loaded presets; `/policy status` reports the active preset and `/policy <preset>` switches it for the session. Outside native TUI, `/policy` does not open a selector or switch automatically.
+- Path and command modes are `allow`, `ask`, or `deny`. `destroy`/`delete` operations remain a permanent hard boundary even when `commands.destroy: allow` is configured. System hard boundaries take precedence over every preset. `ask` requires interactive host confirmation, never executes automatically, and shows bounded summaries with the literal Shell command form and without file content.
+- The loader validates the complete file. Malformed YAML, unknown fields, incomplete definitions, conflicting names, and legacy fields select the built-in `review` baseline.
+
+The current release uses `/policy` rather than the legacy `/profile` command or Profile Footer. AKeel-managed subagent permission tiers remain a separate candidate.
 
 For a session that should retain only AKeel's bootstrap principles and skills, explicitly disable the Access Gate in `policy.yaml`:
 
@@ -82,13 +85,13 @@ For a session that should retain only AKeel's bootstrap principles and skills, e
 accessGate: disabled
 ```
 
-This form must be the only policy field. After restarting the session, all Pi `tool_call` requests pass through without AKeel operation or path admission. Bootstrap and skills remain active, but AKeel provides no tool-call security, path-boundary, Shell, or approval guarantee while disabled. Remove the setting and restart the session to re-enable the Gate.
+This form is the only policy field and takes effect after a session restart. All Pi `tool_call` requests then pass through without AKeel operation or path admission; bootstrap and skills remain active. AKeel supplies no tool-call security, path-boundary, Shell, or approval guarantee in this mode. Remove the setting and restart the session to restore the Gate.
 
 ## Companion tools
 
-AKeel does not depend on a delegation runtime. Each task has one Task Owner Session. Work stays there when it needs no process-context isolation; isolated work whose result still needs that Owner's judgment uses a synchronous Herdr child and a prearranged result artifact. Long-lived work becomes another Task Owner only when the user explicitly grants a mutually exclusive scope and independent acceptance authority. Any delegated agent with effective write/edit/file-modifying Shell capability must run in an independently owned Git worktree; an additional parallel Task Owner with those capabilities must likewise use a checkout not shared with another Owner. Unattended asynchronous child pipelines are not part of the current workflow.
+AKeel uses no delegation runtime of its own. Each task has one Task Owner Session; work stays with that Owner when it needs no process-context isolation, while isolated work that returns to that Owner uses a synchronous Herdr child and a prearranged artifact. A new Task Owner exists only when the user explicitly grants a mutually exclusive scope and independent acceptance. Delegated agents with effective write/edit/file-modifying Shell capability use independently owned Git worktrees, and parallel Task Owners follow the same checkout isolation. Unattended asynchronous child pipelines are outside the current workflow.
 
-`/skill:grill-docs` coordinates a separate Herdr worktree and Grill Agent, waits for it to settle, then pulls `verified-candidate.md` from its reserved path for Task Owner-confirmed record updates. The child does not push a completion prompt or its transcript into the Owner context.
+`/skill:grill-docs` runs a Grill Agent in a separate Herdr worktree, waits for it to settle, and pulls the exact pre-reserved `verified-candidate.md` path for Task Owner-confirmed record updates; the child does not push completion prompts or its transcript into the Owner context.
 
 | Companion | Source | Bounded role |
 |-----------|--------|--------------|

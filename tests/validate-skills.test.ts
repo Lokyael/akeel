@@ -8,6 +8,7 @@
  *   4. /skill: 交叉引用规则必须拦截祈使式、放行用户面向 / 描述性 / 自身引用
  */
 
+import { readFileSync } from "node:fs";
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
@@ -90,6 +91,17 @@ test("principles anchor rule rejects missing anchors and passes live ones", () =
     !result.errors.some((e) => e.includes("Record Lifecycle") || e.includes("§7")),
     `false positive on live anchors: ${result.errors.join("; ")}`
   );
+});
+
+test("survey-context keeps Candidate review explicit and bounded", () => {
+  const content = readFileSync(new URL("../skills/workflows/survey-context/SKILL.md", import.meta.url), "utf8");
+  assert.match(content, /^description: .*when the user explicitly requests Candidate review/m);
+  assert.match(content, /Candidate review is an explicit branch of this workflow, not part of the routine survey/);
+  assert.match(content, /During a routine survey, keep the context focused on current truth and active Tasks/);
+  assert.match(content, /explicitly requests review of all candidates/);
+  assert.match(content, /names one or more `C-xxx` records/);
+  assert.match(content, /locate each heading with Direct `grep` and read only from that heading through the next `##` heading/);
+  assert.match(content, /report a missing ID and keep the remaining requested scope unchanged/);
 });
 
 test("user-invoked reference rule blocks imperatives and passes benign mention forms", () => {
