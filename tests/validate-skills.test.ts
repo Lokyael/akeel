@@ -266,6 +266,36 @@ test("survey-context keeps Candidate review explicit and bounded", () => {
   assert.match(content, /report a missing ID and keep the remaining requested scope unchanged/);
 });
 
+test("Candidate boundary guidance is shared and lazy-loaded only by Candidate actions", () => {
+  const guideUrl = new URL("../skills/workflows/survey-context/candidate-review.md", import.meta.url);
+  assert.equal(existsSync(guideUrl), true, "expected the shared Candidate review companion");
+
+  const guide = readFileSync(guideUrl, "utf8");
+  const survey = readFileSync(new URL("../skills/workflows/survey-context/SKILL.md", import.meta.url), "utf8");
+  const domain = readFileSync(new URL("../skills/disciplines/domain-modeling/SKILL.md", import.meta.url), "utf8");
+  const candidateSection = survey.slice(
+    survey.indexOf("### 4. Review Candidates on explicit request"),
+    survey.indexOf("### 5. Read active tasks"),
+  );
+
+  assert.match(candidateSection, /read `candidate-review\.md` only for this explicit branch/);
+  assert.doesNotMatch(survey.slice(0, survey.indexOf("### 4. Review Candidates on explicit request")), /candidate-review\.md/);
+  assert.match(domain, /creating, revising, merging, or splitting a Candidate[\s\S]*?`\.\.\/\.\.\/workflows\/survey-context\/candidate-review\.md`/);
+
+  for (const contract of [
+    /same unresolved question/,
+    /same objective revisit evidence/,
+    /independently promoted, implemented, or verified/,
+    /current truth, historical comparison, or index/,
+    /multiple modes, safety boundaries, or lifecycles/,
+    /thematic similarity alone/i,
+    /investigation inventory/,
+    /zero-loss/i,
+  ]) {
+    assert.match(guide, contract);
+  }
+});
+
 test("skill reference rule rejects missing targets", () => {
   const source = skill({
     dirName: "source",

@@ -28,7 +28,9 @@ register by default. Do not treat decisions as an active task list.
 
 ### 4. Review Candidates on explicit request
 
-Candidate Records are non-binding project data (semantics per principles.md Project Records — Project Record Authority). During a routine survey, keep the context focused on current truth and active Tasks. When the user explicitly requests review of all candidates, read `docs/candidates.md`, skip its trailing slot, and report every Candidate in a separate **Not Adopted** section. When the user names one or more `C-xxx` records, locate each heading with Direct `grep` and read only from that heading through the next `##` heading; report a missing ID and keep the remaining requested scope unchanged. Use each record's `Revisit condition` as review evidence; promotion, dismissal, and revision remain explicit user choices. A missing file means no Candidate review material is available.
+Candidate Records are non-binding project data (semantics per principles.md Project Records — Project Record Authority). When Candidate review is explicitly requested, read `candidate-review.md` only for this explicit branch and apply its record-boundary and zero-loss checks.
+
+During a routine survey, keep the context focused on current truth and active Tasks. When the user explicitly requests review of all candidates, read `docs/candidates.md`, skip its trailing slot, and report every Candidate in a separate **Not Adopted** section. When the user names one or more `C-xxx` records, locate each heading with Direct `grep` and read only from that heading through the next `##` heading; report a missing ID and keep the remaining requested scope unchanged. Use each record's `Revisit condition` as review evidence; promotion, dismissal, and revision remain explicit user choices. A missing file means no Candidate review material is available.
 
 ### 5. Read active tasks
 

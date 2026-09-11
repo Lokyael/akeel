@@ -47,6 +47,8 @@ When a term or current constraint crystallises, add it to `CONTEXT.md` immediate
 
 ### Park Uncommitted Candidates
 
+Before creating, revising, merging, or splitting a Candidate, read `../../workflows/survey-context/candidate-review.md` and apply its record-boundary and zero-loss checks.
+
 When an idea may matter later but is neither adopted nor committed work, offer
 to add a `C-xxx` entry to `docs/candidates.md` (per principles.md Next-ID slots); fields per principles.md Project
 Records — Document Set; non-binding semantics per principles.md Project
