@@ -63,9 +63,9 @@
 
 | 来源 | 固定版本/修订 | 采用方式 | 采用范围与当前映射 | 许可证与证据 |
 |------|---------------|----------|----------------------|--------------|
-| [Herdr documentation](https://herdr.dev/docs/) 与 [herdrdev/herdr](https://github.com/herdrdev/herdr) | release `v0.9.0`；本机 CLI 合同以 `herdr 0.9.0` 独立核对 | conceptual reference + independently observed | `skills/workflows/grill-docs/SKILL.md`、D-075/D-076 与 C-034 的 workspace/worktree、Agent start/prompt wait、settled/blocked 状态、session reference、worktree non-force removal、provenance、plugin lifecycle event/startup hook 和失败边界；结果交付使用 AKeel 预定 artifact，不复制实现，不把 Herdr 声明为 runtime dependency | Apache-2.0；上游 `v0.9.0` `LICENSE` |
+| [Herdr documentation](https://herdr.dev/docs/) 与 [herdrdev/herdr](https://github.com/herdrdev/herdr) | release `v0.9.0`；本机 CLI 合同以 `herdr 0.9.0` 独立核对 | conceptual reference + independently observed | `skills/workflows/grill-docs/SKILL.md`、D-075 与 C-034 的 workspace/worktree、Agent start/prompt wait、settled/blocked 状态、session reference、worktree non-force removal、provenance、plugin lifecycle event/startup hook 和失败边界；结果交付使用 AKeel 预定 artifact，不复制实现，不把 Herdr 声明为 runtime dependency | Apache-2.0；上游 `v0.9.0` `LICENSE` |
 
-该来源只定义已核对的 Herdr 外部执行面能力，不成为 AKeel 的运行时依赖或权限保证。版本更新不会自动改变 D-075/D-076；CLI、生命周期或 worktree 合同变化时重新核对后再修订。
+该来源只定义已核对的 Herdr 外部执行面能力，不成为 AKeel 的运行时依赖或权限保证。版本更新不会自动改变 D-075；CLI、生命周期或 worktree 合同变化时重新核对后再修订。
 
 ## Runtime 依赖
 

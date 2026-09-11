@@ -113,11 +113,11 @@
 
 **Reversal surface:** user-boundary
 
-**Decision:** 文件检查场景优先选择 Direct `read`、`grep`、`find`、`ls` 工具，但不因为存在 Direct 等价入口而全局禁用 Shell。Direct 请求和 Shell 请求都必须经过同一条 Canonical → Admission → Policy 边界；Shell 只有在当前支持子集内能静态证明命令、效果、路径和 bounded CWD 候选时才进入授权，无法证明的语法或明确的硬安全边界 fail-closed。已证明的 Shell inspect/modify 命令仍按 Policy Snapshot 的 command、path 和 hard-boundary 语义决策。
+**Decision:** 文件检查场景优先选择 Direct `read`、`grep`、`find`、`ls`，但 Direct 等价入口不构成 host 层 Shell 禁令。Direct 与 Shell 请求共享 D-018 的 Canonical → Admission → Policy 边界；只有可静态证明的 Shell 支持子集才进入授权，已证明的 inspect/modify 命令仍按 Policy Snapshot 的 command、path 和 hard-boundary 语义决策。
 
-**Deny feedback:** renderer 对 dynamic、unsafe、opaque、unsupported、blocked-path、symlink escape、destroy 和其他硬边界统一使用静态 bounded host-facing 文案，不拼接用户命令、路径或 glob，也不生成替代命令。模型可在失败后自行选择 Direct 工具或拆成支持的字面 Shell；文案本身不是绕过建议（D-023）。
+**Rendering boundary:** 失败路径的静态 bounded Guidance、用户派生值限制和 literal-form 审批合同只由 D-023 定义。失败后模型可自行选择 Direct 工具或拆成受支持的字面 Shell；renderer 不生成该替代操作。
 
-**Why:** Direct 工具提供结构化参数和更窄的访问面，适合作为模型默认选择；Shell 仍承载 pipeline 之外的已证明组合、命令特有选项和有限 flow 语义。按命令名禁用会把工具选择问题错误地变成能力禁止，并破坏合法的组合操作；反过来，对不可证明的 Shell 形态猜测放行会扩大漏判面。
+**Why:** Direct 工具提供结构化参数和更窄的访问面，适合作为模型默认选择；Shell 仍承载已证明的组合、命令特有选项和有限 flow 语义。按命令名禁用会把工具选择问题错误地变成能力禁止，并破坏合法的组合操作；反过来，对不可证明的 Shell 形态猜测放行会扩大漏判面。
 
 **Impact:** Direct-first 是模型工具选择偏好，不是 host 层自动路由或 Policy Kernel 的强制优先级；安全可分析的字面 Shell 仍然允许。Direct 等价入口不是 Shell gate 的绕过路径，Shell 的 path boundary、credential boundary 和 command policy 仍然生效。
 
@@ -350,7 +350,7 @@ Candidate 是停车记录，不属于常规上下文输入；Candidate review �
 
 **Decision:** Access Decision Pipeline 采用 Greenfield Semantic Rebuild，只以 Pi `tool_call` 外部合同、Linux/Bash 行为、明确的政策语义和安全不变量为设计输入。当前实现独立位于 `src/access-gate/access-decision/`，物理分为 `core/`、`adapters/`、`runtime/`：core 负责 Pi host/config 无关的语义与决策域，Linux pathname lookup 属于该语义域的外部合同；adapters 单向转换外部合同，runtime 是唯一 Composition Root，依赖只能由 runtime 指向 adapters、再指向 core。旧实现、旧配置合同和旧测试不属于当前依赖边界，也不作为正确性 oracle。
 
-生产入口只在完整的新信任链通过验证后切换，并保持单一生产路径；不提供旧 API、旧模块路径、旧 config/Profile schema 或兼容双轨。runtime 只实现 tool-call 决策所需的最小 policy state 与 project/staging 生命周期；其他外围能力独立处理。
+生产入口只连接这条经验证的新信任链并保持单一生产路径；不提供旧 API、旧模块路径、旧 config/Profile schema 或兼容双轨。runtime 只实现 tool-call 决策所需的最小 policy state 与 project/staging 生命周期；其他外围能力独立处理。
 
 **Why:** 从旧模块迁移、复用或逐字段重建会把旧场景假设、隐藏缺陷和错误边界带入新架构；以旧结果做 parity 又会把未知正确性的行为升级为规格。Greenfield 边界迫使语义依据、预算和信任关系重新证明；原子生产切换避免新旧 parser/compiler/kernel/config 交叉组成第三套未验证系统。
 
@@ -381,7 +381,7 @@ Canonical reject 使用本域封闭 code、source anchor 与资源分类；rende
 
 **Impact:**
 
-- 旧架构中“compiler 不接政策、受保护制品只在消费边界廉价验真”的安全意图由 D-060 重新定义；当前不复用旧类型、代码、WeakSet 布局或 verifier。
+- 本条拥有“compiler 不接政策、受保护制品只在消费边界廉价验真”的制品合同；按 D-059 的 Greenfield 边界，不复用旧类型、代码、WeakSet 布局或 verifier。
 - Display View 与 Admission 的职责分离由本条直接定义；不承载旧归约坐标、`ExpansionData` 或 Explanation Replay 状态。
 - Admission 不保存 `operations/commands/paths` 三份平行数组；若 Kernel 需要分类优先级，在同一有序集合上无分配扫描。
 - Composition Root 对每个请求只调用每种投影至多一次；该 orchestration 由 service 测试证明，不要求 projector 自带隐藏缓存。已冻结事实可通过窄类型共享，不做无收益 defensive-copy 链。
@@ -489,7 +489,7 @@ Canonical reject 使用本域封闭 code、source anchor 与资源分类；rende
 
 每个 preset 可以拥有独立的 `allowedRoots`、`blockedRoots` 与 `blockedPaths`，不要求不同 preset 之间一致。切换 preset 因此可以同时改变操作模式和 preset-specific path scope；这些字段仍属于 Policy Snapshot 的授权输入。`commands.destroy` 仍接受 `allow`、`ask`、`deny` 作为配置值，但 destroy/delete 的系统硬边界见 D-071；内置 preset 的固定值为 `deny`。系统级 hard boundary 始终优先，任何 preset 都不能解除或放宽它。
 
-自定义 preset 与内置 preset 使用同一 Policy Snapshot、Admission 和 Policy Kernel 合同；`/policy` 的临时原生 TUI 选择面板和 `/policy <preset>` 显式命令均可选择已加载的合法 preset，`/policy status` 保留为状态查询。preset 名称、策略内容和活动状态不进入模型上下文、tool description 或 system prompt。
+自定义 preset 与内置 preset 使用同一 Policy Snapshot、Admission 和 Policy Kernel 合同。配置层只发行已加载的合法 registry；临时 TUI、显式切换和状态查询的用户入口由 D-068 定义。preset 名称、策略内容和活动状态不进入模型上下文、tool description 或 system prompt。
 
 **Policy file loading:** 用户全局 Policy 输入固定为 `$PI_CODING_AGENT_DIR/akeel/policy.yaml`，默认目录为 `~/.pi/agent`。flat `paths`/`commands` 形式表示使用完整定义的单一静态 policy，不提供 preset registry 或会话切换；具名 `presets` 形式以三个内置 preset 为注册表基础，并可增加合法的完整自定义 preset。外置文件缺失、为空、格式/schema 错误、根非 mapping、必需字段缺失或其他不可用状态时，整体忽略并使用内置 `review` 基线，不部分采用无效内容。唯一合法的 `accessGate: disabled` 形式及其运行时语义由 D-066 规定。
 
@@ -576,7 +576,7 @@ Tilde expansion 仅适用于受支持 Shell word 中位于开头、未引用、�
 
 **Reversal surface:** engineering
 
-**Decision:** `principles.md` 承载跨任务恒定注入的不变量；`skills/disciplines/` 承载可复用工程方法，`skills/workflows/` 承载端到端编排。目录只表达作者职责，不创造 Pi 运行时加载层；运行时发现服从 package manifest，workflow 调用模型由 D-078 定义。Disciplines 使用名词短语，Workflows 使用动词-名词，复合名称使用 kebab-case，避免非必要缩写和人物名。
+**Decision:** 在 D-030 定义的 Prompt Surface 内，跨任务恒定不变量归属 `principles.md`，不包装为按需 skill；`skills/disciplines/` 只承载可复用工程方法，`skills/workflows/` 只承载端到端编排。两目录表达作者职责，不创造 Pi 运行时加载层；运行时发现服从 package manifest，workflow 调用模型由 D-078 定义。Disciplines 使用名词短语，Workflows 使用动词-名词，复合名称使用 kebab-case，避免非必要缩写和人物名。
 
 通用“完成声明前必须取得 fresh evidence”继续只由 `principles.md §6` 定义。独立 `evidence-first` skill 退役，空 `foundations/` 分发根删除；bug/feature 验证、Requirements 核对和提交前检查等具体操作守卫留在 `fix-validation`、`implement-work`、`change-preflight` 等对应动作点，不复制通用规则正文。
 
@@ -611,7 +611,7 @@ Tilde expansion 仅适用于受支持 Shell word 中位于开头、未引用、�
 
 **Rejected:** 保留 `grill-plan` 作为无文档变体（没有实际使用场景，且项目事实仍需核对）；在问题处理期间同步写 Decision（候选尚未确认，会产生反复改写）；以固定措辞测试代替行为验证（只能锁文本，不能证明模型按流程执行）。
 
-**Out of Scope:** Herdr、worktree、独立会话、子代理路由和其他委托机制；这些执行面边界由 D-075/D-076 独立规定，本条不重复定义。
+**Out of Scope:** Herdr、worktree、独立会话、子代理路由和其他委托机制；这些执行面边界由 D-075 规定，本条不重复定义。
 
 ## D-075: Task Owner 上下文准入、Herdr 同步委托与 Worktree 隔离
 
@@ -619,54 +619,37 @@ Tilde expansion 仅适用于受支持 Shell word 中位于开头、未引用、�
 
 **Decision:** 委托同时受权威所有权、上下文准入、执行面路由与 checkout 隔离约束。**Task Owner Session** 是对一个 Task 持有用户原始意图、Requirements、已采纳范围/架构/政策裁决、finding disposition、最终验收、发布与 Project Record 更新权的唯一会话；同一 Task 或 Decision 同时只有一个 Owner。用户可把互斥、可独立验收的长期工作明确授权给新的 Task Owner Session；若新会话仍需把结果交回既有 Owner 裁决，它在语义上仍是 delegated child，而不是第二个 Owner。
 
-Herdr child 可在已定约束内处理开放问题并形成 verified candidate。当前 child 委托只使用同步 fork-join：Owner 预定结果 artifact，等待 child settle 后按路径拉取，不要求 child 通过 prompt 把完成状态或结果推回 Owner。Artifact 承载 verified candidate 及理解、审计、质疑或继续结果所必需的上下文：影响结论的推理与被拒方案、引用证据、变更、验证、未决问题和残余风险；搜索轨迹、完整日志、重复失败、未影响结论的假设、工具时间线和中间草稿留在隔离会话或 artifact。可得的 child session 引用只作按需 forensic 追踪，不自动载入 Owner 上下文。
+所有需要隔离过程上下文、且结果返回既有 Task Owner 裁决的委托统一使用 Herdr；AKeel 不维护第二套委托执行面，也不把 Herdr 声明为 runtime dependency。Herdr child 可在已定约束内处理开放问题并形成 verified candidate。当前 child 委托只使用同步 fork-join：Owner 预定结果 artifact，等待 child settle 后按路径拉取，不要求 child 通过 prompt 把完成状态或结果推回 Owner。Artifact 承载 verified candidate 及理解、审计、质疑或继续结果所必需的上下文：影响结论的推理与被拒方案、引用证据、变更、验证、未决问题和残余风险；搜索轨迹、完整日志、重复失败、未影响结论的假设、工具时间线和中间草稿留在隔离会话或 artifact。可得的 child session 引用只作按需 forensic 追踪，不自动载入 Owner 上下文。
 
 **Routing:** 用户未指定执行面时，按以下封闭顺序决定：
 
 1. 不产生隔离过程上下文的工作由当前 Task Owner 直接完成；用户确认、Project Record 更新、finding 裁决和最终验收留在该 Owner。
 2. repo-wide/跨模块探索、多来源比较、多假设调查、重复实验、完整日志分析、独立审查、交互式方案讨论、跨项目工作和替代 CLI 等会产生隔离过程上下文、且结果仍需当前 Owner 裁决的工作，通过 Herdr child 同步执行并在预定 artifact 上 join。
-3. 长期工作只有在用户明确授予互斥范围和独立验收权时才进入新的 Task Owner Session；多个 Owner 不共同修改同一 Task/Decision 或 checkout，跨 Task 结果由明确的 integration owner 集成。没有该授权时，不把后台运行或新开会话解释为新的 Owner。
+3. 长期工作只有在用户明确授予互斥范围和独立验收权时才进入新的 Task Owner Session；多个 Owner 不共同修改同一 Task/Decision 或 checkout，跨 Task 结果由明确的 integration owner 集成。没有该授权时，不把后台运行或新开会话解释为新的 Owner。用户授权的独立 Task Owner Session 可以运行在 Herdr 中，但不因使用 Herdr 而成为 delegated child。
 
 任何 delegated agent 的有效工具只要包含 `write`、`edit` 或可修改文件的 Shell，就必须位于独立 Git worktree；新增的并行 Task Owner 具备这些能力时，也必须拥有不与其他 Owner 共享的 checkout。按能力而非“不要编辑”的提示词承诺分类。真正只读的 delegated agent 可共享 checkout；测试若可能修改源码或生成受跟踪文件，按写能力任务处理。Herdr 只管理自己创建的 worktree，同一 worktree 只有一个生命周期 owner，不跨执行面清理、合并或复用。Child 不删除自身 pane/workspace/worktree；存活的 Owner 负责检查、导入、合并和经明确批准的清理。
 
 具体的 grilling、packet、Agent 生命周期和 verified candidate 交接步骤由 [`skills/workflows/grill-docs/SKILL.md`](../skills/workflows/grill-docs/SKILL.md) 承载。
 
-**Why:** “主 Agent 技术上能完成”不能判断原始探索是否值得污染长期 Owner 上下文；独立 Agent 的价值包括上下文隔离，而不只包括并发。同步 artifact pull 避免 child 自由文本 callback 形成重复 user-role 消息、额外上下文和交付竞态；长期独立工作直接拥有自己的 Owner，则无需把全过程回灌旧会话。唯一 Owner 与互斥范围防止多个会话对 Requirements、验收和权威记录形成 split-brain。Herdr 已提供可见、可接管的 Agent、pane、worktree 和 focus 合同；按有效写能力强制 worktree 可避免真实工具权限污染共享 checkout。
+**Why:** “主 Agent 技术上能完成”不能判断原始探索是否值得污染长期 Owner 上下文；独立 Agent 的价值包括上下文隔离，而不只包括并发。同步 artifact pull 避免 child 自由文本 callback 形成重复 user-role 消息、额外上下文和交付竞态；长期独立工作直接拥有自己的 Owner，则无需把全过程回灌旧会话。唯一 Owner 与互斥范围防止多个会话对 Requirements、验收和权威记录形成 split-brain。当前工作需要可见的 Agent、pane、worktree、状态和人工裁决，Herdr 已直接覆盖这些目标；统一执行面保持上下文、交接和生命周期合同一致。按有效写能力强制 worktree 可避免真实工具权限污染共享 checkout。
 
-**Impact:** `principles.md` 恒定注入 Task Owner、同步委托路由和 worktree 不变量；`grill-docs` 通过预定 verified candidate 完成交互式讨论和结果拉取，不发送完成 prompt。AKeel 不把 Herdr 声明为 runtime dependency，也不新增自动编排运行时。独立 Task Owner Session 是用户授权与记录所有权边界，不是新的 Herdr primitive。
+**Impact:** `principles.md`、README、CONTEXT、skills 和委托相关 Decision 统一描述 Herdr 执行面、Task Owner、同步委托路由和 worktree 不变量；`grill-docs` 通过预定 verified candidate 完成交互式讨论和结果拉取，不发送完成 prompt。当前委托通过 Herdr 完成 Agent 启动、状态观察、worktree 管理和同步 artifact 交接，不新增 AKeel 自动编排运行时。独立 Task Owner Session 是用户授权与记录所有权边界，不是新的 Herdr primitive。
 
-**Rejected:** 以“可能更快/多一个视角/适合时”触发委托（不可判定且扩大调用）；当前 Owner 可完成即一律直接执行（忽略上下文污染）；同步 child 向 Owner prompt 完成状态或结果（重复交付、增加上下文且不是处理 ACK）；把长任务默认变成异步 child（增加 mailbox、恢复和去重状态而无当前需求）；把同一 Task 交给多个 Owner（权威 split-brain）；child literal self-delete（会使 join 失去正常 settle 结果，且 child 无法确认自身清理成功）；所有隔离工作无条件创建 worktree（应按有效写能力与 tracked side effect 判断）；worktree 内“100% 自由/零审批”（隔离不产生授权）；由 Grill Agent 直接写权威记录（跨 worktree 制造第二 writer 与未经 Owner 导入的权威变更）。
+**Rejected:** 以“可能更快/多一个视角/适合时”触发委托（不可判定且扩大调用）；当前 Owner 可完成即一律直接执行（忽略上下文污染）；维护第二套委托执行面（当前没有真实需求证明其额外编排能力值得承担独立的上下文、结果和生命周期合同）；同步 child 向 Owner prompt 完成状态或结果（重复交付、增加上下文且不是处理 ACK）；把长任务默认变成异步 child（增加 mailbox、恢复和去重状态而无当前需求）；把同一 Task 交给多个 Owner（权威 split-brain）；child literal self-delete（会使 join 失去正常 settle 结果，且 child 无法确认自身清理成功）；所有隔离工作无条件创建 worktree（应按有效写能力与 tracked side effect 判断）；worktree 内“100% 自由/零审批”（隔离不产生授权）；由 Grill Agent 直接写权威记录（跨 worktree 制造第二 writer 与未经 Owner 导入的权威变更）。
 
 **Out of Scope:**
 
 - **异步 child 与无人值守 orchestration:** mailbox、receipt、跨重启恢复、重复通知去重、自动续跑和聚合由 C-031 保持为未采纳候选；出现真实长周期从属任务后再评估。
 - **渐进式多文件结果协议与确定性 Herdr extension:** 当前单一 verified candidate 没有可复现的体积或协议偏差，不新增 TypeScript 自动化层；出现不可接受的上下文负载或可复现执行偏差时再评估。
 - **确定性 child 资源回收:** 当前不把结果保存和破坏边界委托给无人值守清理；pane、workspace、worktree 与临时运行资源的 owned-run、artifact receipt、commit-preservation 和 clean/non-force 生命周期合同由 C-034 保持为未采纳候选，获得用户批准后再实施。
-- **Access Gate 父子 Policy Snapshot 传播:** 当前只定义 workflow 与 checkout 边界，不改变准入实现。Revisit when 独立任务验证 child-runtime policy seam。
+- **Access Gate 父子 Policy Snapshot 传播:** 当前没有可验证的宿主策略 seam，由 C-024 保持为未采纳候选；本条不改变准入实现。
 - **模型行为基准:** 当前没有固定模型与 consuming-agent 评测 harness，不以字符串存在测试冒充行为证明。Revisit when 项目采纳可重复的 prompt 行为评测。
-
-## D-076: Herdr 统一委托执行面
-
-**Reversal surface:** user-boundary
-
-**Decision:** AKeel 将所有需要隔离过程上下文、且结果返回既有 Task Owner 裁决的委托统一交给 Herdr；Task Owner Session 保留用户意图、Requirements、finding disposition、最终验收、发布和 Project Record 更新。
-
-**Why:** 当前工作需要可见的 Agent、pane、worktree、状态和人工裁决，Herdr 已直接覆盖这些目标。统一执行面可以保持上下文、交接和生命周期合同的一致性。
-
-**Impact:** `src/bootstrap/principles.md`、README、CONTEXT、skills 和委托相关 Decision 统一描述 Herdr 执行面；当前委托通过 Herdr 完成 Agent 启动、状态观察、worktree 管理和同步 artifact 交接。用户授权的独立 Task Owner Session 仍可运行在 Herdr 中，但不因使用 Herdr 而成为 delegated child。
-
-**Rejected:** 维护第二套委托执行面（当前没有真实需求证明其额外编排能力值得承担独立的上下文、结果和生命周期合同）。
-
-**Out of Scope:**
-
-- **无人值守自动多代理流水线**：当前由 C-031 独立记录，只有真实长周期后台需求出现后才重新评估。
-- **子代理父子策略传播**：当前没有可验证的宿主策略 seam，由 C-024 保持为未采纳候选。
 
 ## D-077: Decision 寄存器的轻量 hygiene 校验
 
 **Reversal surface:** engineering
 
-**Decision:** `scripts/validate-docs.ts` 对 AKeel 自仓的 `docs/decisions.md` 执行轻量 Decision hygiene 校验。扫描器只解释 fenced code 外的合法 Decision 标题和第 1 列顶层粗体字段：要求 `Reversal surface` → `Decision` → 可选规格子节 → `Why`，并按序接受可选 `Impact`、`Rejected`、`Out of Scope`。条目存在即表示 active，不保存 `Status` 或 `Origin`；已定义的顶层过程字段、任务引用和明确迁移历史标记被拒绝。普通正文日期以及 fenced code、列表、引用块中的粗体标签不进入结构判断。该检查只报告并以非零状态失败，不自动改写记录。
+**Decision:** `scripts/validate-docs.ts` 对 AKeel 自仓的 `docs/decisions.md` 执行轻量 Decision hygiene 校验，并静态执行 D-028 的 active-entry 生命周期与 D-047 的 Reversal surface 格式合同。扫描器只解释 fenced code 外的合法 Decision 标题和第 1 列顶层粗体字段：要求 `Reversal surface` → `Decision` → 可选规格子节 → `Why`，并按序接受可选 `Impact`、`Rejected`、`Out of Scope`；拒绝 `Status`、`Origin`、已定义的顶层过程字段、任务引用和明确迁移历史标记。普通正文日期以及 fenced code、列表、引用块中的粗体标签不进入结构判断。该检查只报告并以非零状态失败，不自动改写记录。
 
 **Why:** 生命周期、批准面、顶层字段位置、Markdown fence 和已定义过程标签是可确定的结构合同，适合在提交前自动阻断；任意正文的日期、新颖过程措辞和其他 Markdown 嵌套内容无法由轻量扫描可靠分类，保留人工审计可避免误伤长期结论。
 
