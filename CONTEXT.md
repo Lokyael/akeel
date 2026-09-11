@@ -116,7 +116,7 @@
 - Shell tilde expansion 只把受支持 Shell word 开头的未引用、未转义裸 `~` 或 `~/` 映射到会话初始化时的 `$HOME`；普通文件名、引用/转义形式、`~user`、动态或未建模形式不映射为 home。Direct path 不继承该 Shell 语义。
 - 不自动识别或写入用户项目的自有文档体系；非标准体系由用户显式声明。
 - 不分发独立 `grill-plan` 或响应自然语言 grill 触发词；grilling 只由用户手动调用 `grill-docs`。
-- 不把 Herdr 声明为 AKeel runtime dependency；`grill-docs` 使用 Herdr 固定执行面和同步 artifact pull。当前不提供异步 child mailbox、receipt、自动续跑、结果聚合或自动 worktree 回收；长期独立工作使用用户授权、范围互斥的 Task Owner Session。
+- 不把 Herdr 声明为 AKeel runtime dependency；`grill-docs` 使用 Herdr 固定执行面和同步 artifact pull。当前不提供异步 child mailbox、receipt、自动续跑、结果聚合或 pane/workspace/worktree/临时运行资源的确定性自动回收；长期独立工作使用用户授权、范围互斥的 Task Owner Session，child 资源仍由存活 Task Owner 检查后清理。
 - `assess-modularity` 不提供覆盖数据所有权、运行时拓扑、部署、可靠性、安全和容量的广义 architecture review，也不实施或采纳其 findings。
 
 ## Project Documents

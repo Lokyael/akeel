@@ -639,9 +639,9 @@ Herdr child 可在已定约束内处理开放问题并形成 verified candidate�
 
 **Out of Scope:**
 
-- **异步 child 与无人值守 orchestration:** mailbox、receipt、跨重启恢复、重复通知去重、自动续跑、聚合和自动回收由 C-031 保持为未采纳候选；出现真实长周期从属任务后再评估。
+- **异步 child 与无人值守 orchestration:** mailbox、receipt、跨重启恢复、重复通知去重、自动续跑和聚合由 C-031 保持为未采纳候选；出现真实长周期从属任务后再评估。
 - **渐进式多文件结果协议与确定性 Herdr extension:** 当前单一 verified candidate 没有可复现的体积或协议偏差，不新增 TypeScript 自动化层；出现不可接受的上下文负载或可复现执行偏差时再评估。
-- **自动 worktree 回收:** 当前不把结果保存和破坏边界委托给无人值守清理；只有独立证明 clean/non-force 生命周期合同并获得用户批准后再评估。
+- **确定性 child 资源回收:** 当前不把结果保存和破坏边界委托给无人值守清理；pane、workspace、worktree 与临时运行资源的 owned-run、artifact receipt、commit-preservation 和 clean/non-force 生命周期合同由 C-034 保持为未采纳候选，获得用户批准后再实施。
 - **Access Gate 父子 Policy Snapshot 传播:** 当前只定义 workflow 与 checkout 边界，不改变准入实现。Revisit when 独立任务验证 child-runtime policy seam。
 - **模型行为基准:** 当前没有固定模型与 consuming-agent 评测 harness，不以字符串存在测试冒充行为证明。Revisit when 项目采纳可重复的 prompt 行为评测。
 
