@@ -8,7 +8,7 @@ Engineering skills and a user-space access-decision system for [pi](https://pi.d
 pi install git:github.com/Lokyael/akeel
 ```
 
-Principles activate automatically; skills load on demand. The package includes evidence-before-assertion principles plus TDD, review, debugging, security, planning, and related engineering skills. AKeel does not create snapshots or provide a `/rollback` command.
+Principles activate automatically; skills load on demand. The package includes evidence-before-assertion principles plus TDD, review, debugging, security, implementation planning, instruction editing, and related engineering skills. AKeel does not create snapshots or provide a `/rollback` command.
 
 ## Access decisions
 

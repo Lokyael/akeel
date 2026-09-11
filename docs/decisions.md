@@ -334,7 +334,7 @@ Candidate 是停车记录，不属于常规上下文输入；Candidate review �
 
 **Reversal surface:** engineering
 
-**Decision:** 提示词面内容的引用化（`per principles.md X` 形态）按总则加四问取舍。总则：引用是共享规则的低频定位手段，不是技能默认形态——操作步骤与守卫留在动作点。四问：① 引用目标须在同一读取/注入面且短而高显著（同文档相邻、guidance 当下渲染）；跨文件引用（技能→其他技能子文件）解析时付一次真实读取，仅在单源收益超过读取成本时使用；长细节段（Next-ID slots、迁移表）接受方必须内嵌。② 执行必需或 do-not-X 守卫（审批否决、分类守卫、防误删）必须留在动作点内嵌。③ 解析失败须可测或有情境兜底（校验器、违反即重现）；否则失败静默。④ 删除量不足指针固定成本（措辞+解析）的短句不指针化。"存量引用存在"不构成映射可靠、常规或正确的证据——本判据约束新改动，存量按同一标准再审计、不自动回退。操作化判据以 AGENTS.md「提示词内容改动约定 — 引用与内嵌取舍」为准。
+**Decision:** 提示词面内容的引用化（`per principles.md X` 形态）按总则加四问取舍。总则：引用是共享规则的低频定位手段，不是技能默认形态——操作步骤与守卫留在动作点。四问：① 引用目标须在同一读取/注入面且短而高显著（同文档相邻、guidance 当下渲染）；跨文件引用（技能→其他技能子文件）解析时付一次真实读取，仅在单源收益超过读取成本时使用；长细节段（Next-ID slots、迁移表）接受方必须内嵌。② 执行必需或 do-not-X 守卫（审批否决、分类守卫、防误删）必须留在动作点内嵌。③ 解析失败须可测或有情境兜底（校验器、违反即重现）；否则失败静默。④ 删除量不足指针固定成本（措辞+解析）的短句不指针化。"存量引用存在"不构成映射可靠、常规或正确的证据——本判据约束新改动，存量按同一标准再审计、不自动回退。操作化判据以 AGENTS.md「AKeel Prompt Surface 维护约定 — 引用取舍」为准。
 
 **Why:** 引用解析依赖模型对注入面文本的回忆——回忆随 session 老化衰减、compaction 重注入不等于可回忆，且无反馈环验证解析成功：失败时模型带着残缺回忆静默继续执行；引用式（citation-style）措辞还降低指令权重。D-030 已按"不可操作化"先例拒斥 token 基线测量——本判据是结构层可靠性标准，正属 D-030 承认的可操作化方向（结构层行为测试）。
 
@@ -784,4 +784,18 @@ Plan 使用 `Plan Slice` 作为内部执行单元。每个 Slice 承载目标、
 
 **Impact:** `survey-context` 将明确的多步实施需求导向 `implementation-planning`；`brainstorm-design` 在设计批准后按任务复杂度衔接规划或实施。规划规则、来源映射和技能校验统一使用该能力名称。
 
-## D-083: 待创建
+## D-083: Instruction Editing discipline 与仓库 overlay
+
+**Reversal surface:** engineering
+
+**Decision:** `instruction-editing` 是模型按需加载的语义保持型编辑 discipline，面向 agent-facing prompts、skills 和 operational instructions。它先建立主体、触发、动作、结果、限定词、安全守卫、排除边界与引用的语义清单，再以当前合同、统一术语、连贯结构、可靠引用和直接措辞组织内容，并通过修改前后映射核对语义完整性。
+
+正向行为合同是常规表达；安全门禁、禁止项、排除边界、铁律和防循环使用明确否定。同一主语、阶段和行为合同形成完整段落，新条件进入既有的条件—动作—结果结构。历史背景只在理解当前兼容、迁移或决策理由所需时进入正文。
+
+`AGENTS.md` 承载 AKeel 专属 overlay：适用的 Prompt Surface、`principles.md` 锚点、D-054 引用取舍、动作点安全守卫，以及 Access Gate 中 `literal form` 与 `fixed text` 的术语归属。`doc-sync` 核对文档与当前事实，`domain-modeling` 维护领域术语和长期裁决，三项能力通过各自产物分界。
+
+**Why:** 用户项目中的 agent instructions 与 AKeel Prompt Surface 都需要在压缩、合并和重写时保持行为语义。通用编辑方法按需分发，使不同项目共享一个完整流程；仓库 overlay 集中本地路径、安全合同和领域词汇，使通用方法与项目约束各有唯一所有者。
+
+**Impact:** package skill 分发包含 `instruction-editing`；AKeel prompt 内容修改从 `AGENTS.md` 进入该方法，并应用本地 overlay。README、CONTEXT 和结构校验公开并锁定现行能力。
+
+## D-084: 待创建

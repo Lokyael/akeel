@@ -179,6 +179,33 @@ test("implementation planning publishes an implementation-ready Task Plan contra
   assert.match(implementation, /`implementation-planning`/);
 });
 
+test("instruction editing publishes semantic preservation with an AKeel repository overlay", () => {
+  const editingUrl = new URL(
+    "../skills/disciplines/instruction-editing/SKILL.md",
+    import.meta.url,
+  );
+  assert.ok(existsSync(editingUrl), "instruction-editing must be distributed");
+
+  const editing = readFileSync(editingUrl, "utf8");
+  const repositoryOverlay = readFileSync(new URL("../AGENTS.md", import.meta.url), "utf8");
+
+  assert.match(editing, /^name: instruction-editing$/m);
+  assert.match(editing, /^description: Use when revising agent-facing prompts, skills, or operational instructions/m);
+  assert.doesNotMatch(editing, /^disable-model-invocation: true$/m);
+  assert.match(editing, /^### 1\. Inventory Behavioral Meaning$/m);
+  assert.match(editing, /^### 2\. Express the Current Contract$/m);
+  assert.match(editing, /^### 3\. Build Cohesive Structure$/m);
+  assert.match(editing, /^### 4\. Normalize Terminology$/m);
+  assert.match(editing, /^### 5\. Choose the Wording Direction$/m);
+  assert.match(editing, /^### 6\. Validate References$/m);
+  assert.match(editing, /^### 7\. Verify Semantic Preservation$/m);
+  assert.match(repositoryOverlay, /^## AKeel Prompt Surface 维护约定$/m);
+  assert.match(repositoryOverlay, /`instruction-editing`/);
+  assert.match(repositoryOverlay, /D-054/);
+  assert.match(repositoryOverlay, /`literal form`/);
+  assert.match(repositoryOverlay, /`fixed text`/);
+});
+
 test("module design integrates boundary evidence and failure handling", () => {
   const moduleDesign = readFileSync(
     new URL("../skills/disciplines/module-design/SKILL.md", import.meta.url),

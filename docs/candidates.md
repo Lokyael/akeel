@@ -253,5 +253,12 @@
 - **Revisit condition:** 至少两个真实用户项目反复出现同类槽位结构漂移；用户明确要求确定性 Project Record 校验或 CI 门禁；或 Pi/AKeel 提供可验证的只读 helper 执行 seam，使 skill 脚本成为稳定的第二个 consumer。
 - **Out of Scope:** 在触发前不移动或复制 `scripts/validate-docs.ts`，不新增 skill、扩展 hook、常驻提示词、项目模板、自动写入或自动修复，也不把 AKeel 专属源码/测试引用扫描包装成通用用户项目合同。
 
-## C-033: 待创建
+## C-033: Capability Assessment discipline
+
+- **Why Not Now:** 当前已有 `module-design`、`domain-modeling`、`assess-modularity` 与 `code-review` 分别承载接口设计、术语校准、结构发现和变更审查；本轮 skill 治理提供了一次组合使用证据，仍需确认“从用户价值重新推导能力并检查四项对齐”是否会在不同对象上反复形成完整、独立的调用场景。
+- **Proposal:** 评估模型可按需加载的 `capability-assessment` discipline。它面向一个已知 skill、workflow、module 或用户能力，从目标用户、核心场景和可核查价值出发，分别判断名称、能力承诺、边界与内容，并检查四者对齐，交付明确结论和具体调整方案。评估结果可选择保持、重命名、重塑边界、重写内容、合并、拆分或移除；每项结论附带场景与证据。
+- **Boundary:** `assess-modularity` 继续发现仓库级未知结构问题，`module-design` 继续设计已知模块与接口，`domain-modeling` 继续维护领域术语和长期裁决，`code-review` 继续审查固定变更面；本候选只承担已知能力的 first-principles 复评及四项对齐。
+- **Revisit condition:** 至少两个不同对象的真实复评再次需要重复组合现有 skills，或现有方法持续遗漏目标用户、核心场景、价值证据和四项对齐中的任一维度；也可在用户明确选择建立该通用能力时复审。
+
+## C-034: 待创建
 
