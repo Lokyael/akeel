@@ -627,7 +627,7 @@ Tilde expansion 仅适用于受支持 Shell word 中位于开头、未引用、�
 2. repo-wide/跨模块探索、多来源比较、多假设调查、重复实验、完整日志分析、独立审查、交互式方案讨论、跨项目工作和替代 CLI 等会产生隔离过程上下文、且结果仍需当前 Owner 裁决的工作，通过 Herdr child 同步执行并在预定 artifact 上 join。
 3. 长期工作只有在用户明确授予互斥范围和独立验收权时才进入新的 Task Owner Session；多个 Owner 不共同修改同一 Task/Decision 或 checkout，跨 Task 结果由明确的 integration owner 集成。没有该授权时，不把后台运行或新开会话解释为新的 Owner。用户授权的独立 Task Owner Session 可以运行在 Herdr 中，但不因使用 Herdr 而成为 delegated child。
 
-任何 delegated agent 的有效工具只要包含 `write`、`edit` 或可修改文件的 Shell，就必须位于独立 Git worktree；新增的并行 Task Owner 具备这些能力时，也必须拥有不与其他 Owner 共享的 checkout。按能力而非“不要编辑”的提示词承诺分类。真正只读的 delegated agent 可共享 checkout；测试若可能修改源码或生成受跟踪文件，按写能力任务处理。Herdr 只管理自己创建的 worktree，同一 worktree 只有一个生命周期 owner，不跨执行面清理、合并或复用。Child 不删除自身 pane/workspace/worktree；存活的 Owner 负责检查、导入、合并和经明确批准的清理。
+任何 delegated agent 的有效工具只要包含 `write`、`edit` 或可修改文件的 Shell，就必须位于独立 Git worktree；新增的并行 Task Owner 具备这些能力时，也必须拥有不与其他 Owner 共享的 checkout。按能力而非“不要编辑”的提示词承诺分类。真正只读的 delegated agent 可共享 checkout；测试若可能修改源码或生成受跟踪文件，按写能力任务处理。Herdr 只管理自己创建的 worktree，同一 worktree 只有一个生命周期 owner，不跨执行面清理、合并或复用。Child 不删除自身 pane/workspace/worktree；存活的 Owner 只在结果完成导入或汇总、bounded run record 与当前 Herdr/Git 事实共同证明资源归属且用户明确批准后，以 exact-target、non-force 操作清理。归属或成果保留状态异常时 fail-closed 并报告；该手工合同不授权自动或跨重启回收。
 
 具体的 grilling、packet、Agent 生命周期和 verified candidate 交接步骤由 [`skills/workflows/grill-docs/SKILL.md`](../skills/workflows/grill-docs/SKILL.md) 承载。
 
@@ -641,7 +641,7 @@ Tilde expansion 仅适用于受支持 Shell word 中位于开头、未引用、�
 
 - **异步 child 与无人值守 orchestration:** mailbox、receipt、跨重启恢复、重复通知去重、自动续跑和聚合由 C-031 保持为未采纳候选；出现真实长周期从属任务后再评估。
 - **渐进式多文件结果协议与确定性 Herdr extension:** 当前单一 verified candidate 没有可复现的体积或协议偏差，不新增 TypeScript 自动化层；出现不可接受的上下文负载或可复现执行偏差时再评估。
-- **确定性 child 资源回收:** 当前不把结果保存和破坏边界委托给无人值守清理；pane、workspace、worktree 与临时运行资源的 owned-run、artifact receipt、commit-preservation 和 clean/non-force 生命周期合同由 C-034 保持为未采纳候选，获得用户批准后再实施。
+- **确定性 child 资源自动回收:** 持久 owned-run registry、artifact receipt、commit-preservation、跨重启 reconciliation 和无人值守生命周期由 C-034 保持为未采纳候选；当前手工合同不提供这些能力。
 - **Access Gate 父子 Policy Snapshot 传播:** 当前没有可验证的宿主策略 seam，由 C-024 保持为未采纳候选；本条不改变准入实现。
 - **模型行为基准:** 当前没有固定模型与 consuming-agent 评测 harness，不以字符串存在测试冒充行为证明。Revisit when 项目采纳可重复的 prompt 行为评测。
 

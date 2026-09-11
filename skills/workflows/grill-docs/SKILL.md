@@ -15,9 +15,9 @@ If the appended user arguments contain `--role grill-agent --packet <path>`, thi
 Otherwise, run the coordinator in the Task Owner Session with Herdr as the fixed execution surface:
 
 1. Reserve a unique run ID under `/tmp/akeel/grill/<run-id>/` and the exact `verified-candidate.md` path before starting the Agent.
-2. Fix the source snapshot. Record the base ref; if relevant state is uncommitted, create a bounded diff artifact and include it explicitly. A new worktree never silently inherits dirty state.
-3. Use `herdr worktree create ... --no-focus` before starting the Agent whenever its effective tools contain `write`, `edit`, or a file-modifying Shell. Never add `--trust-repository` unless the user has verified and approved that repository. Parse the returned workspace and root-pane IDs; Herdr owns this worktree lifecycle.
-4. Write the packet after the Herdr topology is known. Include only the run ID, goal, authoritative record paths, base ref and optional diff artifact, settled constraints, open decisions, verified-candidate path, child Agent/workspace/pane IDs, and trace protocol. Do not copy the full Task Owner transcript.
+2. Fix the source snapshot as a base ref and resolved base commit OID. If relevant state is uncommitted, include a bounded diff artifact; a new worktree never inherits dirty state implicitly.
+3. A child with `write`, `edit`, or file-modifying Shell uses `herdr worktree create ... --no-focus`; a genuinely read-only child may share the checkout. Select a unique branch that did not exist and record it as created by this run. Capture the server/session route from the coordinator and the returned workspace, repository, checkout, and branch facts. Herdr owns this worktree lifecycle. Never use `--trust-repository` without the user's verified approval.
+4. After topology is known, write only the run, goal, authoritative records, source snapshot and optional diff, settled constraints, open decisions, verified-candidate path, child Agent/workspace/pane IDs, bounded resource record, and trace protocol. Do not copy the Task Owner transcript, workspace lists, command output, or terminal history.
 5. Start one uniquely named Agent with `herdr agent start <agent> --kind pi --pane <root-pane-id> --timeout 30000`. Relay the user's explicit invocation with `herdr agent prompt <agent> "/skill:grill-docs --role grill-agent --packet <path>" --wait --timeout 120000`. This is continuation of the user's manual workflow, not permission for the model to invoke unrelated manual skills. Store successful Herdr JSON responses in the run directory and expose only parsed required IDs and terminal state to the Owner context; on failure expose the bounded error code needed for recovery, not terminal history.
 6. Follow the Agent until it settles as `idle`, `done`, or `blocked` for user input. On `idle` or `done`, read the already-reserved verified-candidate path; a missing or incomplete artifact is a failed handoff. A timeout does not prove that the prompt was not delivered, so inspect the Agent before retrying. Focus changes are optional human navigation and never carry the result.
 
@@ -102,7 +102,7 @@ Write `verified-candidate.md` atomically with:
 - confirmed, corrected, and uncertain claims with citations;
 - constraints, verification expectations, Out of Scope, unresolved questions, and residual risks;
 - the run ID, Herdr child Agent/workspace/pane IDs, and `PI_SESSION_ID` plus `PI_SESSION_FILE` when available; identify an ephemeral Pi session explicitly instead of inventing a trace path;
-- the base ref plus optional diff artifact and digest;
+- the base ref and resolved base commit OID plus optional diff artifact and digest;
 - recommended Task, CONTEXT, and Decision updates.
 
 Do not include search trails, full logs, repeated failures, immaterial hypotheses, tool chronology, or intermediate drafts. Session references are forensic pointers; do not copy or automatically load the child transcript. Do not modify authoritative project records from the Grill worktree.
@@ -122,4 +122,12 @@ After confirmation, apply the domain-modeling discipline:
 - keep format and lifecycle rules in their existing authoritative containers;
 - include genuine Out of Scope items where applicable.
 
-Report updated record paths, unresolved questions, and the exact next action. Ask before removing the Herdr worktree; the surviving Task Owner remains responsible for inspection, import, merge, and cleanup decisions.
+### Resource cleanup
+
+After the verified candidate is read and its import decided, present the bounded record and obtain explicit approval to terminate the settled Agent and remove the listed worktree/workspace and branch resources. `idle` and `done` mean a turn settled, not that its process exited; a `blocked` Agent qualifies only when the user explicitly abandons it.
+
+After approval, use the recorded server/session and verify the repository, workspace, checkout, and branch provenance; a clean checkout; a branch created by this run; and a branch tip equal to the resolved base commit OID. Retain and report dirty, diverged, unknown, reused, provenance-mismatched, or force-required resources without cleanup.
+
+For an eligible child, run exact non-force removal in order: `herdr worktree remove --workspace <workspace-id>`, then, only after that worktree is gone, `git -C <owner-checkout> branch -d -- <branch>`. Never use `--force`, `-D`, or prefix-based discovery or deletion. Verify the exact workspace, checkout, and branch are absent. On retry, a missing worktree permits branch cleanup only when the unchanged record still proves repository identity, branch ownership, and branch tip; absence alone never authorizes deletion.
+
+Report updated record paths, unresolved questions, the cleanup result, and the exact next action.

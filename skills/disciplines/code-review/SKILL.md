@@ -26,6 +26,10 @@ If the fixed point does not resolve, the change set is empty, untracked content 
 
 Run both axes as parallel independent Herdr analyses so their contexts do not contaminate each other. The Task Owner waits for both artifacts and owns final finding disposition.
 
+### Owner Resource Record
+
+Before delegation, reserve a run ID and artifact path per child. Give each file-modifying child its own Herdr worktree; a genuinely read-only child may share the checkout. For a worktree, record the resolved base commit OID, choose a unique branch absent before creation, and mark it created by this run. Add the coordinator's server/session route and Herdr's workspace, pane, repository, checkout, and branch facts to the bounded packet; do not expose full workspace lists, command output, or terminal history.
+
 ### Engineering
 
 Inspect every changed hunk for:
@@ -58,3 +62,11 @@ The Task Owner accepts, rejects, or defers findings. Reviewers do not modify fil
 ## 4. Check Staleness
 
 After both analyses settle, compare the current working state with the pinned packet. Any reviewed content change makes the affected result stale. Fixes re-enter preflight and review before final acceptance.
+
+## 5. Clean Up Child Resources
+
+Once both artifacts are read, findings reported, and staleness checked, present the records and obtain explicit approval to terminate the settled Agents and remove the listed worktree/workspace and branch resources. `idle` and `done` mean a settled turn, not that its process exited; a `blocked` Agent qualifies only when the user explicitly abandons it.
+
+Before removal, use the recorded server/session and verify the repository, workspace, checkout, and branch provenance; a clean checkout; a branch created by this run; and a branch tip equal to the resolved base commit OID. Retain and report dirty, diverged, unknown, reused, provenance-mismatched, or force-required resources without cleanup.
+
+For each eligible child, run exact non-force removal in order: `herdr worktree remove --workspace <workspace-id>`, then, only after that worktree is gone, `git -C <owner-checkout> branch -d -- <branch>`. Never use `--force`, `-D`, or prefix-based discovery or deletion. Verify the workspace, checkout, and branch are absent. On retry, a missing worktree permits branch cleanup only if the unchanged record proves repository identity, branch ownership, and branch tip; absence alone never authorizes deletion.

@@ -91,6 +91,37 @@ test("review readiness skills publish distinct invocation and authority contract
   assert.doesNotMatch(cleanup, /at the end of a development phase/);
 });
 
+test("delegated review and grilling publish fail-closed owner cleanup contracts", () => {
+  const review = readFileSync(
+    new URL("../skills/disciplines/code-review/SKILL.md", import.meta.url),
+    "utf8",
+  );
+  const grill = readFileSync(
+    new URL("../skills/workflows/grill-docs/SKILL.md", import.meta.url),
+    "utf8",
+  );
+
+  for (const contract of [review, grill]) {
+    assert.match(contract, /resolved base commit OID/i);
+    assert.match(contract, /created by this run/i);
+    assert.match(contract, /branch tip[^.]*base commit OID/i);
+    assert.match(contract, /explicit approval[^.]*worktree[^.]*branch/i);
+    assert.match(contract, /herdr worktree remove --workspace <workspace-id>/);
+    assert.match(contract, /non-force/i);
+    assert.match(contract, /dirty[^.]*diverged[^.]*unknown[^.]*reused[^.]*provenance-mismatched[^.]*force-required/i);
+    assert.match(contract, /idle[^.]*done[^.]*not[^.]*process[^.]*exited/i);
+    assert.match(contract, /blocked[^.]*explicitly abandons/i);
+    assert.match(contract, /do not (?:expose|copy)[^.]*workspace lists[^.]*terminal history/i);
+    assert.doesNotMatch(contract, /no active process remains/i);
+    assert.match(contract, /never use[^.]*prefix-based[^.]*deletion/i);
+  }
+
+  assert.ok(
+    review.indexOf("## 5. Clean Up Child Resources") > review.indexOf("## 4. Check Staleness"),
+    "review cleanup must follow result reporting and staleness checking",
+  );
+});
+
 test("debugging skills publish the current reproduction and causal-debugging contracts", () => {
   const root = new URL("../skills/disciplines/", import.meta.url);
   const reproductionUrl = new URL("bug-reproduction/SKILL.md", root);
