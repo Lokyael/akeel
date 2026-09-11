@@ -1,7 +1,8 @@
 {
   "name": "akeel",
-  "description": "Engineering skills and user-space access decisions for AI coding — A + Keel for steady work",
+  "description": "Engineering skills and user-space access decisions for Pi-based AI coding",
   "license": "MIT",
+  "keywords": ["pi-package"],
   "type": "module",
   "scripts": {
     "test": "tsx scripts/validate-docs.ts && tsx scripts/validate-skills.ts && tsc --noEmit && tsx --test \"tests/access-gate/**/*.test.ts\" \"tests/validate-docs.test.ts\" \"tests/validate-skills.test.ts\"",
