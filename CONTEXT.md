@@ -28,6 +28,7 @@
 - **Quarantined Process Context**：探索期有用但不具结果准入资格的搜索轨迹、完整日志、重复失败、无影响假设、工具时间线和中间草稿；留在隔离会话或 artifact。
 - **Direct-first**：文件检查优先使用 Direct `read`、`grep`、`find`、`ls`；新 pipeline 不因存在 Direct 等价入口自动拒绝安全可分析的 Shell。
 - **Prompt Surface**：`principles.md` 恒定注入、`skills/` 按需加载，以及失败路径 guidance 三类 LLM 交互面。
+- **Human-only Test Context View**：同一模型 `bash` 工具结果中面向人类 TUI 显示的裁剪后模型视图；用户 `!`/`!!` 产生的 `bashExecution` 不在范围内。该视图由纯投影临时生成，不是 session entry、模型消息或持久化内容。
 - **Constant Invariant**：跨任务持续成立且需恒定可见的行为约束，由 `principles.md` 承载，不包装为按需 skill。
 - **Skill Responsibility**：`disciplines/` 承载可复用工程方法，`workflows/` 承载端到端编排；目录表达作者职责，不定义 Pi 加载机制。
 - **Skill Single Responsibility**：每个 skill 只做一件事，调用时全量消费；触发场景互斥的 skill 保持独立。
@@ -45,7 +46,7 @@
 
 ## Architecture
 
-- `src/bootstrap/` 在 Session 启动和 compaction 后注入工程原则；`src/context-pruner/` 在构建模型 context 时无模型参与地裁剪 `npm test`/`npm run test` 的 `bashExecution` 输出，原始 session/TUI 内容保持不变。通用 fresh-evidence 门禁属于该恒定面。Skills 只保留 `disciplines/` 可复用方法与 `workflows/` 端到端编排两个作者职责根。`module-design` 处理已知模块或接口设计；手动 `assess-modularity` 只发现仓库或子系统级结构摩擦并交付临时 findings。`implementation-planning` 把已批准的 Requirements 与 Design 组织为由 Plan Slices 构成的 implementation-ready Task Plan。`instruction-editing` 为用户项目提供语义保持型 instruction 编辑方法，`AGENTS.md` 为 AKeel Prompt Surface 提供本地 overlay。`implement-work` 持有实施生命周期，并在提交前编排 `change-preflight` 清理和核对当前活动变更；`code-review` 对固定 Review Surface 做独立只读审查，`code-cleanup` 只处理明确批准范围内的行为保持型深度维护。`bug-reproduction` 为难以稳定观察的技术问题建立 Reproduction Result，`systematic-debugging` 消费可用信号并以区分性实验确认根因，在授权范围内衔接 TDD 与 fix validation。Grilling 只由用户手动调用的 `grill-docs` 承载，按未决问题处理、候选方案确认、事实核对、verified candidate 交接和 Task Owner 导入的固定顺序执行。
+- `src/bootstrap/` 在 Session 启动和 compaction 后注入工程原则；`src/context-pruner/` 在构建模型 context 时无模型参与地裁剪模型调用 `bash` 工具产生的 `toolResult` 中的 `npm test`/`npm run test` 输出。用户 `!`/`!!` 产生的 `bashExecution` 保持不变；测试结果的原始 session 内容保持不变。D-084 将同一模型 bash 工具结果的 TUI 展示限定为原始输出与临时 Human-only Test Context View，后者不写入 session，也不改变模型 context 边界。通用 fresh-evidence 门禁属于该恒定面。Skills 只保留 `disciplines/` 可复用方法与 `workflows/` 端到端编排两个作者职责根。`module-design` 处理已知模块或接口设计；手动 `assess-modularity` 只发现仓库或子系统级结构摩擦并交付临时 findings。`implementation-planning` 把已批准的 Requirements 与 Design 组织为由 Plan Slices 构成的 implementation-ready Task Plan。`instruction-editing` 为用户项目提供语义保持型 instruction 编辑方法，`AGENTS.md` 为 AKeel Prompt Surface 提供本地 overlay。`implement-work` 持有实施生命周期，并在提交前编排 `change-preflight` 清理和核对当前活动变更；`code-review` 对固定 Review Surface 做独立只读审查，`code-cleanup` 只处理明确批准范围内的行为保持型深度维护。`bug-reproduction` 为难以稳定观察的技术问题建立 Reproduction Result，`systematic-debugging` 消费可用信号并以区分性实验确认根因，在授权范围内衔接 TDD 与 fix validation。Grilling 只由用户手动调用的 `grill-docs` 承载，按未决问题处理、候选方案确认、事实核对、verified candidate 交接和 Task Owner 导入的固定顺序执行。
 - 委托按 D-075 执行上下文准入和封闭路由：Task Owner Session 保留 Authority Context；需要隔离过程上下文且结果仍由该 Owner 裁决的工作统一通过 Herdr child 同步执行，Owner 预定 artifact、等待 settle 后按路径拉取，child 不发送完成 prompt；AKeel 不维护第二套委托执行面，也不把 Herdr 声明为 runtime dependency。可独立验收的长期工作只有经用户明确授权才进入范围互斥的新 Task Owner Session。有效能力含写入或文件修改 Shell 的 delegated agent 强制进入独立 worktree，新增的并行 Owner 也必须拥有不与其他 Owner 共享的 checkout；child 不自清理，由存活 Owner 负责检查、集成与明确批准后的回收。
 - `src/access-gate/access-decision/` 是当前唯一决策实现：`core/` 负责 Pi host/config 无关的语义与策略，Linux pathname lookup 属于该语义域的外部合同；`core/program-semantics/` 负责 Git、解释器、Python 工具、uv 和 npm 族的程序分类与路径事实，Git `-C`、`--git-dir` 和 `--work-tree` 已通过 Canonical command-local cwd seam 解析，helper-capable Git 操作及 `git config` hard-deny；`adapters/` 转换 Pi 和 policy.yaml 输入，`runtime/` 负责 project/staging 生命周期和 host composition。运行时以 session-start cwd 作为固定 Access Root，不要求 Git root；Shell tilde expansion 使用会话初始化时的 `$HOME`。
 - Access Decision Pipeline（D-059/D-060）已完成 Greenfield trust path 与原子生产切换。Canonical 只解释一次；Admission 与 Display 按需投影；Policy Kernel 不读取配置或重新解析请求。Canonical path resolution 同时保留 lexical 与 symlink-target traversal prefixes，Direct search 与 Shell recursive path 均在 blocked descendants 上 fail-closed；有显式 path boundary 时，unknown/unbounded Shell path access 也不得放行。path-form executable 不因已知 basename 获得 inspect/modify 语义，非破坏性形式统一按 opaque execute 处理。Git 显式项目内 `file://` remote 也在 Canonical 阶段转为 path fact；helper-capable Git 操作与 `git config` 保持 hard-deny，host、alias 和间接 config remote 继续 fail-closed。
@@ -95,6 +96,7 @@
 - [D-081 复现信号与系统化根因调试分界](docs/decisions.md#d-081-复现信号与系统化根因调试分界)
 - [D-082 单一实施规划能力与 Plan Slice](docs/decisions.md#d-082-单一实施规划能力与-plan-slice)
 - [D-083 Instruction Editing discipline 与仓库 overlay](docs/decisions.md#d-083-instruction-editing-discipline-与仓库-overlay)
+- [D-084 测试输出的人类专用模型视图与会话持久化边界](docs/decisions.md#d-084-测试输出的人类专用模型视图与会话持久化边界)
 
 ## Negative Space
 
@@ -109,7 +111,7 @@
 - 旧 `config.yaml`、Profile、命令覆盖、继承和子代理字段不属于新 Policy Snapshot 输入；当前只读取全局 `policy.yaml` 的静态策略字段、preset 绑定或显式 `accessGate` 禁用标志。
 - Shell 只支持显式定义、可静态证明且资源有界的子集；不可证明形态 fail-closed。`core/program-semantics/` 中的已知程序仍需提供 bounded path 事实；解释器脚本、uv run、npm/pnpm/yarn 执行、npx、pytest 和未知子命令等委托执行保持 opaque，在显式 path boundary 下 hard-deny。所有 Canonical `destroy`/`delete` 操作永久 hard-deny；`commands.destroy: allow` 仅可作为自定义 preset 的合法配置值，不改变该边界。Git local transport 仅接受可解析的项目内 `file://` path；HTTPS/SSH 等外部 transport、host、alias、间接 config、ext transport 和其他未建模形态继续 hard-boundary。未建模的命令副作用不单独建模。
 - 不把短期 Task Record、实施过程或审查报告作为永久当前知识；Task checkpoint 留在 Git 历史，正文落地后从当前树清除。
-- 不在 T-069 实现 Static Flow Graph、Explanation Replay、Runtime Audit Event 或 Runtime Content Flow。
+- 不在 T-069 实现 Static Flow Graph、Explanation Replay 或 Runtime Audit Event，也不提供通用 Runtime Content Flow；D-084 仅覆盖模型 `bash` 工具结果行内的人类专用模型视图，不覆盖用户 `!`/`!!` 的 `bashExecution`。
 - 不把旧实现结果当作正确性 oracle；旧代码、旧测试和 archive 只提供待重新证明的历史线索。
 - Access Root 固定为会话启动时的 `cwd`；不自动向下选择子 Git 仓库，不因 cwd 位于 Git 子目录而向上扩大到 Git root，也不在会话内因 Shell `cd` 改变访问根。用户显式项目选择器、多个 Access Root 和动态切换仍不提供。
 - Shell tilde expansion 只把受支持 Shell word 开头的未引用、未转义裸 `~` 或 `~/` 映射到会话初始化时的 `$HOME`；普通文件名、引用/转义形式、`~user`、动态或未建模形式不映射为 home。Direct path 不继承该 Shell 语义。

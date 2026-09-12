@@ -281,5 +281,14 @@
 - **Exploration Direction:** 只在 Canonical 能依据外部程序合同发行有界网络副作用事实时，评估将远端 push/fetch、依赖发布或其他明确外发动作从常规本地修改中分离，并定义 allow/ask/deny、混合 flow、无 UI 和未知 transport 行为。参数级 helper/任意执行仍由 C-027 处理；payload 内容与 lineage 由 C-020 处理；执行期网络 namespace 由 C-021 处理。Operation Admission 的允许不构成 OS-level 网络阻断保证。
 - **Revisit condition:** 真实工作流需要阻断未经授权的网络外发、远端变更或依赖发布，且当前 execute/opaque 边界过宽或过窄；或用户明确选择设计独立 network policy axis。
 
-## C-040: 待创建
+## C-040: Pi render-only tool-result renderer 与测试模型视图
+
+> 本条只记录未来由 Pi 宿主提供渲染接缝、再由 AKeel 评估测试结果模型视图的候选方向，不构成当前需求、路线图、实现承诺或对现有 TUI 行为的修改授权。
+
+- **Why Not Now:** 当前 Pi 的 `registerTool` 与 `renderResult` 仍把渲染定义绑定在工具定义上，没有只装饰内置 `bash` tool result、同时保持执行所有权和 session 持久化不变的公开接口。AKeel 当前已完成 context projection，但没有安全的宿主接缝可实现同一条 TUI 结果中的原始输出与模型视图；现在通过覆盖 `bash`、写入 custom message/entry、处理 `bashExecution` 或 monkey-patch 宿主组件都会越过 D-084 与当前范围边界。
+- **Exploration Direction:** 未来只在 Pi 提供并验证 render-only seam 后，评估独立的 renderer registry/decorator 或等价 middleware：基 renderer 继续拥有 `bash` 执行与原始 result，decorator 接收原始 result、关联 tool call、`expanded`、`isPartial`、错误状态、默认 renderer 和 row-local context，并只返回临时 TUI component。AKeel 复用现有纯 projection，仅在 `changed` 时追加明确标记的模型版本；恢复 session 时从原始消息重新计算，不保存 projection，不新增 command、message、entry 或 details 字段。宿主 API、组合顺序、fallback、异常处理和非 TUI mode 行为必须先由 Pi 的 public seam 测试确定。
+- **Revisit condition:** Pi 发布可供扩展使用、保持单一执行所有权且能通过测试观察 persistence/render 边界的 render-only tool-result 接口；或用户明确要求重新启动该候选的宿主接口与 TUI 视图评估。
+- **Out of Scope:** 在本候选被明确采纳前，不修改 Pi 安装副本，不覆盖或重实现内置 `bash`，不改变 `bashExecution`、Access Gate、session file、tool result details、模型 context projection 或现有 TUI 展示；不创建 T-xxx 实现任务。
+
+## C-041: 待创建
 

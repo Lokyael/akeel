@@ -785,4 +785,44 @@ Plan 使用 `Plan Slice` 作为内部执行单元。每个 Slice 承载目标、
 
 **Impact:** package skill 分发包含 `instruction-editing`；AKeel prompt 内容修改从 `AGENTS.md` 进入该方法，并应用本地 overlay。README、CONTEXT 和结构校验公开并锁定现行能力。
 
-## D-084: 待创建
+## D-084: 测试输出的人类专用模型视图与会话持久化边界
+
+**Reversal surface:** user-boundary
+
+**Decision:** 测试输出维持三种相互独立的表示：session file 保存原始 `bash` tool result；模型 context 使用裁剪后的投影；TUI 在同一条模型 `bash` 工具结果中并列显示原始输出和裁剪后的模型视图。模型视图只在渲染时由纯投影函数生成，不成为 session entry、message 或 tool result details。用户 `!`/`!!` 产生的 `bashExecution` 不属于本决定。
+
+**Display contract:**
+
+- 仅对模型调用内置 `bash` 工具、且实际发生裁剪的独立 `npm test` / `npm run test` 结果显示模型视图，并明确标记其为发送给模型的版本。
+- 原始输出保持现有工具结果展示；取消、截断、非测试命令和不确定失败不产生模型视图。
+- 用户 `!`/`!!` 的 `bashExecution` 不裁剪、不生成模型视图，保持既有 TUI、session 和 context 行为。
+- 模型视图属于人类 TUI 展示，不通过命令打开，不追加自定义会话消息，不写入 session file，也不进入 system prompt、tool description 或模型 context。
+- `context` handler 与 TUI renderer 消费同一个纯裁剪投影，保证展示内容与模型实际收到的内容一致。
+
+**Data boundaries:**
+
+- 恢复会话时从原始 `toolResult` 和关联的 `bash` tool call 重新计算模型视图，不读取或保存裁剪副本。
+- 正常模型请求只接收裁剪后的 context projection。
+- 模型另行通过 `read` 或 `bash` 读取 session file 时，读取的是原始内容；能否读取仍由既有路径权限决定，该视图不提供额外保护。
+
+**Why:** 用户需要在模型测试结果所在位置核对完整过程与模型实际收到的成果或失败信息，而不是浏览整轮上下文。保留原文、临时派生模型视图，可以避免会话文件膨胀，同时使对照内容准确对应本次模型请求。
+
+**Impact:** `context-pruner` 需要从关联的 `bash` tool call 与 `toolResult` 适配输入，再由纯投影函数完成裁剪。TUI 若显示模型视图，需要 Pi 对模型 `bash` tool result 提供不改变执行所有权的 render-only 接缝；不得通过 `bashExecution`/`BashExecutionComponent`、session entry、tool-result 内容持久化或宿主组件 monkey-patch 绕过该边界，也不改变执行、Access Gate 和现有测试输出裁剪规则。
+
+**Rejected:**
+
+- **裁剪用户 `!`/`!!` 的 `bashExecution`：** 该路径不是模型调用的工具结果，且会改变用户命令的既有显示与 context 语义。
+- **全会话 context 预览命令：** 超出局部测试结果对照的需要。
+- **把原文和裁剪版同时放进模型 context：** 失去裁剪收益，并可能造成两份并列事实。
+- **持久化裁剪版：** 造成重复事实、会话膨胀或意外进入模型可见数据。
+- **TUI 只显示裁剪版：** 用户无法核对裁剪是否误删测试过程或诊断。
+
+**Out of Scope:**
+
+- 用户 `!`/`!!` `bashExecution` 的输出裁剪或模型视图。
+- 通用的每轮 system prompt、tool description、provider payload 或 context message 审计器。
+- 阻止模型主动读取 session file 的新安全边界。
+- 修改测试输出分类、失败识别或保留行算法。
+- 通用 Runtime Content Flow；本决定只覆盖模型 `bash` 工具结果行内的人类专用模型视图。
+
+## D-085: 待创建

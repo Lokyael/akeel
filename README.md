@@ -93,7 +93,7 @@ This form is the only policy field and takes effect after a session restart. All
 
 ## Test output context pruning
 
-AKeel trims `npm test` and `npm run test` `bashExecution` results only when building model context. Successful runs become `All tests passed`; failed runs retain failure cases, diagnostics, and stack traces. Cancelled or truncated results, non-test commands, and uncertain failures remain unchanged. The original output remains in the session and TUI; this feature does not call a model.
+AKeel trims output from model-invoked `bash` tool results for standalone `npm test` and `npm run test` commands only when building model context. Successful runs become `All tests passed`; failed runs retain failure cases, diagnostics, and stack traces. Cancelled or truncated results, non-test commands, and uncertain failures remain unchanged. User-entered `!`/`!!` `bashExecution` messages are outside this feature and are never pruned. The original tool result remains in the session; this feature does not call a model.
 
 ## Companion tools
 

@@ -4,49 +4,160 @@ const SUCCESS_OUTPUT = "All tests passed";
 const DIAGNOSTIC_CONTEXT_RADIUS = 1;
 
 type ContextMessage = Readonly<Record<string, unknown>>;
+type MessageRecord = Record<string, unknown>;
+type TextContent = Readonly<{ readonly type: "text"; readonly text: string }>;
+type BashToolCall = Readonly<{ readonly id: string; readonly command: string }>;
+
+export type TestOutputInput = Readonly<{
+  readonly command: string;
+  readonly output: string;
+  readonly exitCode?: number;
+  readonly cancelled?: boolean;
+  readonly truncated?: boolean;
+}>;
+
+export type TestOutputProjection = Readonly<{
+  readonly original: string;
+  readonly model: string;
+  readonly changed: boolean;
+}>;
+
+export function projectTestOutput(input: TestOutputInput): TestOutputProjection | undefined {
+  if (input.cancelled || input.truncated || input.exitCode === undefined) return undefined;
+  if (!isTestCommand(input.command)) {
+    return { original: input.output, model: input.output, changed: false };
+  }
+
+  const model = input.exitCode === 0 && !outputSignalsFailure(input.output)
+    ? SUCCESS_OUTPUT
+    : pruneFailureOutput(input.output);
+  return { original: input.output, model, changed: model !== input.output };
+}
 
 /**
- * Reduces test command output before it is sent to the model.
+ * Reduces model-invoked bash test output before it is sent to the model.
+ * User-entered `!`/`!!` messages are intentionally outside this path.
  * Returning the original message preserves information when classification is uncertain.
  */
 export function pruneTestContext(messages: readonly unknown[]): unknown[] {
-  return messages.map((message) => pruneMessage(message));
+  const bashCalls = collectBashToolCalls(messages);
+  return messages.map((message) => pruneMessage(message, bashCalls));
 }
 
 export default function contextPruner(pi: ExtensionAPI): void {
   pi.on("context", (event) => ({ messages: pruneTestContext(event.messages) }));
 }
 
-function pruneMessage(message: unknown): unknown {
-  if (!isBashExecutionMessage(message) || !isTestCommand(message.command)) return message;
-  if (message.cancelled || message.truncated || message.exitCode === undefined) return message;
+function pruneMessage(message: unknown, bashCalls: ReadonlyMap<string, BashToolCall>): unknown {
+  if (!isBashToolResult(message)) return message;
+  const call = bashCalls.get(message.toolCallId);
+  if (!call) return message;
 
-  if (message.exitCode === 0 && !outputSignalsFailure(message.output)) {
-    return { ...message, output: SUCCESS_OUTPUT };
+  const input = adaptBashToolResult(message, call.command);
+  if (!input) return message;
+  const projection = projectTestOutput(input.input);
+  if (!projection?.changed) return message;
+
+  const model = input.status === undefined ? projection.model : `${projection.model}\n\n${input.status}`;
+  const text = getSingleTextContent(message.content);
+  if (!text) return message;
+  const content = message.content.map((block) => block === text ? { ...text, text: model } : block);
+  return { ...message, content };
+}
+
+function collectBashToolCalls(messages: readonly unknown[]): ReadonlyMap<string, BashToolCall> {
+  const calls = new Map<string, BashToolCall>();
+  for (const message of messages) {
+    if (!isAssistantMessage(message)) continue;
+    for (const block of message.content) {
+      if (!isBashToolCall(block)) continue;
+      const argumentsValue = block.arguments as MessageRecord;
+      calls.set(block.id, { id: block.id, command: argumentsValue.command as string });
+    }
+  }
+  return calls;
+}
+
+type AdaptedBashToolResult = Readonly<{
+  readonly input: TestOutputInput;
+  readonly status?: string;
+}>;
+
+function adaptBashToolResult(message: BashToolResult, command: string): AdaptedBashToolResult | undefined {
+  const output = getSingleTextContent(message.content)?.text;
+  if (output === undefined || isTruncatedDetails(message.details)) return undefined;
+
+  const cancelled = output.endsWith("\n\nCommand aborted");
+  if (cancelled) {
+    return { input: { command, output, cancelled: true, truncated: false } };
   }
 
-  const output = pruneFailureOutput(message.output);
-  return output === message.output ? message : { ...message, output };
+  const exitMatch = output.match(/\n\nCommand exited with code (-?\d+)$/u);
+  if (message.isError && !exitMatch) return undefined;
+
+  const exitCode = exitMatch ? Number(exitMatch[1]) : 0;
+  const rawOutput = exitMatch ? output.slice(0, exitMatch.index) : output;
+  return {
+    input: { command, output: rawOutput, exitCode, cancelled: false, truncated: false },
+    status: exitMatch?.[0].slice(2),
+  };
 }
 
-function isBashExecutionMessage(message: unknown): message is ContextMessage & {
-  readonly command: string;
-  readonly output: string;
-  readonly exitCode?: number;
-  readonly cancelled?: boolean;
-  readonly truncated?: boolean;
-} {
-  if (!message || typeof message !== "object") return false;
-  const candidate = message as Record<string, unknown>;
+function isTruncatedDetails(details: unknown): boolean {
+  if (!details || typeof details !== "object") return false;
+  const truncation = (details as MessageRecord).truncation;
+  return !!truncation && typeof truncation === "object" && (truncation as MessageRecord).truncated === true;
+}
+
+function isAssistantMessage(message: unknown): message is ContextMessage & { readonly content: readonly unknown[] } {
+  return isRecordWithContent(message) && message.role === "assistant";
+}
+
+function isBashToolCall(block: unknown): block is Readonly<{
+  readonly id: string;
+  readonly arguments: MessageRecord;
+}> {
+  if (!block || typeof block !== "object") return false;
+  const candidate = block as MessageRecord;
+  const argumentsValue = candidate.arguments;
   return (
-    candidate.role === "bashExecution" &&
-    typeof candidate.command === "string" &&
-    typeof candidate.output === "string" &&
-    (candidate.exitCode === undefined || typeof candidate.exitCode === "number") &&
-    (candidate.cancelled === undefined || typeof candidate.cancelled === "boolean") &&
-    (candidate.truncated === undefined || typeof candidate.truncated === "boolean")
+    candidate.type === "toolCall" &&
+    candidate.name === "bash" &&
+    typeof candidate.id === "string" &&
+    !!argumentsValue &&
+    typeof argumentsValue === "object" &&
+    typeof (argumentsValue as MessageRecord).command === "string"
   );
 }
+
+function isBashToolResult(message: unknown): message is ContextMessage & BashToolResult {
+  if (!isRecordWithContent(message)) return false;
+  const candidate = message as MessageRecord;
+  return candidate.role === "toolResult" && candidate.toolName === "bash" &&
+    typeof candidate.toolCallId === "string" && typeof candidate.isError === "boolean";
+}
+
+function getSingleTextContent(content: readonly unknown[]): TextContent | undefined {
+  if (content.length !== 1) return undefined;
+  const block = content[0];
+  if (!block || typeof block !== "object") return undefined;
+  const candidate = block as MessageRecord;
+  return candidate.type === "text" && typeof candidate.text === "string" ? candidate as TextContent : undefined;
+}
+
+function isRecordWithContent(message: unknown): message is ContextMessage & { readonly content: readonly unknown[] } {
+  if (!message || typeof message !== "object") return false;
+  const candidate = message as MessageRecord;
+  return Array.isArray(candidate.content);
+}
+
+type BashToolResult = Readonly<{
+  readonly toolCallId: string;
+  readonly toolName: "bash";
+  readonly content: readonly unknown[];
+  readonly isError: boolean;
+  readonly details?: unknown;
+}>;
 
 function isTestCommand(command: string): boolean {
   const trimmed = command.trim();

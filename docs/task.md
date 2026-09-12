@@ -68,4 +68,4 @@ D-028 只保留结论与理由，`principles.md` 单源定义 Git-backed Task li
 - [x] D-028 与 CONTEXT 反映当前合同。
 - [x] 本 Task 已在 `0b723c1` 进入可达 checkpoint；最终清档仍待 Task Owner 完成。
 
-## T-090: 待创建
+## T-091: 待创建
