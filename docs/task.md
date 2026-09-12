@@ -5,7 +5,7 @@
 ## T-094: 测试成功输出的正向证据门槛
 
 **Kind:** maintenance
-**Status:** draft
+**Status:** in-progress
 
 ### Goal
 
