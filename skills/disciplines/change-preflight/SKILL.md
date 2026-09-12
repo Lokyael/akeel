@@ -5,11 +5,11 @@ description: Use before independent review or commit — prepare the current Tas
 
 # Change Preflight
 
-Prepare material Task changes for independent review or commit. For an isolated local instruction-file wording adjustment that is not a material Task (per principles.md Project Record Authority), apply only the bounded inspection and verification portions without creating a Task solely for preflight. This is an author-side readiness gate: it may clean residue created by the active change, but it does not review historical code or start unrelated refactoring.
+Prepare material Task changes for independent review or commit. For a local wording-only instruction change outside the material Task boundary, apply only bounded inspection and verification; do not create a Task solely for preflight. This is an author-side readiness gate: it may clean residue created by the active change, but it does not review historical code or start unrelated refactoring.
 
 ## 1. Pin the Active Change
 
-For a material change, read the active Task Record and capture the complete working surface. For a non-material local instruction change, inspect its complete file and applicable surrounding context without inventing a Task Record. During final lifecycle closure after the completed Task Record is cleared, use the accepted Requirements frozen in the prior Review Surface instead of reconstructing or inventing them:
+Classify the change per `principles.md` Project Record Authority: for material changes, read the active Task Record and capture the complete working surface; otherwise inspect the complete file and applicable surrounding context without creating a Task Record. During final lifecycle closure after the completed Task Record is cleared, use the accepted Requirements frozen in the prior Review Surface instead of reconstructing or inventing them:
 
 - committed changes since the agreed base, when applicable;
 - staged and unstaged changes;

@@ -290,5 +290,12 @@
 - **Revisit condition:** Pi 发布可供扩展使用、保持单一执行所有权且能通过测试观察 persistence/render 边界的 render-only tool-result 接口；或用户明确要求重新启动该候选的宿主接口与 TUI 视图评估。
 - **Out of Scope:** 在本候选被明确采纳前，不修改 Pi 安装副本，不覆盖或重实现内置 `bash`，不改变 `bashExecution`、Access Gate、session file、tool result details、模型 context projection 或现有 TUI 展示；不创建 T-xxx 实现任务。
 
-## C-041: 待创建
+## C-041: CONTEXT Architecture 段落的职责重组与负载控制
+
+- **Why Not Now:** 当前清理只处理本次规则变更产生的重复说明；整体 Architecture 段落涉及多个读取面和长期文档归属，立即重写会扩大范围并混入尚未确认的取舍。
+- **Exploration Direction:** 在明确复审时，按读取者和权威归属区分 Architecture 中的当前事实、运行时边界、skill 目录职责和流程说明，删除只重复其他权威文档的内容，同时保留会影响行为理解的边界与引用。
+- **Revisit condition:** 再次修改 `CONTEXT.md`，或有实际证据表明 Architecture 段落成为主要上下文负载时，重新评估其内容归属和压缩空间。
+- **Out of Scope:** 本候选未被明确采纳前，不重写 `CONTEXT.md`，不修改 `principles.md`、skills、插件代码或 Project Record 生命周期，也不把候选内容当作当前架构结论。
+
+## C-042: 待创建
 
