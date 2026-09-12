@@ -209,17 +209,13 @@ function hasVerifiedTestSuccess(output: string): boolean {
   if (hasNonPassMetadata(output) || outputSignalsFailure(output)) return false;
 
   const lines = output.split(/\r?\n/u);
-  const tapSummaries = parseTapSummaries(lines);
-  if (tapSummaries !== undefined) return allSummariesPass(tapSummaries);
-
-  const vitestSummaries = parseVitestSummaries(lines);
-  if (vitestSummaries !== undefined) return allSummariesPass(vitestSummaries);
-
-  const jestSummaries = parseJestSummaries(lines);
-  if (jestSummaries !== undefined) return allSummariesPass(jestSummaries);
-
-  const bunSummaries = parseBunSummaries(lines);
-  return bunSummaries !== undefined && allSummariesPass(bunSummaries);
+  const summaries = [
+    parseTapSummaries(lines),
+    parseVitestSummaries(lines),
+    parseJestSummaries(lines),
+    parseBunSummaries(lines),
+  ].flatMap((candidate) => candidate ?? []);
+  return allSummariesPass(summaries);
 }
 
 function allSummariesPass(summaries: readonly TestSummary[]): boolean {

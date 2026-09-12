@@ -200,6 +200,7 @@ test("a later zero-test summary is not hidden by an earlier passing summary", ()
     "Tests: 1 passed, 1 total\nTests: 0 total",
     "Tests  1 passed (1)\nTests  0 passed (0)",
     "1 pass\nRan 1 tests across 1 files\n0 pass\nRan 0 tests across 1 files",
+    "ℹ tests 1\nℹ pass 1\nℹ fail 0\nTests: 0 total",
   ];
 
   for (const output of cases) {
