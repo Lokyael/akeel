@@ -68,4 +68,70 @@ D-028 只保留结论与理由，`principles.md` 单源定义 Git-backed Task li
 - [x] D-028 与 CONTEXT 反映当前合同。
 - [ ] 本 Task 至少进入一个可达 checkpoint 后方可清除；等待独立 Task checkpoint commit。
 
-## T-089: 待创建
+## T-089: 无模型参与的测试输出上下文裁剪
+
+**Kind:** feature
+**Status:** in-progress
+
+### Goal
+
+在不调用模型、不破坏原始会话记录的前提下，裁剪发送给模型的测试命令输出：成功结果只保留 `All tests passed`，失败结果保留失败用例、错误和堆栈信息。
+
+### Requirements
+
+- 只实现测试输出裁剪，不扩展到其他命令输出或模型摘要。
+- 只识别 `npm test` 与 `npm run test` 测试命令，并处理 Pi 的 `bashExecution` 上下文消息。
+- 成功且未取消、未截断的测试输出在模型 context 中精确替换为一行 `All tests passed`。
+- 失败测试保留可识别的失败用例、错误和堆栈；无法可靠提取时保留原始输出。
+- 裁剪仅修改 `context` 事件返回值，不修改 session 持久化内容或 TUI 中的原始结果。
+- 裁剪器不调用模型，且非测试命令、取消或截断结果保持不变。
+
+### Design
+
+新增独立 `src/context-pruner/` 扩展，注册 Pi `context` handler。纯裁剪函数识别测试命令与 `bashExecution` 消息，根据退出状态选择成功固定文本或失败信息提取结果；handler 对消息做不可变复制后返回裁剪后的 context。原始输出由 Pi session 保留，裁剪器不使用 `tool_result` middleware，也不接入 `session_before_compact`。
+
+### Out of Scope
+
+- **其他命令输出裁剪：** 当前只需要测试结果语义；待出现稳定的其他命令输出合同后再扩展。
+- **模型摘要或 LLM 调用：** 需求明确要求无模型参与；待未来明确需要语义归纳时另行设计。
+- **持久化原始输出副本：** Pi session 已保存原始结果；待宿主不再提供该保证时再评估独立存储。
+- **失败输出的通用测试框架解析：** 首版只提取稳定的失败块和诊断行；待具体框架语料证明需要时再增加解析器。
+
+### Plan
+
+#### Slice 1: 裁剪测试上下文
+
+**Goal:** 测试命令的 context 输出按成功或失败结果缩减，同时原始消息保持不变。
+**Requirements covered:** 全部 Requirements
+**Depends on:** none
+
+**Acceptance Criteria:**
+- [ ] 成功测试输出在 context 中精确变为 `All tests passed`。
+- [ ] 失败测试保留失败用例、错误和堆栈，并移除成功噪声。
+- [ ] 非测试、取消和截断消息不变，输入消息不被修改。
+- [ ] 扩展已加入 Pi 分发入口，类型检查和全量测试通过。
+
+**Files and Seams:**
+- Add: `src/context-pruner/index.ts` — context extension and public pruning seam
+- Add: `tests/context-pruner/index.test.ts` — pure pruner and context handler behavior
+- Modify: `package.json` — Pi extension registration
+- Modify: `README.md`、`CONTEXT.md` — current capability and architecture
+
+**Verification:**
+- `npm run test:file -- tests/context-pruner/index.test.ts`
+- `npm test`
+
+**Steps:**
+1. 先写成功、失败、边界和不可变行为测试，并确认失败原因是裁剪接口不存在。
+2. 实现纯函数和 `context` handler，最小化支持范围并让聚焦测试通过。
+3. 注册扩展，同步 README 与 CONTEXT，运行类型检查和全量验证。
+
+### Evidence
+
+- 设计已获用户确认；实现与验证待完成。
+
+### Durable Updates
+
+- [ ] 当前无新增长期决策；完成后确认是否需要更新 CONTEXT 的架构描述。
+
+## T-090: 待创建
