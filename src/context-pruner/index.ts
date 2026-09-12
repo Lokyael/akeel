@@ -28,7 +28,7 @@ export function projectTestOutput(input: TestOutputInput): TestOutputProjection 
     return { original: input.output, model: input.output, changed: false };
   }
 
-  const model = input.exitCode === 0 && !outputSignalsFailure(input.output)
+  const model = input.exitCode === 0 && hasVerifiedTestSuccess(input.output)
     ? SUCCESS_OUTPUT
     : pruneFailureOutput(input.output);
   return { original: input.output, model, changed: model !== input.output };
@@ -93,9 +93,8 @@ function adaptBashToolResult(message: BashToolResult, command: string): AdaptedB
   }
 
   const exitMatch = output.match(/\n\nCommand exited with code (-?\d+)$/u);
-  if (message.isError && !exitMatch) return undefined;
-
   const exitCode = exitMatch ? Number(exitMatch[1]) : 0;
+  if (message.isError && (!exitMatch || exitCode === 0)) return undefined;
   const rawOutput = exitMatch ? output.slice(0, exitMatch.index) : output;
   return {
     input: { command, output: rawOutput, exitCode, cancelled: false, truncated: false },
@@ -197,8 +196,70 @@ function containsShellOperator(command: string): boolean {
   return quote !== undefined;
 }
 
+function hasVerifiedTestSuccess(output: string): boolean {
+  if (hasNonPassMetadata(output) || outputSignalsFailure(output)) return false;
+
+  const lines = output.split(/\r?\n/u);
+
+  const tapTests = findCount(lines, /^\s*ℹ\s+tests\s+(\d+)\b/u);
+  if (tapTests !== undefined) {
+    const tapPass = findCount(lines, /^\s*ℹ\s+pass\s+(\d+)\b/u);
+    const tapFail = findCount(lines, /^\s*ℹ\s+fail\s+(\d+)\b/u);
+    return tapTests > 0 && tapPass === tapTests && tapFail === 0;
+  }
+
+  const vitestLine = lines.find((line) => /^\s*Tests\s+(?!:)/iu.test(line));
+  if (vitestLine) {
+    const passed = vitestLine.match(/\b(\d+)\s+passed\b/iu);
+    const total = vitestLine.match(/\((\d+)\)\s*$/u);
+    return passed !== null && total !== null && Number(passed[1]) > 0 && passed[1] === total[1];
+  }
+
+  const jestLine = lines.find((line) => /^\s*Tests:\s/iu.test(line));
+  if (jestLine) {
+    const passed = jestLine.match(/\b(\d+)\s+passed\b/iu);
+    const total = jestLine.match(/\b(\d+)\s+total\b/iu);
+    return passed !== null && total !== null && Number(passed[1]) > 0 && passed[1] === total[1];
+  }
+
+  const bunPass = findCount(lines, /^\s*(\d+)\s+pass(?:ed)?\b/iu);
+  const bunRun = lines
+    .map((line) => line.match(/^\s*Ran\s+(\d+)\s+tests?\s+across\s+(\d+)\s+files?\b/iu))
+    .find((match) => match !== null);
+  return bunPass !== undefined && bunRun !== undefined && bunPass > 0 && bunPass === Number(bunRun[1]);
+}
+
+function hasNonPassMetadata(output: string): boolean {
+  return output.split(/\r?\n/u).some((line) =>
+    /warning|deprecated/iu.test(line) || hasPositiveMetadataCount(line),
+  );
+}
+
+function hasPositiveMetadataCount(line: string): boolean {
+  return (
+    /\b(?:skipped|skip|todo|cancelled)\s+[1-9]\d*\b/iu.test(line) ||
+    /\b[1-9]\d*\s+(?:skipped|skip|todo|cancelled)\b/iu.test(line) ||
+    /\b(?:skipped|skip|todo|cancelled)\s*\(\s*[1-9]\d*\s*\)/iu.test(line) ||
+    /\b(?:skipped|skip|todo|cancelled)\s*[:=]\s*[1-9]\d*\b/iu.test(line)
+  );
+}
+
+function findCount(lines: readonly string[], pattern: RegExp): number | undefined {
+  for (const line of lines) {
+    const match = line.match(pattern);
+    if (match) return Number(match[1]);
+  }
+  return undefined;
+}
+
 function outputSignalsFailure(output: string): boolean {
-  return output.split(/\r?\n/u).some((line) => isFailureMarker(line) || isFailureSummary(line));
+  return output.split(/\r?\n/u).some((line) =>
+    isFailureMarker(line) ||
+    isFailureSummary(line) ||
+    /^\s*(?:Test\s+Files|Test\s+Suites|Tests?)\s*:?.*\b[1-9]\d*\s+(?:fail(?:ed)?|failures?)\b/iu.test(line) ||
+    /^\s*Snapshots?\s*:?.*\b[1-9]\d*\s+(?:fail(?:ed)?|failures?)\b/iu.test(line) ||
+    /^\s*[1-9]\d*\s+(?:fail(?:ed)?|failures?)\b/iu.test(line),
+  );
 }
 
 function pruneFailureOutput(output: string): string {

@@ -90,7 +90,7 @@ test("the shared projection marks unchanged or unsupported output without creati
   );
 });
 
-test("the context projection trims a successful model bash test result", () => {
+test("the context projection trims a verified successful model bash test result", () => {
   const messages = [bashToolCall("call-1", "npm test"), bashToolResult("call-1", successfulNodeTest)];
 
   const result = pruneTestContext(messages);
@@ -99,10 +99,144 @@ test("the context projection trims a successful model bash test result", () => {
   assert.equal((messages[1] as { content: Array<{ text: string }> }).content[0]!.text, successfulNodeTest);
 });
 
+test("an unrecognized zero-exit output is not presented as passed tests", () => {
+  const output = "runner completed without a test summary";
+  const projection = projectTestOutput({
+    command: "npm test",
+    output,
+    exitCode: 0,
+    cancelled: false,
+    truncated: false,
+  });
+
+  assert.deepEqual(projection, { original: output, model: output, changed: false });
+});
+
+test("recognized Node TAP, Vitest, Jest, and Bun summaries can be projected", () => {
+  const cases = [
+    ["ℹ tests 1\nℹ pass 1\nℹ fail 0", "npm test"],
+    ["Test Files  1 passed (1)\nTests       1 passed (1)", "npm test"],
+    ["Test Suites: 1 passed, 1 total\nTests: 1 passed, 1 total", "npm test"],
+    ["1 pass\nRan 1 tests across 1 files", "npm test"],
+  ] as const;
+
+  for (const [output, command] of cases) {
+    const projection = projectTestOutput({
+      command,
+      output,
+      exitCode: 0,
+      cancelled: false,
+      truncated: false,
+    });
+    assert.equal(projection?.model, "All tests passed");
+    assert.equal(projection?.changed, true);
+  }
+});
+
+test("failure summaries block a success projection even with a zero exit code", () => {
+  const cases = [
+    "Test Files  1 failed | 1 passed (2)\nTests       1 failed | 1 passed (2)",
+    "1 pass\n1 fail",
+    "1 pass",
+  ];
+
+  for (const output of cases) {
+    const projection = projectTestOutput({
+      command: "npm test",
+      output,
+      exitCode: 0,
+      cancelled: false,
+      truncated: false,
+    });
+    assert.notEqual(projection?.model, "All tests passed");
+  }
+});
+
+test("warnings and nonzero metadata on mixed lines remain visible", () => {
+  for (const output of [
+    "1 pass\nwarning: skip 0",
+    "1 pass\nℹ skipped 0 todo 1",
+    "ℹ tests 1\nℹ pass 1\nℹ fail 0\nskipped: 1",
+    "ℹ tests 1\nℹ pass 1\nℹ fail 0\ntodo: 1",
+    "ℹ tests 1\nℹ pass 1\nℹ fail 0\ncancelled: 1",
+  ]) {
+    const projection = projectTestOutput({
+      command: "npm test",
+      output,
+      exitCode: 0,
+      cancelled: false,
+      truncated: false,
+    });
+    assert.deepEqual(projection, { original: output, model: output, changed: false });
+  }
+});
+
+test("incomplete or inconsistent summaries are not presented as passed tests", () => {
+  const cases = [
+    "ℹ tests 2\nℹ pass 1\nℹ fail 0",
+    "Tests: 1 passed, 2 total",
+    "Tests: 1 passed, 1 failure, 1 total",
+    "Test Files  1 passed (1)\nTests       1 passed | 1 skipped (2)",
+    "Test Files  1 passed (1)\nTests       1 passed | 1 fail (1)",
+    "1 pass\nRan 2 tests across 1 files",
+    "ℹ tests 1\nℹ pass 1\nℹ fail 0\nSnapshots: 1 failed",
+  ];
+
+  for (const output of cases) {
+    const projection = projectTestOutput({
+      command: "npm test",
+      output,
+      exitCode: 0,
+      cancelled: false,
+      truncated: false,
+    });
+    assert.deepEqual(projection, { original: output, model: output, changed: false });
+  }
+});
+
+test("a zero-test summary is not presented as passed tests", () => {
+  const output = [
+    "ℹ tests 0",
+    "ℹ pass 0",
+    "ℹ fail 0",
+    "ℹ skipped 0",
+    "ℹ todo 0",
+  ].join("\n");
+  const projection = projectTestOutput({
+    command: "npm test",
+    output,
+    exitCode: 0,
+    cancelled: false,
+    truncated: false,
+  });
+
+  assert.deepEqual(projection, { original: output, model: output, changed: false });
+});
+
+test("skipped, todo, and warning details remain visible after a passing test run", () => {
+  const output = [
+    "ℹ tests 2",
+    "ℹ pass 1",
+    "ℹ fail 0",
+    "ℹ skipped 1",
+    "ℹ todo 0",
+    "warning: test environment fallback enabled",
+  ].join("\n");
+  const projection = projectTestOutput({
+    command: "npm test",
+    output,
+    exitCode: 0,
+    cancelled: false,
+    truncated: false,
+  });
+
+  assert.deepEqual(projection, { original: output, model: output, changed: false });
+});
+
 test("the context projection trims npm run test without parsing runner noise", () => {
   const result = pruneTestContext([
     bashToolCall("call-1", "npm run test -- --reporter=spec"),
-    bashToolResult("call-1", "all test output\nℹ fail 0\nℹ duration_ms 10"),
+    bashToolResult("call-1", "all test output\nℹ tests 1\nℹ pass 1\nℹ fail 0\nℹ duration_ms 10"),
   ]);
 
   assert.equal(
@@ -152,7 +286,7 @@ test("compound model bash commands are not pruned", () => {
 test("quoted shell operators remain arguments of an independent model bash test", () => {
   const result = pruneTestContext([
     bashToolCall("call-1", 'npm test -- --grep "a && b"'),
-    bashToolResult("call-1", "runner output"),
+    bashToolResult("call-1", successfulNodeTest),
   ]);
 
   assert.equal((result[1] as { content: Array<{ text: string }> }).content[0]!.text, "All tests passed");
@@ -165,6 +299,17 @@ test("command substitutions inside double-quoted arguments are not pruned", () =
     bashToolResult("call-1", output),
     bashToolCall("call-2", 'npm test -- --grep "`printf substitution`"'),
     bashToolResult("call-2", output),
+  ];
+
+  const result = pruneTestContext(messages);
+
+  assert.deepEqual(result, messages);
+});
+
+test("an errored host result is not presented as successful with a zero status", () => {
+  const messages = [
+    bashToolCall("call-1", "npm test"),
+    bashToolResult("call-1", `${successfulNodeTest}\n\nCommand exited with code 0`, { isError: true }),
   ];
 
   const result = pruneTestContext(messages);
