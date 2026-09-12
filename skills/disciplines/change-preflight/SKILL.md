@@ -1,33 +1,44 @@
 ---
 name: change-preflight
-description: Use before independent review or commit — prepare the current Task's active changes as a scoped, clean, freshly verified Review Surface.
+description: Use before independent review or commit — perform a safe, read-only readiness check of the current change and publish a fixed Review Surface.
 ---
 
 # Change Preflight
 
-Prepare material Task changes for independent review or commit. For a local wording-only instruction change outside the material Task boundary, apply only bounded inspection and verification; do not create a Task solely for preflight. This is an author-side readiness gate: it may clean residue created by the active change, but it does not review historical code or start unrelated refactoring.
+Prepare material Task changes for independent review or commit. For a local wording-only instruction change outside the material Task boundary, apply only bounded inspection and verification; do not create a Task solely for preflight. This is an author-side readiness gate with safe autonomy: it starts read-only, never touches unknown or user-owned content, and may handle only strongly proven, non-sensitive, recoverable residue from the current run.
 
-## 1. Pin the Active Change
+## 1. Pin the Review Surface Without Mutation
 
-Classify the change per `principles.md` Project Record Authority: for material changes, read the active Task Record and capture the complete working surface; otherwise inspect the complete file and applicable surrounding context without creating a Task Record. During final lifecycle closure after the completed Task Record is cleared, use the accepted Requirements frozen in the prior Review Surface instead of reconstructing or inventing them:
+Classify the target per `principles.md` Project Record Authority:
 
-- committed changes since the agreed base, when applicable;
-- staged and unstaged changes;
-- untracked files that belong to the Task.
+- **Immutable committed target:** resolve the target and base OIDs, and use their committed diff as the Review Surface. Unrelated dirty worktree content is an observation outside that surface and does not block review.
+- **Mutable Task surface:** read the active Task Record and capture all committed changes since the agreed base, staged and unstaged changes, and untracked files that belong to the Task.
+- **Final lifecycle closure:** after the Task Record has been cleared, use the accepted Requirements frozen in the prior Review Surface instead of reconstructing or inventing them. If a commit clears its Task Record, inspect the parent or frozen packet for those Requirements.
 
-Start with bounded summaries: `git status --short`, `git diff --stat`, `git diff --cached --stat`, and `git diff --check`. Expand to a detailed diff only when scope, ownership, or semantics remain unclear, and then target the specific file or hunk. Do not default to full commit metadata or unrestricted historical diffs. Inspect all staged, unstaged, and in-scope untracked content; output minimization must not omit evidence needed to establish the complete Review Surface. If a modified file cannot be attributed to the active Task or changed since it was last inspected, stop and ask instead of cleaning or reverting it.
+Start with bounded, read-only summaries: `git status --short`, `git diff --stat`, `git diff --cached --stat`, and `git diff --check`. Expand to a detailed diff only when scope, ownership, or semantics remain unclear, and then target the specific file or hunk. Do not default to full commit metadata or unrestricted historical diffs.
 
-## 2. Clean Only the Current Change
+Classify each staged, unstaged, and untracked path as in-scope, out-of-scope, or unknown. Continue without asking when the classification is evidenced and the out-of-scope content cannot affect the pinned surface. Return `BLOCKED` and ask only when ownership is unknown and could affect the surface, the fixed point does not resolve, or the Requirements source cannot be established.
 
-Remove or fix residue introduced by the active change:
+## 2. Safe Autonomous Handling
 
-- temporary files, throwaway harnesses, generated logs, and debug instrumentation;
-- imports, variables, functions, or comments made obsolete by the change;
-- accidental formatting, type, lint, or build errors introduced by the change;
-- obvious duplication contained within newly added or modified logic;
-- unintended files or sensitive material in the change surface.
+Preflight is read-only by default. It must not directly modify user files, delete ordinary untracked files, change semantic code or tests, commit, or rewrite Git history.
 
-Do not modify pre-existing dead code, historical duplication, unrelated tests, public interfaces, or module boundaries. Report those separately; use `code-cleanup` only after the user or an approved maintenance Task defines the scope.
+A safe autonomous action is allowed only when all conditions hold:
+
+- the outer flow supplies a `run-id` and a creation ledger proving the current run created the residue;
+- the item is non-sensitive, non-semantic, and recoverable;
+- the action does not touch an existing user-owned or unknown path; and
+- the recovery or quarantine step succeeds before the original path is changed.
+
+Apply the narrowest handling:
+
+- disposable residue in a dedicated temporary directory created by this run may be removed;
+- residue inside the repository must be moved, never deleted, to `/tmp/akeel/preflight/<run-id>/quarantine/`, with a manifest containing its original path and content fingerprint;
+- possible credentials, sensitive material, ordinary untracked files, ambiguous residue, and any semantic change are reported without touching them and make the result `BLOCKED` when they affect the surface.
+
+If the run ledger, non-sensitive classification, recovery artifact, quarantine move, or post-action verification is unavailable, do not modify anything. Report the required action instead. Do not use `code-cleanup` implicitly; deep cleanup remains separately authorized.
+
+Quarantine is a run-scoped recovery aid, not a project artifact. Retain it through validation and Code Review; after the Review Surface is accepted, the Task is completed, or the run is explicitly abandoned, remove only that run's quarantine. An interrupted run may leave it until its bounded retention period expires. Never expand cleanup to other run IDs or use force deletion.
 
 ## 3. Check Readiness
 
@@ -36,8 +47,7 @@ Do not modify pre-existing dead code, historical duplication, unrelated tests, p
 - Documentation has been synchronized when behavior, architecture, commands, records, or references changed.
 - Applicable specialized gates, including security review, have completed without unresolved blocking findings.
 - Relevant tests, typechecking, build, and repository checks were run after the final modification. Run any missing or stale checks now.
-
-If preflight changes a file, invalidate earlier evidence affected by that file and rerun the applicable checks.
+- If safe autonomous handling changed anything, rerun all checks affected by that change before publishing `READY`.
 
 ## 4. Publish the Result
 
@@ -45,7 +55,7 @@ Return one status:
 
 ### READY
 
-Name the pinned change surface, cleanup performed, exact verification commands and results, documentation status, specialized-gate status, and any non-blocking observations.
+Name the pinned target and base OIDs, complete path surface, Requirements source and version, exact verification commands and results, documentation and specialized-gate status, out-of-scope observations, and any safe autonomous handling performed. State explicitly that no other content was modified.
 
 ### BLOCKED
 
@@ -53,4 +63,4 @@ For each blocker, name the evidence, the required action, and which check must b
 
 ## Boundary
 
-Preflight does not commit, perform independent review, dispose review findings, or undertake deep cleanup. The outer workflow or Task Owner owns those actions.
+Preflight does not perform independent review, dispose review findings, undertake deep cleanup, or touch content it cannot prove the current run owns. The outer workflow or Task Owner owns explicit cleanup, commit, and final disposition.

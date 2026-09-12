@@ -716,23 +716,25 @@ Tilde expansion 仅适用于受支持 Shell word 中位于开头、未引用、�
 
 **Reversal surface:** engineering
 
-**Decision:** 提交前准备、独立 finding 生成与深度维护保持为三个职责，不合并。`change-preflight` 是模型可按需加载的 discipline，收敛宽泛的提交前自审：它只处理当前 Task 的活动变更，自动移除该变更产生的临时文件、调试残留与 orphan，核对 scope、文档、最终验证和适用的专项门禁，并交付 review-ready 或 blocked 状态；它不扫描或修复历史代码卫生与架构问题。
+**Decision:** 提交前准备、独立 finding 生成与深度维护保持为三个职责，不合并。`change-preflight` 是模型可按需加载的 discipline，默认以只读方式固定当前变更、核对 scope、文档、最终验证和适用的专项门禁，并交付 `READY` 或 `BLOCKED`。它不得触碰未知或用户拥有的内容；仅在外层流程提供当前运行的 `run-id` 与创建记录，且残留非敏感、非语义、可恢复时，才可安全自治处理：专用临时目录中的本次运行残留可清理，仓库内残留只能移入仓外 quarantine。它不扫描或修复历史代码卫生与架构问题。
 
-`code-review` 保持独立、只读的 discipline。它把 branch commits、staged、unstaged 与范围内 untracked 内容固定为同一不可变 Review Surface，分别执行 Engineering 与 Requirements 审查；reviewer 只交付证据化 findings，Task Owner 持有 finding disposition，审查期间或修复后 Review Surface 变化会使旧结果失效。
+`code-review` 保持独立、只读的 discipline。明确提交目标可直接以目标与基准 OID 固定不可变 Review Surface，不因范围外的脏工作区阻断；mutable task surface 则消费未过期的只读 `READY` 结果，并把 branch commits、staged、unstaged 与范围内 untracked 内容固定为同一不可变 Review Surface。两种 surface 都分别执行 Engineering 与 Requirements 审查；reviewer 只交付证据化 findings，Task Owner 持有 finding disposition，审查期间或修复后 Review Surface 变化会使旧结果失效。
 
 `code-cleanup` 只在用户明确指定范围或已批准 maintenance scope 时执行行为保持型深度维护；阶段结束本身不授予扫描或修改历史代码的权限。它以绿色基线开始，无法证明外部 export 不可达时只报告不删除，测试合并保留场景诊断与追踪语义，公共接口或模块职责变化转入模块设计流程。清理完成后重新同步文档、验证并进入 preflight/review；commit 由外层 workflow 或 Task Owner 决定。
 
-**Why:** 三者分别拥有 current-change preparation、independent finding generation 和 approved-scope mutation 三种不同输入、权限与产物。提交前自动清理是必要守卫，但其授权只来自当前已批准变更；把仓库级 dead-code、重复、测试与模块调整同时自动化会扩大 scope 并使既有验证和审查失效。将自动卫生收敛进 preflight，可保留低成本提交门禁而不新增第四个 skill；固定 Review Surface 与只读 reviewer 则防止审查对象漂移和审查/修复角色混合。
+**Why:** 三者分别拥有 current-change preparation、independent finding generation 和 approved-scope mutation 三种不同输入、权限与产物。原设计把当前变更卫生收敛进 preflight，是为了保留低成本提交门禁并避免浪费独立审查上下文；但模型可调用 skill 没有天然事务、备份或 provenance hook，自动删除 untracked 内容会把恢复风险和认知负担转给用户。只读优先、强 provenance 的安全自治和分层 Review Surface 保留自动化收益，同时把不可逆或归属不明的动作挡在用户确认之外。
 
-**Impact:** `change-preflight` 承载独特的提交前守卫；通用 fresh-evidence 规则仍只由 `principles.md §6` 定义，动作特有核对留在 preflight。`implement-work` 在最终 commit 前编排文档同步、验证、适用的专项审查、preflight 与独立 code review，任何后续修改重新进入该闭环。技能来源映射、调用引用和 validator 合同统一使用现行名称。
+**Impact:** `change-preflight` 承载只读优先的提交前守卫和受限安全自治；quarantine 是本次运行的仓外临时恢复工件，保留到验证与 Code Review 完成、Review Surface 接受、Task 完成或运行明确放弃，异常运行按有界保留期清理。通用 fresh-evidence 规则仍只由 `principles.md §6` 定义，动作特有核对留在 preflight。`implement-work` 在最终 commit 前编排文档同步、验证、适用的专项审查、preflight 与独立 code review；明确提交可由固定 OID 直接进入只读 code review。任何相关修改重新进入该闭环。技能来源映射、调用引用和 validator 合同统一使用现行名称。
 
 **Rejected:**
 
 - **合并为 `review-work`：** 会混合作者侧修改、独立只读审查和显式深度维护，并形成互斥模式与不完整正文消费。
 - **保留 `code-audit` 名称：** 名称暗示宽泛或独立审计，不能准确表达当前变更限定的作者侧 readiness gate。
 - **提交前自动运行完整 `code-cleanup`：** 当前 Task 不授权修改历史 dead code、既有测试或模块边界，且广泛清理会扩大并重置 Review Surface。
-- **直接删除提交前独立守卫：** `implement-work` 与独立提交准备都需要低成本 readiness gate；把所有卫生问题留给 Herdr reviewer 会浪费独立审查上下文。
-- **新增 `change-cleanup`：** 当前变更卫生是 preflight 的必要阶段，不产生独立触发或交付物，拆出会增加浅 skill。
+- **工作区一脏就阻断所有审查：** 明确提交的 OID 已提供不可变审查面，范围外脏内容不应把整理负担转给用户；只有可能影响范围的归属不明内容才阻断。
+- **让 Preflight 默认可写：** 模型缺少天然事务和 provenance hook，默认写入会使只读审查前置阶段承担不可逆风险；安全自治必须是满足全部条件的窄例外。
+- **把所有清理都交给用户：** 会牺牲低成本自动化；当前运行明确拥有的非敏感可恢复残留可安全自治处理。
+- **新增 `change-cleanup`：** 当前变更卫生仍是 preflight 的必要检查，不产生独立触发或交付物；深度清理继续由 `code-cleanup` 承载。
 - **把 `code-cleanup` 改为手动 workflow：** 明确自然语言请求或已批准 maintenance scope 已提供可判定触发；当前没有必须增加 `/skill:` 调用摩擦的证据。
 
 **Out of Scope:**

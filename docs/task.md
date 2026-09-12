@@ -6,7 +6,7 @@
 
 **Kind:** refactor
 
-**Status:** in-progress
+**Status:** verified
 
 ### Goal
 
@@ -45,10 +45,10 @@
 
 **Acceptance Criteria:**
 
-- [ ] Preflight 明确默认只读和禁止触碰未知/用户内容。
-- [ ] Preflight 明确提交目标、mutable task surface、分类、quarantine 生命周期和失败阻断条件。
-- [ ] 相关 skills 与 D-080/CONTEXT 的职责描述一致。
-- [ ] skill validator 覆盖关键安全合同。
+- [x] Preflight 明确默认只读和禁止触碰未知/用户内容。
+- [x] Preflight 明确提交目标、mutable task surface、分类、quarantine 生命周期和失败阻断条件。
+- [x] 相关 skills 与 D-080/CONTEXT 的职责描述一致。
+- [x] skill validator 覆盖关键安全合同。
 
 **Files and Seams:**
 
@@ -71,13 +71,13 @@
 
 ### Evidence
 
-- D-080 当前要求 Preflight 自动移除残留，但未规定只读默认、创建 provenance、quarantine 或敏感内容边界。
+- 原 D-080 要求 Preflight 自动移除残留，但未规定只读默认、创建 provenance、quarantine 或敏感内容边界。
 - `code-review` 当前在固定审查面建立前无条件要求 `READY`，无法区分不可变提交目标和 mutable task surface。
 - 本次会话确认用户优先接受安全自治，但不接受把不可逆恢复负担转给用户。
 
 ### Durable Updates
 
-- [ ] D-080 已改为安全自治的 Preflight 与分层 Review Surface 合同。
-- [ ] `CONTEXT.md` 已反映只读优先和提交目标/工作区的分界。
+- [x] D-080 已改为安全自治的 Preflight 与分层 Review Surface 合同。
+- [x] `CONTEXT.md` 已反映只读优先和提交目标/工作区的分界。
 
 ## T-097: 待创建

@@ -91,6 +91,30 @@ test("review readiness skills publish distinct invocation and authority contract
   assert.doesNotMatch(cleanup, /at the end of a development phase/);
 });
 
+test("preflight and review publish safe-autonomy surface contracts", () => {
+  const preflight = readFileSync(
+    new URL("../skills/disciplines/change-preflight/SKILL.md", import.meta.url),
+    "utf8",
+  );
+  const review = readFileSync(
+    new URL("../skills/disciplines/code-review/SKILL.md", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(preflight, /read-only/i);
+  assert.match(preflight, /never (?:modify|delete|commit)/i);
+  assert.match(preflight, /run-id/i);
+  assert.match(preflight, /quarantine/i);
+  assert.match(preflight, /sensitive/i);
+  assert.match(preflight, /BLOCKED/);
+  assert.match(preflight, /dedicated.*temporary|専用.*临时/i);
+  assert.doesNotMatch(preflight, /automatically remove|自动移除/i);
+
+  assert.match(review, /immutable committed|不可变.*提交/i);
+  assert.match(review, /mutable task|mutable.*surface/i);
+  assert.match(review, /read-only.*READY|READY.*read-only/i);
+});
+
 test("delegated review and grilling publish fail-closed owner cleanup contracts", () => {
   const review = readFileSync(
     new URL("../skills/disciplines/code-review/SKILL.md", import.meta.url),

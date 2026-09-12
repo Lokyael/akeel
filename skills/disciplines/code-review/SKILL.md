@@ -7,11 +7,11 @@ description: 'Use when the user wants an independent review of a branch, PR, or 
 
 Independently review one fixed change set. Reviewers report evidence-backed findings; they do not edit the reviewed files or decide whether findings are accepted.
 
-## 1. Accept a READY Review Surface
+## 1. Accept a Fixed Review Surface
 
-Require a current `READY` result from `/skill:change-preflight` and the exact change surface it pinned. If the result is missing, blocked, or stale, stop and ask the Task Owner to complete preflight; the reviewer does not perform cleanup.
+The Task Owner coordinator captures one bounded review packet before delegation. For an immutable committed target, resolve the target and base OIDs and record the committed diff directly; a dirty worktree outside that surface does not block review. For a mutable task surface, require a current `READY` result from the read-only `/skill:change-preflight` and consume the exact surface it pinned.
 
-The Task Owner coordinator then captures one bounded review packet before delegation. For a branch or PR, record the fixed point and committed diff from its merge base to `HEAD`. For task-in-progress work, also include:
+For a branch or PR, record the fixed point and committed diff from its merge base to `HEAD`. For task-in-progress work, also include:
 
 - staged changes;
 - unstaged changes;
@@ -20,7 +20,7 @@ The Task Owner coordinator then captures one bounded review packet before delega
 - the authoritative Task Record or other Requirements source;
 - repository standards that govern the changed paths.
 
-If the fixed point does not resolve, the change set is empty, untracked content cannot be bounded, or the Requirements source is ambiguous, stop and ask. Both review axes must consume the same packet rather than rereading a moving working tree independently.
+If the fixed point does not resolve, the change set is empty, untracked content cannot be bounded, or the Requirements source is ambiguous, stop and ask. Both review axes must consume the same immutable packet rather than rereading a moving working tree independently. The reviewer never performs cleanup or mutates the surface.
 
 ## 2. Run Independent Axes
 

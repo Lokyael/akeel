@@ -21,8 +21,8 @@ Iterate with focused tests, then prepare the complete change in this order:
 1. Run `/skill:doc-sync` so code, user documentation, current architecture, and Project Records agree.
 2. Run the relevant tests, typechecking, build, and full repository validation on that resulting surface.
 3. Run `/skill:security-review` when the changed surface triggers its security scope, and resolve every blocking finding.
-4. Use `/skill:change-preflight` to clean only residue introduced by the active change and publish `READY` with its pinned surface. If preflight modifies anything, return to step 1; earlier documentation, verification, and specialized-review evidence is stale for the changed content.
-5. Use `/skill:code-review` for independent Engineering and Requirements findings against that unchanged READY Review Surface.
+4. Use `/skill:change-preflight` for a read-only readiness check and publish `READY` with its pinned surface. It may autonomously handle only current-run-owned, non-sensitive, recoverable residue under its quarantine contract; if it changes anything, return to step 1 and refresh affected evidence.
+5. Use `/skill:code-review` for independent Engineering and Requirements findings against that unchanged READY Review Surface. An immutable committed target may be reviewed directly from its fixed OIDs without a separate mutable-worktree readiness gate.
 
 The Task Owner disposes every finding. Any accepted fix returns to step 1 and repeats documentation synchronization, fresh validation, applicable specialized review, preflight, and independent code review; do not treat an earlier result as covering changed content.
 
