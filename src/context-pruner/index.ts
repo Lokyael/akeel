@@ -196,37 +196,131 @@ function containsShellOperator(command: string): boolean {
   return quote !== undefined;
 }
 
+type TestSummary = Readonly<{
+  readonly total?: number;
+  readonly passed?: number;
+  readonly failed?: number;
+  readonly skipped?: number;
+  readonly todo?: number;
+  readonly cancelled?: number;
+}>;
+
 function hasVerifiedTestSuccess(output: string): boolean {
   if (hasNonPassMetadata(output) || outputSignalsFailure(output)) return false;
 
   const lines = output.split(/\r?\n/u);
+  const tapSummaries = parseTapSummaries(lines);
+  if (tapSummaries !== undefined) return allSummariesPass(tapSummaries);
 
-  const tapTests = findCount(lines, /^\s*ℹ\s+tests\s+(\d+)\b/u);
-  if (tapTests !== undefined) {
-    const tapPass = findCount(lines, /^\s*ℹ\s+pass\s+(\d+)\b/u);
-    const tapFail = findCount(lines, /^\s*ℹ\s+fail\s+(\d+)\b/u);
-    return tapTests > 0 && tapPass === tapTests && tapFail === 0;
+  const vitestSummaries = parseVitestSummaries(lines);
+  if (vitestSummaries !== undefined) return allSummariesPass(vitestSummaries);
+
+  const jestSummaries = parseJestSummaries(lines);
+  if (jestSummaries !== undefined) return allSummariesPass(jestSummaries);
+
+  const bunSummaries = parseBunSummaries(lines);
+  return bunSummaries !== undefined && allSummariesPass(bunSummaries);
+}
+
+function allSummariesPass(summaries: readonly TestSummary[]): boolean {
+  return summaries.length > 0 && summaries.every((summary) =>
+    summary.total !== undefined &&
+    summary.passed !== undefined &&
+    summary.total > 0 &&
+    summary.passed === summary.total &&
+    (summary.failed ?? 0) === 0 &&
+    (summary.skipped ?? 0) === 0 &&
+    (summary.todo ?? 0) === 0 &&
+    (summary.cancelled ?? 0) === 0,
+  );
+}
+
+function parseTapSummaries(lines: readonly string[]): readonly TestSummary[] | undefined {
+  const byIndent = new Map<number, TestSummary[]>();
+  const current = new Map<number, TestSummary>();
+
+  for (const line of lines) {
+    const match = line.match(/^(\s*)ℹ\s+(tests|pass|fail|skipped|todo|cancelled)\s+(\d+)\b/u);
+    if (!match) continue;
+
+    const indent = match[1]!.length;
+    const field = match[2]! as "tests" | "pass" | "fail" | "skipped" | "todo" | "cancelled";
+    const value = toSafeCount(match[3]!);
+    if (field === "tests") {
+      const summary: TestSummary = { total: value };
+      const summaries = byIndent.get(indent) ?? [];
+      summaries.push(summary);
+      byIndent.set(indent, summaries);
+      current.set(indent, summary);
+      continue;
+    }
+
+    const summary = current.get(indent);
+    if (!summary) {
+      byIndent.set(indent, [...(byIndent.get(indent) ?? []), {}]);
+      continue;
+    }
+    current.set(indent, { ...summary, [field === "pass" ? "passed" : field]: value });
+    const summaries = byIndent.get(indent)!;
+    summaries[summaries.length - 1] = current.get(indent)!;
   }
 
-  const vitestLine = lines.find((line) => /^\s*Tests\s+(?!:)/iu.test(line));
-  if (vitestLine) {
-    const passed = vitestLine.match(/\b(\d+)\s+passed\b/iu);
-    const total = vitestLine.match(/\((\d+)\)\s*$/u);
-    return passed !== null && total !== null && Number(passed[1]) > 0 && passed[1] === total[1];
+  if (byIndent.size === 0) return undefined;
+  let topLevelIndent = Number.POSITIVE_INFINITY;
+  for (const indent of byIndent.keys()) {
+    topLevelIndent = Math.min(topLevelIndent, indent);
   }
+  return byIndent.get(topLevelIndent)!;
+}
 
-  const jestLine = lines.find((line) => /^\s*Tests:\s/iu.test(line));
-  if (jestLine) {
-    const passed = jestLine.match(/\b(\d+)\s+passed\b/iu);
-    const total = jestLine.match(/\b(\d+)\s+total\b/iu);
-    return passed !== null && total !== null && Number(passed[1]) > 0 && passed[1] === total[1];
-  }
+function parseVitestSummaries(lines: readonly string[]): readonly TestSummary[] | undefined {
+  const summaryLines = lines.filter((line) => /^\s*Tests\s+(?!:)/iu.test(line));
+  if (summaryLines.length === 0) return undefined;
+  return summaryLines.map((line) => ({
+    total: numberFromMatch(line.match(/\((\d+)\)\s*$/u)),
+    passed: numberFromMatch(line.match(/\b(\d+)\s+passed\b/iu)),
+    failed: numberFromMatch(line.match(/\b(\d+)\s+failed\b/iu)),
+    skipped: numberFromMatch(line.match(/\b(\d+)\s+skipped\b/iu)),
+    todo: numberFromMatch(line.match(/\b(\d+)\s+todo\b/iu)),
+  }));
+}
 
-  const bunPass = findCount(lines, /^\s*(\d+)\s+pass(?:ed)?\b/iu);
-  const bunRun = lines
+function parseJestSummaries(lines: readonly string[]): readonly TestSummary[] | undefined {
+  const summaryLines = lines.filter((line) => /^\s*Tests:\s/iu.test(line));
+  if (summaryLines.length === 0) return undefined;
+  return summaryLines.map((line) => ({
+    total: numberFromMatch(line.match(/\b(\d+)\s+total\b/iu)),
+    passed: numberFromMatch(line.match(/\b(\d+)\s+passed\b/iu)),
+    failed: numberFromMatch(line.match(/\b(\d+)\s+failed\b/iu)),
+    skipped: numberFromMatch(line.match(/\b(\d+)\s+skipped\b/iu)),
+    todo: numberFromMatch(line.match(/\b(\d+)\s+todo\b/iu)),
+  }));
+}
+
+function parseBunSummaries(lines: readonly string[]): readonly TestSummary[] | undefined {
+  const passes = lines
+    .map((line) => numberFromMatch(line.match(/^\s*(\d+)\s+pass(?:ed)?\b/iu)))
+    .filter((value): value is number => value !== undefined);
+  const runs = lines
     .map((line) => line.match(/^\s*Ran\s+(\d+)\s+tests?\s+across\s+(\d+)\s+files?\b/iu))
-    .find((match) => match !== null);
-  return bunPass !== undefined && bunRun !== undefined && bunPass > 0 && bunPass === Number(bunRun[1]);
+    .map((match) => match ? toSafeCount(match[1]!) : undefined)
+    .filter((value): value is number => value !== undefined);
+
+  if (passes.length === 0 && runs.length === 0) return undefined;
+  return Array.from({ length: Math.max(passes.length, runs.length) }, (_, index) => ({
+    total: runs[index],
+    passed: passes[index],
+    failed: undefined,
+  }));
+}
+
+function numberFromMatch(match: RegExpMatchArray | null): number | undefined {
+  return match ? toSafeCount(match[1]!) : undefined;
+}
+
+function toSafeCount(value: string): number | undefined {
+  const count = Number(value);
+  return Number.isSafeInteger(count) && count >= 0 ? count : undefined;
 }
 
 function hasNonPassMetadata(output: string): boolean {
@@ -242,14 +336,6 @@ function hasPositiveMetadataCount(line: string): boolean {
     /\b(?:skipped|skip|todo|cancelled)\s*\(\s*[1-9]\d*\s*\)/iu.test(line) ||
     /\b(?:skipped|skip|todo|cancelled)\s*[:=]\s*[1-9]\d*\b/iu.test(line)
   );
-}
-
-function findCount(lines: readonly string[], pattern: RegExp): number | undefined {
-  for (const line of lines) {
-    const match = line.match(pattern);
-    if (match) return Number(match[1]);
-  }
-  return undefined;
 }
 
 function outputSignalsFailure(output: string): boolean {

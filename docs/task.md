@@ -5,7 +5,7 @@
 ## T-097: 测试成功摘要的完整证据判断
 
 **Kind:** maintenance
-**Status:** draft
+**Status:** in-progress
 
 ### Goal
 

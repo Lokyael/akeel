@@ -194,6 +194,60 @@ test("incomplete or inconsistent summaries are not presented as passed tests", (
   }
 });
 
+test("a later zero-test summary is not hidden by an earlier passing summary", () => {
+  const cases = [
+    "ℹ tests 1\nℹ pass 1\nℹ fail 0\nℹ tests 0\nℹ pass 0\nℹ fail 0",
+    "Tests: 1 passed, 1 total\nTests: 0 total",
+    "Tests  1 passed (1)\nTests  0 passed (0)",
+    "1 pass\nRan 1 tests across 1 files\n0 pass\nRan 0 tests across 1 files",
+  ];
+
+  for (const output of cases) {
+    const projection = projectTestOutput({
+      command: "npm test",
+      output,
+      exitCode: 0,
+      cancelled: false,
+      truncated: false,
+    });
+    assert.deepEqual(projection, { original: output, model: output, changed: false });
+  }
+});
+
+test("a nested TAP summary does not override a valid top-level aggregate", () => {
+  const output = [
+    "  ℹ tests 0",
+    "  ℹ pass 0",
+    "  ℹ fail 0",
+    "ℹ tests 1",
+    "ℹ pass 1",
+    "ℹ fail 0",
+  ].join("\n");
+  const projection = projectTestOutput({
+    command: "npm test",
+    output,
+    exitCode: 0,
+    cancelled: false,
+    truncated: false,
+  });
+
+  assert.deepEqual(projection, { original: output, model: "All tests passed", changed: true });
+});
+
+test("numeric overflow in a summary is not treated as verified evidence", () => {
+  const count = "9".repeat(400);
+  const output = `ℹ tests ${count}\nℹ pass ${count}\nℹ fail 0`;
+  const projection = projectTestOutput({
+    command: "npm test",
+    output,
+    exitCode: 0,
+    cancelled: false,
+    truncated: false,
+  });
+
+  assert.deepEqual(projection, { original: output, model: output, changed: false });
+});
+
 test("a zero-test summary is not presented as passed tests", () => {
   const output = [
     "ℹ tests 0",
