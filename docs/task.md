@@ -5,7 +5,7 @@
 ## T-097: 测试成功摘要的完整证据判断
 
 **Kind:** maintenance
-**Status:** in-progress
+**Status:** verified
 
 ### Goal
 
@@ -38,11 +38,11 @@
 **Depends on:** none
 
 **Acceptance Criteria:**
-- [ ] 单个受支持的非零全通过摘要仍可投影为短成功消息。
-- [ ] 后续零测试、失败、不完整、冲突或层级不明摘要不会投影为无条件成功。
-- [ ] Node TAP 嵌套摘要不会被错误当作多个 top-level 运行；无法判断时保留原文。
-- [ ] 原始消息不被修改，取消、截断、非测试命令及未关联调用回归测试继续通过。
-- [ ] `npm test` 全量验证、文档校验和 TypeScript 检查通过。
+- [x] 单个受支持的非零全通过摘要仍可投影为短成功消息。
+- [x] 后续零测试、失败、不完整、冲突或层级不明摘要不会投影为无条件成功。
+- [x] Node TAP 嵌套摘要不会被错误当作多个 top-level 运行；无法判断时保留原文。
+- [x] 原始消息不被修改，取消、截断、非测试命令及未关联调用回归测试继续通过。
+- [x] `npm test` 全量验证、文档校验和 TypeScript 检查通过。
 
 **Files and Seams:**
 - Modify: `src/context-pruner/index.ts` — `projectTestOutput` 的成功证据投影
@@ -67,6 +67,6 @@
 
 ### Durable Updates
 
-- [ ] 核对 D-085、README 与 CONTEXT 对完整摘要证据边界的描述；如无新长期结论则不新增 Decision。
+- [x] 已核对 D-085、README 与 CONTEXT 对完整摘要证据边界的描述；无新长期结论，不新增 Decision。
 
 ## T-098: 待创建
