@@ -256,7 +256,8 @@ function parseTapSummaries(lines: readonly string[]): readonly TestSummary[] | u
       byIndent.set(indent, [...(byIndent.get(indent) ?? []), {}]);
       continue;
     }
-    current.set(indent, { ...summary, [field === "pass" ? "passed" : field]: value });
+    const property = field === "pass" ? "passed" : field === "fail" ? "failed" : field;
+    current.set(indent, { ...summary, [property]: value });
     const summaries = byIndent.get(indent)!;
     summaries[summaries.length - 1] = current.get(indent)!;
   }
