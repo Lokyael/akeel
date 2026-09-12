@@ -8,11 +8,11 @@
 - **Scope:** 仅评估 scratch 的物理隔离、独立生命周期和本机用户间可见性；不恢复旧 `staging/**` 规则，不改变 `stagingRoot` runtime 语义，不处理父子代理策略传播或资源自动回收。
 - **Revisit condition:** delegated child 场景出现共享临时目录 symlink 攻击实证，或用户要求 scratch 内容不可被本机其他用户读取。
 
-## C-009: delegated child 的有界验证执行能力
+## C-009: delegated child 的任务能力分层与风险边界
 
-- **Why Not Now:** 非交互 child 获得宽泛 execute 能力会形成任意代码执行授权，`node -e` 等形态也不能由命令名称分类提供边界；当前没有证据表明 delegated child 因无法运行验证而使闭环不可用。
-- **Scope:** 只评估 child 为验证既有结果所需的最小、可证明执行能力；不恢复旧 T0/T1/T2 tier，不预设由 AKeel Policy、Herdr 或其他执行面实现，也不把 worktree 隔离解释为执行授权。
-- **Revisit condition:** 真实 delegated workflow 证明 child 无法运行必要验证并因此不能提供可审计结果，且现有同步 Owner 验证不能合理替代。
+- **Why Not Now:** 当前没有真实 delegated workflow 证明现有能力不足以完成任务，或证明 child 必须自行执行验证才能形成可审计结果；宽泛 execute 仍可能变成任意代码执行授权，`node -e` 等形态不能因“验证”名义获得能力。
+- **Scope:** 评估按任务类型授予最小能力：只读调查、受限修改和有界验证分别处理；删除、发布和任意执行不作为普通 child 能力。子代理能力不得超过父会话，授权关系不明时不得放宽；不预设 T0/T1/T2、角色映射、策略传播或具体执行面，也不把 worktree 隔离解释为执行授权。
+- **Revisit condition:** 真实 delegated workflow 证明当前能力分层无法完成必要任务或形成可审计结果，且现有同步 Owner 验证或其他受限替代不能合理闭环；或用户明确要求重新评估该能力边界。
 
 ## C-010: delegated child 的 durable 文档写保护
 
@@ -71,15 +71,6 @@
 - **Out of Scope:** 网络副作用授权由 C-039 评估；参数级隐式执行由 C-027 评估；`.env` 受管面、历史敏感路径和 OS confinement 分别由 C-016/C-035/C-036、C-026 与 C-021 评估，不在本记录内组成统一“多维策略”。
 - **Revisit condition:** 真实复杂仓库反复出现需要项目局部限制、且全局 policy 无法合理表达的误操作风险；或用户明确要求只收紧、不放宽的项目级 Policy overlay。
 
-## C-024: 子代理策略管理与父子权限收紧
-
-> 本条只记录未来探索方向，不构成当前需求、路线图、架构采纳或实施承诺；当前不创建 Task、不修改代码，也不启动任何实现。
-
-- **Why Not Now:** 当前 AKeel 不注册或管理 subagent tier/parent-tier，Pi host 也尚未提供可冻结的父子 Policy Snapshot 绑定合同；在缺少真实宿主 seam 时实现会把策略传播、降权和生命周期语义猜进 Access Gate。
-- **Exploration Direction:** 在 Policy Kernel 仍只消费不可变 Policy Snapshot 的前提下，探索父会话到子会话的单向权限收紧：子代理只能获得不超过父会话的策略，不能自行切换到更宽 preset；父子绑定在 runtime/adapters 创建时冻结，preset 名称和策略内容不注入模型上下文，并为无 UI、会话结束和子代理重启定义 fail-closed 行为。
-- **Revisit condition:** Pi host 提供可验证的父子会话策略 seam，或真实多代理工作流出现子代理需要独立降权、且当前全局 policy 无法表达的需求。
-- **Origin:** C-022
-
 ## C-025: Access Decision 历史差异复核清单（调查候选）
 
 > 本条保存 `c52bd1d` 重构前实现与当前 Access Decision Pipeline 的历史差异、风险和待核对问题。唯一候选事项是未来是否启动这次系统复核；清单不是功能 backlog、恢复授权、parity 目标或当前实现合同。任何实现、Decision 变更或候选迁移仍需用户在当时会话明确选择。
@@ -135,7 +126,6 @@
 
   - **Decision code and guidance taxonomy:** 旧版拥有较细的 DecisionCode、evidence kind、response kind 与 GuidanceId 映射，如 `dynamic-shell`、`compound-command`、`opaque-command`、`blocked-path`、`symlink-escape`、`profile-restriction`；当前 host-facing block code 更少，失败文案为静态 bounded reason，并新增只读策略切换提醒。候选问题：是否维持收敛后的 host 合同、恢复更细诊断，或把旧码表退役写入决策。
   - **Approval UX:** 旧版 `ask` 走 UI select 的 Allow once/Deny；当前 `ask` 走 `ui.confirm`，无 UI 时 deny，批准摘要 bounded 且 Shell 包含 literal command。候选问题：是否恢复双按钮文案或保留 host confirm 合同。
-  - **Subagent tier:** 旧版有 `subagentProfiles`、T0/T1 与 env 钳制；agent 映射遵循显式配置 > 内置映射 > `*` fallback > scratch，缺失/非法父 tier fail-closed，并通过 `PI_KEEL_PARENT_TIER` 向后代传播；当前明确不提供 AKeel 管理的 subagent tier/parent-tier。候选问题：在 C-025 中保留完整历史差异并与 C-024 的父子 Policy 候选交叉核对，不在 access-decision parity 中顺手恢复，也不以 C-024 的存在视为本项已审查。
 
 ### 测试策略与 Greenfield 迁移一致性
 

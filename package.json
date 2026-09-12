@@ -5,7 +5,7 @@
   "keywords": ["pi-package"],
   "type": "module",
   "scripts": {
-    "test": "tsx scripts/validate-docs.ts && tsx scripts/validate-skills.ts && tsc --noEmit && tsx --test \"tests/access-gate/**/*.test.ts\" \"tests/validate-docs.test.ts\" \"tests/validate-skills.test.ts\"",
+    "test": "tsx scripts/validate-docs.ts && tsx scripts/validate-skills.ts && tsc --noEmit && tsx --test \"tests/access-gate/**/*.test.ts\" \"tests/context-pruner/**/*.test.ts\" \"tests/validate-docs.test.ts\" \"tests/validate-skills.test.ts\"",
     "test:file": "tsx --test",
     "test:index": "tsx --test tests/access-gate/index.test.ts"
   },
@@ -20,7 +20,8 @@
   "pi": {
     "extensions": [
       "./src/bootstrap/index.ts",
-      "./src/access-gate"
+      "./src/access-gate",
+      "./src/context-pruner"
     ],
     "skills": [
       "./skills/disciplines",

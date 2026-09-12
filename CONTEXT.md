@@ -17,7 +17,7 @@
 - **Guidance**：从决策代码到静态 bounded host-facing 文案的封闭映射，不携带可执行 Shell。
 - **Project Record**：项目文档中的受控记录总称，分为 Candidate、Task 和 Decision。
 - **Candidate Record**：未采纳、未承诺实施的 `C-xxx` 停车记录，不构成指令或路线图。
-- **Task Record**：用户已承诺调查、设计或实施的 `T-xxx` 短期工作记录。
+- **Task Record**：用户已承诺调查、设计或实施的 `T-xxx` 短期工作记录；实施开始前或清档前以完整批准输入进入至少一个 Git 可达 checkpoint，落地后从当前树清除。
 - **Slot（待创建占位）**：承载 C/T/D 序列下一可用编号的非记录占位。
 - **Decision**：需要长期保留的架构、领域或安全取舍，记录在 `docs/decisions.md`。
 - **Reversal surface**：每条 Decision 显式声明的逆转批准面；`user-boundary` 需用户显式批准，`engineering` 可经正式生命周期 supersede。
@@ -45,13 +45,13 @@
 
 ## Architecture
 
-- `src/bootstrap/` 在 Session 启动和 compaction 后注入工程原则；通用 fresh-evidence 门禁属于该恒定面。Skills 只保留 `disciplines/` 可复用方法与 `workflows/` 端到端编排两个作者职责根。`module-design` 处理已知模块或接口设计；手动 `assess-modularity` 只发现仓库或子系统级结构摩擦并交付临时 findings。`implementation-planning` 把已批准的 Requirements 与 Design 组织为由 Plan Slices 构成的 implementation-ready Task Plan。`instruction-editing` 为用户项目提供语义保持型 instruction 编辑方法，`AGENTS.md` 为 AKeel Prompt Surface 提供本地 overlay。`implement-work` 持有实施生命周期，并在提交前编排 `change-preflight` 清理和核对当前活动变更；`code-review` 对固定 Review Surface 做独立只读审查，`code-cleanup` 只处理明确批准范围内的行为保持型深度维护。`bug-reproduction` 为难以稳定观察的技术问题建立 Reproduction Result，`systematic-debugging` 消费可用信号并以区分性实验确认根因，在授权范围内衔接 TDD 与 fix validation。Grilling 只由用户手动调用的 `grill-docs` 承载，按未决问题处理、候选方案确认、事实核对、verified candidate 交接和 Task Owner 导入的固定顺序执行。
+- `src/bootstrap/` 在 Session 启动和 compaction 后注入工程原则；`src/context-pruner/` 在构建模型 context 时无模型参与地裁剪 `npm test`/`npm run test` 的 `bashExecution` 输出，原始 session/TUI 内容保持不变。通用 fresh-evidence 门禁属于该恒定面。Skills 只保留 `disciplines/` 可复用方法与 `workflows/` 端到端编排两个作者职责根。`module-design` 处理已知模块或接口设计；手动 `assess-modularity` 只发现仓库或子系统级结构摩擦并交付临时 findings。`implementation-planning` 把已批准的 Requirements 与 Design 组织为由 Plan Slices 构成的 implementation-ready Task Plan。`instruction-editing` 为用户项目提供语义保持型 instruction 编辑方法，`AGENTS.md` 为 AKeel Prompt Surface 提供本地 overlay。`implement-work` 持有实施生命周期，并在提交前编排 `change-preflight` 清理和核对当前活动变更；`code-review` 对固定 Review Surface 做独立只读审查，`code-cleanup` 只处理明确批准范围内的行为保持型深度维护。`bug-reproduction` 为难以稳定观察的技术问题建立 Reproduction Result，`systematic-debugging` 消费可用信号并以区分性实验确认根因，在授权范围内衔接 TDD 与 fix validation。Grilling 只由用户手动调用的 `grill-docs` 承载，按未决问题处理、候选方案确认、事实核对、verified candidate 交接和 Task Owner 导入的固定顺序执行。
 - 委托按 D-075 执行上下文准入和封闭路由：Task Owner Session 保留 Authority Context；需要隔离过程上下文且结果仍由该 Owner 裁决的工作统一通过 Herdr child 同步执行，Owner 预定 artifact、等待 settle 后按路径拉取，child 不发送完成 prompt；AKeel 不维护第二套委托执行面，也不把 Herdr 声明为 runtime dependency。可独立验收的长期工作只有经用户明确授权才进入范围互斥的新 Task Owner Session。有效能力含写入或文件修改 Shell 的 delegated agent 强制进入独立 worktree，新增的并行 Owner 也必须拥有不与其他 Owner 共享的 checkout；child 不自清理，由存活 Owner 负责检查、集成与明确批准后的回收。
 - `src/access-gate/access-decision/` 是当前唯一决策实现：`core/` 负责 Pi host/config 无关的语义与策略，Linux pathname lookup 属于该语义域的外部合同；`core/program-semantics/` 负责 Git、解释器、Python 工具、uv 和 npm 族的程序分类与路径事实，Git `-C`、`--git-dir` 和 `--work-tree` 已通过 Canonical command-local cwd seam 解析，helper-capable Git 操作及 `git config` hard-deny；`adapters/` 转换 Pi 和 policy.yaml 输入，`runtime/` 负责 project/staging 生命周期和 host composition。运行时以 session-start cwd 作为固定 Access Root，不要求 Git root；Shell tilde expansion 使用会话初始化时的 `$HOME`。
 - Access Decision Pipeline（D-059/D-060）已完成 Greenfield trust path 与原子生产切换。Canonical 只解释一次；Admission 与 Display 按需投影；Policy Kernel 不读取配置或重新解析请求。Canonical path resolution 同时保留 lexical 与 symlink-target traversal prefixes，Direct search 与 Shell recursive path 均在 blocked descendants 上 fail-closed；有显式 path boundary 时，unknown/unbounded Shell path access 也不得放行。path-form executable 不因已知 basename 获得 inspect/modify 语义，非破坏性形式统一按 opaque execute 处理。Git 显式项目内 `file://` remote 也在 Canonical 阶段转为 path fact；helper-capable Git 操作与 `git config` 保持 hard-deny，host、alias 和间接 config remote 继续 fail-closed。
 - 受管辖 surface 为 Direct `read`、`write`、`edit`、`find`、`grep`、`ls` 与 Shell `bash`。无效 host context、unsupported syntax 和硬安全边界 fail-closed；外置 `policy.yaml` 缺失、为空或不可用时整体忽略并使用内置 `review` 基线，不部分采用无效内容；未拥有的工具 passthrough。
 - 生产入口只读取 `$PI_CODING_AGENT_DIR/akeel/policy.yaml`（默认 `~/.pi/agent/akeel/policy.yaml`）。内置 `review`、`guided`、`develop` 不依赖外置文件；文件缺失、为空、格式/schema/legacy 不可用时整体忽略并使用内置 `review`，不部分采用、不读取旧 config/Profile schema，也不使用旧 fallback。
-- Policy Preset 当前由 D-069 规定为内置 `review`、`guided`、`develop` 加 `policy.yaml` 自定义 preset；外部 flat policy 与自定义 preset 均使用完整的 `paths` 与 `commands` 定义，缺失必需字段时整体回退到内置 `review`；每个 preset 可拥有独立 path scope，系统 hard boundary 始终优先。`commands.destroy` 可在自定义 preset 中配置为 `allow`，但 D-071 规定所有 destroy/delete 操作永久 hard-deny，不产生 ask。D-068 定案其用户入口：原生 TUI 中 `/policy` 无参数打开临时 human-only 选择面板，显示所有已加载 preset，显式 `/policy <preset>` 入口保留，策略状态不常驻 UI。AKeel 管理的 subagent tier/parent-tier 注册和子代理策略管理仍属候选范围。
+- Policy Preset 当前由 D-069 规定为内置 `review`、`guided`、`develop` 加 `policy.yaml` 自定义 preset；外部 flat policy 与自定义 preset 均使用完整的 `paths` 与 `commands` 定义，缺失必需字段时整体回退到内置 `review`；每个 preset 可拥有独立 path scope，系统 hard boundary 始终优先。`commands.destroy` 可在自定义 preset 中配置为 `allow`，但 D-071 规定所有 destroy/delete 操作永久 hard-deny，不产生 ask。D-068 定案其用户入口：原生 TUI 中 `/policy` 无参数打开临时 human-only 选择面板，显示所有已加载 preset，显式 `/policy <preset>` 入口保留，策略状态不常驻 UI。Delegated child 按任务类型的能力分层与风险边界仍属 C-009 候选范围。
 - 宿主拥有且用于保存实时凭据的凭据工件由 D-070 归入系统 hard boundary：对 Canonical 阶段明确识别的受管路径操作 `read`、`write`、`edit`、`list`、`search` 一律拒绝，preset 不得放宽；模板类工件不属于该类别。分类依据是受信任 agent 目录下的路径身份契约，不读取内容；保护范围是尽力覆盖，不递归扩大到父目录后代，也不为 opaque Shell access 增加凭据专用拒绝；`accessGate: disabled` 时不提供任何保护保证。
 - Access Gate 默认启用；D-066 允许用户以唯一配置 `accessGate: disabled` 进入仅 bootstrap/skills 模式。禁用期间 AKeel 不提供 tool-call 操作准入或路径安全保证，重新启用需修改 policy.yaml 并重启会话。
 - Prompt Surface（D-030/D-053/D-023）：Policy Snapshot、policy.yaml 和活动 policy 状态不进入 context 消息、tool description 或 system prompt；模型可见的政策相关文本只有受 D-023 限定的静态失败 Guidance。
@@ -104,11 +104,11 @@
 - 不拦截 `user_bash`、`shellCommandPrefix`、Bash `spawnHook`、tool override、custom tool backend、未知 Direct tool surface 或其他 Extension 的直接操作。
 - 审批后的实际文件操作由操作系统权限决定；gate 不控制执行后的行为，也不提供完整 security log scrubbing。
 - 不提供旧式 `/profile` 命令或 Profile Footer；Policy Preset 使用 `/policy` 的临时 human-only TUI 选择面板、显式命令和状态查询，不提供独立的旧 Profile UI 或常驻 Footer。自定义 preset 不通过 UI 创建或编辑。
-- 不提供 AKeel 管理的 subagent tier/parent-tier 钳制或子代理 preset 继承；这些能力仍属候选范围。
+- 不提供 AKeel 管理的 delegated child 能力分层、父子权限钳制或子代理 preset 继承；按任务类型的能力与风险边界仍属 C-009 候选范围。
 - Access Gate 可由用户显式禁用；禁用时不拦截 managed tool call，故不提供路径、Shell 或操作准入保证。bootstrap 与 skills 仍然分发和运行。
 - 旧 `config.yaml`、Profile、命令覆盖、继承和子代理字段不属于新 Policy Snapshot 输入；当前只读取全局 `policy.yaml` 的静态策略字段、preset 绑定或显式 `accessGate` 禁用标志。
 - Shell 只支持显式定义、可静态证明且资源有界的子集；不可证明形态 fail-closed。`core/program-semantics/` 中的已知程序仍需提供 bounded path 事实；解释器脚本、uv run、npm/pnpm/yarn 执行、npx、pytest 和未知子命令等委托执行保持 opaque，在显式 path boundary 下 hard-deny。所有 Canonical `destroy`/`delete` 操作永久 hard-deny；`commands.destroy: allow` 仅可作为自定义 preset 的合法配置值，不改变该边界。Git local transport 仅接受可解析的项目内 `file://` path；HTTPS/SSH 等外部 transport、host、alias、间接 config、ext transport 和其他未建模形态继续 hard-boundary。未建模的命令副作用不单独建模。
-- 不把短期 Task Record、实施过程或审查报告作为永久项目知识。
+- 不把短期 Task Record、实施过程或审查报告作为永久当前知识；Task checkpoint 留在 Git 历史，正文落地后从当前树清除。
 - 不在 T-069 实现 Static Flow Graph、Explanation Replay、Runtime Audit Event 或 Runtime Content Flow。
 - 不把旧实现结果当作正确性 oracle；旧代码、旧测试和 archive 只提供待重新证明的历史线索。
 - Access Root 固定为会话启动时的 `cwd`；不自动向下选择子 Git 仓库，不因 cwd 位于 Git 子目录而向上扩大到 Git root，也不在会话内因 Shell `cd` 改变访问根。用户显式项目选择器、多个 Access Root 和动态切换仍不提供。

@@ -91,6 +91,10 @@ accessGate: disabled
 
 This form is the only policy field and takes effect after a session restart. All Pi `tool_call` requests then pass through without AKeel operation or path admission; bootstrap and skills remain active. AKeel supplies no tool-call admission, path-boundary, Shell, or approval guarantee in this mode. Remove the setting and restart the session to restore the Gate.
 
+## Test output context pruning
+
+AKeel trims `npm test` and `npm run test` `bashExecution` results only when building model context. Successful runs become `All tests passed`; failed runs retain failure cases, diagnostics, and stack traces. Cancelled or truncated results, non-test commands, and uncertain failures remain unchanged. The original output remains in the session and TUI; this feature does not call a model.
+
 ## Companion tools
 
 Optional companion tools provide research and isolated interactive workflows:
@@ -117,7 +121,7 @@ AKeel reads `PI_CODING_AGENT_DIR` to override the default agent directory. It re
 | [CONTEXT.md](CONTEXT.md) | Current project context and active decision index |
 | [docs/candidates.md](docs/candidates.md) | Non-binding candidates that are not adopted or committed work |
 | [docs/decisions.md](docs/decisions.md) | Long-term architecture and policy decisions |
-| [docs/task.md](docs/task.md) | Active task records |
+| [docs/task.md](docs/task.md) | Git-checkpointed active task records, cleared from the current tree after completion |
 | [docs/traceability.md](docs/traceability.md) | External sources, adoption mapping, and license obligations |
 
 ## License
