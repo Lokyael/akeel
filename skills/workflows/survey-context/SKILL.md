@@ -50,6 +50,7 @@ git branch --show-current
 
 Based on the project state:
 
+- A request that is not material under `principles.md` Project Record Authority → proceed with the relevant direct edit and applicable validation without creating a Task solely because no active Task exists.
 - No active task → suggest `brainstorm-design` when Requirements or Design need resolution; use `implementation-planning` when the user has committed to explicit, approved input for multi-step implementation.
 - Task Record is `draft` → use `brainstorm-design` for material open Requirements or Design questions, `implementation-planning` for multi-step work that needs an implementation-ready Plan, or tell the user to run `/skill:implement-work` when the approved Task is ready to build.
 - Task Record is `in-progress` → continue it or ask whether to reassess if its evidence is stale.

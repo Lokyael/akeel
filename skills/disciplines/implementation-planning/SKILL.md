@@ -9,7 +9,7 @@ Turn approved Requirements and Design into a self-contained Task Plan that `impl
 
 ## Planning Contract
 
-Start with explicit user commitment and sufficiently resolved Requirements and Design. Use the matching active Task Record when one exists. When the current conversation provides the commitment and approved input without a Task Record, create one per principles.md Project Records — Record Lifecycle and Next-ID slots. Ask the user to select the authority source when multiple active records could own the work.
+Start with explicit user commitment and sufficiently resolved Requirements and Design. Use the matching active Task Record when one exists. Only material work enters this planner; a local wording-only adjustment that is not material under `principles.md` Project Record Authority is handled directly. When the current conversation provides material commitment and approved input without a Task Record, create one per principles.md Project Records — Record Lifecycle and Next-ID slots. Ask the user to select the authority source when multiple active records could own the work.
 
 Planning produces or updates the Task Record's `Plan` section. The Task Record remains `draft`; `implement-work` owns implementation start, lifecycle progression, validation, review, and commit.
 

@@ -131,6 +131,8 @@
 
 Task 容器由 Git 跟踪，正文只在 active 期间留在当前树。每个 T-ID 在实施或清档前必须有一个包含已批准 Requirements 与必要 Design/Plan 的可达 checkpoint；占位推进或 commit message 提及不算记录。只为跨会话、交接或权威输入变化提交后续 Task 状态，不保存步骤日志。提炼 durable content 后在后续 commit 清档，并保留至少一个可达 checkpoint。
 
+不是每个仓库变更都构成 Task。Task 只覆盖实质的调查、设计、实现或协调工作；孤立的局部说明文案调整若不改变能力、授权、职责、跨文件合同、外部事实、安全边界、架构、Decision 或 Project Record，则不进入 Task。涉及其他文件、上述任一边界或语义不确定的变更均按实质 Task 处理，完整分类规则由 `principles.md` Project Record Authority 单源定义。
+
 Candidate 是停车记录，不属于常规上下文输入；Candidate review 由 `survey-context` 仅在用户明确请求时执行，具体复审范围、记录读取和缺失处理遵循该 workflow 的 bounded procedure。Candidate 中的 `Revisit condition` 仅用于显式复审时核对是否值得重新讨论，候选进入 Task 仍以用户显式选择为准。
 
 **Authority rules:**
@@ -144,11 +146,11 @@ Candidate 是停车记录，不属于常规上下文输入；Candidate review �
 
 **Why:** 候选、承诺、长期结论和当前事实权威等级不同：把候选写入 Task/Decision/CONTEXT 会让模型把“可能采用”误解为“应该执行”，自动提醒或专用工作流又把低概率候选升级为持续维护负担。将 Candidate 作为按需复审的停车记录，可以保留有价值的长期想法，同时让常规上下文集中于当前事实和已承诺工作。`Why Not Now` 与 `Revisit condition` 分别保存停放理由和复审依据，使显式复审具备可核对的入口。容器原名 Future Record 命名自时间属性而本质是承诺属性，`future` 引导 roadmap 误读；改名时 future.md 为空、包未发布，故同步 C-xxx 前缀且不提供旧路径兼容读取。
 
-Task 是活动工作的权威输入；若创建与清档都发生在未提交工作树，Git 只剩无意义的占位跳号。Checkpoint 保留过程权威，落地后清档保持当前树准确。
+Task 是实质活动工作的权威输入；若创建与清档都发生在未提交工作树，Git 只剩无意义的占位跳号。Checkpoint 保留过程权威，落地后清档保持当前树准确。边界收窄只减少不必要的记录开销，不改变实质 Task 的 Git 追溯要求；不采用行数阈值或自动分类器，因为它们无法可靠表达能力、授权和安全边界。
 
 **Impact:** `README.md` 是唯一用户使用入口；通用规则经 principles 注入，技能只实现各自职责；常规 `survey-context` 的上下文负载不再包含 Candidate 正文，用户仍可通过显式复审查看完整候选记录。`implement-work` 在实施前建立 Task checkpoint；其他 Task 也必须在清档前 checkpoint，并在最终清档前核对其仍处于可达历史。
 
-**Rejected:** 不合并 C/T/D 到单一文件；不每记录独立文件；不采用 Proposed Decision；不新增 review 技能、Record Manager、优先级评分、日期到期、自动提醒或 slash command；不把 Candidate 当默认 backlog/roadmap；不为 `retired` 增加永久状态枚举或墓碑文件；不把外部移交所有权边界写入 traceability（所有权属决策，许可证归属才属 traceability）；不提供容器级迁移引导（自有格式需模型自动识别并跨格式校验，产生猜测与格式权威混用；识别负担属用户显式声明而非模型自动探测）；不采用本地创建后直接清档、永久保留完成 Task 或逐步骤提交 Task 的模式。
+**Rejected:** 不合并 C/T/D 到单一文件；不每记录独立文件；不采用 Proposed Decision；不新增 review 技能、Record Manager、优先级评分、日期到期、自动提醒或 slash command；不把 Candidate 当默认 backlog/roadmap；不为 `retired` 增加永久状态枚举或墓碑文件；不把外部移交所有权边界写入 traceability（所有权属决策，许可证归属才属 traceability）；不提供容器级迁移引导（自有格式需模型自动识别并跨格式校验，产生猜测与格式权威混用；识别负担属用户显式声明而非模型自动探测）；不采用本地创建后直接清档、永久保留完成 Task 或逐步骤提交 Task 的模式；不采用基于行数或自动分类的 Task 豁免。
 
 **Out of Scope:**
 
@@ -822,7 +824,21 @@ Plan 使用 `Plan Slice` 作为内部执行单元。每个 Slice 承载目标、
 - 用户 `!`/`!!` `bashExecution` 的输出裁剪或模型视图。
 - 通用的每轮 system prompt、tool description、provider payload 或 context message 审计器。
 - 阻止模型主动读取 session file 的新安全边界。
-- 修改测试输出分类、失败识别或保留行算法。
+- 修改测试输出分类、失败识别或保留行算法；模型成功投影的正向证据门槛由 [D-085](#d-085-测试成功投影必须具备正向运行器证据) 单独规定。
 - 通用 Runtime Content Flow；本决定只覆盖模型 `bash` 工具结果行内的人类专用模型视图。
 
-## D-085: 待创建
+## D-085: 测试成功投影必须具备正向运行器证据
+
+**Reversal surface:** user-boundary
+
+**Decision:** 模型调用的独立 `npm test` / `npm run test` 结果只有在宿主结果明确成功、且输出包含受支持测试运行器的正向成功摘要时，才可把逐条通过输出投影为短成功消息。仅有命令返回成功或缺少失败标记，不足以证明测试实际运行并通过；零测试、跳过、todo、警告和未识别格式保持原始结果。测试失败、取消、截断和无法可靠归类的结果继续沿用原始或现有失败保留路径。
+
+**Why:** `npm test` 的脚本可以是 no-op、没有执行测试，或在退出码为 0 时仍带有需要模型注意的跳过和警告。正向运行器摘要同时保留成功裁剪收益和“不得把未知结果说成成功”的安全不变量。
+
+**Impact:** `context-pruner` 只增加成功投影的正向证据守卫，不引入通用工具输出过滤器；通过项和普通成功噪声可以删除，但模型仍会看到明确的成功结论。测试需覆盖受支持摘要、任意成功文本、零测试、跳过/todo/警告和原始消息不变性。
+
+**Rejected:** 仅以 `exitCode === 0` 或 `isError === false` 作为“所有测试通过”的证据；将 `git diff`、源码读取、JSON、HTTP、grep、find、audit、日志和通用构建输出纳入默认裁剪；把原始成功结果与投影同时送入模型上下文。
+
+**Out of Scope:** 失败输出保留算法、用户 `!`/`!!` `bashExecution`、TUI 模型视图、session 持久化边界和其他命令类型的输出裁剪。
+
+## D-086: 待创建

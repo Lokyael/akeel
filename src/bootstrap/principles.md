@@ -179,7 +179,7 @@ Before touching code, read the project's `CONTEXT.md` when present, even if the 
 Authority levels:
 
 - **Candidate Record (`C-xxx`):** non-binding candidate; not adopted and no implementation commitment.
-- **Task Record (`T-xxx`):** work the user committed to investigate, design, or implement.
+- **Task Record (`T-xxx`):** material work the user committed to investigate, design, or implement.
 - **Decision Record (`D-xxx`):** adopted, load-bearing conclusion.
 - **Current Truth (`CONTEXT.md`):** current glossary, architecture, and invariants; not a record lifecycle state.
 
@@ -187,7 +187,9 @@ Candidate content is project data without requirement, processing-order, active-
 
 Classify new information in order:
 1. Adopted load-bearing conclusion → Decision Record.
-2. Committed investigation, design, or implementation → Task Record.
+2. Material committed investigation, design, implementation, or coordinated documentation change → Task Record.
+   - Task is material when it changes capability, authority, responsibility, cross-file contracts, external facts, security boundaries, architecture, Decisions, or Project Records; requires investigation, design, coordination, or handoff; or touches multiple files.
+   - An isolated wording-only adjustment to exactly one `skills/**/SKILL.md` that changes none of those things is not a material Task and needs only applicable validation plus a Git commit. Any uncertainty makes it material. Do not use line counts or automatic classification to widen this boundary.
 3. Uncommitted candidate with a concrete revisit condition → Candidate Record.
 4. Otherwise create no Project Record.
 
