@@ -68,4 +68,62 @@ D-028 只保留结论与理由，`principles.md` 单源定义 Git-backed Task li
 - [x] D-028 与 CONTEXT 反映当前合同。
 - [x] 本 Task 已在 `0b723c1` 进入可达 checkpoint；最终清档仍待 Task Owner 完成。
 
-## T-091: 待创建
+## T-091: 提交预检的最小充分 Git 检查
+
+**Kind:** maintenance
+**Status:** in-progress
+
+### Goal
+
+让提交前变更预检先使用有界摘要，只有在证据不足时才展开详细 Git diff，避免无必要的大段历史与元数据输出。
+
+### Requirements
+
+- `change-preflight` 先检查状态、统计和 diff 校验结果，再判断是否需要详细 diff。
+- 详细检查仅针对具体文件或 hunk，并由范围、归属或语义疑点触发。
+- 默认不读取完整提交元数据或完整历史 diff。
+- 不改变变更归属、完整工作面、清理范围和验证要求。
+
+### Design
+
+只修改 `skills/disciplines/change-preflight/SKILL.md`，在 Pin the Active Change 的检查步骤中加入最小充分输出顺序和按疑点展开的边界。不修改 `principles.md`、插件运行时代码或其他 skill。
+
+### Out of Scope
+
+- **全局所有 Git 检查：** 当前证据只涉及提交预检；其他流程出现同类问题时再单独评估是否提升为全局原则。
+- **插件级输出拦截：** 这是 Agent 的检查策略，不改变运行时工具结果或模型 context。
+- **审查历史代码卫生：** 继续遵守 change-preflight 只处理当前变更的边界。
+
+### Plan
+
+#### Slice 1: 收紧提交预检的 Git 输出范围
+
+**Goal:** 提交预检默认使用摘要，疑点存在时才读取局部详细 diff。
+**Requirements covered:** 全部 Requirements
+**Depends on:** none
+
+**Acceptance Criteria:**
+- [ ] `change-preflight` 明确列出摘要优先和局部展开规则。
+- [ ] skill 校验和全量测试通过。
+- [ ] 其他 prompt surface、插件代码和行为保持不变。
+
+**Files and Seams:**
+- Modify: `skills/disciplines/change-preflight/SKILL.md` — Pin the Active Change inspection procedure
+- Verify: `scripts/validate-skills.ts`、`npm test`
+
+**Verification:**
+- `npm test`
+
+**Steps:**
+1. 在现有变更面检查步骤加入摘要优先和疑点触发展开规则。
+2. 运行 skills 校验、类型检查和全量测试。
+
+### Evidence
+
+- 用户已确认只修改 `change-preflight`，并明确要求实施；必要 Design 已获确认。
+
+### Durable Updates
+
+- [ ] 当前无新的长期决策或架构事实。
+
+## T-092: 待创建
