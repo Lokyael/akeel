@@ -15,7 +15,7 @@ Read the active Task Record and capture the complete working surface. During fin
 - staged and unstaged changes;
 - untracked files that belong to the Task.
 
-Use `git status --short` and the applicable diffs. If a modified file cannot be attributed to the active Task or changed since it was last inspected, stop and ask instead of cleaning or reverting it.
+Start with bounded summaries: `git status --short`, `git diff --stat`, `git diff --cached --stat`, and `git diff --check`. Expand to a detailed diff only when scope, ownership, or semantics remain unclear, and then target the specific file or hunk. Do not default to full commit metadata or unrestricted historical diffs. Inspect all staged, unstaged, and in-scope untracked content; output minimization must not omit evidence needed to establish the complete Review Surface. If a modified file cannot be attributed to the active Task or changed since it was last inspected, stop and ask instead of cleaning or reverting it.
 
 ## 2. Clean Only the Current Change
 
