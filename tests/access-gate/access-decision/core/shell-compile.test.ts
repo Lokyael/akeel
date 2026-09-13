@@ -3,8 +3,8 @@ import test from "node:test";
 import {
   compileShell,
   isShellReject,
-} from "../../../../src/access-gate/access-decision/core/index";
-import { shellCompilationFacts } from "../../../../src/access-gate/access-decision/core/shell-compile";
+} from "../../../../packages/access-gate/src/access-gate/access-decision/core/index";
+import { shellCompilationFacts } from "../../../../packages/access-gate/src/access-gate/access-decision/core/shell-compile";
 
 const bashContract = {
   source: "bash-manual",

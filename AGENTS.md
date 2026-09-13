@@ -10,23 +10,23 @@ AKeel 是 [pi](https://pi.dev) 的插件包：以 **扩展（extensions）** 注
 
 | 类别 | 位置 | 是什么 | 分发方式 | 维护对象 |
 |------|------|--------|----------|----------|
-| **扩展（插件）** | `src/bootstrap/`、`src/access-gate/` | Session 启动注入的原则（`principles.md`）与 `policy.yaml` 驱动的访问控制代码 | `package.json` 的 `pi.extensions` | 运行时行为；改动需同步测试与文档 |
-| **Skills** | `skills/disciplines/`、`skills/workflows/` | 按需加载的技能，含 SKILL.md 与配套文件；两目录表达作者职责，不定义 Pi 加载机制（D-073） | `package.json` 的 `pi.skills` | 技能内容与流程；只引用权威文档，不重复定义规则 |
+| **扩展（插件）** | `packages/guidance/src/bootstrap/`、`packages/access-gate/src/access-gate/`、`packages/context-pruner/src/context-pruner/` | Session 原则注入、`policy.yaml` 驱动的访问控制与测试输出上下文裁剪 | 各 package 的 `pi.extensions` | 运行时行为；改动需同步测试与文档 |
+| **Skills** | `packages/guidance/skills/disciplines/`、`packages/guidance/skills/workflows/` | 按需加载的技能，含 SKILL.md 与配套文件；两目录表达作者职责，不定义 Pi 加载机制（D-073） | `package.json` 的 `pi.skills` | 技能内容与流程；只引用权威文档，不重复定义规则 |
 | **开发内容（dev）** | `tests/`、`scripts/`、`types/`、`tsconfig.json`、`package.json` 脚本 | AKeel 自身的构建、测试、类型声明与技能校验 | 不进入用户项目分发 | 开发质量；改动随对应功能同步 |
 
 ## 目录速查
 
 ```
-src/bootstrap/          # 扩展：Session 注入原则（principles.md + index.ts）
-src/access-gate/        # 扩展：policy.yaml adapter、Canonical access-decision 与 Pi runtime composition
+packages/guidance/src/bootstrap/          # 扩展：Session 注入原则（principles.md + index.ts）
+packages/access-gate/src/access-gate/        # 扩展：policy.yaml adapter、Canonical access-decision 与 Pi runtime composition
   access-decision/core/ #   Pi host/config 无关的 Canonical、Admission、Policy 与 renderer
   access-decision/adapters/ # 外部 Pi/tool/policy.yaml 合同适配
   access-decision/runtime/  # Project/Policy 生命周期与 host composition
   */index.ts            #   目录公共表面：跨目录引用统一走目录 index，不深入实现文件
-skills/                 # skills：两目录按作者职责组织（D-073）
-  disciplines/          #   可复用工程方法（TDD、代码审查、领域建模等）
-  workflows/            #   端到端编排（survey-context、implement-work 等）
-tests/                  # dev：访问控制测试（按 src/access-gate 镜像分层）+ 文档/技能校验规则测试；npm test 入口
+packages/guidance/skills/    # skills：两目录按作者职责组织（D-073）
+  disciplines/            #   可复用工程方法（TDD、代码审查、领域建模等）
+  workflows/              #   端到端编排（survey-context、implement-work 等）
+tests/                  # dev：访问控制测试（按 packages/access-gate/src/access-gate 镜像分层）+ 文档/技能校验规则测试；npm test 入口
 scripts/                # dev：validate-docs.ts、validate-skills.ts 等校验脚本
 types/                  # dev：pi 宿主类型声明
 docs/                   # 项目文档：决策、任务、安全边界、溯源（见 CONTEXT.md）
@@ -40,16 +40,16 @@ CONTEXT.md              # 当前事实、术语、架构与 Active Decisions 索
 - **修改边界（工作区源 vs 安装副本）**：内容只在仓库源 checkout 中修改；已安装的全局副本（pi 分发到 agent 目录的技能与扩展）是分发产物，只读，拒绝直接修改——改动分发走正常安装/更新机制。
 - **路径可移植性**：文档、注释、示例与测试不写死本机具体路径（如 `/home/<user>/...` 绝对路径、本机工作区目录名）；用相对路径、角色化表述或占位符（`~`、`$HOME`）——本机路径随环境迁移或他人开发失效。
 - **文档边界**：长期决策写 `docs/decisions.md`，当前事实写 `CONTEXT.md`（安全承诺与残余风险在 decisions.md 安全条目与 CONTEXT Negative Space），第三方来源与许可证写 `docs/traceability.md`；AGENTS.md 不承接这些职责。
-- **决策寄存器内容分诊**：`docs/decisions.md` 只保留决策级内容（当前结论、理由、必要替代方案、影响）；用户使用文档（如 config schema）进 README，实现细节进代码/测试，验证证据（测试计数、用例枚举、迁移过程）不保留，历史由 Git 承载；条目结构遵循 `src/bootstrap/principles.md` Project Records — Decision Record Format。
-- **技能规则单一来源**：技能只引用 `src/bootstrap/principles.md`，不在技能内重复定义规则（D-030）。
+- **决策寄存器内容分诊**：`docs/decisions.md` 只保留决策级内容（当前结论、理由、必要替代方案、影响）；用户使用文档（如 config schema）进 README，实现细节进代码/测试，验证证据（测试计数、用例枚举、迁移过程）不保留，历史由 Git 承载；条目结构遵循 `packages/guidance/src/bootstrap/principles.md` Project Records — Decision Record Format。
+- **技能规则单一来源**：技能只引用 `packages/guidance/src/bootstrap/principles.md`，不在技能内重复定义规则（D-030）。
 - **技能单一职责**：每个 skill 只做一件事、调用时内容全量被使用；触发场景互斥的 skill 保持独立、不合并（D-030）。
-- **决策 ID 引用**：代码层（`src/`、`tests/` 的 `.ts`）与文档层（`docs/`、`skills/` 的 `.md`、`CONTEXT`/`AGENTS`/`README`）中的 `D-xxx` 引用只指向 `docs/decisions.md` 存活条目（validate-docs 强制）；决策合并/剪除时在同一变更内把全部引用更新到吸收条目，不保留剪除 ID 引用——Git 保留历史是溯源手段，不是保留悬空引用的理由。
+- **决策 ID 引用**：代码层（`packages/`、`tests/` 的 `.ts`）与文档层（`docs/`、`packages/guidance/skills/` 的 `.md`、`CONTEXT`/`AGENTS`/`README`）中的 `D-xxx` 引用只指向 `docs/decisions.md` 存活条目（validate-docs 强制）；决策合并/剪除时在同一变更内把全部引用更新到吸收条目，不保留剪除 ID 引用——Git 保留历史是溯源手段，不是保留悬空引用的理由。
 - **记录可追溯性**：Task checkpoint 与清档遵循 `principles.md` Project Records — Record Lifecycle。历史改写使占位失去依据时，按 Git 历史最大+1 重建；不伪造缺失记录或引用不可追溯 ID。
 - **决策记录时机**：有替代方案的取舍（删 vs 保留、合并 vs 独立、文档化 vs 实现）在落档前定案并同步进 `docs/decisions.md`（或代码注释，按内容分诊）；验收措辞只写行为目标，不写实现方式（实现细节进代码/测试）；实施中推翻已记录决策时，先同步更新记录再继续实施，不事后补丁。
 
 ## AKeel Prompt Surface 维护约定
 
-修改 `src/bootstrap/principles.md`、`skills/` 或 Access Gate Guidance 时应用 `instruction-editing`。语义完整是本仓合入门禁，行数不构成优化目标；以下规则只定义 AKeel 的本地 Prompt Surface overlay。
+修改 `packages/guidance/src/bootstrap/principles.md`、`packages/guidance/skills/` 或 Access Gate Guidance 时应用 `instruction-editing`。语义完整是本仓合入门禁，行数不构成优化目标；以下规则只定义 AKeel 的本地 Prompt Surface overlay。
 
 - **适用面**：`principles.md` 承载恒定原则和 Project Record 参考，skills 承载按需方法与工作流，Access Gate Guidance 承载失败路径的静态行为。每项内容按其运行时读取面和责任维护。
 - **引用目标**：`per principles.md Quick Reference — X` 与 `per principles.md Project Records — X` 指向真实锚点，引用目标完整承载被引用语义。

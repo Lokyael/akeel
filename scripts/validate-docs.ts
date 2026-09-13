@@ -7,7 +7,7 @@
  *   3. 槽位前缀字母与容器匹配（C→candidates、T→task、D→decisions）
  *
  * 二、决策 ID 引用存活校验（AGENTS.md 决策 ID 引用纪律）：
- *   代码（src/、tests/ 的 .ts）与文档层（docs/、skills/ 的 .md，以及
+ *   代码（packages/、tests/ 的 .ts）与文档层（docs/、packages/guidance/skills/ 的 .md，以及
  *   CONTEXT.md、AGENTS.md、README.md）中的 `D-xxx` 引用必须命中 docs/decisions.md 的
  *   存活标题（`## D-NNN:`，排除待创建槽位）。决策合并/剪除后引用即悬空——
  *   Git 保留历史是溯源手段，不是保留悬空引用的理由；剪除时应在同一变更内
@@ -103,7 +103,7 @@ function walkTsFiles(dir: string, out: string[]): void {
   }
 }
 
-/** 递归收集目录下所有 .md 文件（docs/、skills/）。 */
+/** 递归收集目录下所有 .md 文件（docs/、packages/guidance/skills/）。 */
 function walkMdFiles(dir: string, out: string[]): void {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
     const p = join(dir, entry.name);
@@ -377,12 +377,12 @@ function main(): void {
     totalErrors += hygieneResult.errors.length;
   }
   const liveIds = collectLiveDecisionIds(decisionsContent);
-  // 代码层（src/tests）与文档层（docs/、skills/ + 根文档）全部纳入存活校验
+  // 代码层（packages/、tests）与文档层（docs/、packages/guidance/skills/ + 根文档）全部纳入存活校验
   const refFiles: string[] = [];
-  walkTsFiles(join(import.meta.dirname!, "..", "src"), refFiles);
+  walkTsFiles(join(import.meta.dirname!, "..", "packages"), refFiles);
   walkTsFiles(join(import.meta.dirname!, "..", "tests"), refFiles);
   walkMdFiles(join(import.meta.dirname!, "..", "docs"), refFiles);
-  walkMdFiles(join(import.meta.dirname!, "..", "skills"), refFiles);
+  walkMdFiles(join(import.meta.dirname!, "..", "packages", "guidance", "skills"), refFiles);
   for (const rootFile of ["CONTEXT.md", "AGENTS.md", "README.md"]) {
     refFiles.push(join(import.meta.dirname!, "..", rootFile));
   }

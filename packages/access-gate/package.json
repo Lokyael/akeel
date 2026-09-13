@@ -1,0 +1,14 @@
+{
+  "name": "akeel-access-gate",
+  "version": "0.1.0",
+  "description": "AKeel tool-call access decisions for Pi",
+  "license": "MIT",
+  "keywords": ["pi-package"],
+  "type": "module",
+  "dependencies": {
+    "yaml": "^2.9.0"
+  },
+  "pi": {
+    "extensions": ["./src/access-gate"]
+  }
+}

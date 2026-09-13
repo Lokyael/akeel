@@ -3,7 +3,7 @@ import test from "node:test";
 import { mkdirSync, mkdtempSync, rmSync, symlinkSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { resolveShellPath } from "../../../../src/access-gate/access-decision/core/index";
+import { resolveShellPath } from "../../../../packages/access-gate/src/access-gate/access-decision/core/index";
 
 const linuxPathContract = {
   source: "linux-manual",

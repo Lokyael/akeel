@@ -4,9 +4,21 @@ Engineering skills and user-space access decisions for [Pi](https://pi.dev)-base
 
 ## Install
 
+Full package from Git:
+
 ```bash
 pi install git:github.com/Lokyael/akeel
 ```
+
+The package is also split into independently installable capabilities:
+
+```bash
+pi install npm:akeel-guidance        # bootstrap principles + skills
+pi install npm:akeel-access-gate     # tool-call access decisions
+pi install npm:akeel-context-pruner  # test-output context pruning
+```
+
+The `akeel` package is the full bundle. The capability package manifests are maintained under `packages/`; publishing them to npm is a release operation outside this repository change.
 
 AKeel provides bootstrap principles and on-demand engineering skills. It does not create snapshots or provide a `/rollback` command.
 

@@ -15,7 +15,7 @@ import { readFileSync, readdirSync, existsSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { parseDocument } from "yaml";
 
-const SKILLS_ROOT = join(import.meta.dirname!, "..", "skills");
+const SKILLS_ROOT = join(import.meta.dirname!, "..", "packages", "guidance", "skills");
 const SKILL_LAYERS = ["disciplines", "workflows"] as const;
 
 /** 触发句前缀（disciplines 强制 + 模型可调用 workflow 告警共用）。 */
@@ -278,7 +278,7 @@ export function checkSkillReferences(skill: SkillMeta, registry: Map<string, Ski
 //   - "principles.md Next-ID slots" → 粗体锚点（**Next-ID slots**）
 // 本检查锁住引用可解析性。
 
-const PRINCIPLES_FILE = join(SKILLS_ROOT, "..", "src", "bootstrap", "principles.md");
+const PRINCIPLES_FILE = join(import.meta.dirname!, "..", "packages", "guidance", "src", "bootstrap", "principles.md");
 
 interface PrinciplesAnchors {
   /** Quick Reference 与 Project Records 两节的 ### 锚点（S4b 拆节后合并收集）。 */

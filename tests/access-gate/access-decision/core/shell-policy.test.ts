@@ -7,7 +7,7 @@ import {
   freezeShellPolicySnapshot,
   projectShellAdmission,
   shellAdmissionHitsCredentialBoundary,
-} from "../../../../src/access-gate/access-decision/core/index";
+} from "../../../../packages/access-gate/src/access-gate/access-decision/core/index";
 
 function evaluateShellAdmission(admissionValue: unknown, policyValue: Parameters<typeof evaluateShellAdmissionCore>[1]) {
   return evaluateShellAdmissionCore(admissionValue, policyValue);

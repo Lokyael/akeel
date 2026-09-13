@@ -1,0 +1,12 @@
+{
+  "name": "akeel-guidance",
+  "version": "0.1.0",
+  "description": "AKeel engineering principles and on-demand skills for Pi",
+  "license": "MIT",
+  "keywords": ["pi-package"],
+  "type": "module",
+  "pi": {
+    "extensions": ["./src/bootstrap/index.ts"],
+    "skills": ["./skills/disciplines", "./skills/workflows"]
+  }
+}

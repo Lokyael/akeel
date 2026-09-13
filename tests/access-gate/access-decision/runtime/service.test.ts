@@ -4,7 +4,7 @@ import {
   createPolicyState,
   createProjectContext,
   type DirectRequest,
-} from "../../../../src/access-gate/access-decision";
+} from "../../../../packages/access-gate/src/access-gate/access-decision";
 import { createTestDecisionService as createDecisionService } from "./test-fixtures";
 
 const request = (hasUI: boolean): DirectRequest => ({

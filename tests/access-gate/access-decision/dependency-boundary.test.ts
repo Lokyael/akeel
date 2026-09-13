@@ -3,7 +3,7 @@ import { readFileSync, readdirSync, statSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 import test from "node:test";
 
-const root = join(import.meta.dirname!, "../../../src/access-gate/access-decision");
+const root = join(import.meta.dirname!, "../../../packages/access-gate/src/access-gate/access-decision");
 const packageName = "akeel";
 const legacyDirectories = [
   "shell-parse",
@@ -40,10 +40,10 @@ test("new access-decision boundary has no forbidden imports", () => {
   for (const file of files) {
     for (const specifier of importsIn(file)) {
       assert.notEqual(specifier, packageName, `${relative(process.cwd(), file)} imports the package itself`);
-      assert.ok(!specifier.includes("src/access-gate/"), `${relative(process.cwd(), file)} imports source by absolute path`);
+      assert.ok(!specifier.includes("packages/access-gate/src/access-gate/"), `${relative(process.cwd(), file)} imports source by absolute path`);
       const resolvedSpecifier = resolve(dirname(file), specifier);
       assert.ok(
-        !legacyDirectories.some((directory) => resolvedSpecifier.includes(`/src/access-gate/${directory}/`)),
+        !legacyDirectories.some((directory) => resolvedSpecifier.includes(`/packages/access-gate/src/access-gate/${directory}/`)),
         `${relative(process.cwd(), file)} imports legacy directory through ${specifier}`,
       );
     }

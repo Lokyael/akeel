@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { renderDecision } from "../../../../src/access-gate/access-decision/core/index";
-import { renderHostFacingDecision } from "../../../../src/access-gate/access-decision/runtime/index";
+import { renderDecision } from "../../../../packages/access-gate/src/access-gate/access-decision/core/index";
+import { renderHostFacingDecision } from "../../../../packages/access-gate/src/access-gate/access-decision/runtime/index";
 
 test("renderer blocks with a static bounded reason that does not include display path", () => {
   const rendered = renderHostFacingDecision(

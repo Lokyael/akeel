@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { adaptPolicyConfig, adaptPolicyPresets, isAccessGateDisabled } from "../../../../src/access-gate/access-decision";
+import { adaptPolicyConfig, adaptPolicyPresets, isAccessGateDisabled } from "../../../../packages/access-gate/src/access-gate/access-decision";
 
 test("new config adapts path and command policy into a deeply immutable snapshot", () => {
   const config = {

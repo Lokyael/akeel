@@ -4,8 +4,8 @@ import {
   firstNonOptionWord,
   hasUnknownOption,
   scanOptionWords,
-} from "../../../../src/access-gate/access-decision/core/program-semantics/option-scanner";
-import type { ShellWord } from "../../../../src/access-gate/access-decision/core/index";
+} from "../../../../packages/access-gate/src/access-gate/access-decision/core/program-semantics/option-scanner";
+import type { ShellWord } from "../../../../packages/access-gate/src/access-gate/access-decision/core/index";
 
 function word(text: string, start: number): ShellWord {
   return Object.freeze({ text, start, end: start + text.length, quote: "bare" as const });

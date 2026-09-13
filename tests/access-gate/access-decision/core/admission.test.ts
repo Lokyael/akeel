@@ -6,7 +6,7 @@ import {
   freezePolicySnapshot,
   isCanonicalReject,
   projectAdmission,
-} from "../../../../src/access-gate/access-decision/core/index";
+} from "../../../../packages/access-gate/src/access-gate/access-decision/core/index";
 
 const request = {
   surface: "read",

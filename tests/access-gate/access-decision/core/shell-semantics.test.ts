@@ -4,8 +4,8 @@ import {
   analyzeProgramCommand,
   analyzeShellCommand,
   shellCommandOutcomes,
-} from "../../../../src/access-gate/access-decision/core/index";
-import type { ShellWord } from "../../../../src/access-gate/access-decision/core/index";
+} from "../../../../packages/access-gate/src/access-gate/access-decision/core/index";
+import type { ShellWord } from "../../../../packages/access-gate/src/access-gate/access-decision/core/index";
 
 const policyContract = {
   source: "new-policy",

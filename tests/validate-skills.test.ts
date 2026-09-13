@@ -69,7 +69,7 @@ test("model-invocable workflow convention warns on descriptive-first, not trigge
 });
 
 test("review readiness skills publish distinct invocation and authority contracts", () => {
-  const root = new URL("../skills/disciplines/", import.meta.url);
+  const root = new URL("../packages/guidance/skills/disciplines/", import.meta.url);
   const preflightUrl = new URL("change-preflight/SKILL.md", root);
   const retiredAuditUrl = new URL("code-audit/SKILL.md", root);
 
@@ -93,11 +93,11 @@ test("review readiness skills publish distinct invocation and authority contract
 
 test("preflight and review publish safe-autonomy surface contracts", () => {
   const preflight = readFileSync(
-    new URL("../skills/disciplines/change-preflight/SKILL.md", import.meta.url),
+    new URL("../packages/guidance/skills/disciplines/change-preflight/SKILL.md", import.meta.url),
     "utf8",
   );
   const review = readFileSync(
-    new URL("../skills/disciplines/code-review/SKILL.md", import.meta.url),
+    new URL("../packages/guidance/skills/disciplines/code-review/SKILL.md", import.meta.url),
     "utf8",
   );
 
@@ -117,11 +117,11 @@ test("preflight and review publish safe-autonomy surface contracts", () => {
 
 test("delegated review and grilling publish fail-closed owner cleanup contracts", () => {
   const review = readFileSync(
-    new URL("../skills/disciplines/code-review/SKILL.md", import.meta.url),
+    new URL("../packages/guidance/skills/disciplines/code-review/SKILL.md", import.meta.url),
     "utf8",
   );
   const grill = readFileSync(
-    new URL("../skills/workflows/grill-docs/SKILL.md", import.meta.url),
+    new URL("../packages/guidance/skills/workflows/grill-docs/SKILL.md", import.meta.url),
     "utf8",
   );
 
@@ -147,7 +147,7 @@ test("delegated review and grilling publish fail-closed owner cleanup contracts"
 });
 
 test("debugging skills publish the current reproduction and causal-debugging contracts", () => {
-  const root = new URL("../skills/disciplines/", import.meta.url);
+  const root = new URL("../packages/guidance/skills/disciplines/", import.meta.url);
   const reproductionUrl = new URL("bug-reproduction/SKILL.md", root);
   const debuggingUrl = new URL("systematic-debugging/SKILL.md", root);
 
@@ -180,11 +180,11 @@ test("debugging skills publish the current reproduction and causal-debugging con
 
 test("module design and modularity assessment publish distinct invocation contracts", () => {
   const moduleDesign = readFileSync(
-    new URL("../skills/disciplines/module-design/SKILL.md", import.meta.url),
+    new URL("../packages/guidance/skills/disciplines/module-design/SKILL.md", import.meta.url),
     "utf8",
   );
   const assessModularity = readFileSync(
-    new URL("../skills/workflows/assess-modularity/SKILL.md", import.meta.url),
+    new URL("../packages/guidance/skills/workflows/assess-modularity/SKILL.md", import.meta.url),
     "utf8",
   );
 
@@ -199,22 +199,22 @@ test("module design and modularity assessment publish distinct invocation contra
 
 test("implementation planning publishes an implementation-ready Task Plan contract", () => {
   const planningUrl = new URL(
-    "../skills/disciplines/implementation-planning/SKILL.md",
+    "../packages/guidance/skills/disciplines/implementation-planning/SKILL.md",
     import.meta.url,
   );
   assert.ok(existsSync(planningUrl), "implementation-planning must be distributed");
 
   const planning = readFileSync(planningUrl, "utf8");
   const survey = readFileSync(
-    new URL("../skills/workflows/survey-context/SKILL.md", import.meta.url),
+    new URL("../packages/guidance/skills/workflows/survey-context/SKILL.md", import.meta.url),
     "utf8",
   );
   const design = readFileSync(
-    new URL("../skills/workflows/brainstorm-design/SKILL.md", import.meta.url),
+    new URL("../packages/guidance/skills/workflows/brainstorm-design/SKILL.md", import.meta.url),
     "utf8",
   );
   const implementation = readFileSync(
-    new URL("../skills/workflows/implement-work/SKILL.md", import.meta.url),
+    new URL("../packages/guidance/skills/workflows/implement-work/SKILL.md", import.meta.url),
     "utf8",
   );
 
@@ -236,15 +236,15 @@ test("implementation planning publishes an implementation-ready Task Plan contra
 
 test("task lifecycle keeps checkpoints sparse and context current-tree only", () => {
   const principles = readFileSync(
-    new URL("../src/bootstrap/principles.md", import.meta.url),
+    new URL("../packages/guidance/src/bootstrap/principles.md", import.meta.url),
     "utf8",
   );
   const implementation = readFileSync(
-    new URL("../skills/workflows/implement-work/SKILL.md", import.meta.url),
+    new URL("../packages/guidance/skills/workflows/implement-work/SKILL.md", import.meta.url),
     "utf8",
   );
   const survey = readFileSync(
-    new URL("../skills/workflows/survey-context/SKILL.md", import.meta.url),
+    new URL("../packages/guidance/skills/workflows/survey-context/SKILL.md", import.meta.url),
     "utf8",
   );
 
@@ -263,7 +263,7 @@ test("task lifecycle keeps checkpoints sparse and context current-tree only", ()
 
 test("instruction editing publishes semantic preservation with an AKeel repository overlay", () => {
   const editingUrl = new URL(
-    "../skills/disciplines/instruction-editing/SKILL.md",
+    "../packages/guidance/skills/disciplines/instruction-editing/SKILL.md",
     import.meta.url,
   );
   assert.ok(existsSync(editingUrl), "instruction-editing must be distributed");
@@ -290,7 +290,7 @@ test("instruction editing publishes semantic preservation with an AKeel reposito
 
 test("module design integrates boundary evidence and failure handling", () => {
   const moduleDesign = readFileSync(
-    new URL("../skills/disciplines/module-design/SKILL.md", import.meta.url),
+    new URL("../packages/guidance/skills/disciplines/module-design/SKILL.md", import.meta.url),
     "utf8",
   );
   assert.match(moduleDesign, /^## Evaluate the Boundary$/m);
@@ -305,7 +305,7 @@ test("module design integrates boundary evidence and failure handling", () => {
 
 test("modularity guidance routes known seam failures", () => {
   const debugging = readFileSync(
-    new URL("../skills/disciplines/systematic-debugging/SKILL.md", import.meta.url),
+    new URL("../packages/guidance/skills/disciplines/systematic-debugging/SKILL.md", import.meta.url),
     "utf8",
   );
   assert.match(debugging, /module boundary prevents locking down the issue[\s\S]*?module-design/);
@@ -338,7 +338,7 @@ test("principles anchor rule rejects missing anchors and passes live ones", () =
 });
 
 test("survey-context keeps Candidate review explicit and bounded", () => {
-  const content = readFileSync(new URL("../skills/workflows/survey-context/SKILL.md", import.meta.url), "utf8");
+  const content = readFileSync(new URL("../packages/guidance/skills/workflows/survey-context/SKILL.md", import.meta.url), "utf8");
   assert.match(content, /^description: .*when the user explicitly requests Candidate review/m);
   assert.match(content, /Candidate review is an explicit branch of this workflow, not part of the routine survey/);
   assert.match(content, /During a routine survey, keep the context focused on current truth and active Tasks/);
@@ -349,12 +349,12 @@ test("survey-context keeps Candidate review explicit and bounded", () => {
 });
 
 test("Candidate boundary guidance is shared and lazy-loaded only by Candidate actions", () => {
-  const guideUrl = new URL("../skills/workflows/survey-context/candidate-review.md", import.meta.url);
+  const guideUrl = new URL("../packages/guidance/skills/workflows/survey-context/candidate-review.md", import.meta.url);
   assert.equal(existsSync(guideUrl), true, "expected the shared Candidate review companion");
 
   const guide = readFileSync(guideUrl, "utf8");
-  const survey = readFileSync(new URL("../skills/workflows/survey-context/SKILL.md", import.meta.url), "utf8");
-  const domain = readFileSync(new URL("../skills/disciplines/domain-modeling/SKILL.md", import.meta.url), "utf8");
+  const survey = readFileSync(new URL("../packages/guidance/skills/workflows/survey-context/SKILL.md", import.meta.url), "utf8");
+  const domain = readFileSync(new URL("../packages/guidance/skills/disciplines/domain-modeling/SKILL.md", import.meta.url), "utf8");
   const candidateSection = survey.slice(
     survey.indexOf("### 4. Review Candidates on explicit request"),
     survey.indexOf("### 5. Read active tasks"),

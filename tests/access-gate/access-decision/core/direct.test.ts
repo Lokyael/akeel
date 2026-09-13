@@ -8,7 +8,7 @@ import {
   createPolicyState,
   type DirectRequest,
   type PolicyConfig,
-} from "../../../../src/access-gate/access-decision";
+} from "../../../../packages/access-gate/src/access-gate/access-decision";
 import {
   compileDirect,
   createCredentialBoundary,
@@ -16,7 +16,7 @@ import {
   evaluateAdmission,
   freezePolicySnapshot,
   projectAdmission,
-} from "../../../../src/access-gate/access-decision/core/index";
+} from "../../../../packages/access-gate/src/access-gate/access-decision/core/index";
 
 const testBoundary = createCredentialBoundary(["/__test-agent-dir__"]);
 

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { scanShellWords } from "../../../../src/access-gate/access-decision/core/index";
+import { scanShellWords } from "../../../../packages/access-gate/src/access-gate/access-decision/core/index";
 
 const bashContract = {
   source: "bash-manual",

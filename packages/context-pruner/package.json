@@ -1,0 +1,11 @@
+{
+  "name": "akeel-context-pruner",
+  "version": "0.1.0",
+  "description": "AKeel test-output context pruning for Pi",
+  "license": "MIT",
+  "keywords": ["pi-package"],
+  "type": "module",
+  "pi": {
+    "extensions": ["./src/context-pruner"]
+  }
+}

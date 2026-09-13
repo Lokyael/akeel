@@ -6,7 +6,7 @@ import {
   projectDisplay,
   projectShellDisplay,
   type DirectRequest,
-} from "../../../../src/access-gate/access-decision/core/index";
+} from "../../../../packages/access-gate/src/access-gate/access-decision/core/index";
 
 const request: DirectRequest = {
   surface: "write",

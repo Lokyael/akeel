@@ -3,7 +3,7 @@ import test from "node:test";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { loadPolicyFile } from "../../../../src/access-gate/access-decision";
+import { loadPolicyFile } from "../../../../packages/access-gate/src/access-gate/access-decision";
 
 function agentDir(): { readonly path: string; readonly cleanup: () => void } {
   const path = mkdtempSync(join(tmpdir(), "akeel-policy-"));

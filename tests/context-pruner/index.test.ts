@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import contextPruner, { projectTestOutput, pruneTestContext } from "../../src/context-pruner/index";
+import contextPruner, { projectTestOutput, pruneTestContext } from "../../packages/context-pruner/src/context-pruner/index";
 
 function bashToolCall(id: string, command: string): Record<string, unknown> {
   return {

@@ -3,7 +3,7 @@ import test from "node:test";
 import {
   createCredentialBoundary,
   pathHitsCredentialBoundary,
-} from "../../../../src/access-gate/access-decision/core/index";
+} from "../../../../packages/access-gate/src/access-gate/access-decision/core/index";
 
 const boundary = createCredentialBoundary(["/home/user/.pi/agent"]);
 

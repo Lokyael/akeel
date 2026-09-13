@@ -8,7 +8,7 @@ import {
   installGlobalPiAccessDecision,
   installPiAccessDecision,
   type PiCompositionOptions,
-} from "../../../../src/access-gate/access-decision";
+} from "../../../../packages/access-gate/src/access-gate/access-decision";
 
 type Handler = (event: unknown, context: ExtensionContext) => unknown | Promise<unknown>;
 

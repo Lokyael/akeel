@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { adaptHostDecision, adaptHostToolCall, adaptPiToolCall } from "../../../../src/access-gate/access-decision";
+import { adaptHostDecision, adaptHostToolCall, adaptPiToolCall } from "../../../../packages/access-gate/src/access-gate/access-decision";
 
 test("Pi tool-call composition derives cwd and UI only from ExtensionContext", () => {
   const result = adaptPiToolCall(

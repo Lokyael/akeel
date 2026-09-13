@@ -8,7 +8,7 @@
 
 **Reversal surface:** user-boundary
 
-**Decision:** 使用统一的 `src/access-gate/access-decision/` 扩展集中处理 Canonical、Admission、Policy Snapshot、hard boundary 和 host approval，不提供或假定 OS-level isolation。
+**Decision:** 使用统一的 `packages/access-gate/src/access-gate/access-decision/` 扩展集中处理 Canonical、Admission、Policy Snapshot、hard boundary 和 host approval，不提供或假定 OS-level isolation。
 
 **Why:** 多个安全扩展会产生拦截顺序竞争、重复审批、分散配置和难以关联的审计信息。Node.js 路径检查没有 kernel-level enforcement；将 AKeel 称为 sandbox 会造成安全承诺与真实边界不一致。
 
@@ -160,7 +160,7 @@ Task 是实质活动工作的权威输入；若创建与清档都发生在未提
 
 **Reversal surface:** engineering
 
-**Decision:** 提示词按注入面分层：`principles.md`（恒定注入，承载原则与唯一格式/规则来源）、`skills/`（按需加载，每个 skill 单一职责、调用时全量消费）、access-gate guidance（失败路径，保持原样不精简）。通用约束经“原则注入 + Quick Reference”部署。两条约束：① skill 单一职责——一个 skill 只做一件事，触发场景互斥的 skill 保持独立，不合并；② 格式/规则单一来源——只在 `principles.md` 参考节（Quick Reference / Project Records）定义一次，技能只文字引用（如 "per principles.md Project Records — Record Lifecycle"）、不重复定义格式和规则、不内嵌副本。
+**Decision:** 提示词按注入面分层：`principles.md`（恒定注入，承载原则与唯一格式/规则来源）、Guidance package 中的 `skills/`（按需加载，每个 skill 单一职责、调用时全量消费）、access-gate guidance（失败路径，保持原样不精简）。通用约束经“原则注入 + Quick Reference”部署。两条约束：① skill 单一职责——一个 skill 只做一件事，触发场景互斥的 skill 保持独立，不合并；② 格式/规则单一来源——只在 `principles.md` 参考节（Quick Reference / Project Records）定义一次，技能只文字引用（如 "per principles.md Project Records — Record Lifecycle"）、不重复定义格式和规则、不内嵌副本。
 
 **Why:** 混合职责会浪费加载内容并模糊触发边界；格式副本会在技能之间漂移。`principles.md` 是每个 session 都可获得的稳定注入面，集中定义可避免规则分叉和引用死链。
 
@@ -233,7 +233,7 @@ Task 是实质活动工作的权威输入；若创建与清档都发生在未提
 
 **Reversal surface:** engineering
 
-**Decision:** `tests/access-gate/access-decision/` 按 `src/access-gate/access-decision/` 的 `core/`、`adapters/`、`runtime/` 边界镜像分层；extension composition 集成测试保留在 `tests/access-gate/index.test.ts`。`npm test` 使用 `tests/access-gate/**/*.test.ts` 目录 glob，focused `test:index` 覆盖生产入口。行为测试通过当前目录 public seams 验证；同层的结构、密封和 Canonical fact 合同测试可直接读取该层内部 seam，但不导入或复制旧决策链的 helper、fixture 和 expected value。
+**Decision:** `tests/access-gate/access-decision/` 按 `packages/access-gate/src/access-gate/access-decision/` 的 `core/`、`adapters/`、`runtime/` 边界镜像分层；extension composition 集成测试保留在 `tests/access-gate/index.test.ts`。`npm test` 使用 `tests/access-gate/**/*.test.ts` 目录 glob，focused `test:index` 覆盖生产入口。行为测试通过当前目录 public seams 验证；同层的结构、密封和 Canonical fact 合同测试可直接读取该层内部 seam，但不导入或复制旧决策链的 helper、fixture 和 expected value。
 
 **Why:** source 的 `core`、`adapters`、`runtime` 是不同的依赖和职责边界；测试镜像这些目录后，模块到行为测试可以直接导航，且 dependency-boundary 测试能独立守住新边界。目录 glob 不要求每次新增或改名测试时同步维护文件枚举；生产入口仍有独立 focused script，保留快速反馈面而不牺牲全量校验。
 
@@ -324,7 +324,7 @@ Task 是实质活动工作的权威输入；若创建与清档都发生在未提
 **Rules:**
 
 - 模型在任何配置、任何活动 preset 下都观察不到 Policy 数据文本（注入消息 / tool description / system prompt 三面皆无）。
-- 恒定注入面保持唯一：`src/bootstrap/index.ts` 是唯一 `context` 注入点；access-gate 只经失败路径产出静态 Guidance。
+- 恒定注入面保持唯一：`packages/guidance/src/bootstrap/index.ts` 是唯一 `context` 注入点；access-gate 只经失败路径产出静态 Guidance。
 - Guidance 与实现一致：普通 Policy deny 不提供逐次批准（allow-once 仅存在于 ask 流），因此 Guidance 不出现 "approve the operation" 类描述；硬边界、未知和不可证明形态不因 Guidance 而放宽。
 - 未来任何让模型可见活动 preset、Policy 规则或 Policy 状态的需求，必须经本决策生命周期（superseded/retired）显式变更。
 
@@ -354,7 +354,7 @@ Task 是实质活动工作的权威输入；若创建与清档都发生在未提
 
 **Reversal surface:** engineering
 
-**Decision:** Access Decision Pipeline 采用 Greenfield Semantic Rebuild，只以 Pi `tool_call` 外部合同、Linux/Bash 行为、明确的政策语义和安全不变量为设计输入。当前实现独立位于 `src/access-gate/access-decision/`，物理分为 `core/`、`adapters/`、`runtime/`：core 负责 Pi host/config 无关的语义与决策域，Linux pathname lookup 属于该语义域的外部合同；adapters 单向转换外部合同，runtime 是唯一 Composition Root，依赖只能由 runtime 指向 adapters、再指向 core。旧实现、旧配置合同和旧测试不属于当前依赖边界，也不作为正确性 oracle。
+**Decision:** Access Decision Pipeline 采用 Greenfield Semantic Rebuild，只以 Pi `tool_call` 外部合同、Linux/Bash 行为、明确的政策语义和安全不变量为设计输入。当前实现独立位于 `packages/access-gate/src/access-gate/access-decision/`，物理分为 `core/`、`adapters/`、`runtime/`：core 负责 Pi host/config 无关的语义与决策域，Linux pathname lookup 属于该语义域的外部合同；adapters 单向转换外部合同，runtime 是唯一 Composition Root，依赖只能由 runtime 指向 adapters、再指向 core。旧实现、旧配置合同和旧测试不属于当前依赖边界，也不作为正确性 oracle。
 
 生产入口只连接这条经验证的新信任链并保持单一生产路径；不提供旧 API、旧模块路径、旧 config/Profile schema 或兼容双轨。runtime 只实现 tool-call 决策所需的最小 policy state 与 project/staging 生命周期；其他外围能力独立处理。
 
@@ -422,7 +422,7 @@ Canonical reject 使用本域封闭 code、source anchor 与资源分类；rende
 
 **Reversal surface:** user-boundary
 
-**Decision:** 用户可在新的 `policy.yaml` 中以唯一配置 `accessGate: disabled` 显式关闭 AKeel Access Gate。该模式不建立或执行 Operation Admission 决策，所有 Pi `tool_call` 直接 passthrough；`src/bootstrap/` 注入的原则与已声明 `skills/` 继续可用。缺失该字段时 Gate 默认启用；禁用形式不得与 `paths`、`commands` 或 `presets` 混用。未知值、损坏配置和其他不可用外置文件不进入禁用模式，而按 D-069 整体忽略并使用内置 `review` 基线，Gate 继续启用。
+**Decision:** 用户可在新的 `policy.yaml` 中以唯一配置 `accessGate: disabled` 显式关闭 AKeel Access Gate。该模式不建立或执行 Operation Admission 决策，所有 Pi `tool_call` 直接 passthrough；`packages/guidance/src/bootstrap/` 注入的原则与已声明 `packages/guidance/skills/` 继续可用。缺失该字段时 Gate 默认启用；禁用形式不得与 `paths`、`commands` 或 `presets` 混用。未知值、损坏配置和其他不可用外置文件不进入禁用模式，而按 D-069 整体忽略并使用内置 `review` 基线，Gate 继续启用。
 
 **Why:** 某些工作流需要保留工程原则与按需技能，但不希望 AKeel 对工具调用施加操作准入。将选择放在用户明确管理的全局 `policy.yaml` 中，避免异常阻断时依赖隐式环境变量或临时绕过。
 
@@ -582,7 +582,7 @@ Tilde expansion 仅适用于受支持 Shell word 中位于开头、未引用、�
 
 **Reversal surface:** engineering
 
-**Decision:** 在 D-030 定义的 Prompt Surface 内，跨任务恒定不变量归属 `principles.md`，不包装为按需 skill；`skills/disciplines/` 只承载可复用工程方法，`skills/workflows/` 只承载端到端编排。两目录表达作者职责，不创造 Pi 运行时加载层；运行时发现服从 package manifest，workflow 调用模型由 D-078 定义。Disciplines 使用名词短语，Workflows 使用动词-名词，复合名称使用 kebab-case，避免非必要缩写和人物名。
+**Decision:** 在 D-030 定义的 Prompt Surface 内，跨任务恒定不变量归属 `principles.md`，不包装为按需 skill；`packages/guidance/skills/disciplines/` 只承载可复用工程方法，`packages/guidance/skills/workflows/` 只承载端到端编排。两目录表达作者职责，不创造 Pi 运行时加载层；运行时发现服从 package manifest，workflow 调用模型由 D-078 定义。Disciplines 使用名词短语，Workflows 使用动词-名词，复合名称使用 kebab-case，避免非必要缩写和人物名。
 
 通用“完成声明前必须取得 fresh evidence”继续只由 `principles.md §6` 定义。独立 `evidence-first` skill 退役，空 `foundations/` 分发根删除；bug/feature 验证、Requirements 核对和提交前检查等具体操作守卫留在 `fix-validation`、`implement-work`、`change-preflight` 等对应动作点，不复制通用规则正文。
 
@@ -635,7 +635,7 @@ Tilde expansion 仅适用于受支持 Shell word 中位于开头、未引用、�
 
 任何 delegated agent 的有效工具只要包含 `write`、`edit` 或可修改文件的 Shell，就必须位于独立 Git worktree；新增的并行 Task Owner 具备这些能力时，也必须拥有不与其他 Owner 共享的 checkout。按能力而非“不要编辑”的提示词承诺分类。真正只读的 delegated agent 可共享 checkout；测试若可能修改源码或生成受跟踪文件，按写能力任务处理。Herdr 只管理自己创建的 worktree，同一 worktree 只有一个生命周期 owner，不跨执行面清理、合并或复用。Child 不删除自身 pane/workspace/worktree；存活的 Owner 只在结果完成导入或汇总、bounded run record 与当前 Herdr/Git 事实共同证明资源归属且用户明确批准后，以 exact-target、non-force 操作清理。归属或成果保留状态异常时 fail-closed 并报告；该手工合同不授权自动或跨重启回收。
 
-具体的 grilling、packet、Agent 生命周期和 verified candidate 交接步骤由 [`skills/workflows/grill-docs/SKILL.md`](../skills/workflows/grill-docs/SKILL.md) 承载。
+具体的 grilling、packet、Agent 生命周期和 verified candidate 交接步骤由 [`packages/guidance/skills/workflows/grill-docs/SKILL.md`](../packages/guidance/skills/workflows/grill-docs/SKILL.md) 承载。
 
 **Why:** “主 Agent 技术上能完成”不能判断原始探索是否值得污染长期 Owner 上下文；独立 Agent 的价值包括上下文隔离，而不只包括并发。同步 artifact pull 避免 child 自由文本 callback 形成重复 user-role 消息、额外上下文和交付竞态；长期独立工作直接拥有自己的 Owner，则无需把全过程回灌旧会话。唯一 Owner 与互斥范围防止多个会话对 Requirements、验收和权威记录形成 split-brain。当前工作需要可见的 Agent、pane、worktree、状态和人工裁决，Herdr 已直接覆盖这些目标；统一执行面保持上下文、交接和生命周期合同一致。按有效写能力强制 worktree 可避免真实工具权限污染共享 checkout。
 
@@ -843,4 +843,25 @@ Plan 使用 `Plan Slice` 作为内部执行单元。每个 Slice 承载目标、
 
 **Out of Scope:** 失败输出保留算法、用户 `!`/`!!` `bashExecution`、TUI 模型视图、session 持久化边界和其他命令类型的输出裁剪。
 
-## D-086: 待创建
+## D-086: 三个可独立安装能力包与全量分发入口
+
+**Reversal surface:** user-boundary
+
+**Decision:** AKeel 的分发面由三个可独立安装的 Pi package 组成：`akeel-guidance`（bootstrap 与 skills）、`akeel-access-gate`（Access Gate）和 `akeel-context-pruner`（测试输出上下文裁剪）。仓库根 `akeel` 保留为全量分发入口，一次加载三类能力且不重复加载资源。运行时职责可以继续在包内保持独立，但不因此增加额外的可安装包边界；`principles.md` 继续只有 Guidance package 中的单一来源。
+
+**Why:** Guidance 中的 bootstrap 与 skills 共同构成工程指导能力，skills 又依赖原则的单一来源；将两者拆成独立包会产生不完整的 Guidance 安装。Access Gate 和 context-pruner 的触发事件、风险边界和依赖独立，适合单独选择。保留全量入口可以维持现有一条命令安装体验。
+
+**Impact:** 每个 package root 必须拥有自己的 `pi` manifest 和运行时依赖声明；根 manifest 负责全量组合。资源过滤仍可作为 Pi 原生的高级加载方式，但不替代独立 package。未安装 Access Gate 时，AKeel 不提供工具调用准入保证；未安装 context-pruner 时，不提供测试输出上下文裁剪。
+
+**Rejected:**
+
+- **将 bootstrap 与 skills 发布为两个包：** 会把同一 Guidance 能力拆散，并使 skills 缺少其引用的原则来源。
+- **把 context-pruner 合并进 Access Gate：** 两者没有代码依赖，触发点和职责不同，合并只会扩大安装耦合。
+- **只保留一个包并要求用户使用 resource filtering：** 能选择加载内容，但不能提供独立的包身份、依赖和版本边界。
+
+**Out of Scope:**
+
+- **发布流水线与版本联动：** 当前先建立可发布 package root 和 manifest 合同；接入真实 registry 发布时再定义自动化策略。
+- **三类能力的运行时语义变更：** 本决策只定义分发边界；若要改变 Access Gate、bootstrap 或 context-pruner 行为，另立决策。
+
+## D-087: 待创建

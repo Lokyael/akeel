@@ -1,11 +1,13 @@
 {
   "name": "akeel",
+  "version": "0.1.0",
   "description": "Engineering skills and user-space access decisions for Pi-based AI coding",
   "license": "MIT",
   "keywords": ["pi-package"],
   "type": "module",
+  "workspaces": ["packages/*"],
   "scripts": {
-    "test": "tsx scripts/validate-docs.ts && tsx scripts/validate-skills.ts && tsc --noEmit && tsx --test \"tests/access-gate/**/*.test.ts\" \"tests/context-pruner/**/*.test.ts\" \"tests/validate-docs.test.ts\" \"tests/validate-skills.test.ts\"",
+    "test": "tsx scripts/validate-docs.ts && tsx scripts/validate-skills.ts && tsc --noEmit && tsx --test \"tests/access-gate/**/*.test.ts\" \"tests/context-pruner/**/*.test.ts\" \"tests/validate-docs.test.ts\" \"tests/validate-packages.test.ts\" \"tests/validate-skills.test.ts\"",
     "test:file": "tsx --test",
     "test:index": "tsx --test tests/access-gate/index.test.ts"
   },
@@ -19,13 +21,13 @@
   },
   "pi": {
     "extensions": [
-      "./src/bootstrap/index.ts",
-      "./src/access-gate",
-      "./src/context-pruner"
+      "./packages/guidance/src/bootstrap/index.ts",
+      "./packages/access-gate/src/access-gate",
+      "./packages/context-pruner/src/context-pruner"
     ],
     "skills": [
-      "./skills/disciplines",
-      "./skills/workflows"
+      "./packages/guidance/skills/disciplines",
+      "./packages/guidance/skills/workflows"
     ]
   }
 }

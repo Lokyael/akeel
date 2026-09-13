@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
-import accessGate from "../../src/access-gate/index";
+import accessGate from "../../packages/access-gate/src/access-gate/index";
 
 type Handler = (event: unknown, ctx: ExtensionContext) => Promise<unknown>;
 
