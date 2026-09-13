@@ -19,10 +19,12 @@
 - **Why Not Now:** D-075 已通过独立 worktree、唯一 Task Owner 和显式结果导入隔离 delegated write；默认禁止 child 修改 `CONTEXT.md` 或 `docs/` 会同时破坏合法的文档更新和审查准备。仅有 child 在隔离 worktree 中产生文档 diff，不等于权威内容已被污染。
 - **Revisit condition:** 出现 delegated child 对 durable 文档的越权修改被误导入 Owner checkout，或现有 worktree 与 Owner review 无法可靠阻止同类污染的实证。
 
-## C-011: pi-guard 共存说明
+## C-011: pi-guard 命令语义实现参考
 
-- **Why Not Now:** 装了 AKeel 再装 pi-guard 会双重拦截同一 tool_call（两者都拦 bash/read/write）；当前无此用户反馈。AKeel 已独立提供 bash/read/write 的访问决策，是否需要与其他 guard 共存仍缺少真实场景证据。
-- **Revisit condition:** 出现 pi-guard + AKeel 双重拦截的用户报告；复审时重新核对双方当时的实际受管 surface，不以本记录中的产品假设代替新证据。
+- **Why Not Now:** 当前 AKeel 已有独立的 Canonical → Admission → Policy 程序语义边界，尚无真实工作流证明需要参考 pi-guard；其实现不作为正确性依据。
+- **Exploration Direction:** 对照 pi-guard 的命令识别、选项和值消费、wrapper、路径、未知形态与 hard-boundary 处理和当前 public seam；仅在真实需求下依据 Bash/Linux 合同与安全边界重新证明后采纳，不追求 parity 或代码复制。
+- **Boundary:** 不处理安装共存、装配顺序、重复拦截、升级或运行时互操作；不自动恢复命令覆盖或创建实现 Task。
+- **Revisit condition:** 真实工作流受当前命令语义覆盖或处理方式阻塞，且 pi-guard 提供可核查参考证据；或用户明确要求开展有界对照复核。
 
 ## C-015: 复杂 Shell 语义验证方法收敛（停止判据 + Bash 差分语料仲裁）
 
@@ -46,7 +48,7 @@
 
 ## C-020: Content Flow checkpoint governance（仅探索方向）
 
-> 本条只记录未来探索方向，不构成当前需求、路线图、架构采纳或实施承诺；不得据此修改现有 Access Gate 行为。
+> 本条只记录 Content Flow checkpoint 的未来探索；不改变现有 Access Gate 行为。
 
 - **Why Not Now:** 当前项目只有 Operation Admission 信任链，没有可验证的 Content Flow producer/consumer、payload capture、enforcement 或 receipt seam。现在实现会把宿主的 substitution/projection 误称为发布控制，并制造超出实际能力的安全承诺。
 - **Exploration Direction:** 若未来具备真实 seam，重新探索以下边界：Operation Admission 与 Content Flow 独立；静态 Normalized Flow 与运行时 Evidence 分离；Publication、Network Send、Process Start、File Commit 各自拥有 checkpoint 规则、授权、enforcement 和 receipt；只有受控绑定的 `exact` evidence 才能参与进一步判断，`unknown`/`unavailable`/`no-coverage` 不得解释为 clean、safe 或 permit；payload、lineage 和运行时授权不进入 `CompleteAccessPlan`。
@@ -54,7 +56,7 @@
 
 ## C-021: 命令执行的 OS-level confinement
 
-> 本条只记录未来执行期物理隔离方向，不构成当前需求、路线图、架构采纳或实现承诺；当前不引入 sandbox runtime，也不改变 Access Gate 的 Operation Admission 边界。
+> 本条只记录执行期物理隔离的未来探索；当前不引入 sandbox runtime，也不改变 Operation Admission 边界。
 
 - **Why Not Now:** Canonical 与 Policy 只能在执行前决定是否准入，不能约束已放行进程随后触发的依赖生命周期脚本、helper、子进程、文件系统访问或网络外发。OS confinement 需要重新核对 Pi 的 tool operations/sandbox seam、Linux 宿主能力、依赖检测、性能、交互命令和失败模式；当前没有不可信仓库自动执行的高频业务证据，也不能把某个具体 sandbox 工具预先定为方案。
 - **Exploration Direction:** 比较可验证的 Linux 非特权隔离方案，为受管命令建立物理文件系统与网络边界：工作区按需求读写挂载、系统依赖只读、宿主凭据不可见，本地测试或构建可在明确模式下隔离网络。准入语义与执行期 confinement 保持分层；worktree、path admission 或 preset 不能被描述为 OS sandbox。任何方案都需证明不可用宿主、无 UI、嵌套工具、进程树终止、输出与凭据处理，以及 Gate disabled 时的诚实边界。
@@ -73,11 +75,10 @@
 
 ## C-025: Access Decision 历史差异复核清单（调查候选）
 
-> 本条保存 `c52bd1d` 重构前实现与当前 Access Decision Pipeline 的历史差异、风险和待核对问题。唯一候选事项是未来是否启动这次系统复核；清单不是功能 backlog、恢复授权、parity 目标或当前实现合同。任何实现、Decision 变更或候选迁移仍需用户在当时会话明确选择。
+> 本条保存 `c52bd1d` 重构前实现与当前 Access Decision Pipeline 的历史差异、风险和待核对问题。唯一候选事项是未来是否启动这次系统复核；清单不是功能 backlog、恢复授权、parity 目标或当前实现合同。
 
 - **Why Not Now:** 当前实现已按 D-059/D-060 完成 Greenfield trust path 与生产切换，目标不是复刻旧 `command-semantics/gate/profile` 行为；旧实现和旧测试只提供历史线索，不能作为正确性 oracle。完整复核会同时触及安全、配置、UI、可用性、迁移和子代理边界，尚未成为已承诺调查。
-- **Review Contract:** 每个检查点都必须分别核对 historical evidence、current evidence、外部合同与安全不变量，再由用户选择“确认当前行为 / 重新设计或恢复经证明的子集 / 文档同步 / 明确退役 / 发现实现与存活 Decision 不一致 / 迁移为独立 Task、Decision 或 Candidate”。当前已经实现、已有 Decision 或另有相关 Candidate 只构成证据或交叉引用；没有在 C-025 复核中逐项裁决前，不得因此删除本地检查语义或预选结论。
-- **Comparison Points:** 清单覆盖保留不变、增强、收窄和删除项，按后续可独立判断处置的行为族组织，而不是按旧测试数量 parity。命令、选项、输入边界和测试用例细节归入对应功能族或横切检查项；相关 Candidate 可以承载未来独立设计，但不能替代本记录的历史差异问题。
+- **Review Contract:** 每个检查点分别核对 historical evidence、current evidence、外部合同与安全不变量，再由用户选择“确认当前行为 / 重新设计或恢复经证明的子集 / 文档同步 / 明确退役 / 发现实现与存活 Decision 不一致 / 迁移为独立 Task、Decision 或 Candidate”。清单覆盖保留不变、增强、收窄和删除项，按可独立判断的行为族组织，不按旧测试数量追求 parity；命令、选项、输入边界和测试细节归入对应功能族或横切检查项。当前实现、已有 Decision 和相关 Candidate 只构成证据或交叉引用；相关 Candidate 可以承载独立未来设计，但不能替代本记录的历史差异问题，未逐项裁决前也不得删除本地检查语义或预选结论。
 - **Current external dispositions pending this review:**
   - **Resolved cluster:** `Project root and session lifecycle` 与 `Home resolution authority` 当前由 [D-072](decisions.md#d-072-session-启动-cwd-作为访问根与-home-的受限-tilde-语义) 定义；这约束现行行为，但不证明 C-025 已核对旧 Git-root 前置、额外 host `home` 字段及其全部外部场景。正式复核不得无授权逆转 D-072，也不得把 Decision 的存在当作该检查已完成。
   - **Migrated cluster:** `Bounded static iteration semantics` 已由 C-029 独立保存未来设计边界；C-025 仍保留“旧 reducer 与当前 unsupported `for` 的差异是否被正确处置”这一历史核对，不以迁移本身视为完成。
@@ -129,7 +130,7 @@
 
 ### 测试策略与 Greenfield 迁移一致性
 
-  - **Test strategy:** 旧版测试覆盖 legacy 层级；当前新 public seam 测试已覆盖现行 Canonical、Policy、runtime 和 host 合同。候选问题：不是按数量 parity，而是挑旧测试中仍有价值的外部行为转写到新 seam。
+  - **Test strategy:** 不按数量追求 parity；只把旧测试中仍代表外部行为的部分转写到新 public seam。
 - **Supplementary cross-cutting checks:** 以下横切行为尚未在高层点中单独拆项，纳入本候选的待核对范围：
   - **Shared option/config parsing:** 旧 `option-parse.ts`、`config-parse.ts` 统一处理 separated/equals/attached/cluster/`--`、值消费、未知选项 opaque 和 Git/npm config 目标；当前 `program-semantics` 的 scanner 与各命令族实现需逐项对照。
   - **Command prefix normalization:** 旧 `normalize.ts`、`prefix.ts`、`args.ts` 处理 `builtin`、`time`、`!`、env assignment、wrapper positional 和位置参数；当前 wrapper/命令分类是否保留同等边界需核对。
@@ -141,14 +142,12 @@
   - **Shell lexer/parser fidelity:** 旧低层 parser/lexer 测试覆盖 scan-time source span、重复 raw value span 稳定性、comment stripping 边界、quoted env-assignment 判别、numeric fd-prefix 与 quoted digit redirect disambiguation；这些不是当前 public seam，若恢复更宽 Shell 前端需先判定哪些是外部合同。
   - **Command registry internals:** 旧 registry 测试覆盖 duplicate registration fail-fast、`scopeKey` 精确/前缀/最长前缀/`./` 归一化和非真前缀不命中；若重新设计用户命令扩展 seam，需把这些作为候选行为重新证明，而非隐式继承。
   - **Read-only guidance narrow trigger:** 当前只读策略切换提醒只在 `review` 下 Direct `write`/`edit` 的普通 policy deny 生效，不覆盖 Shell、硬边界、未知、破坏性或敏感路径拒绝；后续文档/实现复核需保持这个窄触发，或显式重新设计。
-  - **Runtime trace observer seam:** 当前 service 有 ordered runtime trace events（adapt/compile/admission/evaluate/display/render 等）；若被外部消费者依赖，需决定它是 public diagnostic seam、测试 seam 还是可删除实现细节。
   - **Git hard-boundary/destructive subforms:** 当前 Git 语义对 `-c`、未知 global option、`pathspec-from-file`/NUL、upload/receive/exec hooks、global/system config、remote/archive/submodule hazard，以及 `push --force`、`reset --hard`、branch delete、stash clear 等 destructive 子形态有更细 hard-boundary/destroy 分类；后续 Git parity 不应只按“Git adapter”大项模糊处理。
   - **Path input normalization and invalid forms:** 旧 resolver 还处理 `@` 前缀、拒绝 CR/LF 与 Windows/UNC 路径；当前 Direct canonicalization 与 Shell path resolver 主要显式拒绝 NUL、相对/绝对路径按新 seam 解析。需确认这些旧输入边界是公共兼容行为、安全合同，还是旧实现细节。
   - **Special device/discard handling:** 旧 gate 测试把 `2>/dev/null` 作为 stderr discard 特例允许，同时不把其他外部重定向写入一并放宽；当前 redirection 与 path policy 需确认 `/dev/null`、stdin/stdout/stderr、fd duplicate/close 是否作为稳定合同、Linux 设备特例或实现细节处理。
   - **Direct/Shell equivalence invariants:** 旧测试把 Shell grep 与 Direct grep、Shell read 与 Direct read、写入拒绝等行为作为跨 surface 等价，并锁定“增加 path intent 不得使决策变弱”。当前 Canonical/Admission seam 需确认这些是公共安全不变量、测试 seam，还是随新 surface 收窄而重写的内部证明目标。
   - **Implicit CWD path intent:** 旧 Shell compiler 对无显式路径/重定向的 modify 命令追加 conservative cwd write intent；当前只为 recursive/`ls`/`find` 等命令补 implicit path，其他无路径 modify 形态不再发行同等 cwd write fact。需确认这是刻意收窄、已由其他 hard boundary 吸收，还是遗漏。
   - **Stable legacy code contract:** 旧 `task2-contract` 锁定 headless approval、user denial、path policy deny、shell policy deny 等稳定 code；当前 host-facing block code 收敛且 reason 静态。后续若外部消费者依赖旧 code，需明确兼容、映射或退役，而不是只按 guidance taxonomy 大项处理。
-  - **Distribution and bootstrap identity:** 若比较范围包含整个 `c52bd1d..HEAD` 产品 diff，还需记录 `pi-keel`→`akeel` 的 package/install 名称、bootstrap marker、`.pi-keel/`→`.akeel/` runtime artifact 目录及被移除的分组测试脚本；若 C-025 仅限 Access Decision，则应明确将其排除。
   - **Hard preflight subforms:** 旧 preflight 测试逐项覆盖 literal download-to-interpreter、quote-split interpreter、downloader later in a pipe/line、nested wrapper、`eval` command substitution、comment/string literal 排除与 threat token table。当前更窄 Shell grammar 覆盖部分风险，但若恢复 threat scanner 或解释器/pipeline 子集，需逐项重新采纳或退役这些硬规则。
 - **Decision reset / refresh queue:** 存活 Decision 与既有候选中凡是仍携带重构前结构、旧 Profile/config/schema、旧 plan/verifier/adapter/glob/for-reduction、T-069 前“当前基线”或其他已被 Greenfield Pipeline 重置的术语与结论，都需要逐一重审；未重审前只作为候选议题处理，不作为恢复旧行为的授权。重审时应按当前 Canonical/Admission/Display/Policy seam 迁移仍成立的安全意图，合并已被新决策吸收的内容，并把未承接部分退役或继续留作候选。
 - **Revisit condition:** 用户明确要求开展“重构前后功能 parity/取舍”任务；或出现旧行为缺失导致真实工作流阻塞；或安全复核确认当前实现与存活 Decision（尤其默认敏感路径边界）存在不一致。
@@ -283,10 +282,10 @@
 
 ## C-040: Pi render-only tool-result renderer 与测试模型视图
 
-> 本条只记录未来由 Pi 宿主提供渲染接缝、再由 AKeel 评估测试结果模型视图的候选方向，不构成当前需求、路线图、实现承诺或对现有 TUI 行为的修改授权。
+> 本条只记录 Pi render-only 接缝与测试模型视图的未来评估；不改变现有 TUI、执行或持久化行为。
 
 - **Why Not Now:** 当前 Pi 的 `registerTool` 与 `renderResult` 仍把渲染定义绑定在工具定义上，没有只装饰内置 `bash` tool result、同时保持执行所有权和 session 持久化不变的公开接口。AKeel 当前已完成 context projection，但没有安全的宿主接缝可实现同一条 TUI 结果中的原始输出与模型视图；现在通过覆盖 `bash`、写入 custom message/entry、处理 `bashExecution` 或 monkey-patch 宿主组件都会越过 D-084 与当前范围边界。
-- **Exploration Direction:** 未来只在 Pi 提供并验证 render-only seam 后，评估独立的 renderer registry/decorator 或等价 middleware：基 renderer 继续拥有 `bash` 执行与原始 result，decorator 接收原始 result、关联 tool call、`expanded`、`isPartial`、错误状态、默认 renderer 和 row-local context，并只返回临时 TUI component。AKeel 复用现有纯 projection，仅在 `changed` 时追加明确标记的模型版本；恢复 session 时从原始消息重新计算，不保存 projection，不新增 command、message、entry 或 details 字段。宿主 API、组合顺序、fallback、异常处理和非 TUI mode 行为必须先由 Pi 的 public seam 测试确定。
+- **Exploration Direction:** 仅在 Pi 提供并验证 render-only seam 后，评估在不接管内置 `bash` 执行、不改变 session 持久化的前提下，从原始结果生成临时模型视图。恢复 session 时从原始消息重新计算，不持久化 projection；宿主组合、fallback、异常和非 TUI 行为由 Pi public seam 测试先行确定。
 - **Revisit condition:** Pi 发布可供扩展使用、保持单一执行所有权且能通过测试观察 persistence/render 边界的 render-only tool-result 接口；或用户明确要求重新启动该候选的宿主接口与 TUI 视图评估。
 - **Out of Scope:** 在本候选被明确采纳前，不修改 Pi 安装副本，不覆盖或重实现内置 `bash`，不改变 `bashExecution`、Access Gate、session file、tool result details、模型 context projection 或现有 TUI 展示；不创建 T-xxx 实现任务。
 
@@ -297,5 +296,14 @@
 - **Revisit condition:** 再次修改 `CONTEXT.md`，或有实际证据表明 Architecture 段落成为主要上下文负载时，重新评估其内容归属和压缩空间。
 - **Out of Scope:** 本候选未被明确采纳前，不重写 `CONTEXT.md`，不修改 `principles.md`、skills、插件代码或 Project Record 生命周期，也不把候选内容当作当前架构结论。
 
-## C-042: 待创建
+## C-042: Runtime trace observer seam 的职责与可见性
+
+> 本条从 C-025 独立抽取，记录运行时 trace 的消费者与职责评估；不构成当前公共接口或实现承诺。
+
+- **Why Not Now:** 当前 service 已产生有序的运行时 trace events（`adapt`、`compile`、`admission`、`evaluate`、`display`、`render` 等），但尚未证明存在需要依赖它的外部消费者。将其提升为公共 seam 会引入事件顺序、数据范围和兼容责任；仅为测试保留或完全删除又可能丢失对 pipeline 行为的验证与诊断价值。
+- **Exploration Direction:** 先确认实际消费者和不可替代的使用场景，再比较三种处置：保留为内部测试 seam、重新定义为有界的 public diagnostic seam，或明确退役为实现细节。复核应区分 trace 对测试、诊断和外部集成的不同责任，核对其与 Canonical、Admission、Policy、Display、render 的边界，并保持现有模型上下文、Policy 数据、session 持久化和运行时审计边界不被隐式扩大。
+- **Revisit condition:** 出现外部消费者依赖当前 trace、现有测试或诊断因缺少稳定观测接缝而无法满足真实需求，或用户明确要求重新评估该 trace seam。
+- **Out of Scope:** 在本候选被明确采纳前，不承诺稳定事件 schema、运行时审计日志、session entry、LLM context 注入、Policy 数据暴露、TUI renderer 改造或实现 Task；C-040 的 Pi render-only tool-result renderer 仍是独立候选。
+
+## C-043: 待创建
 
