@@ -70,6 +70,17 @@ test("runtime packages declare only their own extension and required dependency"
   assert.equal(contextPruner.dependencies?.yaml, undefined);
 });
 
+test("each capability package carries the repository license", () => {
+  const license = readFileSync(join(root, "LICENSE"), "utf8");
+  for (const packageRoot of ["packages/guidance", "packages/access-gate", "packages/context-pruner"]) {
+    assert.equal(
+      readFileSync(join(root, packageRoot, "LICENSE"), "utf8"),
+      license,
+      `${packageRoot} must carry the repository LICENSE for independent publication`,
+    );
+  }
+});
+
 test("root akeel manifest loads each capability exactly once", () => {
   const manifest = readPackage("package.json");
   assert.deepEqual(manifest.pi?.extensions, [
