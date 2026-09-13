@@ -202,7 +202,7 @@ Task 是实质活动工作的权威输入；若创建与清档都发生在未提
 
 **Reversal surface:** engineering
 
-**Decision:** `core/shell-words.ts` 是当前支持 wrapper 链的单一语义入口。它从命令词首识别有限的 `env`、`timeout`、`command`、`nohup`、`exec` wrapper，消费各自已证明的 wrapper 参数，并发行 `ShellCommandAnalysis`：`executable` 只承载真正要分析的底层命令，`wrappers` 单独记录 wrapper 链，底层命令的 class、effects 和 paths 由同一入口继续计算。wrapper 不进入 Policy 或 host 层重新解包。
+**Decision:** `core/compilation/shell/invocation.ts` 是当前支持 wrapper 链的单一语义入口。它从命令词首识别有限的 `env`、`timeout`、`command`、`nohup`、`exec` wrapper，消费各自已证明的 wrapper 参数，并发行 `ShellCommandAnalysis`：`executable` 只承载真正要分析的底层命令，`wrappers` 单独记录 wrapper 链，底层命令的 class、effects 和 paths 由同一入口继续计算。wrapper 不进入 Policy 或 host 层重新解包。
 
 支持范围之外的 wrapper option、动态形式、路径形式 wrapper 和不完整 wrapper 链在 Canonical 阶段 fail-closed；当前不把 wrapper 执行期的脚本或子进程行为递归解释为额外语义。
 
@@ -440,7 +440,7 @@ Canonical reject 使用本域封闭 code、source anchor 与资源分类；rende
 
 **Reversal surface:** engineering
 
-**Decision:** Canonical Shell 在词法与 flow 解析之后增加独立的 `core/program-semantics/` 语义层。该层只把已扫描的程序调用转换为命令分类、effects、路径事实和 bounded/opaque 路径知识；registry 只负责可执行文件分派，Policy、配置和 host 不进入该层。Git、解释器、Python 工具、uv 与 npm/pnpm/yarn/npx 使用各自的声明表和少量专用分析器；未知程序和未知子命令保持 `unknown + opaque`。`uv run` 明确分类为 `execute`；uv 的版本/帮助调用和 `uv help` 分类为 `inspect`，其他未建模顶层子命令保持 `unknown + opaque`。
+**Decision:** Canonical Shell 在词法与 flow 解析之后增加独立的 `core/compilation/shell/programs/` 语义层。该层只把已扫描的程序调用转换为命令分类、effects、路径事实和 bounded/opaque 路径知识；registry 只负责可执行文件分派，Policy、配置和 host 不进入该层。Git、解释器、Python 工具、uv 与 npm/pnpm/yarn/npx 使用各自的声明表和少量专用分析器；未知程序和未知子命令保持 `unknown + opaque`。`uv run` 明确分类为 `execute`；uv 的版本/帮助调用和 `uv help` 分类为 `inspect`，其他未建模顶层子命令保持 `unknown + opaque`。
 
 已知且路径访问可完整证明、且不依赖仓库或用户配置执行 helper 的命令可进入普通 `inspect`/`modify`/`execute` 策略。会调用或可能调用 external diff、textconv、filters、hooks、receive hooks、merge drivers 或其他 Git helper 的命令固定进入 hard boundary；当前包括 `git status`、`diff`、`log`、`show`、`add`、`commit`、`push`、`fetch`、`pull`、`clone`、`init`、`help`、`grep`、`blame`、`gc`、checkout/switch/restore、merge/rebase/tag/reset/cherry-pick/revert/stash/submodule 等已建模操作。`git config` 也固定进入 hard boundary，避免隐式配置源暴露凭据或改变后续 helper 语义。解释器脚本、`uv run`、`pytest`、`npm/pnpm/yarn` 的脚本或安装执行、`npx` 以及含未建模运行期访问的命令标记 opaque；配置了显式 `allowedRoots`、`blockedRoots` 或 `blockedPaths` 时由 hard boundary 优先拒绝。`develop` 的 command mode 不扩大该边界。程序语义不递归解释委托的子命令或脚本内容。
 
@@ -459,7 +459,7 @@ Canonical reject 使用本域封闭 code、source anchor 与资源分类；rende
 
 **Rejected:**
 
-- **把所有程序加入 `shell-words.ts` 的 Set：** 无法表达选项值、子命令和委托执行边界，继续扩大单一解析器。
+- **把所有程序加入 `invocation.ts` 的 basename Set：** 无法表达选项值、子命令和委托执行边界，继续扩大单一解析器。
 - **在 adapters/runtime 中解析程序语义：** 违反 core ← adapters ← runtime 依赖方向，并让 Policy/host 重新接触原始命令。
 - **递归解析 `uv run`、`npm run`、`npx` 或解释器脚本：** 脚本和依赖内容不是本次 Canonical 输入的可证明静态事实。
 - **用 `unknown: allow` 或删除 path boundary 放宽 opaque 命令：** 会把不可证明访问变成未声明的安全保证。
@@ -864,4 +864,30 @@ Plan 使用 `Plan Slice` 作为内部执行单元。每个 Slice 承载目标、
 - **发布流水线与版本联动：** 当前先建立可发布 package root 和 manifest 合同；接入真实 registry 发布时再定义自动化策略。
 - **三类能力的运行时语义变更：** 本决策只定义分发边界；若要改变 Access Gate、bootstrap 或 context-pruner 行为，另立决策。
 
-## D-087: 待创建
+## D-087: Access Gate 双语义车道与单一授权信任链
+
+**Reversal surface:** engineering
+
+**Decision:** Access Gate 在 D-059 的 `core ← adapters ← runtime` 外层依赖方向和 D-060 的单次 Canonical 解释边界内，采用“私有 Direct/Shell 语义车道 + 单一授权信任链”。Direct 与 Shell 保留各自的输入语言、编译器和局部语义，但生产调用只进入一个 Canonical facade；该 facade 对每个 managed call 发行一个 opaque、不可伪造、内部以封闭变体区分车道的 `CanonicalCompilation`。同一制品只经一个 Admission facade 投影为 sealed `AdmissionPlan`，其中以判别变体保存 Direct 与 Shell 的最小授权事实，不建立含大量可选字段的公共通用 operation DTO。
+
+Admission 后固定经过不可配置放宽的 Mandatory Boundary Stage，再进入 Configured Policy Kernel；credential、destroy/delete、blocked traversal、recursive blocked descendant 和显式 path scope 下的 opaque access 等系统边界由前者集中拥有，后者只消费 `AdmissionPlan + PolicySnapshot`。两阶段通过一个 Authorization facade 发行统一的 `allow | approval-required | deny` verdict，共享路径事实语义、决策优先级和 tool-call 粒度聚合。`hasUI`、confirm 能力和 `no-ui` 映射属于 Pi host composition，不进入 managed request 的领域事实、Canonical compilation、Admission 或 Policy Kernel；`approval-required` 本身不执行工具。
+
+Canonical compiler 通过受信任、不可由 policy 或用户配置替换的 Linux Path Evidence port 获取 pathname facts；同一 CWD 状态与 source token 对应的语义路径事实只解析一次，后续 CWD 转移、Admission 和 Display 复用已发行结果。Shell program registry 保持封闭且只负责 dispatch；Git、解释器、Python 工具、uv 和 package manager 分别拥有局部 analyzer，并以显式不可变事实表达 path base、cwd change、recursive、opaque 和 hard-boundary 语义，不再以多个 WeakMap/WeakSet sidecar 隐藏同一阶段元数据。
+
+配置 adapter 对一个外部输入只执行一次严格 decode，发行 disabled 或 enabled 的不可变配置结果；enabled 结果包含完整 preset registry、活动 snapshot 和当前 path/command policy，不再为 Direct/Shell 重复构造独立 policy snapshot。Runtime 以单一 session aggregate 拥有固定 Access Root、session-start `$HOME`、policy state、credential boundary 和生命周期资源；策略切换原子替换活动 snapshot。`akeel-access-gate` 的稳定外部表面保持 Pi extension，compiler、parser、resolver、fact accessor 和测试辅助 seam 不从 package root 作为并列产品 API 暴露。
+
+**Why:** 当前实现虽有正确的分层方向，却在层内形成 Direct/Shell 双 Canonical、双 Admission、双 Policy Snapshot/Kernel 和 runtime 双分支；系统硬边界又分散在 service 与不同 evaluator 中。新增共同安全规则因此容易发生只修改一个车道的 shotgun surgery。私有语义车道保留 Direct 结构化合同与 Shell 语言复杂度的 locality，单一信任链则把共同的路径事实、强制边界、政策优先级和结果合同集中到高 leverage seam。将 UI 能力移出授权域，可使同一授权结论不依赖宿主展示能力；一次配置 decode、一次 pathname fact acquisition 和显式 analyzer facts 则减少重复解释与隐藏状态。
+
+**Impact:** Access Gate 的结构重构以新信任链旁路构建、依据当前 Decisions 和外部合同验证，并在完整链路就绪后原子切换生产入口；迁移期间不让新旧 compiler、Admission、Kernel 或 config 交叉组成生产路径。现有 managed/passthrough surface、Policy schema 与 preset、hard boundary、Access Root、tilde、Guidance、disabled mode 和 host-visible allow/confirm/block 行为保持不变。内部测试改为围绕 Canonical facade、Admission facade、Authorization facade、program-family seam 和 Pi composition 验证；无生产消费者的浅层转发与宽 barrel export 可删除。
+
+**Rejected:**
+
+- **把 Direct 与 Shell 压成开放的通用 operation IR：** 两种输入语言与授权轴并不相同；大量可选字段会形成宽 DTO，并把 Shell 的 CWD/opaque 语义泄漏给所有调用方。
+- **Direct 与 Shell 各自保留完整垂直 Policy Kernel：** locality 收益不足以抵消共同 hard boundary、路径优先级和 verdict 继续双源的风险。
+- **让 Policy Kernel 读取 `hasUI` 或直接执行确认：** 宿主能力会污染授权事实，同一请求会因展示环境而得到不同的领域 verdict。
+- **通过用户可配置规则 DSL 或动态 analyzer plugin 扩展系统边界：** 会使 hard-boundary 单调性和 analyzer 信任来源无法由封闭代码合同证明。
+- **在现有 Access Gate 内顺带加入 OS broker/sandbox：** 这会改变执行所有权和安全承诺，不是本模块结构重构。
+
+**Out of Scope:** 新增或放宽 Shell 语法、程序族、destroy/delete、网络或路径能力；改变 `policy.yaml` 用户 schema、内置 preset、凭据分类、Access Root、staging lifecycle 或 `accessGate: disabled` 语义；OS sandbox、fd broker、TOCTOU 消除、执行期子进程/网络隔离；Static Flow、Explanation Replay、Runtime Audit、Runtime Content Flow 和 delegated child policy。
+
+## D-088: 待创建

@@ -1,12 +1,35 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
-  compileDirect,
-  compileShell,
-  projectDisplay,
-  projectShellDisplay,
-  type DirectRequest,
-} from "../../../../packages/access-gate/src/access-gate/access-decision/core/index";
+  compileManagedCall,
+  createCompileEnvironment,
+  createLinuxPathEvidence,
+  projectCompilationDisplay,
+} from "../../../../packages/access-gate/src/access-gate/access-decision/core/compilation/index";
+
+type DirectRequest = Readonly<{
+  readonly surface: "write";
+  readonly arguments: Readonly<{ readonly path: string; readonly content: string }>;
+  readonly cwd: string;
+  readonly hasUI: boolean;
+}>;
+
+function compileDirect(input: DirectRequest) {
+  return compileManagedCall(
+    { surface: input.surface, arguments: input.arguments },
+    createCompileEnvironment({ cwd: input.cwd, pathEvidence: createLinuxPathEvidence() }),
+  );
+}
+
+function compileShell(input: Readonly<{ readonly surface: "bash"; readonly arguments: Readonly<{ readonly command: string }>; readonly cwd: string; readonly hasUI: boolean }>) {
+  return compileManagedCall(
+    { surface: input.surface, arguments: input.arguments },
+    createCompileEnvironment({ cwd: input.cwd, pathEvidence: createLinuxPathEvidence() }),
+  );
+}
+
+const projectDisplay = projectCompilationDisplay;
+const projectShellDisplay = projectCompilationDisplay;
 
 const request: DirectRequest = {
   surface: "write",

@@ -3,7 +3,7 @@ import test from "node:test";
 import {
   createPolicyState,
   handlePiToolCall,
-} from "../../../../packages/access-gate/src/access-gate/access-decision";
+} from "../../../../packages/access-gate/src/access-gate/access-decision/runtime/index";
 import { createTestDecisionService as createDecisionService } from "./test-fixtures";
 
 test("Pi host composition blocks rendered denials with static reason", async () => {

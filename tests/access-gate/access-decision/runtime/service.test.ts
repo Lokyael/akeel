@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import type { DirectRequest } from "../../../../packages/access-gate/src/access-gate/access-decision/core/index";
 import {
   createPolicyState,
   createProjectContext,
-  type DirectRequest,
-} from "../../../../packages/access-gate/src/access-gate/access-decision";
+} from "../../../../packages/access-gate/src/access-gate/access-decision/runtime/index";
 import { createTestDecisionService as createDecisionService } from "./test-fixtures";
 
 const request = (hasUI: boolean): DirectRequest => ({

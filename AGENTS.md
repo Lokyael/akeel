@@ -19,10 +19,12 @@ AKeel 是 [pi](https://pi.dev) 的插件包：以 **扩展（extensions）** 注
 ```
 packages/guidance/src/bootstrap/          # 扩展：Session 注入原则（principles.md + index.ts）
 packages/access-gate/src/access-gate/        # 扩展：policy.yaml adapter、Canonical access-decision 与 Pi runtime composition
-  access-decision/core/ #   Pi host/config 无关的 Canonical、Admission、Policy 与 renderer
-  access-decision/adapters/ # 外部 Pi/tool/policy.yaml 合同适配
-  access-decision/runtime/  # Project/Policy 生命周期与 host composition
-  */index.ts            #   目录公共表面：跨目录引用统一走目录 index，不深入实现文件
+  access-decision/core/authorization/ # sealed Admission、Mandatory Boundary、Configured Policy 与统一 verdict
+  access-decision/core/compilation/   # 单一 Canonical facade、Linux Path Evidence 与私有 Direct/Shell 语义车道
+    shell/programs/                    # Git、解释器、Python、uv、package manager 的封闭 analyzer registry
+  access-decision/adapters/            # 外部 Pi/tool/policy.yaml 合同单次适配
+  access-decision/runtime/             # Gate Session、Project/staging 生命周期与 Pi host approval composition
+  */index.ts                           # 目录公共表面：跨目录引用统一走目录 index，不深入实现文件
 packages/guidance/skills/    # skills：两目录按作者职责组织（D-073）
   disciplines/            #   可复用工程方法（TDD、代码审查、领域建模等）
   workflows/              #   端到端编排（survey-context、implement-work 等）

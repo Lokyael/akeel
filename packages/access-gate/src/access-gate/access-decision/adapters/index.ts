@@ -1,6 +1,10 @@
-export { adaptPolicyConfig, adaptPolicyPresets, isAccessGateDisabled, POLICY_PRESET_NAMES } from "./config";
-export { createCredentialBoundaryForAgentDir } from "./credential-boundary";
-export { loadPolicyFile, resolveAgentDir } from "./policy-file";
-export { adaptHostDecision, adaptHostToolCall, adaptPiToolCall } from "./host";
-export type { AccessGateMode, PolicyConfig, PolicyPresetName, PolicyPresetSet, PolicySnapshot } from "./config";
-export type { HostContext, HostDecision, HostToolCall } from "./host";
+export { decodePolicyConfiguration, POLICY_PRESET_NAMES } from "./config";
+export type {
+  AccessGateMode,
+  DecodedPolicyConfiguration,
+  PolicyConfig,
+  PolicyPresetName,
+} from "./config";
+export { adaptPiGateToolCall } from "./host";
+export type { GateHostToolCall, HostContext } from "./host";
+export { loadDecodedPolicyFile, resolveAgentDir } from "./policy-file";

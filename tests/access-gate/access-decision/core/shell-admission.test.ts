@@ -1,9 +1,24 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { projectUnifiedAdmission as projectShellAdmission } from "../../../../packages/access-gate/src/access-gate/access-decision/core/authorization/index";
 import {
-  compileShell,
-  projectShellAdmission,
-} from "../../../../packages/access-gate/src/access-gate/access-decision/core/index";
+  compileManagedCall,
+  createCompileEnvironment,
+  createLinuxPathEvidence,
+} from "../../../../packages/access-gate/src/access-gate/access-decision/core/compilation/index";
+
+function compileShell(request: Readonly<{
+  readonly surface: "bash";
+  readonly arguments: Readonly<{ readonly command: string }>;
+  readonly cwd: string;
+  readonly hasUI: boolean;
+  readonly home?: string;
+}>) {
+  return compileManagedCall(
+    { surface: request.surface, arguments: request.arguments },
+    createCompileEnvironment({ cwd: request.cwd, home: request.home, pathEvidence: createLinuxPathEvidence() }),
+  );
+}
 
 const pathContract = {
   source: "linux-manual",

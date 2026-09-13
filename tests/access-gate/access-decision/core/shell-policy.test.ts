@@ -1,16 +1,80 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
-  compileShell,
-  createCredentialBoundary,
-  evaluateShellAdmission as evaluateShellAdmissionCore,
-  freezeShellPolicySnapshot,
-  projectShellAdmission,
-  shellAdmissionHitsCredentialBoundary,
-} from "../../../../packages/access-gate/src/access-gate/access-decision/core/index";
+  authorizeAdmission,
+  createMandatoryBoundaries,
+  freezeUnifiedPolicySnapshot,
+  projectUnifiedAdmission,
+} from "../../../../packages/access-gate/src/access-gate/access-decision/core/authorization/index";
+import {
+  compileManagedCall,
+  createCompileEnvironment,
+  createLinuxPathEvidence,
+} from "../../../../packages/access-gate/src/access-gate/access-decision/core/compilation/index";
 
-function evaluateShellAdmission(admissionValue: unknown, policyValue: Parameters<typeof evaluateShellAdmissionCore>[1]) {
-  return evaluateShellAdmissionCore(admissionValue, policyValue);
+const unifiedPolicy = Symbol("unified-policy");
+type TestPolicy = Readonly<Record<string, unknown>> & Readonly<{ [unifiedPolicy]: ReturnType<typeof freezeUnifiedPolicySnapshot> }>;
+type TestAdmission = Readonly<{ readonly value: NonNullable<ReturnType<typeof projectUnifiedAdmission>>; readonly hasUI: boolean }>;
+
+function freezeShellPolicySnapshot(input: Record<string, unknown>): TestPolicy {
+  const allowed = ["read", "write", "inspect", "modify", "execute", "destroy", "unknown", "blockedPaths", "allowedRoots", "blockedRoots"];
+  const required = ["read", "write", "inspect", "modify", "execute", "destroy", "unknown"];
+  if (Reflect.ownKeys(input).some((key) => typeof key !== "string" || !allowed.includes(key)) ||
+    required.some((key) => !["allow", "ask", "deny"].includes(input[key] as string))) {
+    throw new TypeError("invalid shell policy snapshot");
+  }
+  const blockedPaths = Object.freeze([...(input.blockedPaths as readonly string[] | undefined ?? [])]);
+  const allowedRoots = Object.freeze([...(input.allowedRoots as readonly string[] | undefined ?? [])]);
+  const blockedRoots = Object.freeze([...(input.blockedRoots as readonly string[] | undefined ?? [])]);
+  let unified: ReturnType<typeof freezeUnifiedPolicySnapshot>;
+  try {
+    unified = freezeUnifiedPolicySnapshot({
+      paths: {
+        read: input.read,
+        write: input.write,
+        edit: "deny",
+        list: "deny",
+        search: "deny",
+        blockedPaths,
+        allowedRoots,
+        blockedRoots,
+      },
+      commands: {
+        inspect: input.inspect,
+        modify: input.modify,
+        execute: input.execute,
+        destroy: input.destroy,
+        unknown: input.unknown,
+      },
+    });
+  } catch {
+    throw new TypeError("invalid shell policy snapshot");
+  }
+  const result = { ...input, blockedPaths, allowedRoots, blockedRoots };
+  Object.defineProperty(result, unifiedPolicy, { value: unified, enumerable: false });
+  return Object.freeze(result) as unknown as TestPolicy;
+}
+
+function evaluateShellAdmission(admissionValue: TestAdmission, policyValue: TestPolicy) {
+  const verdict = authorizeAdmission(
+    admissionValue.value,
+    createMandatoryBoundaries({ credentialRoots: ["/__test-agent-dir__"] }),
+    policyValue[unifiedPolicy],
+  );
+  if (verdict.kind !== "approval-required") return verdict;
+  return admissionValue.hasUI ? { kind: "ask", executed: false } as const : { kind: "deny", code: "no-ui" } as const;
+}
+
+function createCredentialBoundary(roots: readonly string[]) {
+  return createMandatoryBoundaries({ credentialRoots: roots });
+}
+
+function shellAdmissionHitsCredentialBoundary(admissionValue: TestAdmission, boundaries: unknown): boolean {
+  const allow = freezeUnifiedPolicySnapshot({
+    paths: { read: "allow", write: "allow", edit: "allow", list: "allow", search: "allow", allowedRoots: [], blockedRoots: [], blockedPaths: [] },
+    commands: { inspect: "allow", modify: "allow", execute: "allow", destroy: "allow", unknown: "allow" },
+  });
+  return authorizeAdmission(admissionValue.value, boundaries, allow).kind === "deny";
 }
 
 const policyContract = {
@@ -29,16 +93,14 @@ const policy = {
   blockedPaths: ["/etc/passwd"],
 } as const;
 
-function admission(command: string, hasUI = false) {
-  const compilation = compileShell({
-    surface: "bash",
-    arguments: { command },
-    cwd: "/workspace/project",
-    hasUI,
-  });
-  const result = projectShellAdmission(compilation);
-  assert.ok(result);
-  return result;
+function admission(command: string, hasUI = false): TestAdmission {
+  const compilation = compileManagedCall(
+    { surface: "bash", arguments: { command } },
+    createCompileEnvironment({ cwd: "/workspace/project", pathEvidence: createLinuxPathEvidence() }),
+  );
+  const value = projectUnifiedAdmission(compilation);
+  assert.ok(value);
+  return Object.freeze({ value, hasUI });
 }
 
 test("Shell Policy Snapshot requires explicit read and write modes", () => {

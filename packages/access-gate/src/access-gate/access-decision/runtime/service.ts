@@ -21,7 +21,7 @@ import type { HostFacingDecision } from "./host-render";
 import {
   adaptHostToolCall,
   adaptPiToolCall,
-} from "../adapters/index";
+} from "../adapters/host";
 import { isPolicyState } from "./policy-state";
 import type { PolicyState } from "./policy-state";
 import { isProjectContext } from "./project-context";

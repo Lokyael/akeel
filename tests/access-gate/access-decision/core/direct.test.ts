@@ -4,24 +4,96 @@ import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import {
-  createDecisionService,
-  createPolicyState,
-  type DirectRequest,
-  type PolicyConfig,
-} from "../../../../packages/access-gate/src/access-gate/access-decision";
+  authorizeAdmission,
+  createMandatoryBoundaries,
+  freezeUnifiedPolicySnapshot,
+  projectUnifiedAdmission,
+} from "../../../../packages/access-gate/src/access-gate/access-decision/core/authorization/index";
 import {
-  compileDirect,
-  createCredentialBoundary,
-  directAdmissionHitsCredentialBoundary,
-  evaluateAdmission,
-  freezePolicySnapshot,
-  projectAdmission,
-} from "../../../../packages/access-gate/src/access-gate/access-decision/core/index";
+  compileManagedCall,
+  createCompileEnvironment,
+  createLinuxPathEvidence,
+} from "../../../../packages/access-gate/src/access-gate/access-decision/core/compilation/index";
+
+type DirectRequest = Readonly<{
+  readonly surface: "read" | "write" | "edit" | "list" | "search";
+  readonly arguments: Readonly<Record<string, unknown>>;
+  readonly cwd: string;
+  readonly hasUI: boolean;
+}>;
+
+type TestCompilation = Readonly<{
+  readonly value: ReturnType<typeof compileManagedCall>;
+  readonly hasUI: boolean;
+}>;
+type TestAdmission = Readonly<{
+  readonly value: NonNullable<ReturnType<typeof projectUnifiedAdmission>>;
+  readonly hasUI: boolean;
+}>;
+type TestPolicy = ReturnType<typeof freezeUnifiedPolicySnapshot>;
+
+function createCredentialBoundary(roots: readonly string[]) {
+  return createMandatoryBoundaries({ credentialRoots: roots });
+}
 
 const testBoundary = createCredentialBoundary(["/__test-agent-dir__"]);
 
-function testService(paths: NonNullable<PolicyConfig["paths"]>): ReturnType<typeof createDecisionService> {
-  return createDecisionService(createPolicyState({ paths }), undefined, undefined, testBoundary);
+function compileDirect(request: DirectRequest): TestCompilation {
+  const { cwd, hasUI, ...managed } = request;
+  return Object.freeze({
+    value: compileManagedCall(
+      managed,
+      createCompileEnvironment({ cwd, pathEvidence: createLinuxPathEvidence() }),
+    ),
+    hasUI,
+  });
+}
+
+function projectAdmission(compilation: TestCompilation): TestAdmission | undefined {
+  const value = projectUnifiedAdmission(compilation.value);
+  return value === undefined ? undefined : Object.freeze({ value, hasUI: compilation.hasUI });
+}
+
+function freezePolicySnapshot(input: Record<string, unknown>): TestPolicy {
+  return freezeUnifiedPolicySnapshot({
+    paths: {
+      read: input.read,
+      write: input.write,
+      edit: input.edit ?? "deny",
+      list: input.list ?? "deny",
+      search: input.search ?? "deny",
+      allowedRoots: input.allowedRoots ?? [],
+      blockedRoots: input.blockedRoots ?? [],
+      blockedPaths: input.blockedPaths ?? [],
+    },
+    commands: { inspect: "allow", modify: "allow", execute: "allow", destroy: "allow", unknown: "allow" },
+  });
+}
+
+function evaluateAdmission(admission: TestAdmission, policy: TestPolicy, boundary = testBoundary) {
+  const verdict = authorizeAdmission(admission.value, boundary, policy);
+  if (verdict.kind !== "approval-required") return verdict;
+  return admission.hasUI ? { kind: "ask", executed: false } as const : { kind: "deny", code: "no-ui" } as const;
+}
+
+function directAdmissionHitsCredentialBoundary(admission: TestAdmission, boundary: unknown): boolean {
+  const allow = freezePolicySnapshot({ read: "allow", write: "allow", edit: "allow", list: "allow", search: "allow" });
+  return authorizeAdmission(admission.value, boundary, allow).kind === "deny";
+}
+
+function testService(paths: Record<string, unknown>) {
+  const policy = freezePolicySnapshot(paths);
+  return Object.freeze({
+    decide(request: DirectRequest) {
+      const compilation = compileDirect(request);
+      const admission = projectAdmission(compilation);
+      if (!admission) {
+        const reject = compilation.value as { readonly code?: string };
+        return { kind: "deny", code: reject.code ?? "invalid-request" };
+      }
+      return evaluateAdmission(admission, policy);
+    },
+  });
 }
 
 test("credential artifact paths remain hard boundaries under an allowing Direct policy", () => {

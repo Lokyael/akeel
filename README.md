@@ -24,7 +24,7 @@ AKeel provides bootstrap principles and on-demand engineering skills. It does no
 
 ## Access decisions
 
-AKeel governs the managed `read`, `write`, `edit`, `find`, `grep`, `ls`, and `bash` tool surfaces. Other tool surfaces pass through unchanged. Decisions use a Pi-host-neutral canonical pipeline based on the supported Linux pathname contract; system hard boundaries and unsupported forms fail closed.
+AKeel governs the managed `read`, `write`, `edit`, `find`, `grep`, `ls`, and `bash` tool surfaces. Other tool surfaces pass through unchanged. Private Direct and Shell semantic lanes converge on one sealed admission and authorization chain based on the supported Linux pathname contract; mandatory system boundaries precede configurable policy, while approval availability remains a Pi-host concern. System hard boundaries and unsupported forms fail closed.
 
 Shell analysis covers bounded Git operations, interpreter information commands, Python quality tools, and common uv/npm/pnpm/yarn/npx classifications. Git operations that may invoke repository or user-configured helpers remain hard-denied, including `status`, `diff`, `log`, `show`, `add`, `commit`, fetch/push/clone, related mutations, and `git config`. Script/package/download delegates and unknown subcommands remain opaque; explicit project path boundaries hard-deny them, and `develop` does not widen that boundary. Path-form executables remain opaque `execute` operations, while destructive forms remain hard-denied. Git `-C`, `--git-dir`, `--work-tree`, and explicit project-local `file://` paths are canonicalized; HTTPS/SSH, hosted `file://`, aliases, indirect config remotes, `clone --separate-git-dir`, and other unmodeled locations fail closed.
 

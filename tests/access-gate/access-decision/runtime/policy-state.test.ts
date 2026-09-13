@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { activatePolicyPreset, createPolicyState } from "../../../../packages/access-gate/src/access-gate/access-decision";
+import { activatePolicyPreset, createPolicyState } from "../../../../packages/access-gate/src/access-gate/access-decision/runtime/index";
 
 test("policy state publishes one immutable adapted snapshot", () => {
   const config = { paths: { read: "allow" as const }, commands: { inspect: "allow" as const } };

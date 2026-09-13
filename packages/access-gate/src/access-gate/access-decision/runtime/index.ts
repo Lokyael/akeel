@@ -1,10 +1,12 @@
-export { handlePiToolCall } from "./host-composition";
+export { createGateSession } from "./gate-session";
+export { handleGateSessionToolCall, handlePiToolCall } from "./host-composition";
 export { installGlobalPiAccessDecision, installPiAccessDecision } from "./pi-composition";
 export { createDecisionService } from "./service";
 export { activatePolicyPreset, createPolicyState } from "./policy-state";
 export { createProjectContext } from "./project-context";
 export { renderHostBlock, renderHostFacingDecision } from "./host-render";
 export { createProjectLifecycle } from "./project-lifecycle";
+export type { GateSession, GateSessionResult } from "./gate-session";
 export type { PiToolCallHandlerResult } from "./host-composition";
 export type { GlobalPiCompositionOptions, PiCompositionOptions } from "./pi-composition";
 export type { DecisionService, RuntimeObserver, RuntimeResult, RuntimeTraceEvent } from "./service";

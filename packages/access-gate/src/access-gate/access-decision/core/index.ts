@@ -1,3 +1,22 @@
+export {
+  authorizeAdmission,
+  createMandatoryBoundaries,
+  freezeUnifiedPolicySnapshot,
+  projectUnifiedAdmission,
+} from "./authorization/index";
+export {
+  compileManagedCall,
+  createCompileEnvironment,
+  createLinuxPathEvidence,
+  projectCompilationDisplay,
+} from "./compilation/index";
+export type { AuthorizationVerdict, UnifiedPolicySnapshot } from "./authorization/index";
+export type {
+  ManagedCall,
+  PathEvidencePort,
+  ResolvedPathEvidence,
+  UnifiedDisplayView,
+} from "./compilation/index";
 export { projectAdmission, projectShellAdmission } from "./admission";
 export {
   createCredentialBoundary,
@@ -16,8 +35,13 @@ export type { DirectDisplayView, ShellDisplayOperation, ShellDisplayView } from 
 export type { Decision, DirectEditEntry, DirectRequest, DirectSurface, PolicyInput, PolicyMode } from "./types";
 export { scanShellWords } from "./shell-language";
 export type { ShellPathKind, ShellQuoteMode, ShellWord, ShellWordScan } from "./shell-language";
-export { analyzeProgramCommand } from "./program-semantics";
-export type { ProgramCwdChange, ProgramPath, ProgramPathBase, ProgramSemantic } from "./program-semantics/types";
+export { analyzeProgramCommand } from "./compilation/shell/programs/index";
+export type {
+  ProgramCwdChange,
+  ProgramPath,
+  ProgramPathBase,
+  ProgramSemantic,
+} from "./compilation/shell/programs/index";
 export { analyzeShellCommand, shellCommandOutcomes } from "./shell-words";
 export type {
   ShellCommandAnalysis,

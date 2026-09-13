@@ -2,18 +2,21 @@
 
 ## Glossary
 
-- **Access Gate**：拦截受管辖的 Pi `tool_call`，执行 Canonical → Admission → Policy → host composition；未受管辖的工具 passthrough。
+- **Access Gate**：拦截受管辖的 Pi `tool_call`，执行 Canonical → Admission → Mandatory Boundary → Configured Policy → host composition；未受管辖的工具 passthrough。
 - **Access Root**：AKeel 绑定到 Pi 会话创建时 `cwd` 的固定访问边界；不要求 Git root，不因 Shell `cd` 改变，也不向下猜测子仓库。
 - **Tilde Expansion Authority**：Shell 中受限 tilde expansion 使用的唯一 home 来源；当前为会话初始化时 Pi 进程的 `$HOME`，不是额外的 Pi `home` 字段。
 - **Greenfield Semantic Rebuild**：新决策链只从 Pi/Bash/Linux 外部合同、明确政策语义和安全不变量设计；旧实现仅保留为 Git 历史参考。
 - **Canonical Compilation**：对一个请求执行一次有界解释后发行的 opaque、不可变、可验真的编译制品；内部事实不作为公共 DTO 暴露。
 - **Verified Candidate**：Herdr 讨论完成问题处理与事实核对后生成、等待 Task Owner Session 导入确认的临时候选制品。
-- **Admission Plan**：Canonical Compilation 向授权域投影的最小 sealed 输入，只包含 Policy Kernel 实际消费的事实。
+- **Admission Plan**：Canonical Compilation 向授权域投影的最小 sealed 输入；以私有 Direct/Shell 判别变体保存 Mandatory Boundary 与 Configured Policy 实际消费的事实，不包含 host UI、配置格式或展示数据。
+- **Mandatory Boundary Stage**：先于可配置 Policy 的不可放宽授权阶段，集中处理 credential、destroy/delete、blocked traversal、recursive blocked descendant 与 scoped opaque access。
+- **Authorization Verdict**：Authorization facade 发行的 `allow`、`approval-required` 或 `deny`；UI availability 与确认结果不属于该领域结论。
 - **Policy Snapshot**：与配置格式无关、不可变的授权值；只由新 policy.yaml adapter 发行。
 - **Policy Preset**：会话可绑定的完整策略定位；内置 `review`、`guided`、`develop`，并可加载合法的自定义 preset；不使用继承式 Profile，`status` 是命令保留字。
 - **Human-only Status**：只面向用户显示、不会进入 LLM context、tool description 或 system prompt 的策略状态或选择界面。
 - **Access Gate Disabled Mode**：用户在 `policy.yaml` 中显式设置 `accessGate: disabled` 后，仅保留 bootstrap 与 skills，Access Gate 不执行 tool-call 准入。
-- **Policy Kernel**：只消费 Admission Plan 与 Policy Snapshot 的同步纯函数，不读取原始请求、配置 loader 或 Shell parser。
+- **Policy Kernel**：Configured Policy 阶段中只消费 Admission Plan 与 Policy Snapshot 的同步纯函数，不读取原始请求、配置 loader、Shell parser 或 host UI。
+- **Gate Session**：绑定单次 Pi session 的 runtime aggregate，拥有固定 Access Root、session-start `$HOME`、活动 Policy Snapshot、credential boundary 与 lifecycle。
 - **Guidance**：从决策代码到静态 bounded host-facing 文案的封闭映射，不携带可执行 Shell。
 - **Project Record**：项目文档中的受控记录总称，分为 Candidate、Task 和 Decision。
 - **Candidate Record**：未采纳、未承诺实施的 `C-xxx` 停车记录，不构成指令或路线图。
@@ -49,8 +52,8 @@
 - `packages/guidance/src/bootstrap/` 在 Session 启动和 compaction 后注入工程原则；`packages/context-pruner/src/context-pruner/` 在构建模型 context 时无模型参与地裁剪模型调用 `bash` 工具产生的、具备受支持测试运行器正向摘要的 `npm test`/`npm run test` 成功输出。任意成功文本、零测试、skipped/todo、warning 和未识别格式保持原样。用户 `!`/`!!` 产生的 `bashExecution` 保持不变；测试结果的原始 session 内容保持不变。D-084 将同一模型 bash 工具结果的 TUI 展示限定为原始输出与临时 Human-only Test Context View，后者不写入 session，也不改变模型 context 边界。通用 fresh-evidence 门禁属于该恒定面。Skills 只保留 `packages/guidance/skills/disciplines/` 可复用方法与 `packages/guidance/skills/workflows/` 端到端编排两个作者职责根。`module-design` 处理已知模块或接口设计；手动 `assess-modularity` 只发现仓库或子系统级结构摩擦并交付临时 findings。`implementation-planning` 把已批准的 Requirements 与 Design 组织为由 Plan Slices 构成的 implementation-ready Task Plan。`instruction-editing` 为用户项目提供语义保持型 instruction 编辑方法，`AGENTS.md` 为 AKeel Prompt Surface 提供本地 overlay。`implement-work` 持有实施生命周期，并在提交前编排 `change-preflight` 以只读方式核对当前活动变更、按安全自治合同处理有限残留；`code-review` 对固定 Review Surface 做独立只读审查，明确提交可直接固定 OID，`code-cleanup` 只处理明确批准范围内的行为保持型深度维护。`bug-reproduction` 为难以稳定观察的技术问题建立 Reproduction Result，`systematic-debugging` 消费可用信号并以区分性实验确认根因，在授权范围内衔接 TDD 与 fix validation。Grilling 只由用户手动调用的 `grill-docs` 承载，按未决问题处理、候选方案确认、事实核对、verified candidate 交接和 Task Owner 导入的固定顺序执行。
 - AKeel 分为三个可独立安装的 package：`akeel-guidance`（bootstrap + skills）、`akeel-access-gate`（Access Gate）和 `akeel-context-pruner`（测试输出上下文裁剪）；根 `akeel` package 提供三者的全量 manifest。
 - 委托按 D-075 执行上下文准入和封闭路由：Task Owner Session 保留 Authority Context；需要隔离过程上下文且结果仍由该 Owner 裁决的工作统一通过 Herdr child 同步执行，Owner 预定 artifact、等待 settle 后按路径拉取，child 不发送完成 prompt；AKeel 不维护第二套委托执行面，也不把 Herdr 声明为 runtime dependency。可独立验收的长期工作只有经用户明确授权才进入范围互斥的新 Task Owner Session。有效能力含写入或文件修改 Shell 的 delegated agent 强制进入独立 worktree，新增的并行 Owner 也必须拥有不与其他 Owner 共享的 checkout；child 不自清理，由存活 Owner 负责检查、集成与明确批准后的回收。
-- `packages/access-gate/src/access-gate/access-decision/` 是当前唯一决策实现：`core/` 负责 Pi host/config 无关的语义与策略，Linux pathname lookup 属于该语义域的外部合同；`core/program-semantics/` 负责 Git、解释器、Python 工具、uv 和 npm 族的程序分类与路径事实，Git `-C`、`--git-dir` 和 `--work-tree` 已通过 Canonical command-local cwd seam 解析，helper-capable Git 操作及 `git config` hard-deny；`adapters/` 转换 Pi 和 policy.yaml 输入，`runtime/` 负责 project/staging 生命周期和 host composition。运行时以 session-start cwd 作为固定 Access Root，不要求 Git root；Shell tilde expansion 使用会话初始化时的 `$HOME`。
-- Access Decision Pipeline（D-059/D-060）已完成 Greenfield trust path 与原子生产切换。Canonical 只解释一次；Admission 与 Display 按需投影；Policy Kernel 不读取配置或重新解析请求。Canonical path resolution 同时保留 lexical 与 symlink-target traversal prefixes，Direct search 与 Shell recursive path 均在 blocked descendants 上 fail-closed；有显式 path boundary 时，unknown/unbounded Shell path access 也不得放行。path-form executable 不因已知 basename 获得 inspect/modify 语义，非破坏性形式统一按 opaque execute 处理。Git 显式项目内 `file://` remote 也在 Canonical 阶段转为 path fact；helper-capable Git 操作与 `git config` 保持 hard-deny，host、alias 和间接 config remote 继续 fail-closed。
+- `packages/access-gate/src/access-gate/access-decision/` 是当前唯一决策实现：`core/compilation/` 以一个 facade 封装私有 Direct/Shell 语义车道并发行 opaque Canonical Compilation，Shell 的 Git、解释器、Python 工具、uv 和 npm 族 analyzer 位于 `core/compilation/shell/programs/`；`core/authorization/` 发行 sealed Admission，并集中执行 Mandatory Boundary 与 Configured Policy。Git `-C`、`--git-dir` 和 `--work-tree` 通过 Canonical command-local cwd seam 解析，helper-capable Git 操作及 `git config` hard-deny。`adapters/` 单次转换 Pi 与 policy.yaml 输入，`runtime/gate-session.ts` 聚合固定 Access Root、session-start `$HOME`、Policy、credential boundary 和 project/staging lifecycle，Pi host composition 独占 UI approval/no-UI 映射。
+- Access Decision Pipeline（D-059/D-060/D-087）已完成单一授权信任链的原子生产切换。一个 `compileManagedCall` facade 对每个请求只解释一次并发行内部判别车道的 opaque Compilation；同一制品只投影一次 sealed Admission，Display 仅在 `approval-required` 时按需投影。Mandatory Boundary 先于只消费 Admission + 单一 Policy Snapshot 的 Configured Policy，Authorization verdict 不读取 UI；Pi host 再把 approval requirement 映射为 confirm 或静态 no-UI block。Canonical pathname evidence 在同一 CWD 状态/source token 上只获取一次并保留 lexical 与 symlink-target traversal prefixes；Direct search 与 Shell recursive path 均在 blocked descendants 上 fail-closed，有显式 path boundary 时 unknown/unbounded Shell path access 也不得放行。path-form executable 不因已知 basename 获得 inspect/modify 语义，非破坏性形式统一按 opaque execute 处理；Git 显式项目内 `file://` remote 转为 path fact，helper-capable Git 操作、`git config`、host、alias 和间接 config remote 继续 fail-closed。
 - 受管辖 surface 为 Direct `read`、`write`、`edit`、`find`、`grep`、`ls` 与 Shell `bash`。无效 host context、unsupported syntax 和硬安全边界 fail-closed；外置 `policy.yaml` 缺失、为空或不可用时整体忽略并使用内置 `review` 基线，不部分采用无效内容；未拥有的工具 passthrough。
 - 生产入口只读取 `$PI_CODING_AGENT_DIR/akeel/policy.yaml`（默认 `~/.pi/agent/akeel/policy.yaml`）。内置 `review`、`guided`、`develop` 不依赖外置文件；文件缺失、为空、格式/schema/legacy 不可用时整体忽略并使用内置 `review`，不部分采用、不读取旧 config/Profile schema，也不使用旧 fallback。
 - Policy Preset 当前由 D-069 规定为内置 `review`、`guided`、`develop` 加 `policy.yaml` 自定义 preset；外部 flat policy 与自定义 preset 均使用完整的 `paths` 与 `commands` 定义，缺失必需字段时整体回退到内置 `review`；每个 preset 可拥有独立 path scope，系统 hard boundary 始终优先。`commands.destroy` 可在自定义 preset 中配置为 `allow`，但 D-071 规定所有 destroy/delete 操作永久 hard-deny，不产生 ask。D-068 定案其用户入口：原生 TUI 中 `/policy` 无参数打开临时 human-only 选择面板，显示所有已加载 preset，显式 `/policy <preset>` 入口保留，策略状态不常驻 UI。Delegated child 按任务类型的能力分层与风险边界仍属 C-009 候选范围。
@@ -100,6 +103,7 @@
 - [D-084 测试输出的人类专用模型视图与会话持久化边界](docs/decisions.md#d-084-测试输出的人类专用模型视图与会话持久化边界)
 - [D-085 测试成功投影必须具备正向运行器证据](docs/decisions.md#d-085-测试成功投影必须具备正向运行器证据)
 - [D-086 三个可独立安装能力包与全量分发入口](docs/decisions.md#d-086-三个可独立安装能力包与全量分发入口)
+- [D-087 Access Gate 双语义车道与单一授权信任链](docs/decisions.md#d-087-access-gate-双语义车道与单一授权信任链)
 
 ## Negative Space
 
@@ -112,7 +116,7 @@
 - 不提供 AKeel 管理的 delegated child 能力分层、父子权限钳制或子代理 preset 继承；按任务类型的能力与风险边界仍属 C-009 候选范围。
 - Access Gate 可由用户显式禁用；禁用时不拦截 managed tool call，故不提供路径、Shell 或操作准入保证。bootstrap 与 skills 仍然分发和运行。
 - 旧 `config.yaml`、Profile、命令覆盖、继承和子代理字段不属于新 Policy Snapshot 输入；当前只读取全局 `policy.yaml` 的静态策略字段、preset 绑定或显式 `accessGate` 禁用标志。
-- Shell 只支持显式定义、可静态证明且资源有界的子集；不可证明形态 fail-closed。`core/program-semantics/` 中的已知程序仍需提供 bounded path 事实；解释器脚本、uv run、npm/pnpm/yarn 执行、npx、pytest 和未知子命令等委托执行保持 opaque，在显式 path boundary 下 hard-deny。所有 Canonical `destroy`/`delete` 操作永久 hard-deny；`commands.destroy: allow` 仅可作为自定义 preset 的合法配置值，不改变该边界。Git local transport 仅接受可解析的项目内 `file://` path；HTTPS/SSH 等外部 transport、host、alias、间接 config、ext transport 和其他未建模形态继续 hard-boundary。未建模的命令副作用不单独建模。
+- Shell 只支持显式定义、可静态证明且资源有界的子集；不可证明形态 fail-closed。`core/compilation/shell/programs/` 中的已知程序仍需提供 bounded path 事实；解释器脚本、uv run、npm/pnpm/yarn 执行、npx、pytest 和未知子命令等委托执行保持 opaque，在显式 path boundary 下 hard-deny。所有 Canonical `destroy`/`delete` 操作永久 hard-deny；`commands.destroy: allow` 仅可作为自定义 preset 的合法配置值，不改变该边界。Git local transport 仅接受可解析的项目内 `file://` path；HTTPS/SSH 等外部 transport、host、alias、间接 config、ext transport 和其他未建模形态继续 hard-boundary。未建模的命令副作用不单独建模。
 - 不把短期 Task Record、实施过程或审查报告作为永久当前知识；Task checkpoint 留在 Git 历史，正文落地后从当前树清除。
 - 不在 T-069 实现 Static Flow Graph、Explanation Replay 或 Runtime Audit Event，也不提供通用 Runtime Content Flow；D-084 仅覆盖模型 `bash` 工具结果行内的人类专用模型视图，不覆盖用户 `!`/`!!` 的 `bashExecution`。
 - 不把旧实现结果当作正确性 oracle；旧代码、旧测试和 archive 只提供待重新证明的历史线索。

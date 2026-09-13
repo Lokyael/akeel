@@ -8,7 +8,7 @@ import {
   installGlobalPiAccessDecision,
   installPiAccessDecision,
   type PiCompositionOptions,
-} from "../../../../packages/access-gate/src/access-gate/access-decision";
+} from "../../../../packages/access-gate/src/access-gate/access-decision/runtime/index";
 
 type Handler = (event: unknown, context: ExtensionContext) => unknown | Promise<unknown>;
 
@@ -405,6 +405,32 @@ test("Pi policy command switches presets and keeps the active state visible", as
   await command!("unknown", hostContext);
   assert.equal(
     await invoke(handlers, "tool_call", { toolName: "write", input: { path: "notes.md", content: "updated\n" } }, hostContext),
+    undefined,
+  );
+});
+
+test("Pi composition keeps relative tool paths anchored to the session-start cwd", async () => {
+  const { handlers, pi } = fakePi();
+  installPiAccessDecision(pi, {
+    policyConfig: {
+      paths: {
+        read: "allow",
+        blockedPaths: ["/workspace/project/subdir/README.md"],
+      },
+    },
+    projectRoot: "/workspace/project",
+    stagingRoot: "/tmp/akeel",
+  });
+  const sessionContext = context("/workspace/project", false, async () => false);
+  await invoke(handlers, "session_start", {}, sessionContext);
+
+  assert.equal(
+    await invoke(
+      handlers,
+      "tool_call",
+      { toolName: "read", input: { path: "README.md" } },
+      context("/workspace/project/subdir", false, async () => false),
+    ),
     undefined,
   );
 });

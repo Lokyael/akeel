@@ -4,7 +4,7 @@ import {
   firstNonOptionWord,
   hasUnknownOption,
   scanOptionWords,
-} from "../../../../packages/access-gate/src/access-gate/access-decision/core/program-semantics/option-scanner";
+} from "../../../../packages/access-gate/src/access-gate/access-decision/core/compilation/shell/programs/option-scanner";
 import type { ShellWord } from "../../../../packages/access-gate/src/access-gate/access-decision/core/index";
 
 function word(text: string, start: number): ShellWord {

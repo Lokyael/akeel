@@ -1,10 +1,44 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
-  compileShell,
-  isShellReject,
-} from "../../../../packages/access-gate/src/access-gate/access-decision/core/index";
-import { shellCompilationFacts } from "../../../../packages/access-gate/src/access-gate/access-decision/core/shell-compile";
+  canonicalCompilationFacts,
+  compileManagedCall,
+  createCompileEnvironment,
+  createLinuxPathEvidence,
+} from "../../../../packages/access-gate/src/access-gate/access-decision/core/compilation/index";
+
+type ShellRequest = Readonly<{
+  readonly surface: "bash";
+  readonly arguments: Readonly<{ readonly command: string }>;
+  readonly cwd: string;
+  readonly hasUI: boolean;
+  readonly home?: string;
+}>;
+
+function compileShell(request: ShellRequest | unknown) {
+  if (typeof request !== "object" || request === null) {
+    return compileManagedCall(request, undefined);
+  }
+  const candidate = request as Record<string, unknown>;
+  const environment = createCompileEnvironment({
+    cwd: candidate.cwd,
+    home: candidate.home,
+    pathEvidence: createLinuxPathEvidence(),
+  });
+  return compileManagedCall({ surface: candidate.surface, arguments: candidate.arguments }, environment);
+}
+
+function isShellReject(value: unknown): value is Readonly<{ readonly kind: "reject"; readonly code: string; readonly anchor: unknown; readonly resourceClass: string }> {
+  return typeof value === "object" && value !== null && (value as { readonly kind?: unknown }).kind === "reject";
+}
+
+function shellCompilationFacts(value: unknown) {
+  const facts = canonicalCompilationFacts(value);
+  if (facts?.kind !== "shell") return undefined;
+  return {
+    resolvedPaths: facts.operations.map((operation) => operation.paths.map((path) => path.evidence)),
+  };
+}
 
 const bashContract = {
   source: "bash-manual",

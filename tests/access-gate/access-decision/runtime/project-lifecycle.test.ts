@@ -3,7 +3,7 @@ import test from "node:test";
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import { tmpdir } from "node:os";
-import { createProjectLifecycle } from "../../../../packages/access-gate/src/access-gate/access-decision";
+import { createProjectLifecycle } from "../../../../packages/access-gate/src/access-gate/access-decision/runtime/index";
 
 function project(): { readonly root: string; readonly nested: string; readonly cleanup: () => void } {
   const root = mkdtempSync(join(tmpdir(), "akeel-project-"));

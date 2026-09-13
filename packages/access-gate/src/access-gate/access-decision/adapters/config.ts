@@ -1,14 +1,35 @@
-import {
-  freezePolicySnapshot,
-  freezeShellPolicySnapshot,
-  resolveExistingPath,
-} from "../core/index";
-import type {
-  PolicyMode,
-  PolicySnapshot as DirectPolicySnapshot,
-  ShellPolicyMode,
-  ShellPolicySnapshot,
-} from "../core/index";
+import { freezeUnifiedPolicySnapshot } from "../core/authorization/index";
+import type { AuthorizationMode, UnifiedPolicySnapshot } from "../core/authorization/index";
+import { createLinuxPathEvidence } from "../core/compilation/index";
+
+type PolicyMode = AuthorizationMode;
+type ShellPolicyMode = AuthorizationMode;
+
+type DirectPolicySnapshot = Readonly<{
+  readonly read: PolicyMode;
+  readonly write: PolicyMode;
+  readonly edit: PolicyMode;
+  readonly list: PolicyMode;
+  readonly search: PolicyMode;
+  readonly allowedRoots: readonly string[];
+  readonly blockedRoots: readonly string[];
+  readonly blockedPaths: readonly string[];
+}>;
+
+type ShellPolicySnapshot = Readonly<{
+  readonly read: ShellPolicyMode;
+  readonly write: ShellPolicyMode;
+  readonly inspect: ShellPolicyMode;
+  readonly modify: ShellPolicyMode;
+  readonly execute: ShellPolicyMode;
+  readonly destroy: ShellPolicyMode;
+  readonly unknown: ShellPolicyMode;
+  readonly allowedRoots: readonly string[];
+  readonly blockedRoots: readonly string[];
+  readonly blockedPaths: readonly string[];
+}>;
+
+const POLICY_PATH_EVIDENCE = createLinuxPathEvidence();
 
 export const POLICY_PRESET_NAMES = ["review", "guided", "develop"] as const;
 export type BuiltinPolicyPresetName = (typeof POLICY_PRESET_NAMES)[number];
@@ -50,6 +71,15 @@ export type PolicyPresetSet = Readonly<{
   readonly active: PolicyPresetName;
   readonly snapshots: Readonly<Record<string, PolicySnapshot>>;
 }>;
+
+export type DecodedPolicyConfiguration =
+  | Readonly<{ readonly kind: "disabled" }>
+  | Readonly<{
+      readonly kind: "enabled";
+      readonly activePreset: string;
+      readonly switchable: boolean;
+      readonly snapshots: Readonly<Record<string, UnifiedPolicySnapshot>>;
+    }>;
 
 const POLICY_MODES = ["allow", "ask", "deny"] as const;
 const PATH_FIELDS = [
@@ -157,7 +187,7 @@ function readPaths(value: unknown, requireCompleteModes = false): {
     }
     arrays[field] = Object.freeze(
       (candidate === undefined ? [] : candidate.map((path) => {
-        const normalized = resolveExistingPath(path);
+        const normalized = POLICY_PATH_EVIDENCE.resolve("/", path)?.candidate;
         if (normalized === undefined) throw invalidConfig();
         return normalized;
       })),
@@ -200,12 +230,33 @@ function readCommands(value: unknown, requireCompleteModes = false): {
   };
 }
 
+type NormalizedDefinition = Readonly<{
+  readonly paths: ReturnType<typeof readPaths>;
+  readonly commands: ReturnType<typeof readCommands>;
+}>;
+
+const normalizedDefinitions = new WeakMap<object, NormalizedDefinition>();
+
+function normalizedDefinition(definition: PolicyDefinition): NormalizedDefinition {
+  const cached = normalizedDefinitions.get(definition);
+  if (cached !== undefined) return cached;
+  const normalized = Object.freeze({
+    paths: readPaths(definition.paths),
+    commands: readCommands(definition.commands),
+  });
+  normalizedDefinitions.set(definition, normalized);
+  return normalized;
+}
+
 function readDefinition(value: unknown, requireSections: boolean, requireCompleteModes = false): PolicyDefinition {
   if (!isRecord(value) || !hasOnlyKeys(value, DEFINITION_FIELDS)) throw invalidConfig();
   if ((requireSections || requireCompleteModes) && (value.paths === undefined || value.commands === undefined)) throw invalidConfig();
-  if (value.paths !== undefined) readPaths(value.paths, requireCompleteModes);
-  if (value.commands !== undefined) readCommands(value.commands, requireCompleteModes);
-  return value as PolicyDefinition;
+  const definition = value as PolicyDefinition;
+  normalizedDefinitions.set(definition, Object.freeze({
+    paths: readPaths(value.paths, requireCompleteModes),
+    commands: readCommands(value.commands, requireCompleteModes),
+  }));
+  return definition;
 }
 
 type ParsedPolicy = Readonly<{
@@ -242,10 +293,14 @@ function readConfig(input: unknown, requireCompleteExternalModes = false): Parse
   return Object.freeze({ flat: readDefinition(input, false, requireCompleteExternalModes) });
 }
 
+function unifiedSnapshotFor(definition: PolicyDefinition): UnifiedPolicySnapshot {
+  const { paths, commands } = normalizedDefinition(definition);
+  return freezeUnifiedPolicySnapshot({ paths, commands });
+}
+
 function snapshotFor(definition: PolicyDefinition): PolicySnapshot {
-  const paths = readPaths(definition.paths);
-  const commands = readCommands(definition.commands);
-  const direct = freezePolicySnapshot({
+  const { paths, commands } = normalizedDefinition(definition);
+  const direct: DirectPolicySnapshot = Object.freeze({
     read: paths.read,
     write: paths.write,
     edit: paths.edit,
@@ -255,7 +310,7 @@ function snapshotFor(definition: PolicyDefinition): PolicySnapshot {
     blockedRoots: paths.blockedRoots,
     blockedPaths: paths.blockedPaths,
   });
-  const shell = freezeShellPolicySnapshot({
+  const shell: ShellPolicySnapshot = Object.freeze({
     read: paths.read,
     write: paths.write,
     inspect: commands.inspect,
@@ -273,24 +328,33 @@ function snapshotFor(definition: PolicyDefinition): PolicySnapshot {
 function mergeBuiltinDefinition(name: BuiltinPolicyPresetName, supplied: PolicyDefinition | undefined): PolicyDefinition {
   const builtin = BUILTIN_POLICY_DEFINITIONS[name];
   if (supplied === undefined) return builtin;
-  const merged = {
-    paths: { ...builtin.paths, ...supplied.paths },
-    commands: { ...builtin.commands, ...supplied.commands },
-  };
-  const expected = snapshotFor(builtin);
-  const actual = snapshotFor(merged);
-  if (actual.direct.read !== expected.direct.read ||
-    actual.direct.write !== expected.direct.write ||
-    actual.direct.edit !== expected.direct.edit ||
-    actual.direct.list !== expected.direct.list ||
-    actual.direct.search !== expected.direct.search ||
-    actual.shell.inspect !== expected.shell.inspect ||
-    actual.shell.modify !== expected.shell.modify ||
-    actual.shell.execute !== expected.shell.execute ||
-    actual.shell.destroy !== expected.shell.destroy ||
-    actual.shell.unknown !== expected.shell.unknown) {
-    throw invalidConfig();
+  for (const field of REQUIRED_PATH_MODES) {
+    if (supplied.paths?.[field] !== undefined && supplied.paths[field] !== builtin.paths?.[field]) throw invalidConfig();
   }
+  for (const field of REQUIRED_COMMAND_MODES) {
+    if (supplied.commands?.[field] !== undefined && supplied.commands[field] !== builtin.commands?.[field]) throw invalidConfig();
+  }
+  const merged = Object.freeze({
+    paths: Object.freeze({ ...builtin.paths, ...supplied.paths }),
+    commands: Object.freeze({ ...builtin.commands, ...supplied.commands }),
+  });
+  const builtinNormalized = normalizedDefinition(builtin);
+  const suppliedNormalized = normalizedDefinition(supplied);
+  normalizedDefinitions.set(merged, Object.freeze({
+    paths: Object.freeze({
+      ...builtinNormalized.paths,
+      allowedRoots: supplied.paths?.allowedRoots === undefined
+        ? builtinNormalized.paths.allowedRoots
+        : suppliedNormalized.paths.allowedRoots,
+      blockedRoots: supplied.paths?.blockedRoots === undefined
+        ? builtinNormalized.paths.blockedRoots
+        : suppliedNormalized.paths.blockedRoots,
+      blockedPaths: supplied.paths?.blockedPaths === undefined
+        ? builtinNormalized.paths.blockedPaths
+        : suppliedNormalized.paths.blockedPaths,
+    }),
+    commands: builtinNormalized.commands,
+  }));
   return merged;
 }
 
@@ -304,6 +368,36 @@ function presetSetFrom(parsed: ParsedPolicy): PolicyPresetSet | undefined {
     if (!isBuiltinPresetName(name)) snapshots[name] = snapshotFor(definition);
   }
   return Object.freeze({ active: parsed.activePreset!, snapshots: Object.freeze(snapshots) });
+}
+
+export function decodePolicyConfiguration(
+  input: unknown,
+  requireCompleteExternalModes = false,
+): DecodedPolicyConfiguration {
+  const parsed = readConfig(input, requireCompleteExternalModes);
+  if (parsed.disabled) return Object.freeze({ kind: "disabled" });
+  if (parsed.flat !== undefined) {
+    return Object.freeze({
+      kind: "enabled",
+      activePreset: "static",
+      switchable: false,
+      snapshots: Object.freeze({ static: unifiedSnapshotFor(parsed.flat) }),
+    });
+  }
+
+  const snapshots: Record<string, UnifiedPolicySnapshot> = {};
+  for (const name of POLICY_PRESET_NAMES) {
+    snapshots[name] = unifiedSnapshotFor(mergeBuiltinDefinition(name, parsed.presets![name]));
+  }
+  for (const [name, definition] of Object.entries(parsed.presets!)) {
+    if (!isBuiltinPresetName(name)) snapshots[name] = unifiedSnapshotFor(definition);
+  }
+  return Object.freeze({
+    kind: "enabled",
+    activePreset: parsed.activePreset!,
+    switchable: true,
+    snapshots: Object.freeze(snapshots),
+  });
 }
 
 export function adaptPolicyConfig(input: unknown): PolicySnapshot {

@@ -1,5 +1,5 @@
-import { adaptPolicyConfig, adaptPolicyPresets, isAccessGateDisabled } from "../adapters/index";
-import type { PolicyPresetName, PolicyPresetSet, PolicySnapshot } from "../adapters/index";
+import { adaptPolicyConfig, adaptPolicyPresets, isAccessGateDisabled } from "../adapters/config";
+import type { PolicyPresetName, PolicyPresetSet, PolicySnapshot } from "../adapters/config";
 
 export type PolicyState = Readonly<{
   readonly snapshot: PolicySnapshot;

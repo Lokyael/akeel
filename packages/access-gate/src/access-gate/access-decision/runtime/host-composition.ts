@@ -1,3 +1,6 @@
+import { adaptPiGateToolCall } from "../adapters/index";
+import { renderHostBlock, renderHostFacingDecision } from "./host-render";
+import type { GateSession, GateSessionResult } from "./gate-session";
 import type { DecisionService, RuntimeResult } from "./service";
 
 export type PiToolCallHandlerResult = Readonly<{
@@ -19,6 +22,35 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 function hasApprovalUI(value: unknown): value is ApprovalHostContext {
   if (!isRecord(value) || value.hasUI !== true || !isRecord(value.ui)) return false;
   return typeof value.ui.confirm === "function";
+}
+
+export async function handleGateSessionToolCall(
+  session: GateSession,
+  event: unknown,
+  context: unknown,
+): Promise<PiToolCallHandlerResult> {
+  const adapted = adaptPiGateToolCall(event, context);
+  if (adapted.kind === "passthrough") return undefined;
+  if (adapted.kind === "reject") return hostHandlerResult(renderHostBlock(adapted.code), context);
+
+  const result = session.evaluate(adapted.request);
+  return hostHandlerResult(renderGateSessionResult(result, session, adapted.request.surface), context);
+}
+
+function renderGateSessionResult(
+  result: GateSessionResult,
+  session: GateSession,
+  surface: string,
+): RuntimeResult {
+  if (result.kind === "allow") return result;
+  if (result.kind === "approval-required") {
+    return renderHostFacingDecision({ kind: "ask", executed: false }, result.display);
+  }
+  if (result.code === "policy-denied" && session.activePreset() === "review" &&
+    (surface === "write" || surface === "edit")) {
+    return renderHostBlock("read-only-policy-switch-required");
+  }
+  return renderHostBlock(result.code);
 }
 
 export async function handlePiToolCall(

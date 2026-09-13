@@ -98,7 +98,7 @@
 ### Shell grammar、flow、wrapper 与 redirection
 
   - **Shell grammar:** 旧版受限 Shell IR 覆盖更多形态；当前支持更小的 simple flow 与有界 `&&/||/;`，pipeline/background/compound/newline 多数 fail-closed。候选问题：是否恢复部分旧 Shell 形态，或保持 Greenfield 收窄。
-  - **CWD / control-flow tracing:** 旧版 `control-flow.ts` 建模 `cd`、`cd -`、`pushd/popd`、`&&/||/;/newline` 下的 cwd 候选与 opaque 分支；当前 `shell-flow.ts` 追踪有界 reachable commands 与 `cd` 后 cwd states，但 newline 不作为 flow operator，`pushd/popd` 不再作为专门 cwd 变异族。候选问题：逐项确认旧 cwd 候选语义是否需要恢复、文档化退役，或仅保留当前 bounded flow seam。
+  - **CWD / control-flow tracing:** 旧版 `control-flow.ts` 建模 `cd`、`cd -`、`pushd/popd`、`&&/||/;/newline` 下的 cwd 候选与 opaque 分支；当前 `core/compilation/shell/flow.ts` 追踪有界 reachable commands 与 `cd` 后 cwd states，但 newline 不作为 flow operator，`pushd/popd` 不再作为专门 cwd 变异族。候选问题：逐项确认旧 cwd 候选语义是否需要恢复、文档化退役，或仅保留当前 bounded flow seam。
   - **Wrapper handling:** 旧版建模 `env`、`timeout`、`command`、`nohup`、`exec` wrapper 链；当前仍有 wrapper 集合并测试底层语义保留。候选问题：是否补齐旧 wrapper 边角语料。
   - **Redirection:** 旧版支持重定向且 `<>/2<>` 按 write 侧建模；当前保留 read-write redirection write-side contract，unsupported clobber fail-closed。候选问题：是否补全 README 的重定向支持矩阵。
 ### Program semantics 与命令族覆盖
@@ -165,7 +165,7 @@
 
 > 本条承接一项已从 Decision 寄存器退回的旧命令语义决策；它只记录待重新证明的安全意图与候选边界，不构成当前实现合同、命令扩展路线图或恢复旧 adapter 的承诺。
 
-- **Why Not Now:** 当前 `core/program-semantics/` 已在新的 Canonical 管线中覆盖部分 Git、Python、uv、解释器和 npm 族语义，但旧方案同时混合了 command adapter、用户 overrides、完整 option engine 和未迁移的 CLI 方言。直接恢复旧方案会把旧配置模型、实现内部表和未经当前 Canonical seam 重新证明的 path intent 一并带回。
+- **Why Not Now:** 当前 `core/compilation/shell/programs/` 已在 Canonical 管线中覆盖部分 Git、Python、uv、解释器和 npm 族语义，但旧方案同时混合了 command adapter、用户 overrides、完整 option engine 和未迁移的 CLI 方言。直接恢复旧方案会把旧配置模型、实现内部表和未经当前 Canonical seam 重新证明的 path intent 一并带回。
 - **Exploration Direction:** 在当前 Canonical → Admission → Policy 边界下重新核对以下安全意图：
   - 取值选项区分 `file`、`expression` 和无值 `flag`；file 值产生受统一 boundary 约束的 read/write path intent，expression 值只消费而不伪造路径。
   - 选项值必须先被可靠消费；separated、equals、attached、cluster 和 `--` 形态的支持范围需由各程序族单独声明，未建模形态不得把值泄漏为 positional path。
