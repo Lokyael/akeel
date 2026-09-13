@@ -234,6 +234,29 @@ test("implementation planning publishes an implementation-ready Task Plan contra
   assert.match(implementation, /`implementation-planning`/);
 });
 
+test("task lifecycle keeps checkpoints sparse and context current-tree only", () => {
+  const principles = readFileSync(
+    new URL("../src/bootstrap/principles.md", import.meta.url),
+    "utf8",
+  );
+  const implementation = readFileSync(
+    new URL("../skills/workflows/implement-work/SKILL.md", import.meta.url),
+    "utf8",
+  );
+  const survey = readFileSync(
+    new URL("../skills/workflows/survey-context/SKILL.md", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(principles, /minimum lifecycle is two commits/);
+  assert.match(principles, /Task Record updates are event-driven/);
+  assert.match(principles, /clear the Task in the completion commit before starting another Task/);
+  assert.match(implementation, /first of the minimum two commits/);
+  assert.match(implementation, /Do not commit Task Record changes for individual slices, tests, or steps/);
+  assert.match(implementation, /final landing change, which clears the Task before another Task starts/);
+  assert.match(survey, /do not load cleared Task Records from Git history/);
+});
+
 test("instruction editing publishes semantic preservation with an AKeel repository overlay", () => {
   const editingUrl = new URL(
     "../skills/disciplines/instruction-editing/SKILL.md",
