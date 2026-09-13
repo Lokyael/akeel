@@ -248,13 +248,14 @@ test("task lifecycle keeps checkpoints sparse and context current-tree only", ()
     "utf8",
   );
 
-  assert.match(principles, /minimum lifecycle is two commits/);
-  assert.match(principles, /Task Record updates are event-driven/);
+  assert.match(principles, /Before implementation or clearing, every T-ID must have a complete Task Record/);
+  assert.match(principles, /Update the Task Record only for cross-session continuity, handoff, or material authority changes/);
   assert.match(principles, /clear the Task in the completion commit before starting another Task/);
-  assert.match(implementation, /first of the minimum two commits/);
+  assert.match(implementation, /Before implementation, confirm reachable Git history contains/);
   assert.match(implementation, /Do not commit Task Record changes for individual slices, tests, or steps/);
-  assert.match(implementation, /final landing change, which clears the Task before another Task starts/);
-  assert.match(survey, /do not load cleared Task Records from Git history/);
+  assert.match(implementation, /commit the final landing change; it clears the Task before another Task starts/);
+  assert.match(survey, /Routine survey reads the current tree only/);
+  assert.match(survey, /does not load cleared Task Records from Git history/);
 });
 
 test("instruction editing publishes semantic preservation with an AKeel repository overlay", () => {
