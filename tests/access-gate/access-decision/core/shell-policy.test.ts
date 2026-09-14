@@ -17,7 +17,7 @@ type TestPolicy = Readonly<Record<string, unknown>> & Readonly<{ [unifiedPolicy]
 type TestAdmission = Readonly<{ readonly value: NonNullable<ReturnType<typeof projectUnifiedAdmission>>; readonly hasUI: boolean }>;
 
 function freezeShellPolicySnapshot(input: Record<string, unknown>): TestPolicy {
-  const allowed = ["read", "write", "inspect", "modify", "execute", "destroy", "unknown", "blockedPaths", "allowedRoots", "blockedRoots"];
+  const allowed = ["read", "write", "inspect", "modify", "execute", "opaque", "destroy", "unknown", "blockedPaths", "allowedRoots", "blockedRoots"];
   const required = ["read", "write", "inspect", "modify", "execute", "destroy", "unknown"];
   if (Reflect.ownKeys(input).some((key) => typeof key !== "string" || !allowed.includes(key)) ||
     required.some((key) => !["allow", "ask", "deny"].includes(input[key] as string))) {
@@ -43,6 +43,7 @@ function freezeShellPolicySnapshot(input: Record<string, unknown>): TestPolicy {
         inspect: input.inspect,
         modify: input.modify,
         execute: input.execute,
+        opaque: input.opaque ?? "deny",
         destroy: input.destroy,
         unknown: input.unknown,
       },
@@ -72,7 +73,7 @@ function createCredentialBoundary(roots: readonly string[]) {
 function shellAdmissionHitsCredentialBoundary(admissionValue: TestAdmission, boundaries: unknown): boolean {
   const allow = freezeUnifiedPolicySnapshot({
     paths: { read: "allow", write: "allow", edit: "allow", list: "allow", search: "allow", allowedRoots: [], blockedRoots: [], blockedPaths: [] },
-    commands: { inspect: "allow", modify: "allow", execute: "allow", destroy: "allow", unknown: "allow" },
+    commands: { inspect: "allow", modify: "allow", execute: "allow", opaque: "allow", destroy: "allow", unknown: "allow" },
   });
   return authorizeAdmission(admissionValue.value, boundaries, allow).kind === "deny";
 }
@@ -164,6 +165,35 @@ test("recursive Shell search over a credential root is hard denied", () => {
   });
 });
 
+test("opaque execution follows its independent policy axis", () => {
+  const command = admission("pytest tests/");
+  assert.deepEqual(evaluateShellAdmission(command, freezeShellPolicySnapshot({ ...policy, execute: "allow", opaque: "deny" })), {
+    kind: "deny",
+    code: "policy-denied",
+  });
+  assert.deepEqual(evaluateShellAdmission(admission("pytest tests/", true), freezeShellPolicySnapshot({ ...policy, execute: "allow", opaque: "ask" })), {
+    kind: "ask",
+    executed: false,
+  });
+  assert.deepEqual(evaluateShellAdmission(command, freezeShellPolicySnapshot({ ...policy, execute: "allow", opaque: "allow" })), {
+    kind: "allow",
+  });
+});
+
+test("opaque policy does not bypass unknown command policy", () => {
+  assert.deepEqual(evaluateShellAdmission(
+    admission("mystery-command"),
+    freezeShellPolicySnapshot({ ...policy, unknown: "deny", opaque: "allow" }),
+  ), { kind: "deny", code: "policy-denied" });
+});
+
+test("opaque policy does not bypass hard boundaries", () => {
+  assert.deepEqual(evaluateShellAdmission(
+    admission("rm /workspace/project/file"),
+    freezeShellPolicySnapshot({ ...policy, destroy: "allow", opaque: "allow" }),
+  ), { kind: "deny", code: "hard-boundary" });
+});
+
 test("credential artifact paths are identified before Shell policy evaluation", () => {
   assert.equal(shellAdmissionHitsCredentialBoundary(
     admission("cat /__test-agent-dir__/auth.json.bak"),
@@ -180,7 +210,7 @@ test("path-form destructive executables retain their command and path semantics"
   });
   assert.deepEqual(evaluateShellAdmission(admission("/tmp/cat README.md"), restricted), {
     kind: "deny",
-    code: "hard-boundary",
+    code: "policy-denied",
   });
   assert.deepEqual(evaluateShellAdmission(admission("/tmp/cat README.md"), freezeShellPolicySnapshot({
     ...policy,
@@ -190,7 +220,7 @@ test("path-form destructive executables retain their command and path semantics"
     blockedPaths: [],
   })), {
     kind: "deny",
-    code: "hard-boundary",
+    code: "policy-denied",
   });
 });
 
@@ -377,11 +407,11 @@ test("widening policy modes cannot widen a hard path boundary", () => {
 
 test("execute and unknown classes use their own closed policy modes", () => {
   assert.deepEqual(
-    evaluateShellAdmission(admission("node script.js"), freezeShellPolicySnapshot({ ...policy, execute: "ask", blockedPaths: [] })),
+    evaluateShellAdmission(admission("node script.js"), freezeShellPolicySnapshot({ ...policy, execute: "ask", opaque: "allow", blockedPaths: [] })),
     { kind: "deny", code: "no-ui" },
   );
   assert.deepEqual(
-    evaluateShellAdmission(admission("mystery input"), freezeShellPolicySnapshot({ ...policy, unknown: "allow", blockedPaths: [] })),
+    evaluateShellAdmission(admission("mystery input"), freezeShellPolicySnapshot({ ...policy, unknown: "allow", opaque: "allow", blockedPaths: [] })),
     { kind: "allow" },
   );
 });
@@ -409,10 +439,9 @@ test("uv run is governed by execute policy instead of unknown policy", () => {
     { kind: "deny", code: "policy-denied" },
   );
 
-  const restricted = freezeShellPolicySnapshot({ ...policy, execute: "allow", blockedPaths: ["/etc/passwd"] });
+  const restricted = freezeShellPolicySnapshot({ ...policy, execute: "allow", opaque: "allow", blockedPaths: ["/etc/passwd"] });
   assert.deepEqual(evaluateShellAdmission(admission("uv run cat /etc/passwd"), restricted), {
-    kind: "deny",
-    code: "hard-boundary",
+    kind: "allow",
   });
 });
 
@@ -425,13 +454,13 @@ test("interpreter scripts cannot bypass a blocked path", () => {
   });
 });
 
-test("unmodeled command paths cannot bypass configured path boundaries", () => {
+test("unmodeled command paths follow the opaque policy axis", () => {
   const restricted = freezeShellPolicySnapshot({ ...policy, execute: "allow", unknown: "allow" });
 
   for (const command of ["tee /etc/passwd", "dd if=/etc/passwd of=/tmp/out", "/usr/bin/tee /etc/passwd"]) {
     assert.deepEqual(evaluateShellAdmission(admission(command), restricted), {
       kind: "deny",
-      code: "hard-boundary",
+      code: "policy-denied",
     }, command);
   }
 });
@@ -788,24 +817,25 @@ test("Git file and repository targets cannot escape the allowed project", () => 
   }
 });
 
-test("Package-manager path options and unknown options participate in the same boundary", () => {
+test("Package-manager opaque options follow the opaque policy axis", () => {
   const scoped = freezeShellPolicySnapshot({
     ...policy,
     allowedRoots: ["/workspace/project"],
     blockedRoots: [],
   });
 
-  for (const command of [
-    "npm view --prefix /tmp/deps react",
-    "npm list --global",
-    "npm view --global=/tmp react",
-    "npm view --made-up react",
-    "npm --workspace=/tmp list",
-    "uv help --made-up",
-  ]) {
+  const expected = new Map([
+    ["npm view --prefix /tmp/deps react", "hard-boundary"],
+    ["npm list --global", "policy-denied"],
+    ["npm view --global=/tmp react", "policy-denied"],
+    ["npm view --made-up react", "policy-denied"],
+    ["npm --workspace=/tmp list", "hard-boundary"],
+    ["uv help --made-up", "policy-denied"],
+  ] as const);
+  for (const [command, code] of expected) {
     assert.deepEqual(evaluateShellAdmission(admission(command), scoped), {
       kind: "deny",
-      code: "hard-boundary",
+      code,
     }, command);
   }
 });
@@ -826,20 +856,24 @@ test("Default Ruff scopes and cache cleanup are checked as unsafe CWD access", (
   }
 });
 
-test("unknown Git commands and delegated runners remain hard-boundary under develop", () => {
+test("develop may allow delegated runners while unknown commands remain governed", () => {
   const develop = freezeShellPolicySnapshot({
     ...policy,
     modify: "allow",
     execute: "allow",
+    opaque: "allow",
     unknown: "ask",
     allowedRoots: ["/workspace/project"],
     blockedRoots: [],
   });
 
-  for (const command of ["git mystery", "python script.py", "node script.js", "pytest tests", "uv run pytest tests", "npm run test", "npx vite"]) {
+  assert.deepEqual(evaluateShellAdmission(admission("git mystery"), develop), {
+    kind: "deny",
+    code: "hard-boundary",
+  });
+  for (const command of ["python script.py", "node script.js", "pytest tests", "uv run pytest tests", "npm run test", "npx vite"]) {
     assert.deepEqual(evaluateShellAdmission(admission(command), develop), {
-      kind: "deny",
-      code: "hard-boundary",
+      kind: "allow",
     }, command);
   }
 });

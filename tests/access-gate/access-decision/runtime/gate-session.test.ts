@@ -54,7 +54,7 @@ test("sealed classes reject prototype forgeries without throwing TypeError", () 
   }
 });
 
-test("bash and sh script execution is marked opaque and blocked under scoped path policy", () => {
+test("bash and sh script execution follows the develop opaque policy", () => {
   const createGateSession = (runtime as Record<string, unknown>).createGateSession;
   const configuration = decodePolicyConfiguration({
     presets: {
@@ -80,8 +80,7 @@ test("bash and sh script execution is marked opaque and blocked under scoped pat
 
   for (const command of ["bash script.sh", "sh runner.sh"]) {
     assert.deepEqual(session.evaluate({ surface: "bash", arguments: { command } }), {
-      kind: "deny",
-      code: "hard-boundary",
+      kind: "allow",
     }, command);
   }
 });

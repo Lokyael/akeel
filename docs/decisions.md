@@ -442,18 +442,18 @@ Canonical reject 使用本域封闭 code、source anchor 与资源分类；rende
 
 **Decision:** Canonical Shell 在词法与 flow 解析之后增加独立的 `core/compilation/shell/programs/` 语义层。该层只把已扫描的程序调用转换为命令分类、effects、路径事实和 bounded/opaque 路径知识；registry 只负责可执行文件分派，Policy、配置和 host 不进入该层。Git、解释器、Python 工具、uv 与 npm/pnpm/yarn/npx 使用各自的声明表和少量专用分析器；未知程序和未知子命令保持 `unknown + opaque`。`uv run` 明确分类为 `execute`；uv 的版本/帮助调用和 `uv help` 分类为 `inspect`，其他未建模顶层子命令保持 `unknown + opaque`。
 
-已知且路径访问可完整证明、且不依赖仓库或用户配置执行 helper 的命令可进入普通 `inspect`/`modify`/`execute` 策略。会调用或可能调用 external diff、textconv、filters、hooks、receive hooks、merge drivers 或其他 Git helper 的命令固定进入 hard boundary；当前包括 `git status`、`diff`、`log`、`show`、`add`、`commit`、`push`、`fetch`、`pull`、`clone`、`init`、`help`、`grep`、`blame`、`gc`、checkout/switch/restore、merge/rebase/tag/reset/cherry-pick/revert/stash/submodule 等已建模操作。`git config` 也固定进入 hard boundary，避免隐式配置源暴露凭据或改变后续 helper 语义。解释器脚本、`uv run`、`pytest`、`npm/pnpm/yarn` 的脚本或安装执行、`npx` 以及含未建模运行期访问的命令标记 opaque；配置了显式 `allowedRoots`、`blockedRoots` 或 `blockedPaths` 时由 hard boundary 优先拒绝。`develop` 的 command mode 不扩大该边界。程序语义不递归解释委托的子命令或脚本内容。
+已知且路径访问可完整证明、且不依赖仓库或用户配置执行 helper 的命令可进入普通 `inspect`/`modify`/`execute` 策略。会调用或可能调用 external diff、textconv、filters、hooks、receive hooks、merge drivers 或其他 Git helper 的命令固定进入 hard boundary；当前包括 `git status`、`diff`、`log`、`show`、`add`、`commit`、`push`、`fetch`、`pull`、`clone`、`init`、`help`、`grep`、`blame`、`gc`、checkout/switch/restore、merge/rebase/tag/reset/cherry-pick/revert/stash/submodule 等已建模操作。`git config` 也固定进入 hard boundary，避免隐式配置源暴露凭据或改变后续 helper 语义。解释器脚本、`uv run`、`pytest`、`npm/pnpm/yarn` 的脚本或安装执行、`npx` 以及含未建模运行期访问的命令标记 opaque；opaque 风险由独立的 `commands.opaque` 策略轴控制，并与命令类别策略同时求值，不因显式 `allowedRoots`、`blockedRoots` 或 `blockedPaths` 自动升级为 hard boundary。`develop` 默认允许 opaque，`guided` 默认要求审批，`review` 默认拒绝；程序语义不递归解释委托的子命令或脚本内容。
 
 路径选项和隐式 repository/project scope 必须进入 Canonical 统一解析；Admission 只消费已解析的路径候选，不重新理解程序参数。Git `-C`、`--git-dir` 和 `--work-tree` 已在 Canonical command-local cwd seam 中按 token 顺序解析，后续 repository、基本 path candidate、output 候选和显式项目内 `file://` remote 使用所得 cwd；完整 Git pathspec 语法、HTTPS/SSH 等外部 transport、hosted `file://`、alias、间接 config remote、`clone --separate-git-dir` 及其他尚未形成 Canonical seam 的 location 选项继续 fail-closed。Git repository discovery 只接受真实 `.git` 目录，拒绝 symlink 或 gitfile metadata，避免隐式 Git scope 指向项目外 repository。当前不增加 network policy 轴；Git helper 的执行期隔离不在本条内提供，未形成安全合同的 helper-capable 操作直接 hard-deny。
 
 **Executable identity 与 path-form boundary:**
 
 - Canonical 将 executable token 中包含 `/` 的形式识别为 path-form executable，不解析 PATH，也不因文件系统探测改变命令身份。
-- path-form executable 默认归类为 `execute`；已声明的破坏性 basename 或已证明的破坏性子命令仍归类为 `destroy`。非破坏性 path-form 程序统一为 opaque execute，不因 basename 匹配已知程序族获得 `inspect`/`modify` 语义，也不伪造额外 path operand；显式 path boundary 下 opaque path access 继续 hard-deny。
+- path-form executable 默认归类为 `execute`；已声明的破坏性 basename 或已证明的破坏性子命令仍归类为 `destroy`。非破坏性 path-form 程序统一为 opaque execute，不因 basename 匹配已知程序族获得 `inspect`/`modify` 语义，也不伪造额外 path operand；其未证明访问由独立 `commands.opaque` 策略控制。
 - 裸名 `tsx` 与 Python、Node、Ruby、Perl 属于封闭 interpreter 族：单一 `--version`/`-v`/`--help` 信息调用为 `inspect`，脚本或其他调用为 `execute`，脚本 operand 是 source path；path-form interpreter 统一为 opaque execute。`npx tsx` 保持 `execute + opaque`，即使参数看似信息调用。
 - `od` 是封闭的只读检查例外，产生 `inspect + read`，不构成任意工具自动加入内置语义的先例；裸名未知命令保持 `unknown`。
 
-**Why:** Git、包管理器和语言运行时共享“程序自有参数语言 + 子命令分类 + 路径/委托执行”的结构，但把它们塞进 Shell lexer 或 Policy Kernel 会造成职责泄漏和重复解析。`uv run` 可能同步环境、解析或下载依赖并启动任意子进程，因此不能当作普通只读命令；版本/帮助调用与未建模顶层子命令则需要独立分类。统一的 bounded/opaque 事实同时允许安全的高频检查命令恢复可用性，并阻止 `develop` 把脚本、下载和未知行为误当成项目内安全操作。
+**Why:** Git、包管理器和语言运行时共享“程序自有参数语言 + 子命令分类 + 路径/委托执行”的结构，但把它们塞进 Shell lexer 或 Policy Kernel 会造成职责泄漏和重复解析。`uv run` 可能同步环境、解析或下载依赖并启动任意子进程，因此不能当作普通只读命令；版本/帮助调用与未建模顶层子命令则需要独立分类。opaque 仍必须保持独立事实，但其风险是否可接受属于用户策略选择：`review`、`guided`、`develop` 分别提供拒绝、审批和便利路径；这不宣称 allowed roots 能限制脚本运行期访问，真实执行仍受操作系统权限约束。
 
 **Impact:** 生产入口仍只切换新 Canonical pipeline；新增命令族只需增加 core 语义模块和 public seam 测试，不恢复旧 `command-semantics` 依赖。当前覆盖 Git 常用 inspect/modify/destroy 分类（helper-capable 操作与 `config` 固定 hard-boundary）、解释器信息命令、Python 质量工具、uv 的 `run`/信息/未知子命令分类和 npm 族常用分类；Git `-C`、`--git-dir`、`--work-tree` 和项目内显式 `file://` remote 的 command-local location 已覆盖，完整 CLI 方言、完整 Git pathspec 语法、HTTPS/SSH 等外部 transport、hosted `file://`、alias/间接 config remote、`clone --separate-git-dir` 和网络/执行隔离不在本条内。
 
@@ -462,10 +462,11 @@ Canonical reject 使用本域封闭 code、source anchor 与资源分类；rende
 - **把所有程序加入 `invocation.ts` 的 basename Set：** 无法表达选项值、子命令和委托执行边界，继续扩大单一解析器。
 - **在 adapters/runtime 中解析程序语义：** 违反 core ← adapters ← runtime 依赖方向，并让 Policy/host 重新接触原始命令。
 - **递归解析 `uv run`、`npm run`、`npx` 或解释器脚本：** 脚本和依赖内容不是本次 Canonical 输入的可证明静态事实。
-- **用 `unknown: allow` 或删除 path boundary 放宽 opaque 命令：** 会把不可证明访问变成未声明的安全保证。
+- **用 `unknown: allow` 或删除 path boundary 放宽 opaque 命令：** 会把命令类别与未证明访问风险混为一谈，无法分别表达审查、审批和开发便利性。
+- **把 opaque 直接并入 `execute`：** 会让已证明的执行与黑盒脚本执行共享一个策略开关，丢失用户对未证明访问风险的独立选择。
 - **直接移植旧 command-semantics adapter：** 违反 D-059 的 Greenfield 边界；旧实现仅提供待重新证明的场景线索。
 
-**Out of Scope:** 网络独立授权、OS sandbox、Git hooks/npm lifecycle 的执行期拦截、完整 Git pathspec、远程/容器工具链方言、命令执行后的审计和旧配置兼容。
+**Out of Scope:** 网络独立授权、OS sandbox、Git hooks/npm lifecycle 的执行期拦截、完整 Git pathspec、远程/容器工具链方言、命令执行后的审计和旧配置兼容。`commands.opaque` 只表达用户对未证明执行风险的策略选择，不提供运行期沙箱或路径强制。
 
 ## D-068: Policy preset 临时 TUI 选择面板，不恢复常驻 Footer
 
@@ -871,11 +872,11 @@ Plan 使用 `Plan Slice` 作为内部执行单元。每个 Slice 承载目标、
 
 **Decision:** Access Gate 在 D-059 的 `core ← adapters ← runtime` 外层依赖方向和 D-060 的单次 Canonical 解释边界内，采用“私有 Direct/Shell 语义车道 + 单一授权信任链”。Direct 与 Shell 保留各自的输入语言、编译器和局部语义，但生产调用只进入一个 Canonical facade；该 facade 对每个 managed call 发行一个 opaque、不可伪造、内部以封闭变体区分车道的 `CanonicalCompilation`。同一制品只经一个 Admission facade 投影为 sealed `AdmissionPlan`，其中以判别变体保存 Direct 与 Shell 的最小授权事实，不建立含大量可选字段的公共通用 operation DTO。
 
-Admission 后固定经过不可配置放宽的 Mandatory Boundary Stage，再进入 Configured Policy Kernel；credential、destroy/delete、blocked traversal、recursive blocked descendant 和显式 path scope 下的 opaque access 等系统边界由前者集中拥有，后者只消费 `AdmissionPlan + PolicySnapshot`。两阶段通过一个 Authorization facade 发行统一的 `allow | approval-required | deny` verdict，共享路径事实语义、决策优先级和 tool-call 粒度聚合。`hasUI`、confirm 能力和 `no-ui` 映射属于 Pi host composition，不进入 managed request 的领域事实、Canonical compilation、Admission 或 Policy Kernel；`approval-required` 本身不执行工具。
+Admission 后固定经过不可配置放宽的 Mandatory Boundary Stage，再进入 Configured Policy Kernel；credential、destroy/delete、blocked traversal 和 recursive blocked descendant 等系统边界由前者集中拥有，opaque access 的未证明风险由后者消费 `AdmissionPlan + PolicySnapshot` 中独立的 `commands.opaque` 策略决定。两阶段通过一个 Authorization facade 发行统一的 `allow | approval-required | deny` verdict，共享路径事实语义、决策优先级和 tool-call 粒度聚合。`hasUI`、confirm 能力和 `no-ui` 映射属于 Pi host composition，不进入 managed request 的领域事实、Canonical compilation、Admission 或 Policy Kernel；`approval-required` 本身不执行工具。
 
 Canonical compiler 通过受信任、不可由 policy 或用户配置替换的 Linux Path Evidence port 获取 pathname facts；同一 CWD 状态与 source token 对应的语义路径事实只解析一次，后续 CWD 转移、Admission 和 Display 复用已发行结果。Shell program registry 保持封闭且只负责 dispatch；Git、解释器、Python 工具、uv 和 package manager 分别拥有局部 analyzer，并以显式不可变事实表达 path base、cwd change、recursive、opaque 和 hard-boundary 语义，不再以多个 WeakMap/WeakSet sidecar 隐藏同一阶段元数据。
 
-配置 adapter 对一个外部输入只执行一次严格 decode，发行 disabled 或 enabled 的不可变配置结果；enabled 结果包含完整 preset registry、活动 snapshot 和当前 path/command policy，不再为 Direct/Shell 重复构造独立 policy snapshot。Runtime 以单一 session aggregate 拥有固定 Access Root、session-start `$HOME`、policy state、credential boundary 和生命周期资源；策略切换原子替换活动 snapshot。`akeel-access-gate` 的稳定外部表面保持 Pi extension，compiler、parser、resolver、fact accessor 和测试辅助 seam 不从 package root 作为并列产品 API 暴露。
+配置 adapter 对一个外部输入只执行一次严格 decode，发行 disabled 或 enabled 的不可变配置结果；enabled 结果包含完整 preset registry、活动 snapshot 和当前 path/command policy（包括独立 `commands.opaque`），不再为 Direct/Shell 重复构造独立 policy snapshot。Runtime 以单一 session aggregate 拥有固定 Access Root、session-start `$HOME`、policy state、credential boundary 和生命周期资源；策略切换原子替换活动 snapshot。`akeel-access-gate` 的稳定外部表面保持 Pi extension，compiler、parser、resolver、fact accessor 和测试辅助 seam 不从 package root 作为并列产品 API 暴露。
 
 **Why:** 当前实现虽有正确的分层方向，却在层内形成 Direct/Shell 双 Canonical、双 Admission、双 Policy Snapshot/Kernel 和 runtime 双分支；系统硬边界又分散在 service 与不同 evaluator 中。新增共同安全规则因此容易发生只修改一个车道的 shotgun surgery。私有语义车道保留 Direct 结构化合同与 Shell 语言复杂度的 locality，单一信任链则把共同的路径事实、强制边界、政策优先级和结果合同集中到高 leverage seam。将 UI 能力移出授权域，可使同一授权结论不依赖宿主展示能力；一次配置 decode、一次 pathname fact acquisition 和显式 analyzer facts 则减少重复解释与隐藏状态。
 

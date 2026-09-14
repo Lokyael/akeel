@@ -22,6 +22,7 @@ test("one policy decode issues a tagged registry of unified snapshots", () => {
           execute: "deny",
           destroy: "allow",
           unknown: "deny",
+          opaque: "ask",
         },
       },
     },
@@ -34,11 +35,20 @@ test("one policy decode issues a tagged registry of unified snapshots", () => {
   assert.deepEqual(Reflect.ownKeys(decoded.snapshots.focus), ["paths", "commands"]);
   assert.equal(decoded.snapshots.focus.paths.edit, "ask");
   assert.equal(decoded.snapshots.focus.commands.destroy, "allow");
+  assert.equal(decoded.snapshots.focus.commands.opaque, "ask");
   assert.ok(Object.isFrozen(decoded.snapshots.focus));
 });
 
 test("the explicit disabled form does not manufacture an authorization snapshot", () => {
   assert.deepEqual(decodePolicyConfiguration({ accessGate: "disabled" }), { kind: "disabled" });
+});
+
+test("built-in presets assign independent opaque execution modes", () => {
+  const decoded = decodePolicyConfiguration({ presets: {}, activePreset: "review" });
+  assert.equal(decoded.kind, "enabled");
+  assert.equal(decoded.snapshots.review.commands.opaque, "deny");
+  assert.equal(decoded.snapshots.guided.commands.opaque, "ask");
+  assert.equal(decoded.snapshots.develop.commands.opaque, "allow");
 });
 
 test("named presets preserve built-in semantics and select the active snapshot", () => {
@@ -156,6 +166,7 @@ test("omitted policy sections use a closed deny-by-default snapshot", () => {
       inspect: "deny",
       modify: "deny",
       execute: "deny",
+      opaque: "deny",
       destroy: "deny",
       unknown: "deny",
     },

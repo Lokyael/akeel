@@ -9,7 +9,7 @@
 - **Canonical Compilation**：对一个请求执行一次有界解释后发行的 opaque、不可变、可验真的编译制品；内部事实不作为公共 DTO 暴露。
 - **Verified Candidate**：Herdr 讨论完成问题处理与事实核对后生成、等待 Task Owner Session 导入确认的临时候选制品。
 - **Admission Plan**：Canonical Compilation 向授权域投影的最小 sealed 输入；以私有 Direct/Shell 判别变体保存 Mandatory Boundary 与 Configured Policy 实际消费的事实，不包含 host UI、配置格式或展示数据。
-- **Mandatory Boundary Stage**：先于可配置 Policy 的不可放宽授权阶段，集中处理 credential、destroy/delete、blocked traversal、recursive blocked descendant 与 scoped opaque access。
+- **Mandatory Boundary Stage**：先于可配置 Policy 的不可放宽授权阶段，集中处理 credential、destroy/delete、blocked traversal 与 recursive blocked descendant；opaque access 的未证明风险由独立 policy 轴决定。
 - **Authorization Verdict**：Authorization facade 发行的 `allow`、`approval-required` 或 `deny`；UI availability 与确认结果不属于该领域结论。
 - **Policy Snapshot**：与配置格式无关、不可变的授权值；只由新 policy.yaml adapter 发行。
 - **Policy Preset**：会话可绑定的完整策略定位；内置 `review`、`guided`、`develop`，并可加载合法的自定义 preset；不使用继承式 Profile，`status` 是命令保留字。
@@ -116,7 +116,7 @@
 - 不提供 AKeel 管理的 delegated child 能力分层、父子权限钳制或子代理 preset 继承；按任务类型的能力与风险边界仍属 C-009 候选范围。
 - Access Gate 可由用户显式禁用；禁用时不拦截 managed tool call，故不提供路径、Shell 或操作准入保证。bootstrap 与 skills 仍然分发和运行。
 - 旧 `config.yaml`、Profile、命令覆盖、继承和子代理字段不属于新 Policy Snapshot 输入；当前只读取全局 `policy.yaml` 的静态策略字段、preset 绑定或显式 `accessGate` 禁用标志。
-- Shell 只支持显式定义、可静态证明且资源有界的子集；不可证明形态 fail-closed。`core/compilation/shell/programs/` 中的已知程序仍需提供 bounded path 事实；解释器脚本、uv run、npm/pnpm/yarn 执行、npx、pytest 和未知子命令等委托执行保持 opaque，在显式 path boundary 下 hard-deny。所有 Canonical `destroy`/`delete` 操作永久 hard-deny；`commands.destroy: allow` 仅可作为自定义 preset 的合法配置值，不改变该边界。Git local transport 仅接受可解析的项目内 `file://` path；HTTPS/SSH 等外部 transport、host、alias、间接 config、ext transport 和其他未建模形态继续 hard-boundary。未建模的命令副作用不单独建模。
+- Shell 只支持显式定义、可静态证明且资源有界的子集；不可证明形态保持 opaque，但其风险由独立 `commands.opaque` 策略决定。`core/compilation/shell/programs/` 中的已知程序仍需提供 bounded path 事实；解释器脚本、uv run、npm/pnpm/yarn 执行、npx、pytest 和未知子命令等委托执行继续保持 opaque；内置 `review`/`guided`/`develop` 分别 deny/ask/allow。所有 Canonical `destroy`/`delete` 操作永久 hard-deny；`commands.destroy: allow` 仅可作为自定义 preset 的合法配置值，不改变该边界。Git local transport 仅接受可解析的项目内 `file://` path；HTTPS/SSH 等外部 transport、host、alias、间接 config、ext transport 和其他未建模形态继续 hard-boundary。`commands.opaque: allow` 不提供运行期 sandbox、路径强制或网络隔离；未建模的命令副作用不单独建模。
 - 不把短期 Task Record、实施过程或审查报告作为永久当前知识；Task checkpoint 留在 Git 历史，正文落地后从当前树清除。
 - 不在 T-069 实现 Static Flow Graph、Explanation Replay 或 Runtime Audit Event，也不提供通用 Runtime Content Flow；D-084 仅覆盖模型 `bash` 工具结果行内的人类专用模型视图，不覆盖用户 `!`/`!!` 的 `bashExecution`。
 - 不把旧实现结果当作正确性 oracle；旧代码、旧测试和 archive 只提供待重新证明的历史线索。

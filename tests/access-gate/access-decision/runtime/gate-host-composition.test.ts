@@ -227,8 +227,6 @@ test("Pi host composition blocks Shell path-policy bypasses at the public seam",
     "bash -- /etc/passwd",
     "bash -o vi /etc/passwd",
     "npx tsx -- /etc/passwd",
-    "tee /etc/passwd",
-    "dd if=/etc/passwd of=/tmp/out",
   ]) {
     const result = await handleGateSessionToolCall(
       session,
@@ -236,6 +234,14 @@ test("Pi host composition blocks Shell path-policy bypasses at the public seam",
       { cwd: "/workspace/project", hasUI: false, ui: {} },
     );
     assert.deepEqual(result, { block: true, reason: "Blocked by a security boundary." }, command);
+  }
+  for (const command of ["tee /etc/passwd", "dd if=/etc/passwd of=/tmp/out"]) {
+    const result = await handleGateSessionToolCall(
+      session,
+      { toolName: "bash", input: { command } },
+      { cwd: "/workspace/project", hasUI: false, ui: {} },
+    );
+    assert.deepEqual(result, { block: true, reason: "Blocked because approval UI is unavailable." }, command);
   }
 });
 

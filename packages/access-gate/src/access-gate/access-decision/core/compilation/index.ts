@@ -417,6 +417,7 @@ export type UnifiedDisplayView =
       readonly operations: readonly Readonly<{
         readonly commandClass: ShellCommandClass;
         readonly effects: readonly ShellEffect[];
+        readonly opaque?: true;
       }>[];
     }>;
 
@@ -432,6 +433,7 @@ export function projectCompilationDisplay(compilation: unknown): UnifiedDisplayV
     operations: Object.freeze(facts.operations.map((operation) => Object.freeze({
       commandClass: operation.commandClass,
       effects: operation.effects,
+      ...(operation.opaquePathAccess ? { opaque: true as const } : {}),
     }))),
   });
 }

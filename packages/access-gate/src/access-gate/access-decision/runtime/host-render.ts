@@ -66,7 +66,7 @@ export function renderHostFacingDecision(
 
 function shellSummary(display: Extract<UnifiedDisplayView, { readonly kind: "shell" }>): string {
   const operations = display.operations
-    .map((operation) => `${operation.commandClass} [${operation.effects.join(", ")}]`)
+    .map((operation) => `${operation.commandClass}${operation.opaque ? " [opaque]" : ""} [${operation.effects.join(", ")}]`)
     .join("; ");
   return `shell ${operations} — literal form: ${display.command}`;
 }

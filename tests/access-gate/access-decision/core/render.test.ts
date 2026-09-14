@@ -59,6 +59,22 @@ test("renderer escapes terminal control characters in approval summaries", () =>
   }
 });
 
+test("renderer labels opaque execution in approval summaries", () => {
+  const rendered = renderHostFacingDecision(
+    { kind: "ask", executed: false },
+    {
+      kind: "shell",
+      command: "pytest tests/",
+      operations: [{ commandClass: "execute", effects: ["execute"], opaque: true }],
+    },
+  );
+
+  assert.equal(rendered.kind, "confirm");
+  if (rendered.kind === "confirm") {
+    assert.equal(rendered.summary.includes("execute [opaque] [execute]"), true);
+  }
+});
+
 test("renderer returns an immutable host result without sharing its input", () => {
   const decision = { kind: "allow" } as const;
   const rendered = renderHostFacingDecision(decision);

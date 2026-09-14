@@ -53,6 +53,7 @@ presets:
       inspect: allow
       modify: deny
       execute: deny
+      opaque: deny
       destroy: deny
       unknown: deny
   guided:
@@ -66,6 +67,7 @@ presets:
       inspect: allow
       modify: ask
       execute: ask
+      opaque: ask
       destroy: deny
       unknown: deny
   develop:
@@ -79,6 +81,7 @@ presets:
       inspect: allow
       modify: allow
       execute: allow
+      opaque: allow
       destroy: deny
       unknown: ask
 activePreset: develop
@@ -89,8 +92,8 @@ Policy configuration rules:
 - Custom presets use strict lower-kebab-case names, complete `paths`/`commands` definitions, and optional independent `allowedRoots`, `blockedRoots`, and `blockedPaths`. Built-in names and the reserved `status` name remain fixed.
 - A flat `paths`/`commands` policy uses the same complete schema as custom presets and is a single static policy without runtime switching.
 - In native TUI mode, `/policy` opens the temporary selector for all loaded presets; `/policy status` reports the active preset; `/policy <preset>` switches it for the session. Outside native TUI, `/policy` reports status and does not switch automatically.
-- Path and command modes are `allow`, `ask`, or `deny`. `destroy`/`delete` operations remain a permanent hard boundary even when `commands.destroy: allow` is configured. System hard boundaries take precedence over every preset.
-- `ask` requires interactive host confirmation, never executes automatically, and shows bounded summaries with the literal Shell command form and without file content.
+- Path and command modes are `allow`, `ask`, or `deny`. `commands.opaque` is an independent mode for commands whose runtime path effects cannot be statically proven: built-in `review` denies, `guided` asks, and `develop` allows. It does not provide a sandbox or make `allowedRoots` enforce runtime script access. `destroy`/`delete` operations remain a permanent hard boundary even when `commands.destroy: allow` is configured. System hard boundaries take precedence over every preset.
+- `ask` requires interactive host confirmation, never executes automatically, and shows bounded summaries with the literal Shell command form. Opaque approval is labeled as not fully statically verified; summaries never include file content or policy data.
 - Malformed YAML, unknown fields, incomplete definitions, conflicting names, and legacy fields cause the complete file to be ignored and the built-in `review` baseline to be used.
 
 ## Access Gate disabled mode

@@ -81,13 +81,14 @@ test("bounded Shell flow reuses each state-token path fact for CWD transfer and 
       inspect: "allow",
       modify: "deny",
       execute: "deny",
+      opaque: "allow",
       destroy: "deny",
       unknown: "allow",
     },
   });
   const mandatory = exports.createMandatoryBoundaries!({ credentialRoots: ["/agent"] });
 
-  assert.deepEqual(exports.authorizeAdmission!(admission, mandatory, policy), { kind: "deny", code: "hard-boundary" });
+  assert.deepEqual(exports.authorizeAdmission!(admission, mandatory, policy), { kind: "allow" });
   assert.equal(resolutions.length, 5);
   assert.equal(resolutions.filter((entry) => entry === "/workspace:left").length, 1);
 });

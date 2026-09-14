@@ -112,6 +112,7 @@ test("managed calls use the new allow, confirm, and deny host contract exactly o
     "  inspect: allow",
     "  modify: deny",
     "  execute: deny",
+    "  opaque: deny",
     "  destroy: deny",
     "  unknown: deny",
     "",

@@ -71,6 +71,7 @@ type CommandPolicy = Readonly<{
   readonly inspect: AuthorizationMode;
   readonly modify: AuthorizationMode;
   readonly execute: AuthorizationMode;
+  readonly opaque: AuthorizationMode;
   readonly destroy: AuthorizationMode;
   readonly unknown: AuthorizationMode;
 }>;
@@ -151,7 +152,11 @@ export function freezeUnifiedPolicySnapshot(input: unknown): UnifiedPolicySnapsh
     !Object.hasOwn(input, "commands")) {
     throw new TypeError("invalid policy snapshot");
   }
-  const commands = readModes(input.commands, ["inspect", "modify", "execute", "destroy", "unknown"] as const);
+  if (!isRecord(input.commands)) throw new TypeError("invalid policy snapshot");
+  const commandInput = Object.hasOwn(input.commands, "opaque")
+    ? input.commands
+    : { ...input.commands, opaque: "deny" };
+  const commands = readModes(commandInput, ["inspect", "modify", "execute", "opaque", "destroy", "unknown"] as const);
   return Object.freeze({ paths: readPaths(input.paths), commands: Object.freeze(commands) });
 }
 
@@ -257,7 +262,6 @@ function authorizeShell(
 ): AuthorizationVerdict {
   for (const operation of facts.operations) {
     if (operation.commandClass === "destroy" || operation.effects.includes("delete") || operation.hardBoundary ||
-      operation.opaquePathAccess && hasPathBoundary(policy.paths) ||
       operation.paths.some((path) => pathHitsMandatoryBoundary(path.evidence, mandatory, policy.paths)) ||
       operation.recursive && operation.paths.some((path) =>
         recursiveSearchReachesBlockedPath(path.evidence.candidate, policy.paths) ||
@@ -273,6 +277,7 @@ function authorizeShell(
       if (effect === "write" || effect === "delete") modes.push(policy.paths.write);
     }
     modes.push(policy.commands[operation.commandClass]);
+    if (operation.opaquePathAccess) modes.push(policy.commands.opaque);
   }
   return verdictForModes(modes);
 }
@@ -286,10 +291,6 @@ function pathHitsMandatoryBoundary(
     path.traversed.some((candidate) => credentialArtifact(candidate, mandatory.credentialRoots)) ||
     violatesPathBoundary(path.candidate, policy) ||
     path.traversed.some((candidate) => violatesTraversedBoundary(candidate, policy));
-}
-
-function hasPathBoundary(policy: PathPolicy): boolean {
-  return policy.allowedRoots.length > 0 || policy.blockedRoots.length > 0 || policy.blockedPaths.length > 0;
 }
 
 function verdictForModes(modes: readonly AuthorizationMode[]): AuthorizationVerdict {

@@ -27,6 +27,7 @@ type PolicyDefinition = Readonly<{
     readonly inspect?: ShellPolicyMode;
     readonly modify?: ShellPolicyMode;
     readonly execute?: ShellPolicyMode;
+    readonly opaque?: ShellPolicyMode;
     readonly destroy?: ShellPolicyMode;
     readonly unknown?: ShellPolicyMode;
   }>;
@@ -58,26 +59,26 @@ const PATH_FIELDS = [
   "blockedRoots",
   "blockedPaths",
 ] as const;
-const COMMAND_FIELDS = ["inspect", "modify", "execute", "destroy", "unknown"] as const;
+const COMMAND_FIELDS = ["inspect", "modify", "execute", "opaque", "destroy", "unknown"] as const;
 const DEFINITION_FIELDS = ["paths", "commands"] as const;
 const CONFIG_FIELDS = ["paths", "commands", "presets", "activePreset", "accessGate"] as const;
 const REQUIRED_PATH_MODES = ["read", "write", "edit", "list", "search"] as const;
-const REQUIRED_COMMAND_MODES = ["inspect", "modify", "execute", "destroy", "unknown"] as const;
+const REQUIRED_COMMAND_MODES = ["inspect", "modify", "execute", "opaque", "destroy", "unknown"] as const;
 const PRESET_NAME_PATTERN = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
 const RESERVED_PRESET_NAMES = new Set([...POLICY_PRESET_NAMES, "status"]);
 
 const BUILTIN_POLICY_DEFINITIONS: Readonly<Record<BuiltinPolicyPresetName, PolicyDefinition>> = Object.freeze({
   review: Object.freeze({
     paths: Object.freeze({ read: "allow", list: "allow", search: "allow", write: "deny", edit: "deny" }),
-    commands: Object.freeze({ inspect: "allow", modify: "deny", execute: "deny", destroy: "deny", unknown: "deny" }),
+    commands: Object.freeze({ inspect: "allow", modify: "deny", execute: "deny", opaque: "deny", destroy: "deny", unknown: "deny" }),
   }),
   guided: Object.freeze({
     paths: Object.freeze({ read: "allow", list: "allow", search: "allow", write: "ask", edit: "ask" }),
-    commands: Object.freeze({ inspect: "allow", modify: "ask", execute: "ask", destroy: "deny", unknown: "deny" }),
+    commands: Object.freeze({ inspect: "allow", modify: "ask", execute: "ask", opaque: "ask", destroy: "deny", unknown: "deny" }),
   }),
   develop: Object.freeze({
     paths: Object.freeze({ read: "allow", list: "allow", search: "allow", write: "allow", edit: "allow" }),
-    commands: Object.freeze({ inspect: "allow", modify: "allow", execute: "allow", destroy: "deny", unknown: "ask" }),
+    commands: Object.freeze({ inspect: "allow", modify: "allow", execute: "allow", opaque: "allow", destroy: "deny", unknown: "ask" }),
   }),
 });
 
@@ -178,12 +179,13 @@ function readCommands(value: unknown, requireCompleteModes = false): {
   readonly inspect: ShellPolicyMode;
   readonly modify: ShellPolicyMode;
   readonly execute: ShellPolicyMode;
+  readonly opaque: ShellPolicyMode;
   readonly destroy: ShellPolicyMode;
   readonly unknown: ShellPolicyMode;
 } {
   if (value === undefined) {
     if (requireCompleteModes) throw invalidConfig();
-    return { inspect: "deny", modify: "deny", execute: "deny", destroy: "deny", unknown: "deny" };
+    return { inspect: "deny", modify: "deny", execute: "deny", opaque: "deny", destroy: "deny", unknown: "deny" };
   }
   if (!isRecord(value) || !hasOnlyKeys(value, COMMAND_FIELDS)) throw invalidConfig();
   if (requireCompleteModes) requireFields(value, REQUIRED_COMMAND_MODES);
@@ -191,6 +193,7 @@ function readCommands(value: unknown, requireCompleteModes = false): {
     inspect: modeOrDefault(value.inspect, "deny"),
     modify: modeOrDefault(value.modify, "deny"),
     execute: modeOrDefault(value.execute, "deny"),
+    opaque: modeOrDefault(value.opaque, "deny"),
     destroy: modeOrDefault(value.destroy, "deny"),
     unknown: modeOrDefault(value.unknown, "deny"),
   };
