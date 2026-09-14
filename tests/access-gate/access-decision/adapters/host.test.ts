@@ -1,69 +1,60 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { adaptHostDecision, adaptHostToolCall, adaptPiToolCall } from "../../../../packages/access-gate/src/access-gate/access-decision/adapters/host";
+import { adaptPiGateToolCall } from "../../../../packages/access-gate/src/access-gate/access-decision/adapters/host";
 
-test("Pi tool-call composition derives cwd and UI only from ExtensionContext", () => {
-  const result = adaptPiToolCall(
-    { toolName: "read", input: { path: "notes.md", cwd: "/attacker", hasUI: true } },
-    { cwd: "/workspace/project", hasUI: false, ui: {} },
-  );
-
-  assert.equal(result.kind, "managed");
-  if (result.kind !== "managed") return;
-  assert.equal(result.request.cwd, "/workspace/project");
-  assert.equal(result.request.hasUI, false);
-  assert.deepEqual(result.request.arguments, { path: "notes.md", cwd: "/attacker", hasUI: true });
-});
-
-test("host adapter derives UI capability and cwd from trusted host context", () => {
-  const result = adaptHostToolCall(
-    "read",
-    { path: "notes.md", hasUI: true },
+test("Pi gate adapter validates host context and maps governed surfaces", () => {
+  const result = adaptPiGateToolCall(
+    { toolName: "read", input: { path: "notes.md" } },
     { cwd: "/workspace/project", hasUI: false },
   );
 
   assert.equal(result.kind, "managed");
   if (result.kind !== "managed") return;
-  assert.equal(result.request.hasUI, false);
-  assert.equal(result.request.cwd, "/workspace/project");
-  assert.deepEqual(result.request.arguments, { path: "notes.md", hasUI: true });
+  assert.equal(result.request.surface, "read");
+  assert.deepEqual(result.request.arguments, { path: "notes.md" });
 });
 
-test("host adapter accepts host context fields beyond the authority projection", () => {
-  const result = adaptHostToolCall(
-    "read",
-    { path: "a" },
-    { cwd: "/", hasUI: true, mode: "tui", ui: {} },
+test("Pi gate adapter normalizes aliases ls, grep, find to canonical surfaces", () => {
+  const lsResult = adaptPiGateToolCall({ toolName: "ls", input: {} }, { cwd: "/", hasUI: true });
+  assert.equal(lsResult.kind === "managed" && lsResult.request.surface, "list");
+
+  const grepResult = adaptPiGateToolCall({ toolName: "grep", input: { pattern: "abc" } }, { cwd: "/", hasUI: true });
+  assert.equal(grepResult.kind === "managed" && grepResult.request.surface, "search");
+
+  const findResult = adaptPiGateToolCall({ toolName: "find", input: { pattern: "*.ts" } }, { cwd: "/", hasUI: true });
+  assert.equal(findResult.kind === "managed" && findResult.request.surface, "search");
+});
+
+test("Pi gate adapter passes through unowned tools without checking context", () => {
+  const result = adaptPiGateToolCall(
+    { toolName: "web_search", input: { query: "pi" } },
+    { cwd: "invalid", hasUI: "not-boolean" },
   );
-
-  assert.equal(result.kind, "managed");
+  assert.deepEqual(result, { kind: "passthrough", toolName: "web_search" });
 });
 
-test("host adapter closes governed surfaces and passes through unowned tools", () => {
-  assert.equal(adaptHostToolCall("read", { path: "a" }, { cwd: "/", hasUI: true }).kind, "managed");
-  assert.equal(adaptHostToolCall("ls", {}, { cwd: "/", hasUI: true }).kind, "managed");
-  assert.equal(adaptHostToolCall("bash", { command: "pwd" }, { cwd: "/", hasUI: true }).kind, "managed");
-  assert.deepEqual(adaptHostToolCall("web_search", { query: "pi" }, { cwd: "/", hasUI: true }), {
-    kind: "passthrough",
-    toolName: "web_search",
-  });
+test("Pi gate adapter fails closed on invalid host context or malformed input", () => {
+  assert.deepEqual(
+    adaptPiGateToolCall({ toolName: "read", input: { path: "a" } }, { cwd: "relative", hasUI: true }),
+    { kind: "reject", code: "invalid-host-context" },
+  );
+  assert.deepEqual(
+    adaptPiGateToolCall({ toolName: "read", input: { path: "a" } }, null),
+    { kind: "reject", code: "invalid-host-context" },
+  );
+  assert.deepEqual(
+    adaptPiGateToolCall({ toolName: "read", input: null }, { cwd: "/workspace", hasUI: true }),
+    { kind: "reject", code: "unsupported-surface" },
+  );
+  assert.deepEqual(
+    adaptPiGateToolCall(null, { cwd: "/workspace", hasUI: true }),
+    { kind: "reject", code: "invalid-host-context" },
+  );
 });
 
-test("invalid host context and unsupported inputs fail closed", () => {
-  assert.deepEqual(adaptHostToolCall("read", { path: "a" }, { cwd: "relative", hasUI: true }), {
-    kind: "reject",
-    code: "invalid-host-context",
-  });
-  assert.deepEqual(adaptHostToolCall("edit", "not-an-object", { cwd: "/", hasUI: true }), {
-    kind: "reject",
-    code: "unsupported-surface",
-  });
-});
-
-test("host adapter maps edit tool calls to managed direct requests", () => {
-  const result = adaptHostToolCall(
-    "edit",
-    { path: "src/index.ts", edits: [{ oldText: "a", newText: "b" }] },
+test("Pi gate adapter maps edit tool call to managed direct request", () => {
+  const result = adaptPiGateToolCall(
+    { toolName: "edit", input: { path: "src/index.ts", edits: [{ oldText: "a", newText: "b" }] } },
     { cwd: "/workspace/project", hasUI: true },
   );
   assert.deepEqual(result, {
@@ -71,24 +62,6 @@ test("host adapter maps edit tool calls to managed direct requests", () => {
     request: {
       surface: "edit",
       arguments: { path: "src/index.ts", edits: [{ oldText: "a", newText: "b" }] },
-      cwd: "/workspace/project",
-      hasUI: true,
     },
-  });
-});
-
-test("host adapter maps policy decisions to non-executing host outcomes", () => {
-  assert.deepEqual(adaptHostDecision({ kind: "allow" }), { kind: "allow" });
-  assert.deepEqual(adaptHostDecision({ kind: "ask", executed: false }), {
-    kind: "confirm",
-    executed: false,
-  });
-  assert.deepEqual(adaptHostDecision({ kind: "deny", code: "policy-denied" }), {
-    kind: "block",
-    code: "policy-denied",
-  });
-  assert.deepEqual(adaptHostDecision({ kind: "deny", code: "hard-boundary" }), {
-    kind: "block",
-    code: "hard-boundary",
   });
 });

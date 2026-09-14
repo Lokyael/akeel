@@ -1,7 +1,7 @@
 import { adaptPiGateToolCall } from "../adapters/index";
 import { renderHostBlock, renderHostFacingDecision } from "./host-render";
+import type { HostFacingDecision } from "./host-render";
 import type { GateSession, GateSessionResult } from "./gate-session";
-import type { DecisionService, RuntimeResult } from "./service";
 
 export type PiToolCallHandlerResult = Readonly<{
   readonly block: true;
@@ -33,16 +33,20 @@ export async function handleGateSessionToolCall(
   if (adapted.kind === "passthrough") return undefined;
   if (adapted.kind === "reject") return hostHandlerResult(renderHostBlock(adapted.code), context);
 
-  const result = session.evaluate(adapted.request);
-  return hostHandlerResult(renderGateSessionResult(result, session, adapted.request.surface), context);
+  try {
+    const result = session.evaluate(adapted.request);
+    return await hostHandlerResult(renderGateSessionResult(result, session, adapted.request.surface), context);
+  } catch {
+    return Object.freeze({ block: true, reason: renderHostBlock("invalid-admission").reason });
+  }
 }
 
 function renderGateSessionResult(
   result: GateSessionResult,
   session: GateSession,
   surface: string,
-): RuntimeResult {
-  if (result.kind === "allow") return result;
+): HostFacingDecision {
+  if (result.kind === "allow") return Object.freeze({ kind: "allow" });
   if (result.kind === "approval-required") {
     return renderHostFacingDecision({ kind: "ask", executed: false }, result.display);
   }
@@ -53,24 +57,15 @@ function renderGateSessionResult(
   return renderHostBlock(result.code);
 }
 
-export async function handlePiToolCall(
-  service: DecisionService,
-  event: unknown,
-  context: unknown,
-): Promise<PiToolCallHandlerResult> {
-  const result = service.decidePiToolCall(event, context);
-  return hostHandlerResult(result, context);
-}
-
-async function hostHandlerResult(result: RuntimeResult, context: unknown): Promise<PiToolCallHandlerResult> {
+async function hostHandlerResult(result: HostFacingDecision, context: unknown): Promise<PiToolCallHandlerResult> {
   if (result.kind === "block") return Object.freeze({ block: true, reason: result.reason });
   if (result.kind !== "confirm") return undefined;
   if (!hasApprovalUI(context)) return Object.freeze({ block: true, reason: "Blocked because approval UI is unavailable." });
 
   try {
-    if (await context.ui.confirm("Approval required", result.summary)) return undefined;
+    const approved = await context.ui.confirm("Approval required", result.summary);
+    return approved ? undefined : Object.freeze({ block: true, reason: "Blocked by user." });
   } catch {
-    return Object.freeze({ block: true, reason: "Blocked because approval UI is unavailable." });
+    return Object.freeze({ block: true, reason: "Blocked because approval UI failed." });
   }
-  return Object.freeze({ block: true, reason: "Blocked by user." });
 }

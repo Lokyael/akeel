@@ -4,7 +4,7 @@ import {
   parseShellFlow,
   reachableShellCommands,
   traceShellFlowCwds,
-} from "../../../../packages/access-gate/src/access-gate/access-decision/core/index";
+} from "../../../../packages/access-gate/src/access-gate/access-decision/core/compilation/shell/flow";
 
 const bashContract = {
   source: "bash-manual",

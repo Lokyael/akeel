@@ -1,6 +1,5 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { renderDecision } from "../../../../packages/access-gate/src/access-gate/access-decision/core/index";
 import { renderHostFacingDecision } from "../../../../packages/access-gate/src/access-gate/access-decision/runtime/index";
 
 test("renderer blocks with a static bounded reason that does not include display path", () => {
@@ -43,7 +42,7 @@ test("renderer gives Shell approval a bounded summary with literal command text"
 
 test("renderer returns an immutable host result without sharing its input", () => {
   const decision = { kind: "allow" } as const;
-  const rendered = renderDecision(decision);
+  const rendered = renderHostFacingDecision(decision);
 
   assert.notEqual(rendered, decision);
   assert.equal(Object.isFrozen(rendered), true);

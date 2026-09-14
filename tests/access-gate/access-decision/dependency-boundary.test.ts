@@ -17,6 +17,28 @@ const legacyDirectories = [
   "ui",
 ];
 
+const retiredFiles = [
+  "core/canonical.ts",
+  "core/admission.ts",
+  "core/policy.ts",
+  "core/shell-compile.ts",
+  "core/shell-policy.ts",
+  "core/display.ts",
+  "core/render.ts",
+  "core/credential-boundary.ts",
+  "core/shell-paths.ts",
+  "core/shell-flow.ts",
+  "core/shell-language.ts",
+  "core/shell-words.ts",
+  "core/program-semantics/index.ts",
+  "core/program-semantics/option-scanner.ts",
+  "core/program-semantics/types.ts",
+  "runtime/service.ts",
+  "runtime/policy-state.ts",
+  "adapters/credential-boundary.ts",
+  "core/types.ts",
+];
+
 function filesUnder(directory: string): string[] {
   if (!statSync(directory, { throwIfNoEntry: false })) return [];
   const files: string[] = [];
@@ -35,6 +57,13 @@ function importsIn(file: string): string[] {
   );
 }
 
+test("all 18 legacy files and shims are physically retired", () => {
+  for (const file of retiredFiles) {
+    const fullPath = join(root, file);
+    assert.equal(existsSync(fullPath), false, `${file} still exists on disk`);
+  }
+});
+
 test("new access-decision boundary has no forbidden imports", () => {
   const files = filesUnder(root);
   for (const file of files) {
@@ -52,15 +81,7 @@ test("new access-decision boundary has no forbidden imports", () => {
 
 test("the production extension reaches only the unified trust chain", () => {
   const entry = join(root, "../index.ts");
-  const forbidden = new Set([
-    join(root, "core/canonical.ts"),
-    join(root, "core/admission.ts"),
-    join(root, "core/policy.ts"),
-    join(root, "core/shell-compile.ts"),
-    join(root, "core/shell-policy.ts"),
-    join(root, "runtime/service.ts"),
-    join(root, "runtime/policy-state.ts"),
-  ].map((path) => resolve(path)));
+  const forbidden = new Set(retiredFiles.map((file) => resolve(join(root, file))));
   const visited = new Set<string>();
   const pending = [resolve(entry)];
 

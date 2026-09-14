@@ -1,24 +1,31 @@
-import type { DirectDisplayView, ShellDisplayView } from "../core/index";
-import type { ShellDecision } from "../core/index";
-import type { Decision } from "../core/index";
+import type { UnifiedDisplayView } from "../core/compilation/index";
+
+export type HostFacingBlock = Readonly<{ readonly kind: "block"; readonly code: HostFacingBlockCode; readonly reason: string }>;
 
 export type HostFacingDecision =
   | Readonly<{ readonly kind: "allow" }>
   | Readonly<{ readonly kind: "confirm"; readonly executed: false; readonly summary: string }>
-  | Readonly<{ readonly kind: "block"; readonly code: HostFacingBlockCode; readonly reason: string }>;
+  | HostFacingBlock;
 
-type HostFacingDecisionInput = Decision | ShellDecision;
-type HostFacingDenyCode = Extract<HostFacingDecisionInput, { kind: "deny" }>['code'];
+export type HostFacingDecisionInput =
+  | Readonly<{ readonly kind: "allow" }>
+  | Readonly<{ readonly kind: "ask"; readonly executed: false }>
+  | Readonly<{ readonly kind: "deny"; readonly code: HostFacingBlockCode }>;
+
 export type HostFacingBlockCode =
-  | HostFacingDenyCode
+  | "invalid-request"
+  | "resource-limit"
+  | "policy-denied"
+  | "no-ui"
+  | "hard-boundary"
+  | "path-denied"
+  | "invalid-admission"
   | "security-boundary"
   | "unsupported-syntax"
   | "dynamic-value"
   | "invalid-host-context"
   | "unsupported-surface"
   | "read-only-policy-switch-required";
-
-type DisplayView = DirectDisplayView | ShellDisplayView;
 
 const MAX_HOST_SUMMARY_CHARS = 160;
 const DENY_REASONS: Readonly<Record<HostFacingBlockCode, string>> = Object.freeze({
@@ -37,13 +44,13 @@ const DENY_REASONS: Readonly<Record<HostFacingBlockCode, string>> = Object.freez
   "read-only-policy-switch-required": "The current session is read-only; switch policy with /policy before retrying this modification.",
 });
 
-export function renderHostBlock(code: HostFacingBlockCode): HostFacingDecision {
+export function renderHostBlock(code: HostFacingBlockCode): HostFacingBlock {
   return Object.freeze({ kind: "block", code, reason: DENY_REASONS[code] });
 }
 
 export function renderHostFacingDecision(
   decision: HostFacingDecisionInput,
-  display?: DisplayView,
+  display?: UnifiedDisplayView,
 ): HostFacingDecision {
   if (decision.kind === "allow") return Object.freeze({ kind: "allow" });
   if (decision.kind === "ask") {
@@ -57,7 +64,7 @@ export function renderHostFacingDecision(
   return renderHostBlock(decision.code);
 }
 
-function shellSummary(display: ShellDisplayView): string {
+function shellSummary(display: Extract<UnifiedDisplayView, { readonly kind: "shell" }>): string {
   const operations = display.operations
     .map((operation) => `${operation.commandClass} [${operation.effects.join(", ")}]`)
     .join("; ");

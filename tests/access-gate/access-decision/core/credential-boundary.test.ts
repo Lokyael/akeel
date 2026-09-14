@@ -1,11 +1,54 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
-  createCredentialBoundary,
-  pathHitsCredentialBoundary,
-} from "../../../../packages/access-gate/src/access-gate/access-decision/core/index";
+  authorizeAdmission,
+  createMandatoryBoundaries,
+  freezeUnifiedPolicySnapshot,
+  MandatoryBoundaries,
+  projectUnifiedAdmission,
+} from "../../../../packages/access-gate/src/access-gate/access-decision/core/authorization/index";
+import {
+  compileManagedCall,
+  createCompileEnvironment,
+} from "../../../../packages/access-gate/src/access-gate/access-decision/core/compilation/index";
 
-const boundary = createCredentialBoundary(["/home/user/.pi/agent"]);
+const mandatory = createMandatoryBoundaries({ credentialRoots: ["/home/user/.pi/agent"] });
+const allowPolicy = freezeUnifiedPolicySnapshot({
+  paths: {
+    read: "allow",
+    write: "allow",
+    edit: "allow",
+    list: "allow",
+    search: "allow",
+    allowedRoots: [],
+    blockedRoots: [],
+    blockedPaths: [],
+  },
+  commands: {
+    inspect: "allow",
+    modify: "allow",
+    execute: "allow",
+    destroy: "deny",
+    unknown: "deny",
+  },
+});
+
+function authorizePath(path: string, traversed: readonly string[] = []) {
+  const env = createCompileEnvironment({
+    cwd: "/workspace",
+    pathEvidence: {
+      resolve() {
+        return Object.freeze({
+          candidate: path,
+          traversed: Object.freeze(traversed.length > 0 ? [...traversed] : [path]),
+        });
+      },
+    },
+  });
+  const compilation = compileManagedCall({ surface: "read", arguments: { path } }, env);
+  const admission = projectUnifiedAdmission(compilation);
+  return authorizeAdmission(admission, mandatory, allowPolicy);
+}
 
 for (const path of [
   "/home/user/.pi/agent/auth.json",
@@ -15,7 +58,7 @@ for (const path of [
   "/home/user/.pi/agent/auth.json.2025",
 ]) {
   test(`credential boundary rejects ${path}`, () => {
-    assert.equal(pathHitsCredentialBoundary(path, [], boundary), true);
+    assert.deepEqual(authorizePath(path), { kind: "deny", code: "hard-boundary" });
   });
 }
 
@@ -29,34 +72,24 @@ for (const path of [
   "/home/user/.pi/other/auth.json",
 ]) {
   test(`credential boundary leaves ${path} outside its protected class`, () => {
-    assert.equal(pathHitsCredentialBoundary(path, [], boundary), false);
+    assert.deepEqual(authorizePath(path), { kind: "allow" });
   });
 }
 
 test("credential boundary catches a protected path in traversal prefixes", () => {
-  assert.equal(
-    pathHitsCredentialBoundary(
-      "/workspace/link/notes.md",
-      ["/", "/workspace/link", "/home/user/.pi/agent/auth.json"],
-      boundary,
-    ),
-    true,
+  assert.deepEqual(
+    authorizePath("/workspace/link/notes.md", ["/", "/workspace/link", "/home/user/.pi/agent/auth.json"]),
+    { kind: "deny", code: "hard-boundary" },
   );
 });
 
 test("credential boundary requires non-empty absolute roots", () => {
-  assert.throws(() => createCredentialBoundary([]), /invalid credential boundary/);
-  assert.throws(() => createCredentialBoundary(["relative-agent"]), /invalid credential boundary/);
-  assert.throws(() => createCredentialBoundary(["/agent/\u0000"]), /invalid credential boundary/);
+  assert.throws(() => createMandatoryBoundaries({ credentialRoots: [] }), /invalid mandatory boundaries/);
+  assert.throws(() => createMandatoryBoundaries({ credentialRoots: ["relative-agent"] }), /invalid mandatory boundaries/);
+  assert.throws(() => createMandatoryBoundaries({ credentialRoots: ["/agent/\u0000"] }), /invalid mandatory boundaries/);
 });
 
 test("credential boundary cannot be forged by copying its public shape", () => {
-  assert.equal(
-    pathHitsCredentialBoundary(
-      "/home/user/.pi/agent/auth.json",
-      [],
-      { roots: ["/home/user/.pi/agent"] },
-    ),
-    true,
-  );
+  const forged = { ...mandatory };
+  assert.equal(MandatoryBoundaries.read(forged), undefined);
 });

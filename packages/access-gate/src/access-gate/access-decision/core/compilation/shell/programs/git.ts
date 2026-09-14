@@ -53,6 +53,7 @@ const GIT_HELPER_COMMANDS = new Set([
   "grep",
   "blame",
   "gc",
+  "apply",
 ]);
 const GIT_GLOBAL_VALUE_OPTIONS = new Set(["-C", "-c", "--git-dir", "--work-tree"]);
 const GIT_REMOTE_VALUE_OPTIONS = new Set(["--upload-pack", "-u", "--depth", "--shallow-since", "--shallow-exclude", "--negotiation-tip", "--server-option", "--filter"]);
@@ -344,7 +345,8 @@ export function analyzeGitProgram(args: readonly ShellWord[]): ProgramSemantic {
         paths.push(path(remote, "source", remote.start, pathBase));
       }
     } else {
-      paths.push(...gitPathArguments(rest, "source", subcommand !== "ls-remote", pathBase));
+      const requiresSeparator = ["diff", "show", "log", "grep", "blame"].includes(subcommand);
+      paths.push(...gitPathArguments(rest, "source", requiresSeparator, pathBase));
     }
     if (["diff", "show", "log", "blame"].includes(subcommand)) {
       paths.push(...gitOptionPaths(rest, new Set(["--output", "-o"]), "target", pathBase));

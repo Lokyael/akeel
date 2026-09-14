@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { analyzeShellCommand } from "../../../../../packages/access-gate/src/access-gate/access-decision/core/index";
+import { analyzeShellCommand } from "../../../../../packages/access-gate/src/access-gate/access-decision/core/compilation/shell/invocation";
 
 test("Shell analysis carries immutable semantic facts instead of identity sidecars", () => {
   const analysis = analyzeShellCommand("git -C repo diff -- src/app.ts");

@@ -33,7 +33,7 @@ export type ShellCommandAnalysis =
 
 const inspectionCommands = new Set(["cat", "head", "tail", "grep", "rg", "find", "ls", "od"]);
 const modificationCommands = new Set(["mkdir", "touch", "cp", "mv"]);
-const destructionCommands = new Set(["rm", "rmdir"]);
+const destructionCommands = new Set(["rm", "rmdir", "unlink", "truncate"]);
 const executionCommands = new Set(["sh", "bash", "node", "python", "python3", "ruby", "perl", "tsx"]);
 const interpreterCommands = new Set([...executionCommands]);
 const interpreterInspectionOptions = new Set(["--version", "-v", "--help", "-h"]);

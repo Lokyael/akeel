@@ -69,20 +69,28 @@ export function createGateSession(input: unknown): GateSession {
   });
   const mandatory = createMandatoryBoundaries({ credentialRoots: input.credentialRoots });
   const defaultRoots = Object.freeze([(input.accessRoot as string | undefined) ?? input.cwd, input.stagingRoot]);
+  const effectiveSnapshots = Object.freeze(
+    Object.fromEntries(
+      Object.entries(configuration.snapshots).map(([name, snapshot]) => [
+        name,
+        effectivePolicy(snapshot, defaultRoots),
+      ]),
+    ),
+  );
   let active = configuration.activePreset;
   let closed = false;
 
   const session = Object.freeze({
     evaluate(request: ManagedCall): GateSessionResult {
       if (closed) return Object.freeze({ kind: "deny", code: "invalid-admission" });
-      const snapshot = configuration.snapshots[active];
+      const snapshot = effectiveSnapshots[active];
       if (!snapshot) return Object.freeze({ kind: "deny", code: "invalid-admission" });
       const compilation = compileManagedCall(request, environment);
       if ("kind" in compilation && compilation.kind === "reject") {
         return Object.freeze({ kind: "deny", code: compilation.code });
       }
       const admission = projectUnifiedAdmission(compilation);
-      const verdict = authorizeAdmission(admission, mandatory, effectivePolicy(snapshot, defaultRoots));
+      const verdict = authorizeAdmission(admission, mandatory, snapshot);
       if (verdict.kind !== "approval-required") return verdict;
       const display = projectCompilationDisplay(compilation);
       return display === undefined

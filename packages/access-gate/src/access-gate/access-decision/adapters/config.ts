@@ -5,30 +5,6 @@ import { createLinuxPathEvidence } from "../core/compilation/index";
 type PolicyMode = AuthorizationMode;
 type ShellPolicyMode = AuthorizationMode;
 
-type DirectPolicySnapshot = Readonly<{
-  readonly read: PolicyMode;
-  readonly write: PolicyMode;
-  readonly edit: PolicyMode;
-  readonly list: PolicyMode;
-  readonly search: PolicyMode;
-  readonly allowedRoots: readonly string[];
-  readonly blockedRoots: readonly string[];
-  readonly blockedPaths: readonly string[];
-}>;
-
-type ShellPolicySnapshot = Readonly<{
-  readonly read: ShellPolicyMode;
-  readonly write: ShellPolicyMode;
-  readonly inspect: ShellPolicyMode;
-  readonly modify: ShellPolicyMode;
-  readonly execute: ShellPolicyMode;
-  readonly destroy: ShellPolicyMode;
-  readonly unknown: ShellPolicyMode;
-  readonly allowedRoots: readonly string[];
-  readonly blockedRoots: readonly string[];
-  readonly blockedPaths: readonly string[];
-}>;
-
 const POLICY_PATH_EVIDENCE = createLinuxPathEvidence();
 
 export const POLICY_PRESET_NAMES = ["review", "guided", "develop"] as const;
@@ -60,16 +36,6 @@ export type PolicyConfig = PolicyDefinition & Readonly<{
   readonly presets?: Readonly<Record<PolicyPresetName, PolicyDefinition>>;
   readonly activePreset?: PolicyPresetName;
   readonly accessGate?: AccessGateMode;
-}>;
-
-export type PolicySnapshot = Readonly<{
-  readonly direct: DirectPolicySnapshot;
-  readonly shell: ShellPolicySnapshot;
-}>;
-
-export type PolicyPresetSet = Readonly<{
-  readonly active: PolicyPresetName;
-  readonly snapshots: Readonly<Record<string, PolicySnapshot>>;
 }>;
 
 export type DecodedPolicyConfiguration =
@@ -298,33 +264,6 @@ function unifiedSnapshotFor(definition: PolicyDefinition): UnifiedPolicySnapshot
   return freezeUnifiedPolicySnapshot({ paths, commands });
 }
 
-function snapshotFor(definition: PolicyDefinition): PolicySnapshot {
-  const { paths, commands } = normalizedDefinition(definition);
-  const direct: DirectPolicySnapshot = Object.freeze({
-    read: paths.read,
-    write: paths.write,
-    edit: paths.edit,
-    list: paths.list,
-    search: paths.search,
-    allowedRoots: paths.allowedRoots,
-    blockedRoots: paths.blockedRoots,
-    blockedPaths: paths.blockedPaths,
-  });
-  const shell: ShellPolicySnapshot = Object.freeze({
-    read: paths.read,
-    write: paths.write,
-    inspect: commands.inspect,
-    modify: commands.modify,
-    execute: commands.execute,
-    destroy: commands.destroy,
-    unknown: commands.unknown,
-    allowedRoots: paths.allowedRoots,
-    blockedRoots: paths.blockedRoots,
-    blockedPaths: paths.blockedPaths,
-  });
-  return Object.freeze({ direct, shell });
-}
-
 function mergeBuiltinDefinition(name: BuiltinPolicyPresetName, supplied: PolicyDefinition | undefined): PolicyDefinition {
   const builtin = BUILTIN_POLICY_DEFINITIONS[name];
   if (supplied === undefined) return builtin;
@@ -358,18 +297,6 @@ function mergeBuiltinDefinition(name: BuiltinPolicyPresetName, supplied: PolicyD
   return merged;
 }
 
-function presetSetFrom(parsed: ParsedPolicy): PolicyPresetSet | undefined {
-  if (parsed.presets === undefined) return undefined;
-  const snapshots: Record<string, PolicySnapshot> = {};
-  for (const name of POLICY_PRESET_NAMES) {
-    snapshots[name] = snapshotFor(mergeBuiltinDefinition(name, parsed.presets[name]));
-  }
-  for (const [name, definition] of Object.entries(parsed.presets)) {
-    if (!isBuiltinPresetName(name)) snapshots[name] = snapshotFor(definition);
-  }
-  return Object.freeze({ active: parsed.activePreset!, snapshots: Object.freeze(snapshots) });
-}
-
 export function decodePolicyConfiguration(
   input: unknown,
   requireCompleteExternalModes = false,
@@ -398,31 +325,4 @@ export function decodePolicyConfiguration(
     switchable: true,
     snapshots: Object.freeze(snapshots),
   });
-}
-
-export function adaptPolicyConfig(input: unknown): PolicySnapshot {
-  const parsed = readConfig(input);
-  if (parsed.disabled) return snapshotFor({});
-  if (parsed.flat !== undefined) return snapshotFor(parsed.flat);
-  const presets = presetSetFrom(parsed);
-  return presets!.snapshots[presets!.active];
-}
-
-export function adaptPolicyPresets(input: unknown): PolicyPresetSet | undefined {
-  const parsed = readConfig(input);
-  if (parsed.presets === undefined) return undefined;
-  return presetSetFrom(readConfig(input, true));
-}
-
-export function validateExternalPolicyConfig(input: unknown): void {
-  const parsed = readConfig(input, true);
-  if (parsed.presets !== undefined) {
-    presetSetFrom(parsed);
-  } else if (parsed.flat !== undefined) {
-    snapshotFor(parsed.flat);
-  }
-}
-
-export function isAccessGateDisabled(input: unknown): boolean {
-  return readConfig(input).disabled === true;
 }

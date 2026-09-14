@@ -3,6 +3,8 @@ import { INFO_FLAGS, result } from "./shared";
 import type { ProgramSemantic } from "./types";
 
 export const INTERPRETERS = new Set([
+  "sh",
+  "bash",
   "python",
   "python3",
   "python3.11",

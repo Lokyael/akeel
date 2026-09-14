@@ -360,7 +360,7 @@ test("admits a bounded Direct search request through the public service seam", (
   const service = testService({ read: "deny", write: "deny", list: "deny", search: "allow" });
   const request: DirectRequest = {
     surface: "search",
-    arguments: { path: "src", pattern: "createDecisionService" },
+    arguments: { path: "src", pattern: "compileManagedCall" },
     cwd: "/workspace/project",
     hasUI: false,
   };

@@ -48,7 +48,9 @@ export class UnifiedAdmissionPlan {
   }
 
   static read(value: unknown): AdmissionFacts | undefined {
-    return value instanceof UnifiedAdmissionPlan ? value.#facts : undefined;
+    return typeof value === "object" && value !== null && #facts in value
+      ? (value as UnifiedAdmissionPlan).#facts
+      : undefined;
   }
 }
 
@@ -96,7 +98,9 @@ export class MandatoryBoundaries {
   }
 
   static read(value: unknown): MandatoryBoundaryFacts | undefined {
-    return value instanceof MandatoryBoundaries ? value.#facts : undefined;
+    return typeof value === "object" && value !== null && #facts in value
+      ? (value as MandatoryBoundaries).#facts
+      : undefined;
   }
 }
 

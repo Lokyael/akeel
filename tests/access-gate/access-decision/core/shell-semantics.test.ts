@@ -1,11 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { analyzeProgramCommand } from "../../../../packages/access-gate/src/access-gate/access-decision/core/compilation/shell/programs/index";
 import {
-  analyzeProgramCommand,
   analyzeShellCommand,
   shellCommandOutcomes,
-} from "../../../../packages/access-gate/src/access-gate/access-decision/core/index";
-import type { ShellWord } from "../../../../packages/access-gate/src/access-gate/access-decision/core/index";
+} from "../../../../packages/access-gate/src/access-gate/access-decision/core/compilation/shell/invocation";
+import type { ShellWord } from "../../../../packages/access-gate/src/access-gate/access-decision/core/compilation/shell/language";
 
 const policyContract = {
   source: "new-policy",

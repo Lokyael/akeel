@@ -168,6 +168,8 @@ function installComposition(
       });
     } catch {
       session = undefined;
+      project?.dispose();
+      project = undefined;
     }
   });
 

@@ -66,7 +66,9 @@ export class CompileEnvironment {
   }
 
   static read(value: unknown): CompileEnvironmentFacts | undefined {
-    return value instanceof CompileEnvironment ? value.#facts : undefined;
+    return typeof value === "object" && value !== null && #facts in value
+      ? (value as CompileEnvironment).#facts
+      : undefined;
   }
 }
 
@@ -114,7 +116,9 @@ export class CanonicalCompilation {
   }
 
   static read(value: unknown): CanonicalFacts | undefined {
-    return value instanceof CanonicalCompilation ? value.#facts : undefined;
+    return typeof value === "object" && value !== null && #facts in value
+      ? (value as CanonicalCompilation).#facts
+      : undefined;
   }
 }
 
@@ -238,7 +242,7 @@ export function compileManagedCall(
   }
   if (exceedsDirectTextBudget(textValues)) return reject("resource-limit");
 
-  const resolved = compileEnvironment.pathEvidence.resolve(compileEnvironment.cwd, path);
+  const resolved = compileEnvironment.pathEvidence.resolve(compileEnvironment.cwd, path, { pathKind: "literal" });
   if (!validResolvedPath(resolved)) return reject("invalid-request");
   const evidence = Object.freeze({
     candidate: resolved.candidate,
