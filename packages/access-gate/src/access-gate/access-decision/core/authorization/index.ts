@@ -32,22 +32,24 @@ type ShellAdmission = Readonly<{
 
 type AdmissionFacts = DirectAdmission | ShellAdmission;
 
-const ADMISSION_ISSUER = Object.freeze({});
+const ADMISSION_ISSUER = Symbol("ADMISSION_ISSUER");
 
 export class UnifiedAdmissionPlan {
   #facts: AdmissionFacts;
 
-  private constructor(issuer: object, facts: AdmissionFacts) {
+  private constructor(issuer: symbol, facts: AdmissionFacts) {
     if (issuer !== ADMISSION_ISSUER) throw new TypeError("invalid admission plan");
     this.#facts = facts;
     Object.freeze(this);
   }
 
-  static issue(facts: AdmissionFacts): UnifiedAdmissionPlan {
+  static issue(issuer: symbol, facts: AdmissionFacts): UnifiedAdmissionPlan {
+    if (issuer !== ADMISSION_ISSUER) throw new TypeError("unauthorized issuance");
     return new UnifiedAdmissionPlan(ADMISSION_ISSUER, facts);
   }
 
-  static read(value: unknown): AdmissionFacts | undefined {
+  static read(value: unknown, issuer?: symbol): AdmissionFacts | undefined {
+    if (issuer !== ADMISSION_ISSUER) return undefined;
     return typeof value === "object" && value !== null && #facts in value
       ? (value as UnifiedAdmissionPlan).#facts
       : undefined;
@@ -82,22 +84,24 @@ type MandatoryBoundaryFacts = Readonly<{
   readonly credentialRoots: readonly string[];
 }>;
 
-const BOUNDARY_ISSUER = Object.freeze({});
+const BOUNDARY_ISSUER = Symbol("BOUNDARY_ISSUER");
 
 export class MandatoryBoundaries {
   #facts: MandatoryBoundaryFacts;
 
-  private constructor(issuer: object, facts: MandatoryBoundaryFacts) {
+  private constructor(issuer: symbol, facts: MandatoryBoundaryFacts) {
     if (issuer !== BOUNDARY_ISSUER) throw new TypeError("invalid mandatory boundaries");
     this.#facts = facts;
     Object.freeze(this);
   }
 
-  static issue(facts: MandatoryBoundaryFacts): MandatoryBoundaries {
+  static issue(issuer: symbol, facts: MandatoryBoundaryFacts): MandatoryBoundaries {
+    if (issuer !== BOUNDARY_ISSUER) throw new TypeError("unauthorized issuance");
     return new MandatoryBoundaries(BOUNDARY_ISSUER, facts);
   }
 
-  static read(value: unknown): MandatoryBoundaryFacts | undefined {
+  static read(value: unknown, issuer?: symbol): MandatoryBoundaryFacts | undefined {
+    if (issuer !== BOUNDARY_ISSUER) return undefined;
     return typeof value === "object" && value !== null && #facts in value
       ? (value as MandatoryBoundaries).#facts
       : undefined;
@@ -156,20 +160,20 @@ export function createMandatoryBoundaries(input: unknown): MandatoryBoundaries {
     input.credentialRoots.length === 0 || !input.credentialRoots.every(isAbsolutePath)) {
     throw new TypeError("invalid mandatory boundaries");
   }
-  return MandatoryBoundaries.issue(Object.freeze({ credentialRoots: Object.freeze([...new Set(input.credentialRoots)]) }));
+  return MandatoryBoundaries.issue(BOUNDARY_ISSUER, Object.freeze({ credentialRoots: Object.freeze([...new Set(input.credentialRoots)]) }));
 }
 
 export function projectUnifiedAdmission(compilation: unknown): UnifiedAdmissionPlan | undefined {
   const facts = canonicalCompilationFacts(compilation);
   if (!facts) return undefined;
   if (facts.kind === "direct") {
-    return UnifiedAdmissionPlan.issue(Object.freeze({
+    return UnifiedAdmissionPlan.issue(ADMISSION_ISSUER, Object.freeze({
       kind: "direct",
       operation: facts.operation,
       path: facts.path,
     }));
   }
-  return UnifiedAdmissionPlan.issue(Object.freeze({
+  return UnifiedAdmissionPlan.issue(ADMISSION_ISSUER, Object.freeze({
     kind: "shell",
     operations: facts.operations,
   }));
@@ -219,8 +223,8 @@ export function authorizeAdmission(
   boundaries: unknown,
   policy: UnifiedPolicySnapshot,
 ): AuthorizationVerdict {
-  const facts = UnifiedAdmissionPlan.read(admission);
-  const mandatory = MandatoryBoundaries.read(boundaries);
+  const facts = UnifiedAdmissionPlan.read(admission, ADMISSION_ISSUER);
+  const mandatory = MandatoryBoundaries.read(boundaries, BOUNDARY_ISSUER);
   if (!facts || !mandatory) return Object.freeze({ kind: "deny", code: "invalid-admission" });
   return facts.kind === "direct"
     ? authorizeDirect(facts, mandatory, policy)

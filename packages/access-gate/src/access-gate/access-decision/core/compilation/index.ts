@@ -50,22 +50,24 @@ type CompileEnvironmentFacts = Readonly<{
   readonly pathEvidence: PathEvidencePort;
 }>;
 
-const ENVIRONMENT_ISSUER = Object.freeze({});
+const ENVIRONMENT_ISSUER = Symbol("ENVIRONMENT_ISSUER");
 
 export class CompileEnvironment {
   #facts: CompileEnvironmentFacts;
 
-  private constructor(issuer: object, facts: CompileEnvironmentFacts) {
+  private constructor(issuer: symbol, facts: CompileEnvironmentFacts) {
     if (issuer !== ENVIRONMENT_ISSUER) throw new TypeError("invalid compile environment");
     this.#facts = facts;
     Object.freeze(this);
   }
 
-  static issue(facts: CompileEnvironmentFacts): CompileEnvironment {
+  static issue(issuer: symbol, facts: CompileEnvironmentFacts): CompileEnvironment {
+    if (issuer !== ENVIRONMENT_ISSUER) throw new TypeError("unauthorized issuance");
     return new CompileEnvironment(ENVIRONMENT_ISSUER, facts);
   }
 
-  static read(value: unknown): CompileEnvironmentFacts | undefined {
+  static read(value: unknown, issuer?: symbol): CompileEnvironmentFacts | undefined {
+    if (issuer !== ENVIRONMENT_ISSUER) return undefined;
     return typeof value === "object" && value !== null && #facts in value
       ? (value as CompileEnvironment).#facts
       : undefined;
@@ -100,22 +102,24 @@ type ShellCompilationFacts = Readonly<{
 
 export type CanonicalFacts = DirectCompilationFacts | ShellCompilationFacts;
 
-const COMPILATION_ISSUER = Object.freeze({});
+const COMPILATION_ISSUER = Symbol("COMPILATION_ISSUER");
 
 export class CanonicalCompilation {
   #facts: CanonicalFacts;
 
-  private constructor(issuer: object, facts: CanonicalFacts) {
+  private constructor(issuer: symbol, facts: CanonicalFacts) {
     if (issuer !== COMPILATION_ISSUER) throw new TypeError("invalid canonical compilation");
     this.#facts = facts;
     Object.freeze(this);
   }
 
-  static issue(facts: CanonicalFacts): CanonicalCompilation {
+  static issue(issuer: symbol, facts: CanonicalFacts): CanonicalCompilation {
+    if (issuer !== COMPILATION_ISSUER) throw new TypeError("unauthorized issuance");
     return new CanonicalCompilation(COMPILATION_ISSUER, facts);
   }
 
-  static read(value: unknown): CanonicalFacts | undefined {
+  static read(value: unknown, issuer?: symbol): CanonicalFacts | undefined {
+    if (issuer !== COMPILATION_ISSUER) return undefined;
     return typeof value === "object" && value !== null && #facts in value
       ? (value as CanonicalCompilation).#facts
       : undefined;
@@ -176,7 +180,7 @@ export function createCompileEnvironment(input: unknown): CompileEnvironment {
     throw new TypeError("invalid compile environment");
   }
   if (input.home !== undefined && !isAbsolutePath(input.home)) throw new TypeError("invalid compile environment");
-  return CompileEnvironment.issue(Object.freeze({
+  return CompileEnvironment.issue(ENVIRONMENT_ISSUER, Object.freeze({
     cwd: input.cwd,
     home: input.home as string | undefined,
     pathEvidence: input.pathEvidence as PathEvidencePort,
@@ -187,7 +191,7 @@ export function compileManagedCall(
   request: unknown,
   environment: unknown,
 ): CanonicalCompilation | UnifiedCanonicalReject {
-  const compileEnvironment = CompileEnvironment.read(environment);
+  const compileEnvironment = CompileEnvironment.read(environment, ENVIRONMENT_ISSUER);
   if (!compileEnvironment || !isRecord(request) || !hasExactKeys(request, ["surface", "arguments"]) ||
     !isRecord(request.arguments)) {
     return reject("invalid-request");
@@ -234,7 +238,6 @@ export function compileManagedCall(
   if (typeof path !== "string" || path.length === 0 || path.includes("\u0000")) return reject("invalid-request");
   const textValues = [path, compileEnvironment.cwd];
   if (surface === "search") textValues.push(argumentsValue.pattern as string);
-  if (surface === "write") textValues.push(argumentsValue.content as string);
   if (surface === "edit") {
     for (const edit of argumentsValue.edits as readonly { oldText: string; newText: string }[]) {
       textValues.push(edit.oldText, edit.newText);
@@ -248,7 +251,7 @@ export function compileManagedCall(
     candidate: resolved.candidate,
     traversed: Object.freeze([...resolved.traversed]),
   });
-  return CanonicalCompilation.issue(Object.freeze({ kind: "direct", operation: surface, path: evidence }));
+  return CanonicalCompilation.issue(COMPILATION_ISSUER, Object.freeze({ kind: "direct", operation: surface, path: evidence }));
 }
 
 type CompleteShellAnalysis = Extract<ShellCommandAnalysis, { readonly kind: "complete" }>;
@@ -311,7 +314,7 @@ function compileShellCall(
     }
   }
 
-  return CanonicalCompilation.issue(Object.freeze({
+  return CanonicalCompilation.issue(COMPILATION_ISSUER, Object.freeze({
     kind: "shell",
     command,
     operations: Object.freeze(operations),
@@ -418,7 +421,7 @@ export type UnifiedDisplayView =
     }>;
 
 export function projectCompilationDisplay(compilation: unknown): UnifiedDisplayView | undefined {
-  const facts = CanonicalCompilation.read(compilation);
+  const facts = CanonicalCompilation.read(compilation, COMPILATION_ISSUER);
   if (!facts) return undefined;
   if (facts.kind === "direct") {
     return Object.freeze({ kind: "direct", operation: facts.operation, path: facts.path.candidate });
@@ -434,5 +437,5 @@ export function projectCompilationDisplay(compilation: unknown): UnifiedDisplayV
 }
 
 export function canonicalCompilationFacts(value: unknown): CanonicalFacts | undefined {
-  return CanonicalCompilation.read(value);
+  return CanonicalCompilation.read(value, COMPILATION_ISSUER);
 }

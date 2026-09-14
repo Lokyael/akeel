@@ -29,6 +29,18 @@ test("project lifecycle uses the session cwd as access root and owns staging", (
   }
 });
 
+test("project lifecycle isolates staging root by process uid", () => {
+  const cwd = mkdtempSync(join(tmpdir(), "akeel-uid-test-"));
+  try {
+    const lifecycle = createProjectLifecycle(cwd);
+    const uid = typeof process.getuid === "function" ? process.getuid() : "user";
+    assert.match(lifecycle.context.stagingRoot, new RegExp(`akeel-${uid}[/\\\\]access-decision-`));
+    lifecycle.dispose();
+  } finally {
+    rmSync(cwd, { recursive: true, force: true });
+  }
+});
+
 test("project lifecycle accepts a non-Git cwd as access root", () => {
   const cwd = mkdtempSync(join(tmpdir(), "akeel-no-project-"));
   try {

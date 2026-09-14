@@ -55,8 +55,9 @@ export function scanShellWords(input: string): ShellWordScan {
   let index = 0;
 
   while (index < input.length) {
+    if (isForbiddenControlCharacter(input[index]!)) return rejected("unsupported-syntax", index, index + 1);
     while (index < input.length && /\s/u.test(input[index]!)) {
-      if (input[index] === "\n") return rejected("unsupported-syntax", index, index + 1);
+      if (isForbiddenControlCharacter(input[index]!)) return rejected("unsupported-syntax", index, index + 1);
       index += 1;
     }
     if (index === input.length) break;
@@ -70,6 +71,7 @@ export function scanShellWords(input: string): ShellWordScan {
 
     while (index < input.length) {
       const character = input[index]!;
+      if (isForbiddenControlCharacter(character)) return rejected("unsupported-syntax", index, index + 1);
       if (quote === "single") {
         if (character === "'") {
           quote = undefined;
@@ -87,8 +89,10 @@ export function scanShellWords(input: string): ShellWordScan {
         }
         if (character === "\\") {
           if (index + 1 >= input.length) return rejected("unsupported-syntax", start, input.length);
-          if (input[index + 1] === "\n") return rejected("unsupported-syntax", index, index + 2);
-          text += input[index + 1]!;
+          if (isForbiddenControlCharacter(input[index + 1]!)) return rejected("unsupported-syntax", index, index + 2);
+          const next = input[index + 1]!;
+          if (next === "$" || next === "`" || next === '"' || next === "\\") text += next;
+          else text += `\\${next}`;
           escaped = true;
           index += 2;
           continue;
@@ -131,7 +135,7 @@ export function scanShellWords(input: string): ShellWordScan {
       }
       if (character === "\\") {
         if (index + 1 >= input.length) return rejected("unsupported-syntax", start, input.length);
-        if (input[index + 1] === "\n") return rejected("unsupported-syntax", index, index + 2);
+        if (isForbiddenControlCharacter(input[index + 1]!)) return rejected("unsupported-syntax", index, index + 2);
         text += input[index + 1]!;
         escaped = true;
         index += 2;
@@ -157,6 +161,11 @@ export function scanShellWords(input: string): ShellWordScan {
   }
 
   return Object.freeze({ kind: "complete", words: Object.freeze(words) });
+}
+
+function isForbiddenControlCharacter(character: string): boolean {
+  const code = character.charCodeAt(0);
+  return code < 0x20 && code !== 0x09 || code === 0x7f;
 }
 
 function unsupportedRedirectionLength(input: string, index: number): number {

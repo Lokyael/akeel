@@ -62,3 +62,13 @@ test("option scanner exposes a missing separated value instead of consuming the 
   assert.equal(emptyAttached[0]?.missingValue, true);
   assert.equal(emptyAttached[0]?.value, undefined);
 });
+
+test("attached and equals option values preserve literal pathKind when not home-relative", () => {
+  const words = [word("-C~/repo", 0), word("--git-dir=~/repo", 9)];
+  const occurrences = scanOptionWords(words, {
+    attachedOptions: new Set(["-C"]),
+  });
+
+  assert.equal(occurrences[0]?.value?.pathKind, "literal");
+  assert.equal(occurrences[1]?.value?.pathKind, "literal");
+});

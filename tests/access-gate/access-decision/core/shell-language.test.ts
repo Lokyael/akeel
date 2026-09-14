@@ -51,3 +51,26 @@ test("dynamic expansions are rejected instead of being guessed", () => {
     resourceClass: "syntax",
   });
 });
+
+test("ASCII control characters are rejected as unsupported syntax", () => {
+  for (const input of ["mkdir /tmp/x\rVERIFIED", "cat 'file\rname'", "cat file\bname", "echo \x1b[31mred"]) {
+    const result = scanShellWords(input);
+    assert.equal(result.kind, "reject", input);
+    if (result.kind === "reject") {
+      assert.equal(result.code, "unsupported-syntax", input);
+    }
+  }
+});
+
+test("double quote escaping follows POSIX rules and retains non-special backslashes", () => {
+  const result = scanShellWords('cat "foo\\bar" "foo\\"bar" "foo\\\\bar"');
+  assert.deepEqual(result, {
+    kind: "complete",
+    words: [
+      { text: "cat", start: 0, end: 3, quote: "bare" },
+      { text: "foo\\bar", start: 4, end: 13, quote: "double" },
+      { text: 'foo"bar', start: 14, end: 24, quote: "double" },
+      { text: "foo\\bar", start: 25, end: 35, quote: "double" },
+    ],
+  });
+});

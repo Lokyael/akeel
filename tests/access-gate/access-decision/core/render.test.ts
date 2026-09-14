@@ -40,6 +40,25 @@ test("renderer gives Shell approval a bounded summary with literal command text"
   assert.equal(rendered.kind === "confirm" && rendered.summary.length <= 160, true);
 });
 
+test("renderer escapes terminal control characters in approval summaries", () => {
+  const rendered = renderHostFacingDecision(
+    { kind: "ask", executed: false },
+    {
+      kind: "shell",
+      command: "mkdir /tmp/x\rSAFE\bNOW",
+      operations: [{ commandClass: "modify", effects: ["write"] }],
+    },
+  );
+
+  assert.equal(rendered.kind, "confirm");
+  if (rendered.kind === "confirm") {
+    assert.equal(rendered.summary.includes("\\x0d"), true);
+    assert.equal(rendered.summary.includes("\\x08"), true);
+    assert.equal(rendered.summary.includes("\r"), false);
+    assert.equal(rendered.summary.includes("\b"), false);
+  }
+});
+
 test("renderer returns an immutable host result without sharing its input", () => {
   const decision = { kind: "allow" } as const;
   const rendered = renderHostFacingDecision(decision);

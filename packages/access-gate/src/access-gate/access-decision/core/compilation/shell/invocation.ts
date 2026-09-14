@@ -1,5 +1,6 @@
 import { scanSimpleShellFlow } from "./flow";
 import { analyzeProgramCommand } from "./programs/index";
+import { INTERPRETERS } from "./programs/interpreters";
 import type { ProgramCwdChange, ProgramPathBase } from "./programs/index";
 import type { ShellWord } from "./language";
 import type { ShellCommandStatus } from "./flow";
@@ -34,8 +35,8 @@ export type ShellCommandAnalysis =
 const inspectionCommands = new Set(["cat", "head", "tail", "grep", "rg", "find", "ls", "od"]);
 const modificationCommands = new Set(["mkdir", "touch", "cp", "mv"]);
 const destructionCommands = new Set(["rm", "rmdir", "unlink", "truncate"]);
-const executionCommands = new Set(["sh", "bash", "node", "python", "python3", "ruby", "perl", "tsx"]);
-const interpreterCommands = new Set([...executionCommands]);
+const executionCommands = new Set([...INTERPRETERS]);
+const interpreterCommands = new Set([...INTERPRETERS]);
 const interpreterInspectionOptions = new Set(["--version", "-v", "--help", "-h"]);
 const findActionOptions = new Set(["-exec", "-execdir", "-ok", "-okdir", "-delete", "-fls", "-fprint", "-fprint0", "-fprintf"]);
 const unsupportedCommandWords = new Set([

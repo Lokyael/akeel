@@ -72,6 +72,9 @@ function shellSummary(display: Extract<UnifiedDisplayView, { readonly kind: "she
 }
 
 function boundedSummary(value: string): string {
-  if (value.length <= MAX_HOST_SUMMARY_CHARS) return value;
-  return `${value.slice(0, MAX_HOST_SUMMARY_CHARS - 1)}…`;
+  const sanitized = value.replace(/[\u0000-\u001f\u007f]/gu, (character) =>
+    `\\x${character.charCodeAt(0).toString(16).padStart(2, "0")}`,
+  );
+  if (sanitized.length <= MAX_HOST_SUMMARY_CHARS) return sanitized;
+  return `${sanitized.slice(0, MAX_HOST_SUMMARY_CHARS - 1)}…`;
 }

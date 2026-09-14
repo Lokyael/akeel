@@ -10,6 +10,7 @@ import {
 } from "../../../../packages/access-gate/src/access-gate/access-decision/core/authorization/index";
 import {
   CanonicalCompilation,
+  CompileEnvironment,
   compileManagedCall,
   createCompileEnvironment,
   createLinuxPathEvidence,
@@ -91,4 +92,30 @@ test("authorization rejects forged mandatory boundaries without throwing", () =>
       code: "invalid-admission",
     });
   });
+});
+
+test("sealed classes reject unauthorized issuance and unauthorized reading", () => {
+  assert.throws(() => {
+    (UnifiedAdmissionPlan as any).issue({ kind: "direct", operation: "read", path: { candidate: "/etc/passwd", traversed: [] } });
+  }, /unauthorized issuance/);
+
+  assert.throws(() => {
+    (CanonicalCompilation as any).issue({ kind: "direct", operation: "read", path: { candidate: "/etc/passwd", traversed: [] } });
+  }, /unauthorized issuance/);
+
+  assert.throws(() => {
+    (MandatoryBoundaries as any).issue({ credentialRoots: ["/etc"] });
+  }, /unauthorized issuance/);
+
+  assert.throws(() => {
+    (CompileEnvironment as any).issue({ cwd: "/tmp", pathEvidence: {} });
+  }, /unauthorized issuance/);
+
+  const compilation = compileManagedCall({ surface: "read", arguments: { path: "README.md" } }, env);
+  const admission = projectUnifiedAdmission(compilation);
+  assert.ok(admission);
+
+  assert.equal(UnifiedAdmissionPlan.read(admission), undefined);
+  assert.equal(CanonicalCompilation.read(compilation), undefined);
+  assert.equal(MandatoryBoundaries.read(boundaries), undefined);
 });

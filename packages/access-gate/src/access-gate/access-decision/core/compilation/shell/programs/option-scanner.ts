@@ -15,6 +15,11 @@ type ScannerOptions = Readonly<{
   readonly attachedOptions?: ReadonlySet<string>;
 }>;
 
+function optionValuePathKind(token: ShellWord, value: string): ShellWord["pathKind"] {
+  if (token.pathKind === "home-relative") return "home-relative";
+  return value === "~" || value.startsWith("~/") ? "literal" : token.pathKind;
+}
+
 function optionName(text: string): Readonly<{ readonly name: string; readonly attachedValue?: string }> | undefined {
   if (!text.startsWith("-") || text === "-") return undefined;
   const equals = text.indexOf("=");
@@ -42,11 +47,12 @@ export function scanOptionWords(
     const attached = attachedOption(token.text, options.attachedOptions ?? new Set());
     const valueOptions = options.valueOptions ?? new Set();
     if (attached !== undefined) {
+      const pathKind = optionValuePathKind(token, attached.value);
       occurrences.push(Object.freeze({
         name: attached.name,
         token,
         index,
-        value: Object.freeze({ ...token, text: attached.value }),
+        value: Object.freeze({ ...token, text: attached.value, pathKind }),
         valueIndex: index,
         attached: true,
         missingValue: false,
@@ -57,11 +63,12 @@ export function scanOptionWords(
     if (parsed === undefined) continue;
     if (parsed.attachedValue !== undefined) {
       const missingValue = parsed.attachedValue.length === 0;
+      const pathKind = optionValuePathKind(token, parsed.attachedValue);
       occurrences.push(Object.freeze({
         name: parsed.name,
         token,
         index,
-        value: missingValue ? undefined : Object.freeze({ ...token, text: parsed.attachedValue }),
+        value: missingValue ? undefined : Object.freeze({ ...token, text: parsed.attachedValue, pathKind }),
         valueIndex: missingValue ? undefined : index,
         attached: true,
         missingValue,

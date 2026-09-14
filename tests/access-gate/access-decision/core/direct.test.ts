@@ -332,6 +332,18 @@ test("admits a Direct write request with its required content", () => {
   assert.deepEqual(service.decide(request), { kind: "allow" });
 });
 
+test("admits a Direct write request whose content exceeds the path analysis budget", () => {
+  const service = testService({ read: "allow", write: "allow", list: "deny", search: "deny" });
+  const request: DirectRequest = {
+    surface: "write",
+    arguments: { path: "large.md", content: "x".repeat(32_768) },
+    cwd: "/workspace/project",
+    hasUI: false,
+  };
+
+  assert.deepEqual(service.decide(request), { kind: "allow" });
+});
+
 test("admits a normalized Direct list request through the public service seam", () => {
   const service = testService({ read: "deny", write: "deny", list: "allow", search: "deny" });
   const request: DirectRequest = {

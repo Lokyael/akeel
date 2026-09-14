@@ -24,7 +24,8 @@ export function createProjectLifecycle(cwd: string): ProjectLifecycle {
     throw new TypeError("invalid project lifecycle");
   }
   const root = accessRoot(cwd);
-  const stagingParent = join(tmpdir(), "akeel");
+  const uid = typeof process.getuid === "function" ? process.getuid() : "user";
+  const stagingParent = join(tmpdir(), `akeel-${uid}`);
   mkdirSync(stagingParent, { recursive: true });
   const stagingRoot = mkdtempSync(join(stagingParent, "access-decision-"));
   let disposed = false;
