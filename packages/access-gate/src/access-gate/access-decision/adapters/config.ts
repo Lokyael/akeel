@@ -67,18 +67,71 @@ const REQUIRED_COMMAND_MODES = ["inspect", "modify", "execute", "opaque", "destr
 const PRESET_NAME_PATTERN = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
 const RESERVED_PRESET_NAMES = new Set([...POLICY_PRESET_NAMES, "status"]);
 
-const BUILTIN_POLICY_DEFINITIONS: Readonly<Record<BuiltinPolicyPresetName, PolicyDefinition>> = Object.freeze({
+type NormalizedDefinition = Readonly<{
+  readonly paths: ReturnType<typeof readPaths>;
+  readonly commands: ReturnType<typeof readCommands>;
+}>;
+
+const BUILTIN_POLICY_DEFINITIONS: Readonly<Record<BuiltinPolicyPresetName, NormalizedDefinition>> = Object.freeze({
   review: Object.freeze({
-    paths: Object.freeze({ read: "allow", list: "allow", search: "allow", write: "deny", edit: "deny" }),
-    commands: Object.freeze({ inspect: "allow", modify: "deny", execute: "deny", opaque: "deny", destroy: "deny", unknown: "deny" }),
+    paths: Object.freeze({
+      read: "allow",
+      write: "deny",
+      edit: "deny",
+      list: "allow",
+      search: "allow",
+      allowedRoots: Object.freeze([]),
+      blockedRoots: Object.freeze([]),
+      blockedPaths: Object.freeze([]),
+    }),
+    commands: Object.freeze({
+      inspect: "allow",
+      modify: "deny",
+      execute: "deny",
+      opaque: "deny",
+      destroy: "deny",
+      unknown: "deny",
+    }),
   }),
   guided: Object.freeze({
-    paths: Object.freeze({ read: "allow", list: "allow", search: "allow", write: "ask", edit: "ask" }),
-    commands: Object.freeze({ inspect: "allow", modify: "ask", execute: "ask", opaque: "ask", destroy: "deny", unknown: "deny" }),
+    paths: Object.freeze({
+      read: "allow",
+      write: "ask",
+      edit: "ask",
+      list: "allow",
+      search: "allow",
+      allowedRoots: Object.freeze([]),
+      blockedRoots: Object.freeze([]),
+      blockedPaths: Object.freeze([]),
+    }),
+    commands: Object.freeze({
+      inspect: "allow",
+      modify: "ask",
+      execute: "ask",
+      opaque: "ask",
+      destroy: "deny",
+      unknown: "deny",
+    }),
   }),
   develop: Object.freeze({
-    paths: Object.freeze({ read: "allow", list: "allow", search: "allow", write: "allow", edit: "allow" }),
-    commands: Object.freeze({ inspect: "allow", modify: "allow", execute: "allow", opaque: "allow", destroy: "deny", unknown: "ask" }),
+    paths: Object.freeze({
+      read: "allow",
+      write: "allow",
+      edit: "allow",
+      list: "allow",
+      search: "allow",
+      allowedRoots: Object.freeze([]),
+      blockedRoots: Object.freeze([]),
+      blockedPaths: Object.freeze([]),
+    }),
+    commands: Object.freeze({
+      inspect: "allow",
+      modify: "allow",
+      execute: "allow",
+      opaque: "allow",
+      destroy: "deny",
+      unknown: "ask",
+    }),
   }),
 });
 
@@ -120,6 +173,19 @@ function requireFields(value: Record<string, unknown>, fields: readonly string[]
   if (!fields.every((field) => Object.hasOwn(value, field) && value[field] !== undefined)) throw invalidConfig();
 }
 
+function readPathArray(candidate: unknown): readonly string[] {
+  if (!Array.isArray(candidate) || !candidate.every(isAbsolutePolicyPath)) {
+    throw invalidConfig();
+  }
+  return Object.freeze(
+    candidate.map((path) => {
+      const normalized = POLICY_PATH_EVIDENCE.resolve("/", path)?.candidate;
+      if (normalized === undefined) throw invalidConfig();
+      return normalized;
+    }),
+  );
+}
+
 function readPaths(value: unknown, requireCompleteModes = false): {
   readonly read: PolicyMode;
   readonly write: PolicyMode;
@@ -149,16 +215,7 @@ function readPaths(value: unknown, requireCompleteModes = false): {
   const arrays = {} as Record<"allowedRoots" | "blockedRoots" | "blockedPaths", readonly string[]>;
   for (const field of ["allowedRoots", "blockedRoots", "blockedPaths"] as const) {
     const candidate = value[field];
-    if (candidate !== undefined && (!Array.isArray(candidate) || !candidate.every(isAbsolutePolicyPath))) {
-      throw invalidConfig();
-    }
-    arrays[field] = Object.freeze(
-      (candidate === undefined ? [] : candidate.map((path) => {
-        const normalized = POLICY_PATH_EVIDENCE.resolve("/", path)?.candidate;
-        if (normalized === undefined) throw invalidConfig();
-        return normalized;
-      })),
-    );
+    arrays[field] = candidate === undefined ? Object.freeze([]) : readPathArray(candidate);
   }
 
   const read = modeOrDefault(value.read, "deny");
@@ -200,38 +257,62 @@ function readCommands(value: unknown, requireCompleteModes = false): {
   };
 }
 
-type NormalizedDefinition = Readonly<{
-  readonly paths: ReturnType<typeof readPaths>;
-  readonly commands: ReturnType<typeof readCommands>;
-}>;
+function readBuiltinOverride(name: BuiltinPolicyPresetName, value: unknown): NormalizedDefinition {
+  if (!isRecord(value) || !hasOnlyKeys(value, DEFINITION_FIELDS)) throw invalidConfig();
+  const builtin = BUILTIN_POLICY_DEFINITIONS[name];
+  const pathsValue = value.paths;
+  const commandsValue = value.commands;
 
-const normalizedDefinitions = new WeakMap<object, NormalizedDefinition>();
+  let allowedRoots = builtin.paths.allowedRoots;
+  let blockedRoots = builtin.paths.blockedRoots;
+  let blockedPaths = builtin.paths.blockedPaths;
 
-function normalizedDefinition(definition: PolicyDefinition): NormalizedDefinition {
-  const cached = normalizedDefinitions.get(definition);
-  if (cached !== undefined) return cached;
-  const normalized = Object.freeze({
-    paths: readPaths(definition.paths),
-    commands: readCommands(definition.commands),
+  if (pathsValue !== undefined) {
+    if (!isRecord(pathsValue) || !hasOnlyKeys(pathsValue, PATH_FIELDS)) throw invalidConfig();
+    for (const field of REQUIRED_PATH_MODES) {
+      const mode = pathsValue[field];
+      if (mode !== undefined && mode !== builtin.paths[field]) throw invalidConfig();
+    }
+    if (pathsValue.allowedRoots !== undefined) allowedRoots = readPathArray(pathsValue.allowedRoots);
+    if (pathsValue.blockedRoots !== undefined) blockedRoots = readPathArray(pathsValue.blockedRoots);
+    if (pathsValue.blockedPaths !== undefined) blockedPaths = readPathArray(pathsValue.blockedPaths);
+  }
+
+  if (commandsValue !== undefined) {
+    if (!isRecord(commandsValue) || !hasOnlyKeys(commandsValue, COMMAND_FIELDS)) throw invalidConfig();
+    for (const field of REQUIRED_COMMAND_MODES) {
+      const mode = commandsValue[field];
+      if (mode !== undefined && mode !== builtin.commands[field]) throw invalidConfig();
+    }
+  }
+
+  return Object.freeze({
+    paths: Object.freeze({
+      ...builtin.paths,
+      allowedRoots,
+      blockedRoots,
+      blockedPaths,
+    }),
+    commands: builtin.commands,
   });
-  normalizedDefinitions.set(definition, normalized);
-  return normalized;
 }
 
-function readDefinition(value: unknown, requireSections: boolean, requireCompleteModes = false): PolicyDefinition {
+function readDefinition(
+  value: unknown,
+  requireSections: boolean,
+  requireCompleteModes = false,
+): NormalizedDefinition {
   if (!isRecord(value) || !hasOnlyKeys(value, DEFINITION_FIELDS)) throw invalidConfig();
   if ((requireSections || requireCompleteModes) && (value.paths === undefined || value.commands === undefined)) throw invalidConfig();
-  const definition = value as PolicyDefinition;
-  normalizedDefinitions.set(definition, Object.freeze({
-    paths: readPaths(value.paths, requireCompleteModes),
-    commands: readCommands(value.commands, requireCompleteModes),
-  }));
-  return definition;
+  return Object.freeze({
+    paths: Object.freeze(readPaths(value.paths, requireCompleteModes)),
+    commands: Object.freeze(readCommands(value.commands, requireCompleteModes)),
+  });
 }
 
 type ParsedPolicy = Readonly<{
-  readonly flat?: PolicyDefinition;
-  readonly presets?: Readonly<Record<string, PolicyDefinition>>;
+  readonly flat?: NormalizedDefinition;
+  readonly presets?: Readonly<Record<string, NormalizedDefinition>>;
   readonly activePreset?: PolicyPresetName;
   readonly disabled?: true;
 }>;
@@ -244,14 +325,12 @@ function readConfig(input: unknown, requireCompleteExternalModes = false): Parse
   }
   if (input.presets !== undefined) {
     if (input.paths !== undefined || input.commands !== undefined || !isRecord(input.presets)) throw invalidConfig();
-    const presets = {} as Record<string, PolicyDefinition>;
+    const presets = {} as Record<string, NormalizedDefinition>;
     for (const [name, value] of Object.entries(input.presets)) {
       if (!isValidPresetName(name)) throw invalidConfig();
-      presets[name] = readDefinition(
-        value,
-        !isBuiltinPresetName(name),
-        requireCompleteExternalModes && !isBuiltinPresetName(name),
-      );
+      presets[name] = isBuiltinPresetName(name)
+        ? readBuiltinOverride(name, value)
+        : readDefinition(value, true, requireCompleteExternalModes);
     }
     if (typeof input.activePreset !== "string" ||
       (!isBuiltinPresetName(input.activePreset) && !Object.hasOwn(presets, input.activePreset))) {
@@ -263,42 +342,8 @@ function readConfig(input: unknown, requireCompleteExternalModes = false): Parse
   return Object.freeze({ flat: readDefinition(input, false, requireCompleteExternalModes) });
 }
 
-function unifiedSnapshotFor(definition: PolicyDefinition): UnifiedPolicySnapshot {
-  const { paths, commands } = normalizedDefinition(definition);
-  return freezeUnifiedPolicySnapshot({ paths, commands });
-}
-
-function mergeBuiltinDefinition(name: BuiltinPolicyPresetName, supplied: PolicyDefinition | undefined): PolicyDefinition {
-  const builtin = BUILTIN_POLICY_DEFINITIONS[name];
-  if (supplied === undefined) return builtin;
-  for (const field of REQUIRED_PATH_MODES) {
-    if (supplied.paths?.[field] !== undefined && supplied.paths[field] !== builtin.paths?.[field]) throw invalidConfig();
-  }
-  for (const field of REQUIRED_COMMAND_MODES) {
-    if (supplied.commands?.[field] !== undefined && supplied.commands[field] !== builtin.commands?.[field]) throw invalidConfig();
-  }
-  const merged = Object.freeze({
-    paths: Object.freeze({ ...builtin.paths, ...supplied.paths }),
-    commands: Object.freeze({ ...builtin.commands, ...supplied.commands }),
-  });
-  const builtinNormalized = normalizedDefinition(builtin);
-  const suppliedNormalized = normalizedDefinition(supplied);
-  normalizedDefinitions.set(merged, Object.freeze({
-    paths: Object.freeze({
-      ...builtinNormalized.paths,
-      allowedRoots: supplied.paths?.allowedRoots === undefined
-        ? builtinNormalized.paths.allowedRoots
-        : suppliedNormalized.paths.allowedRoots,
-      blockedRoots: supplied.paths?.blockedRoots === undefined
-        ? builtinNormalized.paths.blockedRoots
-        : suppliedNormalized.paths.blockedRoots,
-      blockedPaths: supplied.paths?.blockedPaths === undefined
-        ? builtinNormalized.paths.blockedPaths
-        : suppliedNormalized.paths.blockedPaths,
-    }),
-    commands: builtinNormalized.commands,
-  }));
-  return merged;
+function unifiedSnapshotFor(definition: NormalizedDefinition): UnifiedPolicySnapshot {
+  return freezeUnifiedPolicySnapshot({ paths: definition.paths, commands: definition.commands });
 }
 
 export function decodePolicyConfiguration(
@@ -318,7 +363,8 @@ export function decodePolicyConfiguration(
 
   const snapshots: Record<string, UnifiedPolicySnapshot> = {};
   for (const name of POLICY_PRESET_NAMES) {
-    snapshots[name] = unifiedSnapshotFor(mergeBuiltinDefinition(name, parsed.presets![name]));
+    const definition = parsed.presets?.[name] ?? BUILTIN_POLICY_DEFINITIONS[name];
+    snapshots[name] = unifiedSnapshotFor(definition);
   }
   for (const [name, definition] of Object.entries(parsed.presets!)) {
     if (!isBuiltinPresetName(name)) snapshots[name] = unifiedSnapshotFor(definition);

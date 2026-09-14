@@ -1,6 +1,11 @@
 import { scanSimpleShellFlow } from "./flow";
 import { analyzeProgramCommand } from "./programs/index";
-import { INTERPRETERS } from "./programs/interpreters";
+import {
+  INTERPRETERS,
+  isInterpreterInspection,
+  unsupportedInterpreterOption,
+  interpreterScriptPath,
+} from "./programs/interpreters";
 import type { ProgramCwdChange, ProgramPathBase } from "./programs/index";
 import type { ShellWord } from "./language";
 import type { ShellCommandStatus } from "./flow";
@@ -33,11 +38,9 @@ export type ShellCommandAnalysis =
     }>;
 
 const inspectionCommands = new Set(["cat", "head", "tail", "grep", "rg", "find", "ls", "od"]);
-const modificationCommands = new Set(["mkdir", "touch", "cp", "mv"]);
+const modificationCommands = new Set(["mkdir", "touch", "cp", "mv", "ln"]);
 const destructionCommands = new Set(["rm", "rmdir", "unlink", "truncate"]);
 const executionCommands = new Set([...INTERPRETERS]);
-const interpreterCommands = new Set([...INTERPRETERS]);
-const interpreterInspectionOptions = new Set(["--version", "-v", "--help", "-h"]);
 const findActionOptions = new Set(["-exec", "-execdir", "-ok", "-okdir", "-delete", "-fls", "-fprint", "-fprint0", "-fprintf"]);
 const unsupportedCommandWords = new Set([
   "case", "do", "done", "elif", "else", "esac", "fi", "for", "function", "if", "in", "select", "then", "time", "until", "while",
@@ -124,7 +127,7 @@ function commandClass(executable: string, words: readonly ShellWord[] = []): She
   if (name === "uv" && words[0]?.text === "run") return "execute";
   if (name === "uv" && (words[0]?.text === "help" ||
     (words.length === 1 && ["--version", "-V", "--help", "-h"].includes(words[0]!.text)))) return "inspect";
-  if (interpreterCommands.has(name) && words.length === 1 && interpreterInspectionOptions.has(words[0]!.text)) return "inspect";
+  if (isInterpreterInspection(name, words)) return "inspect";
   if (executable.includes("/")) return destructionCommands.has(name) ? "destroy" : "execute";
   if (inspectionCommands.has(name)) return "inspect";
   if (modificationCommands.has(name)) return "modify";
@@ -134,45 +137,12 @@ function commandClass(executable: string, words: readonly ShellWord[] = []): She
   return "unknown";
 }
 
-function interpreterArguments(executable: string, words: readonly ShellWord[]): readonly ShellWord[] | undefined {
-  if (interpreterCommands.has(executable)) return words;
-  if (executable === "npx" && words[0]?.text === "tsx") return words.slice(1);
-  return undefined;
-}
-
-function unsupportedInterpreterOption(executable: string, words: readonly ShellWord[]): ShellWord | undefined {
-  const argumentsForInterpreter = interpreterArguments(executable, words);
-  if (argumentsForInterpreter === undefined) return undefined;
-  if (argumentsForInterpreter.length === 1 && interpreterInspectionOptions.has(argumentsForInterpreter[0]!.text)) return undefined;
-  for (const word of argumentsForInterpreter) {
-    if (word.text === "--") continue;
-    if (word.text.startsWith("-")) return word;
-  }
-  return undefined;
-}
-
-function interpreterScriptPath(executable: string, words: readonly ShellWord[]): ShellWord | undefined {
-  const argumentsForInterpreter = interpreterArguments(executable, words);
-  if (argumentsForInterpreter === undefined) return undefined;
-  let optionsEnded = false;
-  for (const word of argumentsForInterpreter) {
-    if (optionsEnded) return word;
-    if (word.text === "--") {
-      optionsEnded = true;
-      continue;
-    }
-    if (word.text.startsWith("-")) continue;
-    return word;
-  }
-  return undefined;
-}
-
 function unmodeledPathOption(executable: string, words: readonly ShellWord[]): ShellWord | undefined {
   for (let wordIndex = 0; wordIndex < words.length; wordIndex += 1) {
     const word = words[wordIndex]!;
     const shortOptions = word.text.startsWith("-") && !word.text.startsWith("--") ? word.text.slice(1) : "";
     if (executable === "rg" && (word.text === "--follow" || shortOptions.includes("L"))) return word;
-    if ((executable === "cp" || executable === "mv") && (shortOptions.includes("L") || word.text === "--dereference")) return word;
+    if ((executable === "cp" || executable === "mv" || executable === "ln") && (shortOptions.includes("L") || word.text === "--dereference")) return word;
     if (executable === "ls" && (shortOptions.includes("L") || word.text === "--dereference")) return word;
     if (executable === "grep" && (shortOptions.includes("R") || word.text === "--dereference-recursive")) return word;
     if (executable === "rg" && (rgValueOptionMissing(word.text, words[wordIndex + 1]) || isUnmodeledRgOption(word.text))) return word;
@@ -200,7 +170,7 @@ function unmodeledPathOption(executable: string, words: readonly ShellWord[]): S
     )) {
       return word;
     }
-    if ((executable === "cp" || executable === "mv") &&
+    if ((executable === "cp" || executable === "mv" || executable === "ln") &&
       (shortOptions.includes("t") || word.text === "-t" || word.text.startsWith("-t") || word.text === "--target-directory" || word.text.startsWith("--target-directory="))) {
       return word;
     }
@@ -440,7 +410,7 @@ export function analyzeShellCommandWords(words: readonly ShellWord[]): ShellComm
       addPath(Object.freeze({ text: ".", role: "source" }), executableWord.end);
     }
   }
-  if ((executableName === "cp" || executableName === "mv" || executableName === "cd") &&
+  if ((executableName === "cp" || executableName === "mv" || executableName === "ln" || executableName === "cd") &&
     paths.some(({ path }) => path.role === "source")) {
     addEffect(effects, "read");
   }

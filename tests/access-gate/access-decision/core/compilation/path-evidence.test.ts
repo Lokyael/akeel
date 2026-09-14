@@ -74,3 +74,16 @@ test("symlink traversal beyond the analysis bound fails closed", () => {
     rmSync(root, { recursive: true, force: true });
   }
 });
+
+test("circular symlink traversal fails closed without hanging", () => {
+  const root = mkdtempSync(join(tmpdir(), "akeel-circular-link-"));
+  try {
+    const linkA = join(root, "linkA");
+    const linkB = join(root, "linkB");
+    symlinkSync(linkB, linkA);
+    symlinkSync(linkA, linkB);
+    assert.equal(linuxPathEvidence.resolve(root, "linkA/file"), undefined);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});

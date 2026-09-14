@@ -57,7 +57,7 @@
 - 受管辖 surface 为 Direct `read`、`write`、`edit`、`find`、`grep`、`ls` 与 Shell `bash`。无效 host context、unsupported syntax 和硬安全边界 fail-closed；外置 `policy.yaml` 缺失、为空或不可用时整体忽略并使用内置 `review` 基线，不部分采用无效内容；未拥有的工具 passthrough。
 - 生产入口只读取 `$PI_CODING_AGENT_DIR/akeel/policy.yaml`（默认 `~/.pi/agent/akeel/policy.yaml`）。内置 `review`、`guided`、`develop` 不依赖外置文件；文件缺失、为空、格式/schema/legacy 不可用时整体忽略并使用内置 `review`，不部分采用、不读取旧 config/Profile schema，也不使用旧 fallback。
 - Policy Preset 当前由 D-069 规定为内置 `review`、`guided`、`develop` 加 `policy.yaml` 自定义 preset；外部 flat policy 与自定义 preset 均使用完整的 `paths` 与 `commands` 定义，缺失必需字段时整体回退到内置 `review`；每个 preset 可拥有独立 path scope，系统 hard boundary 始终优先。`commands.destroy` 可在自定义 preset 中配置为 `allow`，但 D-071 规定所有 destroy/delete 操作永久 hard-deny，不产生 ask。D-068 定案其用户入口：原生 TUI 中 `/policy` 无参数打开临时 human-only 选择面板，显示所有已加载 preset，显式 `/policy <preset>` 入口保留，策略状态不常驻 UI。Delegated child 按任务类型的能力分层与风险边界仍属 C-009 候选范围。
-- 宿主拥有且用于保存实时凭据的凭据工件由 D-070 归入系统 hard boundary：对 Canonical 阶段明确识别的受管路径操作 `read`、`write`、`edit`、`list`、`search` 一律拒绝，preset 不得放宽；模板类工件不属于该类别。分类依据是受信任 agent 目录下的路径身份契约，不读取内容；递归 search 若候选路径与 credential root 相交则硬拒绝，非递归的 agent 目录访问仍按既有路径策略处理，也不为无法发行具体路径的 opaque Shell access 增加凭据专用拒绝。凭据名称保证只覆盖默认大小写敏感的本地 Linux 文件系统，不覆盖 casefold/CIFS/VFAT/NTFS 等别名语义；`accessGate: disabled` 时不提供任何保护保证。
+- 宿主拥有且用于保存实时凭据的凭据工件由 D-070 归入系统 hard boundary：对 Canonical 阶段明确识别的受管路径操作 `read`、`write`、`edit`、`list`、`search` 一律拒绝，preset 不得放宽；模板类工件不属于该类别。分类依据是受信任 agent 目录下的路径身份契约，不读取内容；递归 search 若候选路径与 credential root 相交则硬拒绝，非递归的 agent 目录访问仍按既有路径策略处理，也不为无法发行具体路径的 opaque Shell access 增加凭据专用拒绝。
 - Access Gate 默认启用；D-066 允许用户以唯一配置 `accessGate: disabled` 进入仅 bootstrap/skills 模式。禁用期间 AKeel 不提供 tool-call 操作准入或路径安全保证，重新启用需修改 policy.yaml 并重启会话。
 - Prompt Surface（D-030/D-053/D-023）：Policy Snapshot、policy.yaml 和活动 policy 状态不进入 context 消息、tool description 或 system prompt；模型可见的政策相关文本只有受 D-023 限定的静态失败 Guidance。
 - 旧决策实现、旧测试与 archive 不属于当前依赖边界，也不是 parity oracle。Static Flow、Explanation Replay 与 Runtime Content Flow 不属于 T-069。
@@ -108,7 +108,7 @@
 ## Negative Space
 
 - 不提供 OS-level sandbox、容器、VM、seccomp、Landlock、network namespace 或独立 network policy 轴。
-- 仅保证支持 Linux 平台；不提供 Windows、macOS、BSD 支持，也不建模其路径和选项方言。
+- 仅保证支持 Linux 平台及默认大小写敏感的本地文件系统语义；不提供 Windows、macOS、BSD 支持，不建模其路径和选项方言，也不覆盖 casefold 目录或 CIFS/VFAT/NTFS 挂载点上的大小写别名语义。
 - 不承诺 pathname check 与实际文件操作之间的 TOCTOU 消除；gate 只做纯决策，不执行文件操作或传递 fd。
 - 不拦截 `user_bash`、`shellCommandPrefix`、Bash `spawnHook`、tool override、custom tool backend、未知 Direct tool surface 或其他 Extension 的直接操作。
 - 审批后的实际文件操作由操作系统权限决定；gate 不控制执行后的行为，也不提供完整 security log scrubbing。

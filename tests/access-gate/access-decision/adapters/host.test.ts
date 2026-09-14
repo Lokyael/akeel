@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { adaptPiGateToolCall } from "../../../../packages/access-gate/src/access-gate/access-decision/adapters/host";
+import { adaptPiGateToolCall } from "../../../../packages/access-gate/src/access-gate/access-decision/adapters/index";
 
 test("Pi gate adapter validates host context and maps governed surfaces", () => {
   const result = adaptPiGateToolCall(

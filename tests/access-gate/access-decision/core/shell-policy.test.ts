@@ -305,6 +305,10 @@ test("copy and move source operands consume read policy", () => {
     kind: "deny",
     code: "policy-denied",
   });
+  assert.deepEqual(evaluateShellAdmission(admission("ln source destination"), restricted), {
+    kind: "deny",
+    code: "policy-denied",
+  });
 });
 
 test("Shell path effects obey the corresponding read and write policy modes", () => {
