@@ -406,15 +406,16 @@ Canonical reject 使用本域封闭 code、source anchor 与资源分类；rende
 
 **Reversal surface:** user-boundary
 
-**Decision:** Direct `edit` 是独立的路径策略轴。外部 flat policy 与自定义 preset 必须使用完整的 `paths` 与 `commands` 定义，其中 `paths.edit` 必须显式声明 `allow`、`ask` 或 `deny`；内置 preset 提供完整的固定语义。Edit 输入只做结构与资源边界校验，不在 Gate 内重演宿主的文本匹配语义。
+**Decision:** Direct `edit` 是独立的路径策略轴。外部 flat policy 与自定义 preset 必须使用完整的 `paths` 与 `commands` 定义，其中 `paths.edit` 必须显式声明 `allow`、`ask` 或 `deny`；内置 preset 提供完整的固定语义。`edit` 的授权等级不得宽于 `read`：`edit` 可以独立收紧为 `ask` 或 `deny`，但 `edit: allow` 需要 `read: allow`，`edit: ask` 需要 `read` 至少为 `ask`。Edit 输入只做结构与资源边界校验，不在 Gate 内重演宿主的文本匹配语义。
 
-**Why:** edit 与 write 是不同的 Pi 工具合同，独立策略轴可以分别表达完整写入和局部编辑的授权意图。外部 policy 使用完整字段定义，内置 preset 使用固定语义。Gate 只负责受管请求的结构、路径和策略决策，文本替换的唯一匹配与不重叠语义由宿主工具执行。
+**Why:** edit 与 write 是不同的 Pi 工具合同，独立策略轴可以分别表达完整写入和局部编辑的授权意图；但宿主执行 edit 需要读取目标内容，故 edit 不能绕过更窄的 read 边界。外部 policy 使用完整字段定义，内置 preset 使用固定语义。Gate 只负责受管请求的结构、路径和策略决策，文本替换的唯一匹配与不重叠语义由宿主工具执行。
 
-**Impact:** flat policy 与自定义 preset 的完整定义都必须显式包含 `edit`；内置 preset 的 edit 语义由固定定义提供。README 示例与 policy 文档展示 write/edit 分离。
+**Impact:** flat policy 与自定义 preset 的完整定义都必须显式包含 `edit`；内置 preset 的 edit 语义由固定定义提供。配置适配器拒绝 `edit` 宽于 `read` 的策略；README 示例与 policy 文档展示 write/edit 分离。
 
 **Rejected:**
 
 - **Gate 重复实现 oldText 的唯一匹配和区间不重叠：** 这会把宿主编辑器执行语义复制到纯决策层，增加漂移而不扩大路径安全边界。
+- **允许 edit 宽于 read：** 宿主 edit 仍需读取目标内容，会把独立策略轴变成绕过 read 边界的隐式读取通道。
 
 **Out of Scope:** edit 的实际文件读取、文本替换、唯一匹配和重叠处理；这些仍由 Pi host 的 edit 工具负责。
 

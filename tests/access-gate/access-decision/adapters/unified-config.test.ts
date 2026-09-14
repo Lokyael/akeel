@@ -221,6 +221,16 @@ test("rejects write modes that are wider than the read mode", () => {
   }
 });
 
+test("rejects edit modes that are wider than the read mode", () => {
+  for (const [read, edit] of [["deny", "ask"], ["deny", "allow"], ["ask", "allow"]] as const) {
+    assert.throws(
+      () => decodePolicyConfiguration({ paths: { read, edit } }),
+      /invalid policy config/,
+      `${read}/${edit}`,
+    );
+  }
+});
+
 test("rejects malformed lower-kebab-case custom preset names", () => {
   for (const name of ["Audit", "audit_preset", "audit-", "-audit", "audit preset", "audit/preset", "1audit"]) {
     assert.throws(() => decodePolicyConfiguration({

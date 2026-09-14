@@ -163,12 +163,13 @@ function readPaths(value: unknown, requireCompleteModes = false): {
 
   const read = modeOrDefault(value.read, "deny");
   const write = modeOrDefault(value.write, "deny");
-  if (modeRank(write) > modeRank(read)) throw invalidConfig();
+  const edit = modeOrDefault(value.edit, "deny");
+  if (modeRank(write) > modeRank(read) || modeRank(edit) > modeRank(read)) throw invalidConfig();
 
   return {
     read,
     write,
-    edit: modeOrDefault(value.edit, "deny"),
+    edit,
     list: modeOrDefault(value.list, "deny"),
     search: modeOrDefault(value.search, "deny"),
     ...arrays,
