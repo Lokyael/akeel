@@ -251,7 +251,7 @@ test("all Direct credential artifact surfaces remain hard boundaries", () => {
   }), { kind: "deny", code: "hard-boundary" });
 });
 
-test("credential templates and parent directory searches remain policy-governed", () => {
+test("credential templates and non-recursive parent access remain policy-governed", () => {
   const service = testService({
     read: "allow",
     write: "allow",
@@ -276,7 +276,7 @@ test("credential templates and parent directory searches remain policy-governed"
     arguments: { path: "/__test-agent-dir__", pattern: "needle" },
     cwd: "/workspace/project",
     hasUI: false,
-  }), { kind: "allow" });
+  }), { kind: "deny", code: "hard-boundary" });
 });
 
 test("Direct search cannot recurse into a blocked descendant", () => {

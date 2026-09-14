@@ -33,7 +33,7 @@ const allowPolicy = freezeUnifiedPolicySnapshot({
   },
 });
 
-function authorizePath(path: string, traversed: readonly string[] = []) {
+function authorizeRequest(request: unknown, path: string, traversed: readonly string[] = []) {
   const env = createCompileEnvironment({
     cwd: "/workspace",
     pathEvidence: {
@@ -45,9 +45,13 @@ function authorizePath(path: string, traversed: readonly string[] = []) {
       },
     },
   });
-  const compilation = compileManagedCall({ surface: "read", arguments: { path } }, env);
+  const compilation = compileManagedCall(request, env);
   const admission = projectUnifiedAdmission(compilation);
   return authorizeAdmission(admission, mandatory, allowPolicy);
+}
+
+function authorizePath(path: string, traversed: readonly string[] = []) {
+  return authorizeRequest({ surface: "read", arguments: { path } }, path, traversed);
 }
 
 for (const path of [
@@ -92,4 +96,42 @@ test("credential boundary requires non-empty absolute roots", () => {
 test("credential boundary cannot be forged by copying its public shape", () => {
   const forged = { ...mandatory };
   assert.equal(MandatoryBoundaries.read(forged), undefined);
+});
+
+test("recursive Direct search rejects a credential root and its parents", () => {
+  for (const path of ["/home/user/.pi/agent", "/home/user"]) {
+    assert.deepEqual(
+      authorizeRequest({ surface: "search", arguments: { path, pattern: "token" } }, path),
+      { kind: "deny", code: "hard-boundary" },
+      path,
+    );
+  }
+});
+
+test("recursive Direct search outside credential roots remains policy governed", () => {
+  assert.deepEqual(
+    authorizeRequest({ surface: "search", arguments: { path: "/workspace/project", pattern: "token" } }, "/workspace/project"),
+    { kind: "allow" },
+  );
+});
+
+test("non-recursive agent directory access remains policy governed", () => {
+  assert.deepEqual(authorizePath("/home/user/.pi/agent"), { kind: "allow" });
+});
+
+test("recursive Shell search rejects a credential root and its parents", () => {
+  for (const path of ["/home/user/.pi/agent", "/home/user"]) {
+    assert.deepEqual(
+      authorizeRequest({ surface: "bash", arguments: { command: `grep -r token ${path}` } }, path),
+      { kind: "deny", code: "hard-boundary" },
+      path,
+    );
+  }
+});
+
+test("recursive Shell search outside credential roots remains policy governed", () => {
+  assert.deepEqual(
+    authorizeRequest({ surface: "bash", arguments: { command: "grep -r token /workspace/project" } }, "/workspace/project"),
+    { kind: "allow" },
+  );
 });

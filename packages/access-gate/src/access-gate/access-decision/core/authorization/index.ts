@@ -198,6 +198,10 @@ function recursiveSearchReachesBlockedPath(candidate: string, policy: PathPolicy
     policy.blockedPaths.some((path) => pathWithinRoot(path, candidate));
 }
 
+function recursiveSearchReachesCredentialRoot(candidate: string, credentialRoots: readonly string[]): boolean {
+  return credentialRoots.some((root) => pathWithinRoot(root, candidate) || pathWithinRoot(candidate, root));
+}
+
 const TEMPLATE_MARKERS = new Set(["template", "sample", "example", "skeleton"]);
 
 function protectedCredentialName(name: string): boolean {
@@ -237,7 +241,10 @@ function authorizeDirect(
   policy: UnifiedPolicySnapshot,
 ): AuthorizationVerdict {
   if (pathHitsMandatoryBoundary(facts.path, mandatory, policy.paths) ||
-    facts.operation === "search" && recursiveSearchReachesBlockedPath(facts.path.candidate, policy.paths)) {
+    facts.operation === "search" && (
+      recursiveSearchReachesBlockedPath(facts.path.candidate, policy.paths) ||
+      recursiveSearchReachesCredentialRoot(facts.path.candidate, mandatory.credentialRoots)
+    )) {
     return Object.freeze({ kind: "deny", code: "hard-boundary" });
   }
   return verdictForModes([policy.paths[facts.operation]]);
@@ -252,7 +259,10 @@ function authorizeShell(
     if (operation.commandClass === "destroy" || operation.effects.includes("delete") || operation.hardBoundary ||
       operation.opaquePathAccess && hasPathBoundary(policy.paths) ||
       operation.paths.some((path) => pathHitsMandatoryBoundary(path.evidence, mandatory, policy.paths)) ||
-      operation.recursive && operation.paths.some((path) => recursiveSearchReachesBlockedPath(path.evidence.candidate, policy.paths))) {
+      operation.recursive && operation.paths.some((path) =>
+        recursiveSearchReachesBlockedPath(path.evidence.candidate, policy.paths) ||
+        recursiveSearchReachesCredentialRoot(path.evidence.candidate, mandatory.credentialRoots)
+      )) {
       return Object.freeze({ kind: "deny", code: "hard-boundary" });
     }
   }

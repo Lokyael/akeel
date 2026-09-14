@@ -145,12 +145,22 @@ test("recursive reads account for blocked descendants", () => {
   }
 });
 
-test("recursive Shell search remains policy-governed without a direct credential path", () => {
+test("recursive Shell search remains policy-governed outside credential roots", () => {
+  assert.deepEqual(evaluateShellAdmission(
+    admission("grep -r pattern /workspace/project"),
+    freezeShellPolicySnapshot({ ...policy, read: "allow", inspect: "allow" }),
+  ), {
+    kind: "allow",
+  });
+});
+
+test("recursive Shell search over a credential root is hard denied", () => {
   assert.deepEqual(evaluateShellAdmission(
     admission("grep -r pattern /__test-agent-dir__"),
     freezeShellPolicySnapshot({ ...policy, read: "allow", inspect: "allow" }),
   ), {
-    kind: "allow",
+    kind: "deny",
+    code: "hard-boundary",
   });
 });
 

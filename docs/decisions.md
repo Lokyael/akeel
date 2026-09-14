@@ -518,21 +518,22 @@ Canonical reject 使用本域封闭 code、source anchor 与资源分类；rende
 
 **Reversal surface:** user-boundary
 
-**Decision:** 将宿主拥有、用于保存实时凭据的凭据工件归入系统 hard boundary；当前确认范围包括 pi host 的 `auth.json` 及其备份或变体，但模板类工件不属于该类别。当前没有可验证的 Pi Host 工件角色 metadata seam，因此以受信任 agent 目录下的路径身份契约识别类别，不读取文件内容、不做值级猜测。对 Canonical 阶段明确识别为该类别的受管路径操作 `read`、`write`、`edit`、`list`、`search` 一律 hard deny，任何 preset 都不得放宽；模板类工件继续由 preset/path policy 管理。保护范围是路径证据驱动的尽力覆盖，不递归扩展到父目录后代，也不为无法发行具体路径的 opaque Shell access 增加凭据专用拒绝。
+**Decision:** 将宿主拥有、用于保存实时凭据的凭据工件归入系统 hard boundary；当前确认范围包括 pi host 的 `auth.json` 及其备份或变体，但模板类工件不属于该类别。当前没有可验证的 Pi Host 工件角色 metadata seam，因此以受信任 agent 目录下的路径身份契约识别类别，不读取文件内容、不做值级猜测。对 Canonical 阶段明确识别为该类别的受管路径操作 `read`、`write`、`edit`、`list`、`search` 一律 hard deny，任何 preset 都不得放宽；模板类工件继续由 preset/path policy 管理。递归 `search` 若其候选路径与 credential root 相交——候选位于 credential root 内，或 credential root 位于候选路径内——一律 hard deny，以避免通过父目录或 agent 根递归枚举凭据；这只收紧递归搜索，不把整棵 agent 目录的非递归操作普遍封锁，也不为无法发行具体路径的 opaque Shell access 增加凭据专用拒绝。
 
 `accessGate: disabled` 时沿用 D-066：AKeel 不提供任何 tool-call、路径或凭据保护保证。该边界不扩展为整棵宿主 agent 目录的拒绝，也不宣称 AKeel 能保护所有可能承载凭据的文件。
 
-**Why:** 实时凭据工件同时承载高敏感性与完整性风险，`ask` 或可切换 preset 都不能构成可靠的保护边界。按工件职责分类可以保护凭据存储，同时保留模板类文件的正常使用场景；把规则置于 preset 之前，也避免用户自定义策略或会话切换解除系统底线。
+**Why:** 实时凭据工件同时承载高敏感性与完整性风险，`ask` 或可切换 preset 都不能构成可靠的保护边界。明确文件路径时按工件职责分类可以保护凭据存储，同时保留模板类文件的正常使用场景；递归搜索无法发行单个后代文件事实，若继续放行就能通过父目录间接读取凭据，因此以 credential root 的路径相交关系作为有界的 fail-closed 判据。把规则置于 preset 之前，也避免用户自定义策略或会话切换解除系统底线。
 
-**Impact:** 系统 hard boundary 优先于 Policy Snapshot、preset-specific path scope 和审批；凭据工件的拒绝不因 `develop` 或自定义 preset 放宽。非凭据工件仍走既有路径策略；Gate 禁用、其他 extension 的直接文件访问、操作系统权限和宿主自身凭据流程不由本决策提供保护。
+**Impact:** 系统 hard boundary 优先于 Policy Snapshot、preset-specific path scope 和审批；凭据工件及与 credential root 相交的递归搜索不因 `develop` 或自定义 preset 放宽。非递归的 agent 目录访问与非凭据工件仍走既有路径策略；Gate 禁用、其他 extension 的直接文件访问、操作系统权限和宿主自身凭据流程不由本决策提供保护。
 
 **Rejected:**
 
 - **由 preset 管理凭据工件：** 可切换或误配的策略不能作为实时凭据的保护边界。
-- **整棵宿主 agent 目录硬拒：** 会误伤模板、配置和会话等合法场景，超出最小边界。
+- **整棵宿主 agent 目录硬拒：** 会误伤模板、配置和会话等合法场景，超出最小边界；本决定只对递归搜索与 credential root 相交时硬拒绝。
+- **保持覆盖凭据根的递归搜索放行：** 父目录递归搜索可以枚举并输出实时凭据，无法作为可接受的最小安全边界。
 - **按文件内容猜测是否为凭据：** 值级嗅探不稳定且会把授权边界依赖不可靠的内容推断；分类应基于工件职责与所有权。
 
-**Out of Scope:** 其他文件中的偶然凭据、宿主外部扩展的直接访问、Gate 禁用后的安全保证，以及模板类工件的具体 preset 配置。
+**Out of Scope:** 其他文件中的偶然凭据、宿主外部扩展的直接访问、Gate 禁用后的安全保证、模板类工件的具体 preset 配置，以及大小写折叠或大小写不敏感文件系统上的凭据别名保证；AKeel 只保证默认大小写敏感的本地 Linux 文件系统语义。
 
 ## D-071: Destroy 操作永久硬拒绝
 
