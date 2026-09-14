@@ -63,7 +63,7 @@ class FakePaymentGateway implements PaymentGateway {
 
 ## The Dependency Injection Rule
 
-If you can't test without mocks, the code is too coupled. Use dependency injection to pass dependencies, don't import them globally:
+When testing requires excessive mocks, decouple with dependency injection to pass dependencies rather than importing them globally:
 
 ```typescript
 // Bad — can't test without mocking the module

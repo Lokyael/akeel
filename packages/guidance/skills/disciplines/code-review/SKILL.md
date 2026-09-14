@@ -5,7 +5,7 @@ description: 'Use when the user wants an independent review of a branch, PR, or 
 
 # Code Review
 
-Independently review one fixed change set. Reviewers report evidence-backed findings; they do not edit the reviewed files or decide whether findings are accepted.
+Independently review one fixed change set. Reviewers report evidence-backed findings; file modifications and finding disposition belong to the Task Owner.
 
 ## 1. Accept a Fixed Review Surface
 
@@ -39,7 +39,7 @@ Inspect every changed hunk for:
 - violations of repository standards;
 - maintainability problems at the changed seam.
 
-Use documented repository standards first. Baseline smells such as duplicated code, speculative generality, feature envy, data clumps, primitive obsession, message chains, middle men, and mysterious names are heuristics, not automatic violations. Skip checks already enforced by tooling unless the diff demonstrates a gap. A deep vulnerability assessment belongs to `security-review`; do not ignore an obvious security finding while routing the broader scan.
+Use documented repository standards first. Baseline smells such as duplicated code, speculative generality, feature envy, data clumps, primitive obsession, message chains, middle men, and mysterious names are heuristics, not automatic violations. Skip checks already enforced by tooling unless the diff demonstrates a gap. Report immediate security findings directly while routing broader vulnerability scans to `security-review`.
 
 ### Requirements
 
@@ -51,13 +51,13 @@ Check the authoritative Requirements source for:
 - unrequested behavior or scope creep;
 - tests that do not prove the claimed Requirement.
 
-If no Requirements source exists after asking, report that limitation; do not invent one.
+If no Requirements source exists after asking, report that limitation.
 
 ## 3. Report Findings
 
 Keep `## Engineering` and `## Requirements` separate. Each finding includes severity, file and line or other stable anchor, evidence, impact, and the smallest corrective direction. Report the total and worst finding for each axis; do not hide one axis behind an aggregate score.
 
-The Task Owner accepts, rejects, or defers findings. Reviewers do not modify files, create cleanup scope, or commit.
+The Task Owner accepts, rejects, or defers findings. Review remains read-only; the Task Owner owns cleanup scope, file edits, and commits.
 
 ## 4. Check Staleness
 

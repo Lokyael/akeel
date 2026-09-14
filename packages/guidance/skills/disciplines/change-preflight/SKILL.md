@@ -5,7 +5,7 @@ description: Use before independent review or commit — perform a safe, read-on
 
 # Change Preflight
 
-Prepare material Task changes for independent review or commit. For a local wording-only instruction change outside the material Task boundary, apply only bounded inspection and verification; do not create a Task solely for preflight. This is an author-side readiness gate with safe autonomy: it starts read-only, never touches unknown or user-owned content, and may handle only strongly proven, non-sensitive, recoverable residue from the current run.
+Prepare material Task changes for independent review or commit. For a local wording-only instruction change outside the material Task boundary, apply bounded inspection and verification without creating a Task. This is an author-side readiness gate with safe autonomy: it starts read-only, never touches unknown or user-owned content, and may handle only strongly proven, non-sensitive, recoverable residue from the current run.
 
 ## 1. Pin the Review Surface Without Mutation
 
@@ -15,7 +15,7 @@ Classify the target per `principles.md` Project Record Authority:
 - **Mutable Task surface:** read the active Task Record and capture all committed changes since the agreed base, staged and unstaged changes, and untracked files that belong to the Task.
 - **Final lifecycle closure:** after the Task Record has been cleared, use the accepted Requirements frozen in the prior Review Surface instead of reconstructing or inventing them. If a commit clears its Task Record, inspect the parent or frozen packet for those Requirements.
 
-Start with bounded, read-only summaries: `git status --short`, `git diff --stat`, `git diff --cached --stat`, and `git diff --check`. Expand to a detailed diff only when scope, ownership, or semantics remain unclear, and then target the specific file or hunk. Do not default to full commit metadata or unrestricted historical diffs.
+Start with bounded, read-only summaries: `git status --short`, `git diff --stat`, `git diff --cached --stat`, and `git diff --check`. Expand to a detailed diff only when scope, ownership, or semantics remain unclear, and then target the specific file or hunk.
 
 Classify each staged, unstaged, and untracked path as in-scope, out-of-scope, or unknown. Continue without asking when the classification is evidenced and the out-of-scope content cannot affect the pinned surface. Return `BLOCKED` and ask only when ownership is unknown and could affect the surface, the fixed point does not resolve, or the Requirements source cannot be established.
 
@@ -36,7 +36,7 @@ Apply the narrowest handling:
 - residue inside the repository must be moved, never deleted, to `/tmp/akeel/preflight/<run-id>/quarantine/`, with a manifest containing its original path and content fingerprint;
 - possible credentials, sensitive material, ordinary untracked files, ambiguous residue, and any semantic change are reported without touching them and make the result `BLOCKED` when they affect the surface.
 
-If the run ledger, non-sensitive classification, recovery artifact, quarantine move, or post-action verification is unavailable, do not modify anything. Report the required action instead. Do not use `code-cleanup` implicitly; deep cleanup remains separately authorized.
+When the run ledger, non-sensitive classification, recovery artifact, quarantine move, or post-action verification is unavailable, report the required action without modifying files. Deep cleanup requires separate authorization through `code-cleanup`.
 
 Quarantine is a run-scoped recovery aid, not a project artifact. Retain it through validation and Code Review; after the Review Surface is accepted, the Task is completed, or the run is explicitly abandoned, remove only that run's quarantine. An interrupted run may leave it until its bounded retention period expires. Never expand cleanup to other run IDs or use force deletion.
 
@@ -63,4 +63,4 @@ For each blocker, name the evidence, the required action, and which check must b
 
 ## Boundary
 
-Preflight does not perform independent review, dispose review findings, undertake deep cleanup, or touch content it cannot prove the current run owns. The outer workflow or Task Owner owns explicit cleanup, commit, and final disposition.
+Independent review, finding disposition, explicit cleanup, and final commits remain with the outer workflow or Task Owner. Preflight handles only content proven to belong to the current run.

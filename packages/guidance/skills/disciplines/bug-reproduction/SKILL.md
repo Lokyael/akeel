@@ -25,7 +25,7 @@ Treat a comparison baseline as known-good when user evidence, an external contra
 
 Run the signal, verify that its failure matches the user's symptom, and reduce the scenario one condition at a time. Improve determinism where practical by fixing seeds, clocks, schedules, fixtures, and environmental inputs while preserving the original behavior.
 
-For intermittent behavior, measure the loop instead of applying a universal threshold:
+For intermittent behavior, measure the loop directly:
 
 - attempts and matching failures;
 - iteration cost and total observation budget;

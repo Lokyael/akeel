@@ -5,67 +5,53 @@ description: Use after implementing features or refactoring, before declaring co
 
 # Documentation Synchronization
 
-After every non-trivial code change, documentation drifts. This skill stops that.
+After non-trivial code changes, synchronize documentation and Project Records within the same change set.
 
 ## When to Apply
 
 Activate automatically after:
-- Feature implementation (new capabilities, new modules)
-- Refactoring (architecture changes, file renames)
-- Adding/removing rules, tests, or configurations
-- Any change that alters what README, `CONTEXT.md`, `docs/candidates.md`, `docs/decisions.md`, or the active Task Record describe
+- Feature implementation (new capabilities, new modules);
+- Refactoring (architecture changes, file renames);
+- Adding or modifying rules, tests, or configurations;
+- Any change altering behavior described by README, `CONTEXT.md`, `docs/candidates.md`, `docs/decisions.md`, or the active Task Record.
 
-## The 4-Step Check
+## Process
 
 ### Step 1: Identify Affected Docs
 
-Scan the project root for documentation markers. Common files:
-
-| File | Contains | Stale When |
-|------|----------|------------|
-| Actual doc files in project | Features, counts, architecture, guides, conventions | Code changes that alter what the docs describe |
-
-Also scan `CONTEXT.md`, `docs/candidates.md`, `docs/decisions.md`, `docs/task.md`, and `docs/task-*.md`; apply the checks in Step 2 while scanning.
+Scan the repository for documentation files whose content may be affected by the code change:
+- Project guides, user docs, and README;
+- Central project knowledge in `CONTEXT.md`;
+- Authoritative record containers: `docs/candidates.md`, `docs/decisions.md`, `docs/task.md`, and any active `docs/task-*.md`.
 
 ### Step 2: Verify Each Against Code
 
 For each identified doc, verify:
 
-1. **Counts**: "66 rules" → count actual entries in source. Remove hardcoded counts that rot.
-2. **Architecture**: diagrams and pipelines match actual code flow
-3. **Commands**: all listed commands still exist
+1. **Counts**: verify numeric statements against actual source counts. Prefer references or ranges over hardcoded counts that rot.
+2. **Architecture**: diagrams and pipelines match actual code flow.
+3. **Commands**: all listed commands still exist and work as documented.
 4. **References**: cross-references to other docs/files resolve; record IDs (`C-xxx`/`T-xxx`/`D-xxx`) cited in code comments resolve to live entries (per principles.md Project Records — Record Lifecycle). Run `grep -rnE 'D-[0-9]{3}' src tests` and resolve each hit against the `docs/decisions.md` headings; skip this check when the project has no record containers.
-5. **Examples**: code examples still work with current API; paths are portable — no machine-specific absolute paths (e.g. `/home/<user>/...`), use placeholders (`~`, `$HOME`) or relative paths
-6. **Record authority**: Candidate Records remain visibly non-binding; promoted content has one authoritative destination and no duplicate C source
-7. **Task lifecycle**: Task Record status matches reality; verified tasks are either cleared or clearly blocked on a durable documentation update
-8. **Slot invariant**: each container (`docs/candidates.md`, `docs/task.md`, `docs/decisions.md`) has exactly one trailing empty slot (per principles.md Next-ID slots)
-9. **Decision format and lifecycle**: each present Decision follows principles.md Project Records — Decision Record Format; a superseded decision names its replacement and a retired decision names its destination (Negative Space or a boundary decision), then leaves the live register — otherwise complete the transition or flag the gap
-10. **User-project container check**: when the user project explicitly uses the standard `docs/candidates.md`, `docs/task.md`, or `docs/decisions.md` containers, use Direct `find`/`grep` to locate the trailing `## X-0NN: 待创建` slot and Direct `read` only from that slot to end-of-file; confirm exactly one matching slot, matching container prefix, and no non-empty content after it. Missing optional containers are skipped; nonstandard record paths or ambiguous results are reported without guessing or creating files. Do not run the AKeel repository validator against user projects, and do not auto-fix records.
-11. **Zero-loss editing**: merging, compressing, or pruning record content deletes only synonymous repetition — qualifiers, specific terms, enumerations, and terminology are meaning, not filler
+5. **Examples**: code examples work with current API; paths are portable — use relative paths or placeholders (`~`, `$HOME`) instead of machine-specific absolute paths.
+6. **Record authority**: Candidate Records remain visibly non-binding; promoted content has one authoritative destination and no duplicate C source.
+7. **Task lifecycle**: Task Record status matches reality; verified tasks are either cleared or clearly blocked on a durable documentation update.
+8. **Slot invariant**: each container (`docs/candidates.md`, `docs/task.md`, `docs/decisions.md`) has exactly one trailing empty slot (per principles.md Next-ID slots).
+9. **Decision format and lifecycle**: each present Decision follows principles.md Project Records — Decision Record Format; a superseded decision names its replacement and a retired decision names its destination (Negative Space or a boundary decision), then leaves the live register — otherwise complete the transition or flag the gap.
+10. **User-project container check**: when the user project explicitly uses the standard `docs/candidates.md`, `docs/task.md`, or `docs/decisions.md` containers, use Direct `find`/`grep` to locate the trailing `## X-0NN: 待创建` slot and Direct `read` only from that slot to end-of-file; confirm exactly one matching slot, matching container prefix, and no non-empty content after it. Skip missing optional containers, and report nonstandard record paths or ambiguous results directly. Internal repository validators and automated fixes apply only to AKeel itself, leaving user-project records to user-directed editing.
+11. **Zero-loss editing**: merging, compressing, or pruning record content deletes only synonymous repetition — qualifiers, specific terms, enumerations, and terminology are meaning, not filler.
 
-### Step 3: Fix or Flag
+### Step 3: Update or Report
 
-- Fix stale information immediately
-- Prefer removing stale counts over hardcoding new ones
-- Flag issues you can't fix: "The decision record references module X, removed in commit Y"
-
-## Anti-Patterns
-
-| Don't | Do |
-|-------|-----|
-| Skip docs because "they'll be rewritten" | Fix counts and references — useful even if imperfect |
-| Add new exact counts that will rot | Use ranges, links to source, or remove counts entirely |
-| Update docs in a separate commit | Include doc changes with the code change |
-| Assume someone else will do it | You made the change — you sync the docs |
+- Update stale documentation inline within the same commit.
+- Flag unresolvable discrepancies with concrete evidence (for example, a Decision citing a removed module).
 
 ## Success Criteria
 
 After applying this skill:
-- Every doc count verified or removed
-- Every architecture description reflects current code
-- Every cross-reference resolves
-- No reference to deleted files, modules, or features
-- No machine-specific local paths in docs or examples
-- Record content edits (merge/compress/prune) preserve semantic zero-loss
-- No completed Task Record remains without a documented reason
-- No Candidate Record is presented as adopted work, and no promoted record remains duplicated across authority levels
+- Every doc count is verified or replaced with a stable reference;
+- Architecture diagrams and flow descriptions reflect current code;
+- All cross-references and cited record IDs resolve to live targets;
+- Documentation contains no machine-specific local paths;
+- Record edits preserve semantic zero-loss;
+- Completed Task Records are cleared or have documented rationale;
+- Candidate Records remain visibly non-binding, distinct from adopted work.

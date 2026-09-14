@@ -5,71 +5,38 @@ description: 'Use after fixing a bug or implementing a feature, before code-revi
 
 # Validate Fix
 
-> **HARD GATE** — No fix is "done" until proven with fresh evidence.
-> Apply principles.md §6: no completion claim without fresh verification evidence.
+> **HARD GATE** — Apply principles.md §6: prove completion with fresh verification evidence before code review.
 
 ## Process
 
 ### 1. Re-run the Failing Test
 
-Run the exact test that was failing before the fix:
-
-```bash
-npm run test:file -- path/to/failing-test.test.ts
-```
-
-Expected: PASS. If it fails, the fix is incomplete. Return to debugging.
+Run the exact test, command, or reproduction harness that previously failed. Confirm the targeted test passes. If the failure persists, return to `/skill:systematic-debugging`.
 
 ### 2. Run the Full Test Suite
 
-The fix might have broken something else:
-
-```bash
-npm test
-```
-
-Expected: All tests pass. If any fail, fix the regression before proceeding.
+Run the project test suite using its standard test runner. Confirm all tests pass with zero failures and no regressions are introduced.
 
 ### 3. Check Repository Validation Gates
 
-The full `npm test` command already runs `validate-docs`, `validate-skills`, TypeScript checking, and the complete test suite. This repository has no separate `build` or `lint` scripts.
+Run the project's build, typechecking, lint, and validation checks. Confirm all validation gates exit cleanly with zero errors.
 
-Expected: `npm test` exits 0 with no new warnings.
+### 4. Verify User-Visible Behavior
 
-### 4. Manual Verification (if applicable)
+When the change affects UI or human-observable behavior, verify the result directly:
+- Confirm the reported symptom is resolved;
+- Confirm the new behavior satisfies Task Record requirements;
+- Confirm boundary conditions and edge cases behave as specified.
 
-If the fix touches UI or behaviour visible to a human, verify manually:
-- Does the original bug no longer reproduce?
-- Does the new behaviour match the Task Record requirements?
-- Are edge cases handled correctly?
-
-### 5. Git Status Check
+### 5. Verify Working Tree Scope
 
 ```bash
 git status --short
 git diff --stat
 ```
 
-Confirm: only the files you intended to change are modified. No stray files.
-
-## Verification Checklist
-
-- [ ] Original failing test passes
-- [ ] Full test suite passes (0 failures)
-- [ ] Repository validation gates and TypeScript check pass via `npm test`
-- [ ] No unintended files changed
-- [ ] Bug no longer reproduces manually (if applicable)
-
-## If Validation Fails
-
-| Symptom | Action |
-|---------|--------|
-| Original test still fails | Fix is incomplete — return to debugging |
-| Other tests fail | Fix introduced a regression — fix regression |
-| Build fails | Fix broke compilation — restore build |
-| Lint fails | Fix introduced style violations — fix style |
-| Bug still reproduces | Fix didn't address root cause — return to systematic-debugging |
+Confirm modified paths match the intended change scope and no unintended files remain.
 
 ## Handoff
 
-After all checks pass: ready for `code-review`.
+When all verification steps succeed, proceed to `/skill:code-review`.

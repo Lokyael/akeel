@@ -38,7 +38,7 @@ SQLi (CWE-89), XSS (CWE-79), SSRF (CWE-918), command injection (CWE-78), auth by
 Each finding: **`File:Line` — Severity — Category**
 - Description: how the vulnerability manifests
 - Exploit scenario: concrete attack path
-- Recommendation: fix with code example (show the safe code, not just describe it)
+- Recommendation: fix with concrete code example demonstrating the safe implementation
 
 ## Integration Points
 

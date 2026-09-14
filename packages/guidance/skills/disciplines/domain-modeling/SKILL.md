@@ -21,7 +21,7 @@ User projects keep current knowledge and typed records in stable containers:
 └── src/
 ```
 
-Create `CONTEXT.md` when current project terminology or constraints first need a home. Create `docs/candidates.md` lazily for the first uncommitted candidate, and create `docs/decisions.md` lazily for the first adopted load-bearing decision. Candidate content never becomes current knowledge merely because the file exists. Do not create one file per record.
+Create `CONTEXT.md` when current project terminology or constraints first need a home. Create `docs/candidates.md` lazily for the first uncommitted candidate, and create `docs/decisions.md` lazily for the first adopted load-bearing decision. All records live in these shared container files; candidate content remains non-binding until promoted.
 
 ## During the Session
 
@@ -60,16 +60,14 @@ principles.md Project Records — Migration Protocol).
 
 ### Record Load-Bearing Decisions
 
-Offer: "Want me to record this in `docs/decisions.md`?" only after the user has adopted a hard, contentious, or future-explorer-relevant conclusion. Record a precise `D-xxx: <decision>` entry using the approval classification in principles.md Project Records — Record Lifecycle, the structure in principles.md Project Records — Decision Record Format, and principles.md Next-ID slots. Do not record exploratory steps or uncommitted candidates as Decisions, generate empty optional sections, or create one file per decision.
+Offer: "Want me to record this in `docs/decisions.md`?" only after the user has adopted a hard, contentious, or future-explorer-relevant conclusion. Record a precise `D-xxx: <decision>` entry using the approval classification in principles.md Project Records — Record Lifecycle, the structure in principles.md Project Records — Decision Record Format, and principles.md Next-ID slots. Keep Decisions focused on adopted conclusions within the shared container, populating optional sections only when content exists.
 
 ### Retire a Decision
 
-When a decision's capability is withdrawn or handed to an external owner,
-classify the transition as `retired`, not `superseded` — `superseded` requires
-an absorbing successor. In the same change, move residual durable claims to
-`CONTEXT.md` Negative Space or a new boundary decision, then prune the old
-entry; do not leave terminal status metadata in the live register. Git retains
-history and the ID is never reused.
+When a decision's capability is withdrawn or handed to an external owner without an absorbing successor,
+classify the transition as `retired` (reserving `superseded` for transitions with a replacement).
+In the same change, move residual durable claims to `CONTEXT.md` Negative Space or a new boundary
+decision, then prune the old entry from the live register. Git retains history and the ID is retired permanently.
 
 ## Integration
 

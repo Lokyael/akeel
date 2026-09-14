@@ -52,14 +52,14 @@ Compare each alternative across:
 | **Testability** | Can callers verify the contract through a stable seam? |
 | **Cost** | Does the boundary earn its implementation and migration cost? |
 
-Choose the trade-off that best fits the stated constraints, not automatically the first workable design.
+Choose the trade-off that best fits the stated constraints, comparing alternatives rather than anchoring on the first workable design.
 
 ## Shape a Deep Module
 
 1. **Start with the interface** — Write the wished-for API from the caller's needs before choosing the implementation.
 2. **Hide complexity** — Keep information about how the behavior works inside the module.
-3. **Constrain invalid states** — Make invalid states unrepresentable where practical; do not rely on callers to preserve hidden invariants.
-4. **Handle remaining failures explicitly** — Define the failure contract for states that cannot be eliminated instead of pretending they are impossible.
+3. **Constrain invalid states** — Make invalid states unrepresentable where practical, encapsulating invariants within the module.
+4. **Handle remaining failures explicitly** — Define the failure contract for states that cannot be eliminated.
 5. **Validate through the seam** — Test the public interface, or use a higher-level seam when the behavior necessarily crosses module boundaries.
 
 ## Red Flags

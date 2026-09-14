@@ -29,7 +29,7 @@ Treat imperative force and qualifiers such as `only`, `every`, `explicit`, `user
 
 State the current actor, condition, action, and result directly. Give the current behavior a self-contained explanation, then attach compatibility, migration, or decision background when that context is necessary to use or understand the contract.
 
-Use current authoritative sources to resolve stale or conflicting statements. Surface an unresolved conflict instead of selecting an unsupported meaning.
+Use current authoritative sources to resolve stale or conflicting statements. Surface any unresolved conflict for user resolution.
 
 ### 3. Build Cohesive Structure
 

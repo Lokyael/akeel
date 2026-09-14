@@ -26,7 +26,7 @@ Classify each part before deciding its destination:
 - A historical comparison or index belongs in a Candidate only when it supports a real uncommitted choice about whether to conduct that review; Git remains the history authority.
 - Material with no uncommitted choice and no concrete revisit evidence does not become a Project Record.
 
-An investigation inventory is one Candidate when the unresolved choice is whether to conduct one bounded investigation and its checklist items are evidence to inspect, not independently proposed features. Keep each unreviewed checkpoint local: current implementation, a live Decision, or a related Candidate is evidence, not proof that the inventory reviewed or disposed that checkpoint. Do not split such a checklist into a backlog merely because its items could lead to different findings.
+An investigation inventory is one Candidate when the unresolved choice is whether to conduct one bounded investigation and its checklist items are evidence to inspect, not independently proposed features. Keep each unreviewed checkpoint local: current implementation, a live Decision, or a related Candidate is evidence, not proof that the inventory reviewed or disposed that checkpoint. Keep the checklist intact as a single Candidate rather than splitting it into a backlog, even when items could produce distinct findings.
 
 ### Candidate abstraction and cleanup
 
@@ -56,4 +56,4 @@ Before merging, splitting, compressing, or pruning, build a source-to-destinatio
 - safety boundary, prohibition, fallback, residual risk, and out-of-scope statement;
 - named term, enumeration, example that distinguishes a category, and reference carrying part of the meaning.
 
-Delete only synonymous repetition or content whose removal the user explicitly approved. Existing implementation is not a deletion reason by itself. After editing, verify every source item has an identifiable destination and report any unresolved semantic conflict instead of choosing silently.
+Delete only synonymous repetition or content whose removal the user explicitly approved. Existing implementation is not a deletion reason by itself. After editing, verify every source item has an identifiable destination and report any unresolved semantic conflict for user resolution.

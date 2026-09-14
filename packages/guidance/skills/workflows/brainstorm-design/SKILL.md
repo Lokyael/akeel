@@ -12,29 +12,25 @@ Help turn ideas into fully formed designs and Requirements through natural colla
 Do NOT invoke any implementation skill, write any code, scaffold any project, or take any implementation action until you have presented a design and the user has approved it. This applies to EVERY project regardless of perceived simplicity.
 </HARD-GATE>
 
-## Anti-Pattern: "This Is Too Simple To Need A Design"
-
-Every project goes through this process. "Simple" projects are where unexamined assumptions cause the most wasted work. The design can be short (a few sentences for truly simple projects), but you MUST present it and get approval.
-
 ## Process
 
-1. **Explore project context** — read CONTEXT.md if it exists (Glossary, Architecture, Active Decisions, Negative Space), then read `docs/decisions.md` and `docs/task.md` if they exist, and recent commits
-2. **Ask clarifying questions** — one at a time, understand purpose/constraints/success criteria. Prefer multiple choice when possible. One question per message.
-3. **Propose 2-3 approaches** — with trade-offs and your recommendation. For interface-level design, apply Design Twice from module-design. Lead with your recommended option and explain why.
-4. **Present design** — in sections scaled to their complexity, get user approval after each section. Cover: architecture, components, data flow, error handling, testing, and Out of Scope (principles.md §8 format).
-5. **Record the design** — add the approved design to the current Task Record (`docs/task.md` or `docs/task-<topic>.md`). Include Out of Scope (per principles.md §8) and explicitly list any open questions that remain unresolved. Do not create a separate design file.
-6. **Work-item self-review** — quick check for placeholders, contradictions, and ambiguity. Fix inline.
+1. **Explore project context** — read `CONTEXT.md` if it exists (Glossary, Architecture, Active Decisions, Negative Space), then read `docs/decisions.md` and `docs/task.md` if they exist, and recent commits.
+2. **Ask clarifying questions** — one at a time, understand purpose, constraints, and success criteria. Prefer concrete choices where applicable. One question per message.
+3. **Propose 2–3 approaches** — with trade-offs and your recommendation. For interface-level design, apply Design Twice from `module-design`. Lead with your recommended option and explain why.
+4. **Present design** — in sections scaled to their complexity, getting user approval after each section. Cover: architecture, components, data flow, error handling, testing, and Out of Scope (per principles.md §8 format).
+5. **Record the design** — add the approved design to the current Task Record (`docs/task.md` or `docs/task-<topic>.md`), including Out of Scope (per principles.md §8) and any unresolved questions. Keep the design within the Task Record without creating separate design files.
+6. **Work-item self-review** — check for placeholders, contradictions, and ambiguity; resolve inline.
 7. **User reviews the Task Record** — ask the user to review the design section before proceeding.
 
 ## Working in Existing Codebases
 
 - Explore the current structure before proposing changes. Follow existing patterns.
 - Where existing code has problems that affect the work, include targeted improvements as part of the design.
-- Don't propose unrelated refactoring. Stay focused on the current goal.
+- Focus strictly on the current goal; propose unrelated refactoring separately.
 
 ## Design for Isolation
 
-Break the system into units that each have one clear purpose, communicate through well-defined interfaces, and can be understood and tested independently. Can someone understand what a unit does without reading its internals? If not, boundaries need work.
+Break the system into units that each have one clear purpose, communicate through well-defined interfaces, and can be understood and tested independently. Verify that callers can use a unit through its public boundary without relying on internal details.
 
 ## After the Design
 

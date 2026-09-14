@@ -5,7 +5,7 @@ description: Use when implementing any feature or bugfix before writing implemen
 
 # Test-Driven Development
 
-TDD is the red → green loop. This skill makes that loop produce tests worth keeping: what a good test is, where tests go, the anti-patterns to avoid, and the rules of the loop.
+TDD is the red → green loop. This discipline ensures the loop produces durable, behavior-protecting tests: defining observable seams, maintaining test falsifiability, and executing minimal implementation steps.
 
 When exploring the codebase, read `CONTEXT.md` (if it exists) so test names and interface vocabulary match the project's domain language. Respect relevant entries in `docs/decisions.md`.
 
@@ -15,116 +15,79 @@ When exploring the codebase, read `CONTEXT.md` (if it exists) so test names and 
 NO PRODUCTION CODE WITHOUT A FAILING TEST FIRST
 ```
 
-Write code before the test? Delete it. Start over. No "keeping it as reference."
+Write production code before the test? Delete it and restart with TDD.
 
 ## What a Good Test Is
 
-Tests verify behavior through public interfaces, not implementation details. Code can change entirely; tests shouldn't. A good test reads like a specification — "user can checkout with valid cart" tells you exactly what capability exists — and survives refactors because it doesn't care about internal structure.
+Tests verify behavior through public interfaces, not implementation details. Code may be refactored freely; tests change only when behavior changes. A good test reads like a specification describing an observable capability and survives refactoring because it remains uncoupled from internal structure.
 
-A good test is also **falsifiable**: it fails for the right reason — when the behavior it guards breaks (see [tests.md](tests.md) — Falsifiability).
+A good test is **falsifiable**: it fails when the behavior it guards breaks (see [tests.md](tests.md) — Falsifiability).
 
 See [tests.md](tests.md) for examples and [mocking.md](mocking.md) for mocking guidelines.
 
 ## Seams — Where Tests Go
 
-A **seam** is the public boundary you test at: the interface where you observe behavior without reaching inside. Tests live at seams, never against internals.
+A **seam** is the public boundary where behavior can be observed without reaching into private implementation. Tests live at seams, never against internals.
 
-**Test only at pre-agreed seams.** Before writing any test, write down the seams under test and confirm them with the user. No test is written at an unconfirmed seam.
+**Test only at pre-agreed seams.** Before writing tests, identify the seams under test and confirm them with the user.
 
-Ask: "What's the public interface, and which seams should we test?"
+Ask: "What is the public interface, and which seams should we test?"
 
 ## Anti-Patterns
 
-- **Implementation-coupled** — mocks internal collaborators, tests private methods, or verifies through a side channel. The tell: the test breaks when you refactor but behavior hasn't changed.
-- **Tautological** — the assertion recomputes the expected value the way the code does (`expect(add(a,b)).toBe(a+b)`), so it passes by construction. Expected values must come from an independent source of truth.
-- **String-presence** — asserts a script, skill, or config contains an exact line instead of running it. It passes because the source is the source and fails on rewording, not breakage.
-- **Change detector** — only intentional decisions (a constant's value, exact message wording, private structure) can fail it. It fires on redesign and sleeps through bugs.
-- **Horizontal slicing** — writing all tests first, then all implementation. Work in **vertical slices** instead — one test → one implementation → repeat.
+- **Implementation-coupled** — mocks internal collaborators, tests private methods, or verifies through side channels. The test breaks during refactoring even though behavior is unchanged.
+- **Tautological** — recomputes expected values using the same logic as the implementation (`expect(add(a,b)).toBe(a+b)`). Expected values must come from an independent source of truth.
+- **String-presence** — asserts a file or configuration contains exact literal text rather than executing it. It fails on benign rewording instead of behavioral breakage.
+- **Change detector** — asserts private structure or internal constant values rather than behavior. It fails on redesign and misses functional regressions.
+- **Horizontal slicing** — writing all tests before any implementation. Work in **vertical slices** instead: one test → one minimal implementation → repeat.
 
 ## Rules of the Red-Green-Refactor Loop
 
-### RED — Write Failing Test
+### 1. RED — Write Failing Test
 
-Write one minimal test showing what should happen.
+Write one minimal test exercising one observable behavior through the public seam.
 
-**Requirements:**
-- One behavior per test
-- Clear name describing behavior
-- Real code (no mocks unless unavoidable — see [mocking.md](mocking.md))
-- Names the break it catches — the production change that would fail it (see [tests.md](tests.md))
+Requirements:
+- One behavior per test;
+- Descriptive name stating expected capability;
+- Real collaborators where possible (mock only I/O boundaries per [mocking.md](mocking.md));
+- Demonstrates falsifiability by catching a specific production defect (see [tests.md](tests.md)).
 
-### Verify RED — Watch It Fail
+### 2. Verify RED — Watch It Fail
 
-**MANDATORY. Never skip.**
-
-```bash
-npm run test:file -- path/to/test.test.ts
-```
+Run the targeted test runner command:
 
 Confirm:
-- Test fails (not errors)
-- Failure message is expected
-- Fails because feature missing (not typos)
+- The test fails with an assertion failure (not a crash or syntax error);
+- The failure message matches the missing capability;
+- It fails because the feature is missing, not due to test errors.
 
-**Test passes?** You're testing existing behavior. Fix test.
-**Test errors?** Fix error, re-run until it fails correctly.
+### 3. GREEN — Minimal Code
 
-### GREEN — Minimal Code
+Write the simplest code that passes the test. Add no extra features, speculative abstractions, or unrelated refactoring.
 
-Write simplest code to pass the test. Don't add features, don't refactor other code, don't "improve" beyond the test.
+### 4. Verify GREEN — Watch It Pass
 
-### Verify GREEN — Watch It Pass
+Run the targeted test command and verify:
+- The targeted test passes;
+- Existing tests continue to pass;
+- Output is clean.
 
-**MANDATORY.**
+### 5. REFACTOR — Clean Up
 
-```bash
-npm run test:file -- path/to/test.test.ts
-```
+With tests green, remove duplication, improve naming, and extract clean helpers without altering observable behavior.
 
-Confirm: test passes, other tests still pass, output pristine.
+Before moving on, verify through a mutation check: every realistic defect must fail at least one test (see [tests.md](tests.md)).
 
-### REFACTOR — Clean Up
+### 6. Repeat
 
-After green only: remove duplication, improve names, extract helpers. Keep tests green. Don't add behavior.
-
-**Finish:** mentally mutate the production code — every realistic mutation must fail at least one test (mutation check, see [tests.md](tests.md)).
-
-### Repeat
-
-Next failing test for next behavior. One slice at a time.
-
-## Common Rationalizations (All Wrong)
-
-| Excuse | Reality |
-|--------|---------|
-| "Too simple to test" | Simple code breaks. Test takes 30 seconds. |
-| "I'll test after" | Passing immediately proves nothing — might test the wrong thing, implementation, or miss edge cases. |
-| "Already manually tested" | Ad-hoc ≠ systematic. No record, can't re-run. |
-| "TDD will slow me down" | TDD is faster than debugging. |
-| "Need to explore first" | Fine. Throw away exploration, start with TDD. |
-| "Test hard = design unclear" | Listen to test. Hard to test = hard to use. |
-
-## Red Flags — STOP and Start Over
-
-Any of these means: Delete code. Start over with TDD.
-- Code before test
-- Test after implementation
-- Test passes immediately
-- Can't explain why test failed
-- Rationalizing "just this once"
+Advance to the next failing test for the next behavior slice.
 
 ## When Stuck
 
-| Problem | Solution |
-|---------|----------|
-| Don't know how to test | Write wished-for API. Write assertion first. Ask. |
-| Test too complicated | Design too complicated. Simplify interface. |
-| Must mock everything | Code too coupled. Use dependency injection. |
-| Test setup huge | Extract helpers. Still complex? Simplify design. |
-
-## Final Rule
-
-```
-Production code → test exists and failed first
-Otherwise → not TDD
-```
+| Friction | Resolution |
+|----------|------------|
+| Unclear how to test | Design wished-for API from caller's perspective; write assertion first; ask user. |
+| Test too complex | Interface is too complex. Simplify the public boundary. |
+| Excessive mocking required | Code is too tightly coupled. Apply dependency injection. |
+| Setup boilerplate too large | Extract test helpers; if still large, simplify module design. |
