@@ -26,10 +26,6 @@ const GIT_MODIFY = new Set([
   "stash", "format-patch", "archive", "config",
 ]);
 const GIT_HELPER_COMMANDS = new Set([
-  "status",
-  "diff",
-  "log",
-  "show",
   "add",
   "commit",
   "push",
@@ -302,7 +298,9 @@ export function analyzeGitProgram(args: readonly ShellWord[]): ProgramSemantic {
   if (rest.some((word) => word.text === "--upload-pack" || word.text.startsWith("--upload-pack=") ||
     word.text === "-u" || word.text.startsWith("-u=") || word.text.startsWith("-u") && word.text.length > 2 ||
     word.text === "--receive-pack" || word.text.startsWith("--receive-pack=") ||
-    word.text === "--exec" || word.text.startsWith("--exec="))) {
+    word.text === "--exec" || word.text.startsWith("--exec=") ||
+    word.text === "--ext-diff" || word.text.startsWith("--ext-diff=") ||
+    word.text === "--textconv" || word.text.startsWith("--textconv="))) {
     hardBoundary = true;
   }
   const known = GIT_INSPECT.has(subcommand) || GIT_MODIFY.has(subcommand) || subcommand === "clean" || subcommand === "branch";

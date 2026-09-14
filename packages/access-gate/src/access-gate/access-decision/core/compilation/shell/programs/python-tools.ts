@@ -1,5 +1,5 @@
 import type { ShellWord } from "../language";
-import { hasUnknownOption } from "./option-scanner";
+import { hasUnknownOption, scanOptionWords } from "./option-scanner";
 import { firstCommand, path, result } from "./shared";
 import type { ProgramPath, ProgramSemantic } from "./types";
 
@@ -32,22 +32,44 @@ export function analyzePythonToolProgram(name: string, args: readonly ShellWord[
 
   const paths: ProgramPath[] = [];
   if (commandClass !== "execute") {
+    const occurrences = scanOptionWords(args, { valueOptions: PYTHON_VALUE_OPTIONS });
+    const optionIndices = new Set<number>();
+    for (const occ of occurrences) {
+      optionIndices.add(occ.index);
+      if (!occ.attached && occ.valueIndex !== undefined) {
+        optionIndices.add(occ.valueIndex);
+      }
+      if (occ.name === "--config" && occ.value !== undefined) {
+        paths.push(path(occ.value, "source"));
+      } else if (occ.name === "--output-file" && occ.value !== undefined) {
+        paths.push(path(occ.value, "target"));
+      }
+    }
+
+    let endOfOptions = false;
     let skippedSubcommand = false;
-    for (const word of args) {
-      if (word.text === "--" || word.text.startsWith("-")) continue;
+    let positionalCount = 0;
+    for (let index = 0; index < args.length; index += 1) {
+      const word = args[index]!;
+      if (!endOfOptions && word.text === "--") {
+        endOfOptions = true;
+        continue;
+      }
+      if (!endOfOptions && (optionIndices.has(index) || word.text.startsWith("-"))) continue;
       if (name === "ruff" && !skippedSubcommand && ["check", "format", "rule", "linter", "clean"].includes(word.text)) {
         skippedSubcommand = true;
         continue;
       }
+      positionalCount += 1;
       paths.push(path(word, commandClass === "modify" || commandClass === "destroy" ? "target" : "source"));
     }
-  }
-  if (paths.length === 0) {
-    paths.push(path(
-      { text: ".", start: 0, end: 0, quote: "bare" },
-      commandClass === "modify" || commandClass === "destroy" ? "target" : "source",
-      0,
-    ));
+    if (positionalCount === 0) {
+      paths.push(path(
+        { text: ".", start: 0, end: 0, quote: "bare" },
+        commandClass === "modify" || commandClass === "destroy" ? "target" : "source",
+        0,
+      ));
+    }
   }
   return result(
     commandClass,

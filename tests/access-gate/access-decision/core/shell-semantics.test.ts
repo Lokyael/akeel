@@ -48,12 +48,21 @@ test("path-form interpreter information calls remain executable and opaque", () 
   }
 });
 
-test("Git helper-capable commands remain hard-boundary", () => {
-  for (const subcommand of ["status", "diff", "add", "commit", "push", "config", "help", "grep", "blame", "gc"]) {
+test("Git helper-capable commands remain hard-boundary while inspect commands are admitted", () => {
+  for (const subcommand of ["status", "diff", "log", "show"]) {
+    const semantic = analyzeProgramCommand({ executable: "git", arguments: [word(subcommand, 0)] });
+    assert.ok(semantic);
+    assert.equal(semantic.commandClass, "inspect", subcommand);
+    assert.equal(semantic.hardBoundary, false, subcommand);
+  }
+  for (const subcommand of ["add", "commit", "push", "config", "help", "grep", "blame", "gc"]) {
     const semantic = analyzeProgramCommand({ executable: "git", arguments: [word(subcommand, 0)] });
     assert.ok(semantic);
     assert.equal(semantic.hardBoundary, true, subcommand);
   }
+  const diffWithExtDiff = analyzeProgramCommand({ executable: "git", arguments: [word("diff", 0), word("--ext-diff", 5)] });
+  assert.ok(diffWithExtDiff);
+  assert.equal(diffWithExtDiff.hardBoundary, true);
   const grepWithTextconv = analyzeProgramCommand({ executable: "git", arguments: [word("grep", 0), word("--textconv", 5)] });
   assert.ok(grepWithTextconv);
   assert.equal(grepWithTextconv.hardBoundary, true);
@@ -70,7 +79,7 @@ test("Git rm is a destructive operation", () => {
 });
 
 test("path-form Git helper boundaries are retained as opaque execution", () => {
-  const semantic = analyzeProgramCommand({ executable: "/usr/bin/git", arguments: [word("status", 0)] });
+  const semantic = analyzeProgramCommand({ executable: "/usr/bin/git", arguments: [word("commit", 0)] });
   assert.ok(semantic);
   assert.equal(semantic.commandClass, "execute");
   assert.equal(semantic.opaque, true);
@@ -211,6 +220,16 @@ test("Git mutating commands expose their file paths and risk class", () => {
 
 test("Python tool option values do not hide the semantic subcommand", () => {
   assert.equal((analyzeShellCommand("ruff --config pyproject.toml format") as { commandClass: string }).commandClass, "modify");
+});
+
+test("Python tool option values and configs are not mistaken for target paths", () => {
+  assert.deepEqual(complete("ruff format --config pyproject.toml src").paths, [
+    { text: "pyproject.toml", role: "source" },
+    { text: "src", role: "target" },
+  ]);
+  assert.deepEqual(complete("black --line-length 88 src").paths, [
+    { text: "src", role: "target" },
+  ]);
 });
 
 test("Python, uv, Node and package runners use explicit family semantics", () => {

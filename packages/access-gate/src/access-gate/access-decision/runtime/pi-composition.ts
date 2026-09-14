@@ -94,13 +94,14 @@ function credentialRoots(agentDir: string): readonly string[] {
 
 function installComposition(
   pi: ExtensionAPI,
-  initialConfiguration: DecodedPolicyConfiguration | undefined,
+  policyProvider: () => DecodedPolicyConfiguration | undefined,
   createSessionProject: (cwd: string) => SessionProject,
   agentDir: string,
 ): void {
   let session: GateSession | undefined;
   let project: ProjectLifecycle | undefined;
   let sessionHome: string | undefined;
+  let currentConfiguration: DecodedPolicyConfiguration | undefined = policyProvider();
   const pathEvidence = createLinuxPathEvidence();
   const protectedRoots = credentialRoots(agentDir);
 
@@ -112,16 +113,16 @@ function installComposition(
     description: "Show or switch the active AKeel policy preset.",
     handler: async (args, context) => {
       const requested = args.trim();
-      if (initialConfiguration?.kind === "disabled") {
+      if (currentConfiguration?.kind === "disabled") {
         notifyPolicy(context, "Access Gate is disabled; bootstrap and skills remain active.", "warning");
         return;
       }
-      if (initialConfiguration?.kind !== "enabled" || !initialConfiguration.switchable) {
+      if (currentConfiguration?.kind !== "enabled" || !currentConfiguration.switchable) {
         notifyPolicy(context, "No Policy Presets are configured; the static policy remains active.", "warning");
         return;
       }
       if (requested.length === 0 && context.mode === "tui") {
-        const options = policyPresetOptions(initialConfiguration);
+        const options = policyPresetOptions(currentConfiguration);
         const selected = await context.ui.select(
           "Select AKeel policy preset:",
           options.map((option) => option.label),
@@ -129,18 +130,18 @@ function installComposition(
         const selectedPreset = presetNameForLabel(options, selected);
         if (selectedPreset === undefined) return;
         if (setPolicyPreset(selectedPreset)) {
-          notifyPolicy(context, `Active AKeel policy: ${policyStatus(initialConfiguration, session)}.`);
+          notifyPolicy(context, `Active AKeel policy: ${policyStatus(currentConfiguration, session)}.`);
         } else {
           notifyPolicy(context, "Unknown AKeel policy preset selection.", "error");
         }
         return;
       }
       if (requested.length === 0 || requested === "status") {
-        notifyPolicy(context, `Active AKeel policy: ${policyStatus(initialConfiguration, session)}.`);
+        notifyPolicy(context, `Active AKeel policy: ${policyStatus(currentConfiguration, session)}.`);
         return;
       }
       if (setPolicyPreset(requested)) {
-        notifyPolicy(context, `Active AKeel policy: ${policyStatus(initialConfiguration, session)}.`);
+        notifyPolicy(context, `Active AKeel policy: ${policyStatus(currentConfiguration, session)}.`);
       } else {
         notifyPolicy(context, `Unknown AKeel policy preset: ${requested}.`, "error");
       }
@@ -153,7 +154,8 @@ function installComposition(
     session = undefined;
     project = undefined;
     sessionHome = captureSessionHome();
-    if (initialConfiguration === undefined || initialConfiguration.kind === "disabled") return;
+    currentConfiguration = policyProvider();
+    if (currentConfiguration === undefined || currentConfiguration.kind === "disabled") return;
     try {
       const sessionProject = createSessionProject(context.cwd);
       if ("dispose" in sessionProject) project = sessionProject as ProjectLifecycle;
@@ -163,7 +165,7 @@ function installComposition(
         stagingRoot: sessionProject.context.stagingRoot,
         home: sessionHome,
         credentialRoots: protectedRoots,
-        configuration: initialConfiguration,
+        configuration: currentConfiguration,
         pathEvidence,
       });
     } catch {
@@ -182,7 +184,7 @@ function installComposition(
   });
 
   pi.on("tool_call", async (event, context) => {
-    if (initialConfiguration?.kind === "disabled") return undefined;
+    if (currentConfiguration?.kind === "disabled") return undefined;
     if (!session) {
       return adaptPiGateToolCall(event, context).kind === "passthrough" ? undefined : initializationFailure();
     }
@@ -192,7 +194,7 @@ function installComposition(
 
 export function installPiAccessDecision(pi: ExtensionAPI, options: PiCompositionOptions): void {
   const agentDir = resolveAgentDir(options.agentDir);
-  installComposition(pi, decodedPolicy(options.policyConfig), (cwd) => {
+  installComposition(pi, () => decodedPolicy(options.policyConfig), (cwd) => {
     if (options.projectRoot !== cwd) throw new TypeError("project root must match session cwd");
     return {
       context: createProjectContext({ cwd, projectRoot: cwd, stagingRoot: options.stagingRoot }),
@@ -202,5 +204,5 @@ export function installPiAccessDecision(pi: ExtensionAPI, options: PiComposition
 
 export function installGlobalPiAccessDecision(pi: ExtensionAPI, options: GlobalPiCompositionOptions): void {
   const agentDir = resolveAgentDir(options.agentDir);
-  installComposition(pi, loadDecodedPolicyFile(agentDir), createProjectLifecycle, agentDir);
+  installComposition(pi, () => loadDecodedPolicyFile(agentDir), createProjectLifecycle, agentDir);
 }

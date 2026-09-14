@@ -413,6 +413,32 @@ test("a Shell command containing NUL is rejected as invalid input", () => {
   });
 });
 
+test("a shell request with a valid optional timeout compiles successfully", () => {
+  const compilation = compileShell({
+    ...request,
+    arguments: { command: "cat README.md", timeout: 30 },
+  });
+  assert.equal(isShellReject(compilation), false);
+  assert.equal(Object.isFrozen(compilation), true);
+});
+
+test("a shell request with an invalid timeout or unknown arguments fails closed", () => {
+  for (const invalidArguments of [
+    { command: "cat README.md", timeout: -5 },
+    { command: "cat README.md", timeout: 0 },
+    { command: "cat README.md", timeout: Number.NaN },
+    { command: "cat README.md", timeout: "30" },
+    { command: "cat README.md", timeout: 30, unknown: true },
+  ]) {
+    assert.deepEqual(compileShell({ ...request, arguments: invalidArguments }), {
+      kind: "reject",
+      code: "invalid-request",
+      anchor: { start: 0, end: 0 },
+      resourceClass: "input",
+    });
+  }
+});
+
 test("a shell command beyond the byte budget is rejected before word materialization", () => {
   const command = `printf ${"x".repeat(16_385)}`;
   assert.deepEqual(compileShell({ ...request, arguments: { command } }), {

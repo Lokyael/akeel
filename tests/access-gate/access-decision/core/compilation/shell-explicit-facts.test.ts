@@ -14,6 +14,6 @@ test("Shell analysis carries immutable semantic facts instead of identity sideca
     "invocation-cwd",
     "command-cwd",
   ]);
-  assert.equal((facts as { readonly hardBoundary: boolean }).hardBoundary, true);
+  assert.equal((facts as { readonly hardBoundary: boolean }).hardBoundary, false);
   assert.equal((facts as { readonly recursive: boolean }).recursive, true);
 });

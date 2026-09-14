@@ -156,3 +156,18 @@ test("session shutdown removes the new decision service", async () => {
     );
   });
 });
+
+test("session start reloads updated policy.yaml from agent directory", async () => {
+  await withAgentFiles("accessGate: disabled\n", undefined, async (agentDir, harness) => {
+    await harness.handlers.get("session_start")!(undefined, harness.ctx);
+    assert.equal(await invoke(harness, { toolName: "bash", input: { command: "mkdir generated" } }), undefined);
+
+    writeFileSync(join(agentDir, "akeel", "policy.yaml"), "preset: review\n");
+
+    await harness.handlers.get("session_start")!(undefined, harness.ctx);
+    assert.deepEqual(
+      await invoke(harness, { toolName: "bash", input: { command: "mkdir generated" } }),
+      { block: true, reason: "Blocked by access policy." },
+    );
+  });
+});

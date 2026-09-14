@@ -174,6 +174,10 @@ function isPositiveInteger(value: unknown): value is number {
   return typeof value === "number" && Number.isSafeInteger(value) && value > 0;
 }
 
+function isPositiveNumber(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value) && value > 0;
+}
+
 export function createCompileEnvironment(input: unknown): CompileEnvironment {
   if (!isRecord(input) || !isAbsolutePath(input.cwd) || !isRecord(input.pathEvidence) ||
     typeof input.pathEvidence.resolve !== "function") {
@@ -261,8 +265,11 @@ function compileShellCall(
   argumentsValue: Record<string, unknown>,
   environment: CompileEnvironmentFacts,
 ): CanonicalCompilation | UnifiedCanonicalReject {
-  if (!hasExactKeys(argumentsValue, ["command"]) || typeof argumentsValue.command !== "string" ||
-    argumentsValue.command.length === 0 || argumentsValue.command.includes("\u0000")) {
+  const argumentKeys = Reflect.ownKeys(argumentsValue);
+  if (!hasAllowedKeys(argumentsValue, ["command"], ["command", "timeout"]) ||
+    typeof argumentsValue.command !== "string" || argumentsValue.command.length === 0 ||
+    argumentsValue.command.includes("\u0000") ||
+    argumentKeys.includes("timeout") && !isPositiveNumber(argumentsValue.timeout)) {
     return rejectShell("invalid-request", 0);
   }
   const command = argumentsValue.command;

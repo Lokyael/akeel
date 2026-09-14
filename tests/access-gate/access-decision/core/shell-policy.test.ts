@@ -238,7 +238,7 @@ test("unknown Git commands remain hard-boundary without a path policy", () => {
 });
 
 test("path-form Git helper boundaries cannot be widened by execute policy", () => {
-  assert.deepEqual(evaluateShellAdmission(admission("/usr/bin/git status"), freezeShellPolicySnapshot({
+  assert.deepEqual(evaluateShellAdmission(admission("/usr/bin/git commit -m msg"), freezeShellPolicySnapshot({
     ...policy,
     execute: "allow",
     blockedPaths: [],
@@ -517,7 +517,7 @@ test("recursive grep without an explicit path checks the current directory", () 
   }
 });
 
-test("Git helper-capable commands remain hard-boundary under develop", () => {
+test("Git inspect commands are admitted under develop and review while helper commands remain hard-boundary", () => {
   const develop = freezeShellPolicySnapshot({
     ...policy,
     inspect: "allow",
@@ -527,8 +527,36 @@ test("Git helper-capable commands remain hard-boundary under develop", () => {
     allowedRoots: ["/workspace/project"],
     blockedRoots: [],
   });
+  const review = freezeShellPolicySnapshot({
+    ...policy,
+    inspect: "allow",
+    modify: "deny",
+    execute: "deny",
+    opaque: "deny",
+    allowedRoots: ["/workspace/project"],
+    blockedRoots: [],
+  });
 
-  for (const command of ["git status", "git diff -- src/app.ts", "git commit -m message", "git add src/app.ts", "git push file:///workspace/project/remote main", "git config --list", "git grep --textconv pattern", "git help status", "git rm file.txt"]) {
+  for (const command of ["git status", "git diff -- src/app.ts", "git log", "git show"]) {
+    assert.deepEqual(evaluateShellAdmission(admission(command), develop), {
+      kind: "allow",
+    }, command);
+    assert.deepEqual(evaluateShellAdmission(admission(command), review), {
+      kind: "allow",
+    }, command);
+  }
+
+  for (const command of [
+    "git commit -m message",
+    "git add src/app.ts",
+    "git push file:///workspace/project/remote main",
+    "git config --list",
+    "git grep --textconv pattern",
+    "git diff --ext-diff",
+    "git diff --textconv",
+    "git help status",
+    "git rm file.txt",
+  ]) {
     assert.deepEqual(evaluateShellAdmission(admission(command), develop), {
       kind: "deny",
       code: "hard-boundary",
@@ -614,11 +642,11 @@ test("Git helper boundaries win over canonical command-local repository paths", 
   });
 
   for (const command of [
-    "git --git-dir .git status",
-    "git --git-dir=/workspace/project/.git status",
-    "git --work-tree subdir status",
-    "git -C subdir --git-dir=../.git status",
-    "git -C subdir --work-tree=. status",
+    "git --git-dir .git commit -m msg",
+    "git --git-dir=/workspace/project/.git commit -m msg",
+    "git --work-tree subdir commit -m msg",
+    "git -C subdir --git-dir=../.git commit -m msg",
+    "git -C subdir --work-tree=. commit -m msg",
   ]) {
     assert.deepEqual(evaluateShellAdmission(admission(command), scoped), {
       kind: "deny",
@@ -662,10 +690,26 @@ test("Git helper boundaries win over command-local paths", () => {
     blockedRoots: [],
   });
 
-  for (const command of ["git -C subdir status", "git -Csubdir diff -- src/app.ts", "git -C subdir -C nested status"]) {
+  for (const command of ["git -C subdir commit -m msg", "git -Csubdir push", "git -C subdir -C nested commit -m msg"]) {
     assert.deepEqual(evaluateShellAdmission(admission(command), scoped), {
       kind: "deny",
       code: "hard-boundary",
+    }, command);
+  }
+});
+
+test("Git inspect commands with command-local paths are admitted when within allowed roots", () => {
+  const scoped = freezeShellPolicySnapshot({
+    ...policy,
+    inspect: "allow",
+    modify: "allow",
+    allowedRoots: ["/workspace/project/subdir"],
+    blockedRoots: [],
+  });
+
+  for (const command of ["git -C subdir status", "git -Csubdir diff -- src/app.ts", "git -C subdir -C nested status"]) {
+    assert.deepEqual(evaluateShellAdmission(admission(command), scoped), {
+      kind: "allow",
     }, command);
   }
 });
