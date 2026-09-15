@@ -223,3 +223,28 @@ test("GateSession close transitions state and unknown preset activation returns 
   });
 });
 
+test("default roots admit the session access root, staging root, and /tmp/akeel", () => {
+  const createGateSession = (runtime as Record<string, unknown>).createGateSession;
+  const configuration = decodePolicyConfiguration({
+    presets: { develop: {} },
+    activePreset: "develop",
+  });
+  const session = (createGateSession as Function)({
+    cwd: "/workspace",
+    home: "/home/user",
+    stagingRoot: "/tmp/akeel-stage",
+    credentialRoots: ["/agent"],
+    configuration,
+    pathEvidence: Object.freeze({
+      resolve(base: string, path: string) {
+        const candidate = path.startsWith("/") ? path : `${base}/${path}`;
+        return Object.freeze({ candidate, traversed: Object.freeze([candidate]) });
+      },
+    }),
+  });
+
+  assert.deepEqual(session.evaluate({ surface: "write", arguments: { path: "/tmp/akeel/artifact.md", content: "ok" } }), {
+    kind: "allow",
+  });
+});
+

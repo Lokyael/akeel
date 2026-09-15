@@ -21,7 +21,7 @@ packages/guidance/src/bootstrap/          # 扩展：Session 注入原则（prin
 packages/access-gate/src/access-gate/        # 扩展：policy.yaml adapter、Canonical access-decision 与 Pi runtime composition
   access-decision/core/authorization/ # sealed Admission、Mandatory Boundary、Configured Policy 与统一 verdict
   access-decision/core/compilation/   # 单一 Canonical facade、Linux Path Evidence 与私有 Direct/Shell 语义车道
-    shell/programs/                    # Git、解释器、Python、uv、package manager 的封闭 analyzer registry
+    shell/programs/                    # Git、解释器、Python、uv、herdr、package manager 的封闭 analyzer registry
   access-decision/adapters/            # 外部 Pi/tool/policy.yaml 合同单次适配
   access-decision/runtime/             # Gate Session、Project/staging 生命周期与 Pi host approval composition
   */index.ts                           # 目录公共表面：跨目录引用统一走目录 index，不深入实现文件

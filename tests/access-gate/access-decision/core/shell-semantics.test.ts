@@ -351,3 +351,78 @@ test("Git option values and revisions are not mistaken for file paths", () => {
     paths: [{ text: ".", role: "target" }],
   });
 });
+
+test("Herdr commands map to inspect, execute, and modify semantics with path extraction", () => {
+  for (const command of [
+    "herdr --version",
+    "herdr -V",
+    "herdr --help",
+    "herdr status",
+    "herdr agent list",
+    "herdr agent get child1",
+    "herdr agent read child1 --source recent-unwrapped --lines 80",
+    "herdr agent wait child1",
+    "herdr workspace list",
+    "herdr workspace get w1",
+    "herdr worktree list",
+  ]) {
+    const analysis = analyzeShellCommand(command);
+    assert.equal(analysis.kind, "complete", command);
+    if (analysis.kind === "complete") {
+      assert.equal(analysis.commandClass, "inspect", command);
+      assert.deepEqual(analysis.effects, ["read"], command);
+    }
+  }
+
+  for (const command of [
+    "herdr agent start child1 --kind pi --pane 1",
+    "herdr agent prompt child1 'review' --wait",
+  ]) {
+    const analysis = analyzeShellCommand(command);
+    assert.equal(analysis.kind, "complete", command);
+    if (analysis.kind === "complete") {
+      assert.equal(analysis.commandClass, "execute", command);
+      assert.deepEqual(analysis.effects, ["execute"], command);
+      assert.equal(analysis.semantic.opaquePathAccess, true, command);
+    }
+  }
+
+  const wsCreate = analyzeShellCommand("herdr workspace create --cwd . --label test --no-focus");
+  assert.equal(wsCreate.kind, "complete");
+  if (wsCreate.kind === "complete") {
+    assert.equal(wsCreate.commandClass, "modify");
+    assert.deepEqual(wsCreate.effects, ["read", "write"]);
+    assert.deepEqual(wsCreate.paths, [{ text: ".", role: "source" }]);
+  }
+
+  const wtCreate = analyzeShellCommand("herdr worktree create --cwd . --branch feature --path /tmp/wt --no-focus");
+  assert.equal(wtCreate.kind, "complete");
+  if (wtCreate.kind === "complete") {
+    assert.equal(wtCreate.commandClass, "modify");
+    assert.deepEqual(wtCreate.effects, ["read", "write"]);
+    assert.deepEqual(wtCreate.paths, [
+      { text: ".", role: "source" },
+      { text: "/tmp/wt", role: "target" },
+    ]);
+  }
+
+  for (const command of [
+    "herdr workspace close w1",
+    "herdr worktree remove --workspace w1",
+  ]) {
+    const analysis = analyzeShellCommand(command);
+    assert.equal(analysis.kind, "complete", command);
+    if (analysis.kind === "complete") {
+      assert.equal(analysis.commandClass, "modify", command);
+      assert.notEqual(analysis.commandClass, "destroy", "herdr worktree remove must not be destroy");
+      assert.deepEqual(analysis.effects, ["read", "write"], command);
+    }
+  }
+
+  const unknown = analyzeShellCommand("herdr unknown-command");
+  assert.equal(unknown.kind, "complete");
+  if (unknown.kind === "complete") {
+    assert.equal(unknown.commandClass, "unknown");
+    assert.equal(unknown.semantic.opaquePathAccess, true);
+  }
+});

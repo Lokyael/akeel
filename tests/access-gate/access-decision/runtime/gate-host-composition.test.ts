@@ -87,7 +87,7 @@ test("Pi host composition gives read-only guidance for a denied direct modificat
 
   assert.deepEqual(result, {
     block: true,
-    reason: "The current session is read-only; switch policy with /policy before retrying this modification.",
+    reason: "The current session is read-only; prompt the user to switch policy.",
   });
 });
 

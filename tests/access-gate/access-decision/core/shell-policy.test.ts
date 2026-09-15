@@ -938,3 +938,48 @@ test("recursive paths cannot traverse a blocked component before reaching an all
     code: "hard-boundary",
   });
 });
+
+test("herdr commands follow policy classification and path boundaries", () => {
+  const develop = freezeShellPolicySnapshot({
+    ...policy,
+    modify: "allow",
+    execute: "allow",
+    opaque: "allow",
+    unknown: "ask",
+    allowedRoots: ["/workspace/project", "/tmp/akeel"],
+    blockedRoots: [],
+  });
+
+  assert.deepEqual(evaluateShellAdmission(admission("herdr agent get child1"), develop), {
+    kind: "allow",
+  });
+  assert.deepEqual(evaluateShellAdmission(admission("herdr agent prompt child1 'review'"), develop), {
+    kind: "allow",
+  });
+  assert.deepEqual(evaluateShellAdmission(admission("herdr worktree create --cwd ."), develop), {
+    kind: "allow",
+  });
+  assert.deepEqual(evaluateShellAdmission(admission("herdr worktree create --cwd /etc"), develop), {
+    kind: "deny",
+    code: "hard-boundary",
+  });
+
+  const review = freezeShellPolicySnapshot({
+    ...policy,
+    inspect: "allow",
+    modify: "deny",
+    execute: "deny",
+    opaque: "deny",
+    unknown: "deny",
+    allowedRoots: ["/workspace/project"],
+    blockedRoots: [],
+  });
+
+  assert.deepEqual(evaluateShellAdmission(admission("herdr agent get child1"), review), {
+    kind: "allow",
+  });
+  assert.deepEqual(evaluateShellAdmission(admission("herdr agent prompt child1 'review'"), review), {
+    kind: "deny",
+    code: "policy-denied",
+  });
+});

@@ -1,5 +1,6 @@
 import type { ShellWord } from "../language";
 import { analyzeGitProgram } from "./git";
+import { analyzeHerdrProgram } from "./herdr";
 import { analyzeInterpreterProgram, INTERPRETERS } from "./interpreters";
 import { analyzePackageManagerProgram, PACKAGE_MANAGERS } from "./package-managers";
 import { analyzePythonToolProgram, PYTHON_TOOLS } from "./python-tools";
@@ -17,6 +18,7 @@ export type {
 
 export {
   analyzeGitProgram,
+  analyzeHerdrProgram,
   analyzeInterpreterProgram,
   analyzePackageManagerProgram,
   analyzePythonToolProgram,
@@ -27,6 +29,7 @@ type ProgramAnalyzer = (name: string, args: readonly ShellWord[]) => ProgramSema
 
 const PROGRAM_ANALYZERS: ReadonlyMap<string, ProgramAnalyzer> = new Map([
   ["git", (_name, args) => analyzeGitProgram(args)],
+  ["herdr", (_name, args) => analyzeHerdrProgram(args)],
   ["uv", (_name, args) => analyzeUvProgram(args)],
   ...[...INTERPRETERS].map((name) => [name, (_name: string, args: readonly ShellWord[]) => analyzeInterpreterProgram(args)] as const),
   ...[...PYTHON_TOOLS].map((name) => [name, (_name: string, args: readonly ShellWord[]) => analyzePythonToolProgram(name, args)] as const),

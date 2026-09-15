@@ -59,7 +59,7 @@ test("legacy config is ignored and the built-in review policy remains active", a
       assert.equal(await invoke(harness, { toolName: "read", input: { path: "README.md" } }), undefined);
       assert.deepEqual(
         await invoke(harness, { toolName: "write", input: { path: "notes.md", content: "updated\n" } }),
-        { block: true, reason: "The current session is read-only; switch policy with /policy before retrying this modification." },
+        { block: true, reason: "The current session is read-only; prompt the user to switch policy." },
       );
     },
   );
@@ -71,7 +71,7 @@ test("missing and malformed external policy use the built-in review baseline", a
     assert.equal(await invoke(harness, { toolName: "read", input: { path: "README.md" } }), undefined);
     assert.deepEqual(
       await invoke(harness, { toolName: "write", input: { path: "notes.md", content: "updated\n" } }),
-      { block: true, reason: "The current session is read-only; switch policy with /policy before retrying this modification." },
+      { block: true, reason: "The current session is read-only; prompt the user to switch policy." },
     );
   });
 
@@ -80,7 +80,7 @@ test("missing and malformed external policy use the built-in review baseline", a
     assert.equal(await invoke(harness, { toolName: "read", input: { path: "README.md" } }), undefined);
     assert.deepEqual(
       await invoke(harness, { toolName: "write", input: { path: "notes.md", content: "updated\n" } }),
-      { block: true, reason: "The current session is read-only; switch policy with /policy before retrying this modification." },
+      { block: true, reason: "The current session is read-only; prompt the user to switch policy." },
     );
   });
 });
@@ -94,7 +94,7 @@ test("an invalid external policy is ignored as a whole", async () => {
       assert.equal(await invoke(harness, { toolName: "read", input: { path: "README.md" } }), undefined);
       assert.deepEqual(
         await invoke(harness, { toolName: "write", input: { path: "notes.md", content: "updated\n" } }),
-        { block: true, reason: "The current session is read-only; switch policy with /policy before retrying this modification." },
+        { block: true, reason: "The current session is read-only; prompt the user to switch policy." },
       );
     },
   );

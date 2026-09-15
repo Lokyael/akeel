@@ -6,7 +6,7 @@ disable-model-invocation: true
 
 # Implement Task
 
-Require a writable policy before making modifications; if permissions are insufficient, tell the user: "Switch to a writable policy with `/policy develop` first."
+Require a writable policy before making modifications; if permissions are insufficient, prompt the user to switch to a writable policy.
 
 ## Process
 

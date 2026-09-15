@@ -197,7 +197,7 @@ test("Pi global composition uses the built-in review policy when external policy
     );
     assert.deepEqual(
       await invoke(blocked.handlers, "tool_call", { toolName: "write", input: { path: "notes.md", content: "updated\n" } }, hostContext),
-      { block: true, reason: "The current session is read-only; switch policy with /policy before retrying this modification." },
+      { block: true, reason: "The current session is read-only; prompt the user to switch policy." },
     );
 
     writeFileSync(join(agentDir, "akeel", "policy.yaml"), "paths:\n  read: allow\n");
@@ -311,7 +311,7 @@ test("cancelling the native TUI policy selector keeps the active preset", async 
 
   assert.deepEqual(
     await invoke(handlers, "tool_call", { toolName: "write", input: { path: "notes.md", content: "updated\\n" } }, hostContext),
-    { block: true, reason: "The current session is read-only; switch policy with /policy before retrying this modification." },
+    { block: true, reason: "The current session is read-only; prompt the user to switch policy." },
   );
 });
 
@@ -345,7 +345,7 @@ test("non-TUI policy command does not open a native selector", async () => {
   assert.equal(selectCalls, 0);
   assert.deepEqual(
     await invoke(handlers, "tool_call", { toolName: "write", input: { path: "notes.md", content: "updated\\n" } }, hostContext),
-    { block: true, reason: "The current session is read-only; switch policy with /policy before retrying this modification." },
+    { block: true, reason: "The current session is read-only; prompt the user to switch policy." },
   );
 });
 

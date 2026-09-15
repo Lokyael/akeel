@@ -12,18 +12,18 @@ Use Herdr when process context must stay separate and the current Task Owner ret
 Verify the current session is inside Herdr:
 
 ```bash
-test "${HERDR_ENV:-}" = 1
+printenv HERDR_ENV
 ```
 
 Create the workspace matching the child's capability:
 
 - **Modifying child** (`write`, `edit`, or file-changing Shell) — create an independent worktree on a unique branch:
   ```bash
-  herdr worktree create --cwd "$PWD" --branch "<unique-branch>" --label "<label>" --no-focus
+  herdr worktree create --cwd . --branch "<unique-branch>" --label "<label>" --no-focus
   ```
 - **Read-only child** — create a workspace in the current checkout:
   ```bash
-  herdr workspace create --cwd "$PWD" --label "<label>" --no-focus
+  herdr workspace create --cwd . --label "<label>" --no-focus
   ```
 
 Start the child in the returned root pane:
@@ -58,5 +58,5 @@ After integrating results and receiving user approval, the Task Owner removes th
   ```
 - **Workspace run**:
   ```bash
-  herdr workspace remove <workspace-id>
+  herdr workspace close <workspace-id>
   ```

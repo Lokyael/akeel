@@ -40,11 +40,11 @@
 
 **Out of Scope:** 恢复初始引入的精确上游 revision：本地提交 `2f4a3ef` 未保存这些 revision，Git 历史无法可靠还原，仅在有可验证历史快照或导入元数据时补录。
 
-## D-018: Shell 语义与 Access Gate
+## D-018: Shell 与 Direct 语义准入边界
 
 **Reversal surface:** user-boundary
 
-**Decision:** 受管 Shell `bash` 与已知 Direct surface 共享 hard boundary、Canonical path resolution 和 Policy Snapshot 决策。Shell 只在当前由 Bash/Linux 外部合同和独立测试证明的支持子集内建模：简单命令、有限 `&&`/`||`/`;` flow、受限重定向、bounded CWD 候选和已声明的程序语义。Canonical 发行事实后，Admission 向 Policy Kernel 提供最小授权事实；Policy 不执行 Shell，也不重新解析请求（D-059/D-060）。
+**Decision:** 受管 Shell `bash` 与已知 Direct surface 共享 hard boundary、Canonical path resolution 和 Policy Snapshot 决策。文件检查场景优先选择 Direct `read`、`grep`、`find`、`ls`；Direct-first 属于模型工具选择偏好，不构成 host 层 Shell 禁令，Direct 等价入口也不是 Shell gate 的绕过路径。Shell 只在当前由 Bash/Linux 外部合同和独立测试证明的支持子集内建模：简单命令、有限 `&&`/`||`/`;` flow、受限重定向、bounded CWD 候选和已声明的程序语义。Canonical 发行事实后，Admission 向 Policy Kernel 提供最小授权事实；Policy 不执行 Shell，也不重新解析请求（D-059/D-060）。
 
 **Security invariants:**
 
@@ -63,9 +63,11 @@
 
 只对 Pi `tool_call` 中的 `bash` 和已知 Direct surface 执行策略；未知 Direct surface passthrough。不承诺全局 enforcement：`user_bash`、`shellCommandPrefix`、Bash `spawnHook`、tool override、custom tool backend 及后续 handler 对 input 的修改不在范围内。
 
-**Why:** Direct 写保护无法覆盖重定向、`cp`、`mv` 等 Shell 写入入口；统一 Canonical 语义层集中提取命令类别、路径事实与 effects，避免分类和策略漂移。fail-closed 优先：识别不了就拒绝，由模型拆解，而不是猜测语义造成潜在漏判。
+**Why:** Direct 工具提供结构化参数和更窄的访问面，适合作为模型默认选择；但 Direct 写保护无法覆盖重定向、`cp`、`mv` 等 Shell 写入入口。统一 Canonical 语义层集中提取命令类别、路径事实与 effects，避免分类和策略漂移。按命令名禁用会把工具选择变成能力禁止并破坏合法组合；反过来，对不可证明形态猜测放行会造成潜在漏判。fail-closed 优先：识别不了就拒绝，由模型拆解。
 
-**Impact:** 新 Shell 形态按“识别 → Canonical 建模 → Admission/Policy → 拒绝拆解”处理；新增程序、重定向或 flow 形态必须先在当前外部合同和 public seam 上证明，再进入支持子集。
+**Impact:** 新 Shell 形态按“识别 → Canonical 建模 → Admission/Policy → 拒绝拆解”处理；新增程序、重定向或 flow 形态必须先在当前外部合同和 public seam 上证明，再进入支持子集。Direct-first 是模型偏好，不是 host 层强制路由；安全可分析的字面 Shell 仍然允许，且受相同的 path boundary、credential boundary 和 command policy 约束。
+
+**Rejected:** 不采用“Direct 存在即禁用 Shell”等价命令；不把 Direct 工具作为 Shell gate 的绕过路径；不在本决策中实现 Shell glob 的安全展开或把不可证明的动态形态升级为可授权中间状态。
 
 ## D-023: 决策渲染、静态 Guidance 与知情同意（literal form）
 
@@ -88,7 +90,7 @@
 
 **Review-mode modification Guidance:**
 
-- 当活动 preset 是内置 `review`，且 Direct `write`/`edit` 因普通 `policy-denied` 被拒时，可返回固定的静态 Guidance，提醒用户通过 `/policy` 切换到允许修改的策略后重试。
+- 当活动 preset 是内置 `review`，且 Direct `write`/`edit` 因普通 `policy-denied` 被拒时，可返回固定的静态 Guidance，提醒用户切换到允许修改的策略。
 - 该 Guidance 不是授权、审批替代或自动提权；用户必须显式完成策略切换。Shell、hard boundary、敏感路径、破坏性操作、unknown、unsupported 或其他非普通策略拒绝不使用该窄 Guidance。
 - Guidance 不判断规划是否完成，不携带路径、命令、策略字段或其他用户派生值。Policy 内容、策略状态和活动 preset 的上下文隔离仍由 D-053 负责。
 
@@ -108,20 +110,6 @@
 - 逐命令拆分审批：批准粒度仍是 tool-call 级。
 - 对 unknown/opaque 命令补充运行期语义：属于当前程序语义候选边界（C-027）。
 - 宿主对工具调用历史、执行输出或其他 extension 通道的脱敏与审计：不属于 renderer 合同。
-
-## D-025: Direct 优先与 Shell 安全子集
-
-**Reversal surface:** user-boundary
-
-**Decision:** 文件检查场景优先选择 Direct `read`、`grep`、`find`、`ls`，但 Direct 等价入口不构成 host 层 Shell 禁令。Direct 与 Shell 请求共享 D-018 的 Canonical → Admission → Policy 边界；只有可静态证明的 Shell 支持子集才进入授权，已证明的 inspect/modify 命令仍按 Policy Snapshot 的 command、path 和 hard-boundary 语义决策。
-
-**Rendering boundary:** 失败路径的静态 bounded Guidance、用户派生值限制和 literal-form 审批合同只由 D-023 定义。失败后模型可自行选择 Direct 工具或拆成受支持的字面 Shell；renderer 不生成该替代操作。
-
-**Why:** Direct 工具提供结构化参数和更窄的访问面，适合作为模型默认选择；Shell 仍承载已证明的组合、命令特有选项和有限 flow 语义。按命令名禁用会把工具选择问题错误地变成能力禁止，并破坏合法的组合操作；反过来，对不可证明的 Shell 形态猜测放行会扩大漏判面。
-
-**Impact:** Direct-first 是模型工具选择偏好，不是 host 层自动路由或 Policy Kernel 的强制优先级；安全可分析的字面 Shell 仍然允许。Direct 等价入口不是 Shell gate 的绕过路径，Shell 的 path boundary、credential boundary 和 command policy 仍然生效。
-
-**Rejected:** 不采用“Direct 存在即禁用 Shell”等价命令；不把 Direct 工具作为 Shell gate 的绕过路径；不在本决策中实现 Shell glob 的安全展开或把不可证明的动态形态升级为可授权中间状态。
 
 ## D-028: 统一 Project Record 模型与 Candidate 显式复审
 
@@ -441,7 +429,7 @@ Canonical reject 使用本域封闭 code、source anchor 与资源分类；rende
 
 **Reversal surface:** engineering
 
-**Decision:** Canonical Shell 在词法与 flow 解析之后增加独立的 `core/compilation/shell/programs/` 语义层。该层只把已扫描的程序调用转换为命令分类、effects、路径事实和 bounded/opaque 路径知识；registry 只负责可执行文件分派，Policy、配置和 host 不进入该层。Git、解释器、Python 工具、uv 与 npm/pnpm/yarn/npx 使用各自的声明表和少量专用分析器；未知程序和未知子命令保持 `unknown + opaque`。`uv run` 明确分类为 `execute`；uv 的版本/帮助调用和 `uv help` 分类为 `inspect`，其他未建模顶层子命令保持 `unknown + opaque`。
+**Decision:** Canonical Shell 在词法与 flow 解析之后增加独立的 `core/compilation/shell/programs/` 语义层。该层只把已扫描的程序调用转换为命令分类、effects、路径事实和 bounded/opaque 路径知识；registry 只负责可执行文件分派，Policy、配置和 host 不进入该层。Git、解释器、Python 工具、uv、herdr 与 npm/pnpm/yarn/npx 使用各自的声明表和少量专用分析器；未知程序和未知子命令保持 `unknown + opaque`。`uv run` 与 `herdr agent start/prompt` 分类为 `execute`；uv 与 herdr 的版本/帮助调用、状态查询和只读观测分类为 `inspect`，其他未建模顶层子命令保持 `unknown + opaque`。
 
 已知且路径访问可完整证明、且不依赖仓库或用户配置执行 helper 的命令可进入普通 `inspect`/`modify`/`execute` 策略；其中纯只读审查命令（`git status`、`diff`、`log`、`show` 等，未显式声明 `--ext-diff` 或 `--textconv`）作为 bounded inspect read 进入常规策略求值，在 `review`、`guided`、`develop` 预设下均直接放行。显式声明 external driver（`--ext-diff`、`--textconv`）、会调用或可能调用 Git helper、hooks、filters、receive hooks、merge drivers 的操作（如 `add`、`commit`、`push`、`fetch`、`pull`、`clone`、`init`、`help`、`grep`、`blame`、`gc`、checkout/switch/restore、merge/rebase/tag/reset/cherry-pick/revert/stash/submodule 等已建模操作），以及 `git config`，固定进入 hard boundary。解释器脚本、`uv run`、`pytest`、`npm/pnpm/yarn` 的脚本或安装执行、`npx` 以及含未建模运行期访问的命令标记 opaque；opaque 风险由独立的 `commands.opaque` 策略轴控制，并与命令类别策略同时求值，不因显式 `allowedRoots`、`blockedRoots` 或 `blockedPaths` 自动升级为 hard boundary。`develop` 默认允许 opaque，`guided` 默认要求审批，`review` 默认拒绝；程序语义不递归解释委托的子命令或脚本内容。
 
@@ -456,7 +444,7 @@ Canonical reject 使用本域封闭 code、source anchor 与资源分类；rende
 
 **Why:** Git、包管理器和语言运行时共享“程序自有参数语言 + 子命令分类 + 路径/委托执行”的结构，但把它们塞进 Shell lexer 或 Policy Kernel 会造成职责泄漏和重复解析。`uv run` 可能同步环境、解析或下载依赖并启动任意子进程，因此不能当作普通只读命令；版本/帮助调用与未建模顶层子命令则需要独立分类。opaque 仍必须保持独立事实，但其风险是否可接受属于用户策略选择：`review`、`guided`、`develop` 分别提供拒绝、审批和便利路径；这不宣称 allowed roots 能限制脚本运行期访问，真实执行仍受操作系统权限约束。
 
-**Impact:** 生产入口仍只切换新 Canonical pipeline；新增命令族只需增加 core 语义模块和 public seam 测试，不恢复旧 `command-semantics` 依赖。当前覆盖 Git 常用 inspect/modify/destroy 分类（helper-capable 操作与 `config` 固定 hard-boundary）、解释器信息命令、Python 质量工具、uv 的 `run`/信息/未知子命令分类和 npm 族常用分类；Git `-C`、`--git-dir`、`--work-tree` 和项目内显式 `file://` remote 的 command-local location 已覆盖，完整 CLI 方言、完整 Git pathspec 语法、HTTPS/SSH 等外部 transport、hosted `file://`、alias/间接 config remote、`clone --separate-git-dir` 和网络/执行隔离不在本条内。
+**Impact:** 生产入口仍只切换新 Canonical pipeline；新增命令族只需增加 core 语义模块和 public seam 测试，不恢复旧 `command-semantics` 依赖。当前覆盖 Git 常用 inspect/modify/destroy 分类（helper-capable 操作与 `config` 固定 hard-boundary）、解释器信息命令、Python 质量工具、uv 的 `run`/信息/未知子命令分类、herdr 的 inspect/execute/modify 分类（工作区创建提取 `--cwd`/`--path` 路径事实，worktree remove 与 workspace close 归入 modify）和 npm 族常用分类；Git `-C`、`--git-dir`、`--work-tree` 和项目内显式 `file://` remote 的 command-local location 已覆盖，完整 CLI 方言、完整 Git pathspec 语法、HTTPS/SSH 等外部 transport、hosted `file://`、alias/间接 config remote、`clone --separate-git-dir` 和网络/执行隔离不在本条内。
 
 **Rejected:**
 
@@ -469,27 +457,7 @@ Canonical reject 使用本域封闭 code、source anchor 与资源分类；rende
 
 **Out of Scope:** 网络独立授权、OS sandbox、Git hooks/npm lifecycle 的执行期拦截、完整 Git pathspec、远程/容器工具链方言、命令执行后的审计和旧配置兼容。`commands.opaque` 只表达用户对未证明执行风险的策略选择，不提供运行期沙箱或路径强制。
 
-## D-068: Policy preset 临时 TUI 选择面板，不恢复常驻 Footer
-
-**Reversal surface:** user-boundary
-
-**Decision:** 在原生 TUI 模式下，`/policy` 无参数打开临时的 Policy Preset 选择面板，供用户选择当前已加载的内置或自定义 preset。内置 `review`、`guided`、`develop` 显示固定用途摘要；自定义 preset 至少显示其合法名称。用户完成选择并确认后，runtime 按既有会话边界原子替换当前不可变 Policy Snapshot；取消、关闭或无效选择不改变当前策略。面板不提供逐项编辑路径、命令权限或创建自定义 preset 的入口。
-
-`/policy <preset>` 显式命令式入口继续保留。非 TUI 模式不尝试打开原生选择面板：`/policy` 不自动切换策略，仍提供当前 preset 的查询或静态使用提示，显式 preset 命令按既有会话切换规则处理。策略名称、策略内容和活动状态不进入模型上下文、tool description 或 system prompt。
-
-**Why:** 临时选择面板比常驻 Footer 更适合会话级策略切换：它保留用户可发现性和选择效率，同时不持续占用 TUI 空间，也不引入旧 Profile Footer 的生命周期和渲染合同。保留显式命令保证无 TUI、自动化和 RPC 客户端可以使用不依赖原生终端的入口。
-
-**Impact:** `/policy` 在原生 TUI 中由无参数查询变为选择入口；需要查看状态时使用 `/policy status` 或等价的查询路径。面板是一次性 human-only UI，不持久显示，不生成 LLM 消息，不通过策略信息改变 Gate 决策。原生 TUI 选择面板依赖 `ctx.mode === "tui"`；`ctx.hasUI` 不能单独代表可用的原生 TUI，因为 RPC 也可能提供 UI 协议但不支持原生 custom panel。
-
-**Rejected:**
-
-- **恢复旧 Profile Footer：** 产生常驻 UI 状态和旧 Profile 展示合同，收益不足以抵消生命周期与提示词隔离边界的耦合。
-- **让 `/policy` 面板编辑完整策略：** 会把 preset 选择扩展为新的策略编辑器，扩大配置验证、权限变更和安全证明范围。
-- **无 UI 时自动选择或改用更宽 preset：** 无法构成用户显式授权，且会破坏 fail-closed 边界。
-
-**Out of Scope:** 完整 Policy human-only 展示、逐项权限编辑、自定义 preset 创建、旧 Profile alias、常驻 Footer、RPC 客户端自有面板设计和子代理 preset 管理。
-
-## D-069: Policy 文件、内置与自定义 Preset 及独立路径范围
+## D-069: Policy 配置文件、Preset 注册表与用户交互界面
 
 **Reversal surface:** user-boundary
 
@@ -497,24 +465,29 @@ Canonical reject 使用本域封闭 code、source anchor 与资源分类；rende
 
 每个 preset 可以拥有独立的 `allowedRoots`、`blockedRoots` 与 `blockedPaths`，不要求不同 preset 之间一致。切换 preset 因此可以同时改变操作模式和 preset-specific path scope；这些字段仍属于 Policy Snapshot 的授权输入。`commands.destroy` 仍接受 `allow`、`ask`、`deny` 作为配置值，但 destroy/delete 的系统硬边界见 D-071；内置 preset 的固定值为 `deny`。系统级 hard boundary 始终优先，任何 preset 都不能解除或放宽它。
 
-自定义 preset 与内置 preset 使用同一 Policy Snapshot、Admission 和 Policy Kernel 合同。配置层只发行已加载的合法 registry；临时 TUI、显式切换和状态查询的用户入口由 D-068 定义。preset 名称、策略内容和活动状态不进入模型上下文、tool description 或 system prompt。
+自定义 preset 与内置 preset 使用同一 Policy Snapshot、Admission 和 Policy Kernel 合同。配置层只发行已加载的合法 registry；preset 名称、策略内容和活动状态不进入模型上下文、tool description 或 system prompt。
 
 **Policy file loading:** 用户全局 Policy 输入固定为 `$PI_CODING_AGENT_DIR/akeel/policy.yaml`，默认目录为 `~/.pi/agent`。flat `paths`/`commands` 形式表示使用完整定义的单一静态 policy，不提供 preset registry 或会话切换；具名 `presets` 形式以三个内置 preset 为注册表基础，并可增加合法的完整自定义 preset。外置文件缺失、为空、格式/schema 错误、根非 mapping、必需字段缺失或其他不可用状态时，整体忽略并使用内置 `review` 基线，不部分采用无效内容。唯一合法的 `accessGate: disabled` 形式及其运行时语义由 D-066 规定。
 
-**Why:** 固定的三个内置定位提供稳定、无需配置的默认选择；自定义 preset 支持真实工作流的权限和空间差异，而不迫使用户修改内置语义。允许 preset-specific scope 是显式产品需求；将系统 hard boundary 与 preset scope 分层，避免该灵活性被误解为可解除不可覆盖的安全底线。对不可用外置文件整体回退到内置 `review`，可以避免配置损坏产生半配置状态或关闭 Gate。
+**User interaction surface:** 在原生 TUI 模式下，`/policy` 无参数打开临时的 Policy Preset 选择面板，供用户选择当前已加载的内置或自定义 preset。内置 preset 显示固定用途摘要，自定义 preset 显示其名称。用户完成选择并确认后，runtime 按会话边界原子替换不可变 Policy Snapshot；取消、关闭或无效选择保持当前策略不变。`/policy <preset>` 显式切换入口与 `/policy status` 状态查询保留。非 TUI 模式下 `/policy` 不打开原生面板，提供状态查询或静态使用提示。交互面板是一次性 human-only UI，不持久显示，不生成 LLM 消息，不提供逐项权限编辑或自定义 preset 创建入口，不恢复常驻 Footer。
 
-**Impact:** policy adapter 将内置定义与合法的用户 preset 合并为一个注册表，并为每个 preset 发行独立 snapshot；flat policy 与自定义 preset 使用相同的完整 `paths`/`commands` schema，schema 接受合法自定义名称和独立 scope，同时保留现有三项内置声明的兼容形式。Policy loader 对外置文件采用整体有效性判定，文件无效时不产生部分 Policy Snapshot，也不激活 `accessGate: disabled`。`destroy: allow` 对自定义 preset 是合法配置值，但不产生授权；实际 destroy/delete 操作仍由 D-071 的 hard boundary 拒绝。选择面板选项不再是固定三项，命令保留字 `status` 不进入注册表。新增或变更 preset 名称时必须保持配置校验、TUI 选项、显式命令和状态查询的一致性。
+**Why:** 固定的三个内置定位提供稳定、无需配置的默认选择；自定义 preset 支持真实工作流的权限和空间差异，而不迫使用户修改内置语义。允许 preset-specific scope 满足空间隔离需求；将系统 hard boundary 与 preset scope 分层，避免策略配置削弱安全底线。对不可用外置文件整体回退到内置 `review`，避免配置损坏导致半配置或意外关闭门禁。临时选择面板与显式命令相比常驻 Footer 更加轻量，在保障用户可发现性的同时避免占用 TUI 空间与引入复杂生命周期。
+
+**Impact:** policy adapter 将内置定义与合法用户 preset 合并为一个注册表并发行独立 snapshot；schema 接受合法自定义名称和独立 scope，同时保留内置声明兼容形式。Policy loader 对外置文件采用整体有效性判定，无效时不产生部分 snapshot，也不激活 disabled 模式。`destroy: allow` 是合法配置值但不产生授权，仍由 D-071 的 hard boundary 拒绝。选择面板显示所有已加载 preset，命令保留字 `status` 不进入注册表。
 
 **Rejected:**
 
-- **要求所有 preset 共享路径范围：** 不满足自定义策略表达独立访问空间的需求，并把操作模式与空间 scope 不必要地绑定。
-- **允许自定义 preset 覆盖内置 preset：** 会改变稳定内置语义并制造配置来源歧义。
-- **让 `status` 成为合法 preset：** 与 `/policy status` 状态命令冲突，且会使命令解析依赖额外消歧。
-- **通过 preset 解除系统 hard boundary：** 会把可配置策略误作 OS 级隔离或安全底线，违反 fail-closed 边界。
-- **把无效外置文件部分解析为可用 preset：** 会产生半配置状态和不可审计的策略组合；无效文件必须整体回退到内置 `review`。
-- **把 Policy 文件缺失视为 Gate 缺失：** 配置损坏不应关闭安全门禁，缺失或不可用文件仍保持 Gate 启用。
+- **要求所有 preset 共享路径范围：** 无法满足自定义策略表达独立访问空间的需求，不必要地绑定模式与空间范围。
+- **允许自定义 preset 覆盖内置 preset：** 破坏稳定内置语义并产生配置来源歧义。
+- **让 `status` 成为合法 preset：** 与 `/policy status` 状态命令冲突。
+- **通过 preset 解除系统 hard boundary：** 混淆可配置策略与系统安全底线，违反 fail-closed 边界。
+- **把无效外置文件部分解析为可用 preset：** 避免产生未经验证的组合状态。
+- **把 Policy 文件缺失视为 Gate 缺失：** 配置缺失仍应保持安全门禁启用。
+- **恢复旧 Profile Footer：** 产生常驻 UI 状态与展示耦合，成本高于收益。
+- **在 `/policy` 面板中支持逐项编辑策略：** 扩展为复杂策略编辑器会扩大配置校验与权限变更证明范围。
+- **无 UI 时自动选择更宽 preset：** 缺少用户显式授权，违反 fail-closed 边界。
 
-**Out of Scope:** 多个 Policy 文件、项目级配置和子代理策略；preset 继承、逐项策略编辑、旧 Profile 命令与 alias、常驻 Footer、子代理 preset 传播、网络独立授权和 OS sandbox。
+**Out of Scope:** 多个 Policy 文件、项目级配置和子代理策略；preset 继承、逐项策略编辑、旧 Profile alias、常驻 Footer、子代理 preset 传播、网络独立授权和 OS sandbox。
 
 ## D-070: 宿主凭据工件的系统硬边界与分类规则
 
@@ -792,15 +765,17 @@ Plan 使用 `Plan Slice` 作为内部执行单元。每个 Slice 承载目标、
 
 **Impact:** package skill 分发包含 `instruction-editing`；AKeel prompt 内容修改从 `AGENTS.md` 进入该方法，并应用本地 overlay。README、CONTEXT 和结构校验公开并锁定现行能力。
 
-## D-084: 测试输出的人类专用模型视图与会话持久化边界
+## D-084: 测试输出投影、正向运行器证据与会话持久化边界
 
 **Reversal surface:** user-boundary
 
-**Decision:** 测试输出维持三种相互独立的表示：session file 保存原始 `bash` tool result；模型 context 使用裁剪后的投影；TUI 在同一条模型 `bash` 工具结果中并列显示原始输出和裁剪后的模型视图。模型视图只在渲染时由纯投影函数生成，不成为 session entry、message 或 tool result details。用户 `!`/`!!` 产生的 `bashExecution` 不属于本决定。
+**Decision:** 测试输出维持三种相互独立的表示：session file 保存原始 `bash` tool result；模型 context 使用裁剪后的投影；TUI 在同一条模型 `bash` 工具结果中并列显示原始输出和裁剪后的模型视图。模型视图只在渲染时由纯投影函数生成，不成为 session entry、message 或 tool result details。用户 `!`/`!!` 产生的 `bashExecution` 保持既有行为，不裁剪、不生成模型视图。
+
+模型调用的独立 `npm test` / `npm run test` 结果只有在宿主结果明确成功、且输出包含受支持测试运行器的正向成功摘要时，才可把逐条通过输出投影为短成功消息。仅有命令返回成功（如 `exitCode === 0` 或 `isError === false`）不足以证明测试实际运行并通过；零测试、跳过、todo、警告和未识别格式保持原始结果。测试失败、取消、截断和无法可靠归类的结果继续沿用原始或失败保留路径。
 
 **Display contract:**
 
-- 仅对模型调用内置 `bash` 工具、且实际发生裁剪的独立 `npm test` / `npm run test` 结果显示模型视图，并明确标记其为发送给模型的版本。
+- 仅对模型调用内置 `bash` 工具、且实际发生裁剪的独立 `npm test` / `npm run test` 结果显示模型视图，并明确标记为发送给模型的版本。
 - 原始输出保持现有工具结果展示；取消、截断、非测试命令和不确定失败不产生模型视图。
 - 用户 `!`/`!!` 的 `bashExecution` 不裁剪、不生成模型视图，保持既有 TUI、session 和 context 行为。
 - 模型视图属于人类 TUI 展示，不通过命令打开，不追加自定义会话消息，不写入 session file，也不进入 system prompt、tool description 或模型 context。
@@ -810,41 +785,29 @@ Plan 使用 `Plan Slice` 作为内部执行单元。每个 Slice 承载目标、
 
 - 恢复会话时从原始 `toolResult` 和关联的 `bash` tool call 重新计算模型视图，不读取或保存裁剪副本。
 - 正常模型请求只接收裁剪后的 context projection。
-- 模型另行通过 `read` 或 `bash` 读取 session file 时，读取的是原始内容；能否读取仍由既有路径权限决定，该视图不提供额外保护。
+- 模型另行通过 `read` 或 `bash` 读取 session file 时读取的是原始内容，该视图不提供额外文件权限保护。
 
-**Why:** 用户需要在模型测试结果所在位置核对完整过程与模型实际收到的成果或失败信息，而不是浏览整轮上下文。保留原文、临时派生模型视图，可以避免会话文件膨胀，同时使对照内容准确对应本次模型请求。
+**Why:** 用户需要在模型测试结果所在位置核对完整过程与模型实际收到的信息，而不是浏览整轮上下文。保留原文、临时派生模型视图可避免会话文件膨胀，同时使对照内容准确对应本次请求。同时，`npm test` 可能是 no-op 或在退出码为 0 时包含跳过和警告；正向运行器摘要兼顾了成功裁剪收益与“不得把未知结果说成成功”的安全不变量。
 
-**Impact:** `context-pruner` 需要从关联的 `bash` tool call 与 `toolResult` 适配输入，再由纯投影函数完成裁剪。TUI 若显示模型视图，需要 Pi 对模型 `bash` tool result 提供不改变执行所有权的 render-only 接缝；不得通过 `bashExecution`/`BashExecutionComponent`、session entry、tool-result 内容持久化或宿主组件 monkey-patch 绕过该边界，也不改变执行、Access Gate 和现有测试输出裁剪规则。
+**Impact:** `context-pruner` 从关联的 `bash` tool call 与 `toolResult` 适配输入，由纯投影函数完成裁剪，并增加成功投影的正向证据守卫，不引入通用工具输出过滤器。通过项和普通成功噪声可以删除，但模型仍会看到明确的成功结论。测试覆盖受支持摘要、任意成功文本、零测试、跳过/todo/警告和原始消息不变性。
 
 **Rejected:**
 
-- **裁剪用户 `!`/`!!` 的 `bashExecution`：** 该路径不是模型调用的工具结果，且会改变用户命令的既有显示与 context 语义。
-- **全会话 context 预览命令：** 超出局部测试结果对照的需要。
-- **把原文和裁剪版同时放进模型 context：** 失去裁剪收益，并可能造成两份并列事实。
-- **持久化裁剪版：** 造成重复事实、会话膨胀或意外进入模型可见数据。
-- **TUI 只显示裁剪版：** 用户无法核对裁剪是否误删测试过程或诊断。
+- **裁剪用户 `!`/`!!` 的 `bashExecution`：** 改变用户命令既有显示与 context 语义。
+- **仅以 `exitCode === 0` 或 `isError === false` 判定测试通过：** 忽略跳过、未执行测试或警告。
+- **全会话 context 预览命令：** 超出局部测试结果对照需求。
+- **把原文和裁剪版同时放进模型 context：** 失去裁剪收益并造成两份并列事实。
+- **持久化裁剪版：** 造成重复事实与会话膨胀。
+- **TUI 只显示裁剪版：** 无法核对裁剪是否误删测试过程或诊断。
+- **将非测试命令纳入默认裁剪：** 扩大不确定语义修剪面。
 
 **Out of Scope:**
 
 - 用户 `!`/`!!` `bashExecution` 的输出裁剪或模型视图。
 - 通用的每轮 system prompt、tool description、provider payload 或 context message 审计器。
 - 阻止模型主动读取 session file 的新安全边界。
-- 修改测试输出分类、失败识别或保留行算法；模型成功投影的正向证据门槛由 [D-085](#d-085-测试成功投影必须具备正向运行器证据) 单独规定。
-- 通用 Runtime Content Flow；本决定只覆盖模型 `bash` 工具结果行内的人类专用模型视图。
-
-## D-085: 测试成功投影必须具备正向运行器证据
-
-**Reversal surface:** user-boundary
-
-**Decision:** 模型调用的独立 `npm test` / `npm run test` 结果只有在宿主结果明确成功、且输出包含受支持测试运行器的正向成功摘要时，才可把逐条通过输出投影为短成功消息。仅有命令返回成功或缺少失败标记，不足以证明测试实际运行并通过；零测试、跳过、todo、警告和未识别格式保持原始结果。测试失败、取消、截断和无法可靠归类的结果继续沿用原始或现有失败保留路径。
-
-**Why:** `npm test` 的脚本可以是 no-op、没有执行测试，或在退出码为 0 时仍带有需要模型注意的跳过和警告。正向运行器摘要同时保留成功裁剪收益和“不得把未知结果说成成功”的安全不变量。
-
-**Impact:** `context-pruner` 只增加成功投影的正向证据守卫，不引入通用工具输出过滤器；通过项和普通成功噪声可以删除，但模型仍会看到明确的成功结论。测试需覆盖受支持摘要、任意成功文本、零测试、跳过/todo/警告和原始消息不变性。
-
-**Rejected:** 仅以 `exitCode === 0` 或 `isError === false` 作为“所有测试通过”的证据；将 `git diff`、源码读取、JSON、HTTP、grep、find、audit、日志和通用构建输出纳入默认裁剪；把原始成功结果与投影同时送入模型上下文。
-
-**Out of Scope:** 失败输出保留算法、用户 `!`/`!!` `bashExecution`、TUI 模型视图、session 持久化边界和其他命令类型的输出裁剪。
+- 失败输出保留算法的具体调优。
+- 通用 Runtime Content Flow。
 
 ## D-086: 三个可独立安装能力包与全量分发入口
 
