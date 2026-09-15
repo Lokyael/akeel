@@ -26,8 +26,6 @@ const GIT_MODIFY = new Set([
   "stash", "format-patch", "archive", "config",
 ]);
 const GIT_HELPER_COMMANDS = new Set([
-  "add",
-  "commit",
   "push",
   "fetch",
   "pull",
@@ -306,6 +304,32 @@ export function analyzeGitProgram(args: readonly ShellWord[]): ProgramSemantic {
   const known = GIT_INSPECT.has(subcommand) || GIT_MODIFY.has(subcommand) || subcommand === "clean" || subcommand === "branch";
   if (!known) return result("unknown", [], globalPaths, { cwdChanges, opaque: true, hardBoundary: true });
   if (GIT_HELPER_COMMANDS.has(subcommand)) hardBoundary = true;
+
+  if (subcommand === "commit") {
+    const commitOptions = scanOptionWords(rest, { valueOptions: GIT_VALUE_OPTIONS });
+    const hasMessage = commitOptions.some(
+      (opt) => (opt.name === "-m" || opt.name === "--message" || opt.name === "-F" || opt.name === "--file") &&
+        opt.value !== undefined && opt.value.text.length > 0,
+    );
+    if (!hasMessage || hasUnknownOption(rest, GIT_SAFE_OPTIONS, GIT_VALUE_OPTIONS)) hardBoundary = true;
+    if (rest.some((word) =>
+      word.text === "-e" || word.text === "--edit" ||
+      word.text === "-i" || word.text === "--interactive" ||
+      word.text === "-p" || word.text === "--patch" ||
+      word.text === "-c" || word.text.startsWith("-c=") || (word.text.startsWith("-c") && word.text.length > 2),
+    )) {
+      hardBoundary = true;
+    }
+  }
+  if (subcommand === "add") {
+    if (hasUnknownOption(rest, GIT_SAFE_OPTIONS, GIT_VALUE_OPTIONS) || rest.some((word) =>
+      word.text === "-i" || word.text === "--interactive" ||
+      word.text === "-p" || word.text === "--patch" ||
+      word.text === "-e" || word.text === "--edit",
+    )) {
+      hardBoundary = true;
+    }
+  }
 
   let commandClass: ProgramSemantic["commandClass"] = GIT_INSPECT.has(subcommand) ? "inspect" : "modify";
   if (subcommand === "branch" && !rest.some((word) => ["-d", "-D", "--delete", "-f", "--force", "-m", "-M", "--move", "--rename", "-c", "-C", "--copy"].includes(word.text))) {

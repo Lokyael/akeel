@@ -55,7 +55,7 @@ test("Git helper-capable commands remain hard-boundary while inspect commands ar
     assert.equal(semantic.commandClass, "inspect", subcommand);
     assert.equal(semantic.hardBoundary, false, subcommand);
   }
-  for (const subcommand of ["add", "commit", "push", "config", "help", "grep", "blame", "gc"]) {
+  for (const subcommand of ["push", "config", "help", "grep", "blame", "gc"]) {
     const semantic = analyzeProgramCommand({ executable: "git", arguments: [word(subcommand, 0)] });
     assert.ok(semantic);
     assert.equal(semantic.hardBoundary, true, subcommand);
@@ -69,6 +69,52 @@ test("Git helper-capable commands remain hard-boundary while inspect commands ar
   const unknownGit = analyzeProgramCommand({ executable: "git", arguments: [word("mystery", 0)] });
   assert.ok(unknownGit);
   assert.equal(unknownGit.hardBoundary, true);
+});
+
+test("Git bounded add and commit commands are admitted as modify operations", () => {
+  const add = analyzeProgramCommand({ executable: "git", arguments: [word("add", 0), word("src/app.ts", 4)] });
+  assert.ok(add);
+  assert.equal(add.commandClass, "modify");
+  assert.equal(add.hardBoundary, false);
+
+  const commit = analyzeProgramCommand({
+    executable: "git",
+    arguments: [word("commit", 0), word("-m", 7), word("msg", 10)],
+  });
+  assert.ok(commit);
+  assert.equal(commit.commandClass, "modify");
+  assert.equal(commit.hardBoundary, false);
+
+  // Commit without message has hardBoundary = true
+  const commitNoMsg = analyzeProgramCommand({ executable: "git", arguments: [word("commit", 0)] });
+  assert.ok(commitNoMsg);
+  assert.equal(commitNoMsg.hardBoundary, true);
+
+  // Commit with -c has hardBoundary = true
+  const commitWithConfig = analyzeProgramCommand({
+    executable: "git",
+    arguments: [word("commit", 0), word("-c", 7), word("core.hooksPath=/tmp", 10), word("-m", 30), word("msg", 33)],
+  });
+  assert.ok(commitWithConfig);
+  assert.equal(commitWithConfig.hardBoundary, true);
+
+  const commitSkippingHooks = analyzeProgramCommand({
+    executable: "git",
+    arguments: [word("commit", 0), word("--no-verify", 7), word("-m", 19), word("msg", 22)],
+  });
+  assert.ok(commitSkippingHooks);
+  assert.equal(commitSkippingHooks.hardBoundary, true);
+
+  // Add with -p or an unmodeled option has hardBoundary = true
+  const addInteractive = analyzeProgramCommand({ executable: "git", arguments: [word("add", 0), word("-p", 4)] });
+  assert.ok(addInteractive);
+  assert.equal(addInteractive.hardBoundary, true);
+  const addUnknownOption = analyzeProgramCommand({
+    executable: "git",
+    arguments: [word("add", 0), word("--intent-to-add", 4), word("src/app.ts", 19)],
+  });
+  assert.ok(addUnknownOption);
+  assert.equal(addUnknownOption.hardBoundary, true);
 });
 
 test("Git rm is a destructive operation", () => {

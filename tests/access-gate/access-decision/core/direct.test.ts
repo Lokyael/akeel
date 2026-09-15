@@ -583,3 +583,43 @@ test("Direct edit rejects modifications in a blocked component", () => {
     hasUI: false,
   }), { kind: "deny", code: "hard-boundary" });
 });
+
+test("Direct write and edit reject modifications to Git control artifacts even under allowing policy", () => {
+  const service = testService({
+    read: "allow",
+    write: "allow",
+    edit: "allow",
+    allowedRoots: ["/workspace/project"],
+  });
+
+  for (const relativePath of [
+    ".git/hooks/pre-commit",
+    ".husky/pre-commit",
+    ".githooks/pre-commit",
+    ".lefthook/pre-commit",
+    ".git/config",
+    ".gitattributes",
+    ".pre-commit-config.yaml",
+  ]) {
+    assert.deepEqual(service.decide({
+      surface: "write",
+      arguments: { path: relativePath, content: "#!/bin/sh\nexit 0\n" },
+      cwd: "/workspace/project",
+      hasUI: false,
+    }), { kind: "deny", code: "hard-boundary" }, `write to ${relativePath}`);
+
+    assert.deepEqual(service.decide({
+      surface: "edit",
+      arguments: { path: relativePath, edits: [{ oldText: "a", newText: "b" }] },
+      cwd: "/workspace/project",
+      hasUI: false,
+    }), { kind: "deny", code: "hard-boundary" }, `edit to ${relativePath}`);
+  }
+
+  assert.deepEqual(service.decide({
+    surface: "read",
+    arguments: { path: ".gitattributes" },
+    cwd: "/workspace/project",
+    hasUI: false,
+  }), { kind: "allow" });
+});

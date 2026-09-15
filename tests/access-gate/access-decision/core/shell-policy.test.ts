@@ -238,7 +238,7 @@ test("unknown Git commands remain hard-boundary without a path policy", () => {
 });
 
 test("path-form Git helper boundaries cannot be widened by execute policy", () => {
-  assert.deepEqual(evaluateShellAdmission(admission("/usr/bin/git commit -m msg"), freezeShellPolicySnapshot({
+  assert.deepEqual(evaluateShellAdmission(admission("/usr/bin/git push"), freezeShellPolicySnapshot({
     ...policy,
     execute: "allow",
     blockedPaths: [],
@@ -546,9 +546,47 @@ test("Git inspect commands are admitted under develop and review while helper co
     }, command);
   }
 
+  for (const command of ["git commit -m message", "git add src/app.ts"]) {
+    assert.deepEqual(evaluateShellAdmission(admission(command), develop), {
+      kind: "allow",
+    }, command);
+    assert.deepEqual(evaluateShellAdmission(admission(command), review), {
+      kind: "deny",
+      code: "policy-denied",
+    }, command);
+  }
+
+  const guided = freezeShellPolicySnapshot({
+    ...policy,
+    inspect: "allow",
+    modify: "ask",
+    execute: "ask",
+    opaque: "ask",
+    allowedRoots: ["/workspace/project"],
+    blockedRoots: [],
+  });
+  for (const command of ["git commit -m message", "git add src/app.ts"]) {
+    assert.deepEqual(evaluateShellAdmission(admission(command, true), guided), {
+      kind: "ask",
+      executed: false,
+    }, command);
+  }
+
   for (const command of [
-    "git commit -m message",
-    "git add src/app.ts",
+    "git commit",
+    "git commit -p -m message",
+    "git commit -e -m message",
+    "git commit -c core.hooksPath=/tmp -m message",
+    "git add -p src/app.ts",
+    "git add -i",
+  ]) {
+    assert.deepEqual(evaluateShellAdmission(admission(command), develop), {
+      kind: "deny",
+      code: "hard-boundary",
+    }, command);
+  }
+
+  for (const command of [
     "git push file:///workspace/project/remote main",
     "git config --list",
     "git grep --textconv pattern",
@@ -642,11 +680,11 @@ test("Git helper boundaries win over canonical command-local repository paths", 
   });
 
   for (const command of [
-    "git --git-dir .git commit -m msg",
-    "git --git-dir=/workspace/project/.git commit -m msg",
-    "git --work-tree subdir commit -m msg",
-    "git -C subdir --git-dir=../.git commit -m msg",
-    "git -C subdir --work-tree=. commit -m msg",
+    "git --git-dir .git push",
+    "git --git-dir=/workspace/project/.git push",
+    "git --work-tree subdir push",
+    "git -C subdir --git-dir=../.git push",
+    "git -C subdir --work-tree=. push",
   ]) {
     assert.deepEqual(evaluateShellAdmission(admission(command), scoped), {
       kind: "deny",
@@ -690,7 +728,7 @@ test("Git helper boundaries win over command-local paths", () => {
     blockedRoots: [],
   });
 
-  for (const command of ["git -C subdir commit -m msg", "git -Csubdir push", "git -C subdir -C nested commit -m msg"]) {
+  for (const command of ["git -C subdir push", "git -Csubdir push", "git -C subdir -C nested push"]) {
     assert.deepEqual(evaluateShellAdmission(admission(command), scoped), {
       kind: "deny",
       code: "hard-boundary",
@@ -982,4 +1020,41 @@ test("herdr commands follow policy classification and path boundaries", () => {
     kind: "deny",
     code: "policy-denied",
   });
+});
+
+test("Shell write and modification reject Git control artifacts even under allowing policy", () => {
+  const develop = freezeShellPolicySnapshot({
+    ...policy,
+    read: "allow",
+    write: "allow",
+    modify: "allow",
+    execute: "allow",
+    opaque: "allow",
+    unknown: "ask",
+    allowedRoots: ["/workspace/project"],
+    blockedRoots: [],
+  });
+
+  for (const command of [
+    "echo '#!/bin/sh' > .husky/pre-commit",
+    "echo '#!/bin/sh' > .git/hooks/pre-commit",
+    "echo '* filter=evil' > .gitattributes",
+    "cp /workspace/project/script.sh .husky/pre-commit",
+    "cp /workspace/project/script.sh .git/hooks/pre-commit",
+  ]) {
+    assert.deepEqual(evaluateShellAdmission(admission(command), develop), {
+      kind: "deny",
+      code: "hard-boundary",
+    }, command);
+  }
+
+  // Reading Git control artifacts remains allowed under develop
+  for (const command of [
+    "cat .husky/pre-commit",
+    "cat .gitattributes",
+  ]) {
+    assert.deepEqual(evaluateShellAdmission(admission(command), develop), {
+      kind: "allow",
+    }, command);
+  }
 });

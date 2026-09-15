@@ -227,6 +227,30 @@ function credentialArtifact(path: string, roots: readonly string[]): boolean {
   });
 }
 
+function gitControlArtifact(path: string): boolean {
+  if (
+    /(?:^|\/)\.git\/hooks(?:\/|$)/u.test(path) ||
+    /(?:^|\/)\.husky(?:\/|$)/u.test(path) ||
+    /(?:^|\/)\.githooks(?:\/|$)/u.test(path) ||
+    /(?:^|\/)\.lefthook(?:\/|$)/u.test(path) ||
+    /(?:^|\/)\.git\/config(?:\.[^/]+|\/|$)/u.test(path)
+  ) {
+    return true;
+  }
+  const basename = path.slice(path.lastIndexOf("/") + 1);
+  return (
+    basename === ".gitattributes" ||
+    basename === ".pre-commit-config.yaml" ||
+    basename === "lefthook.yml" ||
+    basename === ".lefthook.yml"
+  );
+}
+
+function pathHitsGitControlArtifact(path: ResolvedPathEvidence): boolean {
+  return gitControlArtifact(path.candidate) ||
+    path.traversed.some((candidate) => gitControlArtifact(candidate));
+}
+
 export function authorizeAdmission(
   admission: unknown,
   boundaries: unknown,
@@ -246,6 +270,7 @@ function authorizeDirect(
   policy: UnifiedPolicySnapshot,
 ): AuthorizationVerdict {
   if (pathHitsMandatoryBoundary(facts.path, mandatory, policy.paths) ||
+    ((facts.operation === "write" || facts.operation === "edit") && pathHitsGitControlArtifact(facts.path)) ||
     facts.operation === "search" && (
       recursiveSearchReachesBlockedPath(facts.path.candidate, policy.paths) ||
       recursiveSearchReachesCredentialRoot(facts.path.candidate, mandatory.credentialRoots)
@@ -261,8 +286,10 @@ function authorizeShell(
   policy: UnifiedPolicySnapshot,
 ): AuthorizationVerdict {
   for (const operation of facts.operations) {
+    const isModifying = operation.effects.includes("write") || operation.effects.includes("delete");
     if (operation.commandClass === "destroy" || operation.effects.includes("delete") || operation.hardBoundary ||
       operation.paths.some((path) => pathHitsMandatoryBoundary(path.evidence, mandatory, policy.paths)) ||
+      (isModifying && operation.paths.some((path) => pathHitsGitControlArtifact(path.evidence))) ||
       operation.recursive && operation.paths.some((path) =>
         recursiveSearchReachesBlockedPath(path.evidence.candidate, policy.paths) ||
         recursiveSearchReachesCredentialRoot(path.evidence.candidate, mandatory.credentialRoots)
@@ -270,6 +297,7 @@ function authorizeShell(
       return Object.freeze({ kind: "deny", code: "hard-boundary" });
     }
   }
+
   const modes: AuthorizationMode[] = [];
   for (const operation of facts.operations) {
     for (const effect of operation.effects) {
