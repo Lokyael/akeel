@@ -305,5 +305,14 @@
 - **Revisit condition:** 出现外部消费者依赖当前 trace、现有测试或诊断因缺少稳定观测接缝而无法满足真实需求，或用户明确要求重新评估该 trace seam。
 - **Out of Scope:** 在本候选被明确采纳前，不承诺稳定事件 schema、运行时审计日志、session entry、LLM context 注入、Policy 数据暴露、TUI renderer 改造或实现 Task；C-040 的 Pi render-only tool-result renderer 仍是独立候选。
 
-## C-043: 待创建
+## C-043: Path-form Git 本地变更的边界复核
+
+> 本条记录 Access Gate 中 path-form Git 可执行文件与有界本地 `add`/`commit` 语义之间的独立边界问题；不改变当前准入行为，不构成实现承诺。
+
+- **Why Not Now:** D-067 当前规定含 `/` 的可执行文件不因 basename 获得已知程序语义，而本地 `git add`/`git commit` 已从 helper hard boundary 转为有界 `modify`。两条规则组合后，`/usr/bin/git add ...` 或 `/usr/bin/git commit -m ...` 可能落入 `opaque execute`，在允许 opaque 的策略下绕过有界 Git 语义。该问题需要重新决定 path-form Git 的安全边界，不能通过局部测试调整或默认策略说明静默解决。
+- **Exploration Direction:** 在不放宽 `git push`、`fetch`、`pull`、`remote`、`config` 等网络/配置边界的前提下，比较：①对 path-form Git 本地变更保持 hard boundary；②为 path-form Git 建立独立、可证明且不伪造路径事实的语义合同；③维持 opaque 语义并明确其对本地 Git 变更的残余风险。复核必须覆盖 `add`、`commit -m/-F`、交互/未建模选项、wrapper、`opaque` preset、控制面写保护以及裸名与 path-form 的一致性。
+- **Revisit condition:** 真实工作流需要绝对路径调用 Git 本地变更，或出现 path-form Git 绕过有界语义的安全/误操作证据；也可由用户明确启动该边界复核。
+- **Out of Scope:** 不在本候选中放行 `fetch`/`push` 或其他网络操作；不处理 Hook 依赖脚本、全局 Git 配置、`.git/info/attributes` 等更广泛的 Hook 信任链；不修改 D-067、不创建实现 Task，除非候选被用户明确采纳。
+
+## C-044: 待创建
 
