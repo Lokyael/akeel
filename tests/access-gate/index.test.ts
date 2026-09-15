@@ -38,7 +38,7 @@ async function invoke(
 test("production extension registers only the new decision composition", async () => {
   await withAgentFiles(undefined, undefined, async (_agentDir, harness) => {
     assert.equal(harness.commands.has("profile"), false);
-    assert.equal(harness.hasFooterFactory(), false);
+    assert.equal(harness.getStatus("akeel-policy"), undefined);
     assert.equal(harness.handlers.has("session_start"), true);
     assert.equal(harness.handlers.has("session_shutdown"), true);
   });
@@ -172,77 +172,52 @@ test("session start reloads updated policy.yaml from agent directory", async () 
   });
 });
 
-test("synchronizes active policy badge into 2-line footer decorator without extra statusline", async () => {
+test("publishes the active policy badge through the host status API", async () => {
   await withAgentFiles(undefined, undefined, async (_agentDir, harness) => {
-    assert.equal(harness.hasFooterFactory(), false);
     assert.equal(harness.getStatus("akeel-policy"), undefined);
 
     await harness.handlers.get("session_start")!(undefined, harness.ctx);
-    assert.equal(harness.hasFooterFactory(), true);
-    assert.equal(harness.getStatus("akeel-policy"), undefined);
-
-    let lines = harness.renderFooter(120);
-    assert.equal(lines.length, 2);
-    assert.match(lines[0]!, /🛡️ R$/);
+    assert.equal(harness.getStatus("akeel-policy"), "🛡️ R");
 
     const policyCommand = harness.commands.get("policy");
     assert.ok(policyCommand, "policy command must be registered");
 
     await policyCommand("develop", harness.ctx);
-    lines = harness.renderFooter(120);
-    assert.equal(lines.length, 2);
-    assert.match(lines[0]!, /🛡️ D$/);
+    assert.equal(harness.getStatus("akeel-policy"), "🛡️ D");
 
     await policyCommand("guided", harness.ctx);
-    lines = harness.renderFooter(120);
-    assert.equal(lines.length, 2);
-    assert.match(lines[0]!, /🛡️ G$/);
+    assert.equal(harness.getStatus("akeel-policy"), "🛡️ G");
 
     await harness.handlers.get("session_shutdown")!(undefined, harness.ctx);
-    assert.equal(harness.hasFooterFactory(), false);
+    assert.equal(harness.getStatus("akeel-policy"), undefined);
   });
 });
 
-test("reflects off mode in 2-line footer decorator and can enable gate via /policy", async () => {
+test("publishes off mode through the host status API and can re-enable the gate", async () => {
   await withAgentFiles("accessGate: off\n", undefined, async (_agentDir, harness) => {
     await harness.handlers.get("session_start")!(undefined, harness.ctx);
-    assert.equal(harness.hasFooterFactory(), true);
-    assert.equal(harness.getStatus("akeel-policy"), undefined);
+    assert.equal(harness.getStatus("akeel-policy"), "🛡️ off");
 
-    let lines = harness.renderFooter(120);
-    assert.equal(lines.length, 2);
-    assert.match(lines[0]!, /🛡️ off$/);
-
-    // 在 off 模式下，工具调用直接放行
     assert.equal(await invoke(harness, { toolName: "write", input: { path: "notes.md", content: "hello" } }), undefined);
 
-    // 通过 /policy develop 动态启用 Access Gate
     const policyCommand = harness.commands.get("policy");
     assert.ok(policyCommand);
-
     await policyCommand("develop", harness.ctx);
-    lines = harness.renderFooter(120);
-    assert.match(lines[0]!, /🛡️ D$/);
+    assert.equal(harness.getStatus("akeel-policy"), "🛡️ D");
 
-    // 此时 Gate 已启用，受 develop 规则管辖
     harness.setConfirmResult(true);
     assert.equal(await invoke(harness, { toolName: "read", input: { path: "README.md" } }), undefined);
 
-    // 再通过 /policy off 关闭门禁
-    harness.setConfirmResult(true);
     await policyCommand("off", harness.ctx);
-    lines = harness.renderFooter(120);
-    assert.match(lines[0]!, /🛡️ off$/);
-
-    // 恢复 passthrough
+    assert.equal(harness.getStatus("akeel-policy"), "🛡️ off");
     assert.equal(await invoke(harness, { toolName: "write", input: { path: "notes.md", content: "again" } }), undefined);
 
     await harness.handlers.get("session_shutdown")!(undefined, harness.ctx);
-    assert.equal(harness.hasFooterFactory(), false);
+    assert.equal(harness.getStatus("akeel-policy"), undefined);
   });
 });
 
-test("supports custom preset badges and disambiguation in 2-line footer decorator", async () => {
+test("publishes custom preset badges through the host status API", async () => {
   const policy = [
     "presets:",
     "  custom-work:",
@@ -261,38 +236,15 @@ test("supports custom preset badges and disambiguation in 2-line footer decorato
 
   await withAgentFiles(policy, undefined, async (_agentDir, harness) => {
     await harness.handlers.get("session_start")!(undefined, harness.ctx);
-    let lines = harness.renderFooter(120);
-    assert.equal(lines.length, 2);
-    assert.match(lines[0]!, /🛡️ CW$/);
+    assert.equal(harness.getStatus("akeel-policy"), "🛡️ CW");
 
     const policyCommand = harness.commands.get("policy");
     assert.ok(policyCommand);
 
     await policyCommand("audit-one", harness.ctx);
-    lines = harness.renderFooter(120);
-    assert.equal(lines.length, 2);
-    assert.match(lines[0]!, /🛡️ AO$/);
+    assert.equal(harness.getStatus("akeel-policy"), "🛡️ AO");
 
     await policyCommand("audit-two", harness.ctx);
-    lines = harness.renderFooter(120);
-    assert.equal(lines.length, 2);
-    assert.match(lines[0]!, /🛡️ AT$/);
-  });
-});
-
-test("chains and preserves downstream plugin footers while maintaining 2 lines", async () => {
-  await withAgentFiles(undefined, undefined, async (_agentDir, harness) => {
-    await harness.handlers.get("session_start")!(undefined, harness.ctx);
-
-    // 模拟第三方插件在 AKeel 之后调用 setFooter
-    harness.ctx.ui.setFooter((_tui, _theme, _data) => ({
-      render: (_w: number) => ["CustomPluginLine1", "CustomPluginLine2"],
-      invalidate: () => {},
-    }));
-
-    const lines = harness.renderFooter(120);
-    assert.equal(lines.length, 2);
-    assert.match(lines[0]!, /^CustomPluginLine1\s+🛡️ R$/);
-    assert.equal(lines[1], "CustomPluginLine2");
+    assert.equal(harness.getStatus("akeel-policy"), "🛡️ AT");
   });
 });

@@ -357,7 +357,7 @@ Task 是实质活动工作的权威输入；若创建与清档都发生在未提
 - **新旧 parity shadow：** 旧输出不是权威 oracle；一致只能证明复刻，不能证明语义正确。
 - **逐层生产切换：** 新旧 compiler/kernel/config 的混搭没有整体信任证明。
 
-**Out of Scope:** 旧 API、旧模块路径、旧 config/Profile schema、旧测试 helper 和旧 integration；Static Flow、Explanation Replay、Runtime Audit、Runtime Content Flow；不参与当前决策信任链的 Footer、Session 和子代理内部行为。
+**Out of Scope:** 旧 API、旧模块路径、旧 config/Profile schema、旧测试 helper 和旧 integration；Static Flow、Explanation Replay、Runtime Audit、Runtime Content Flow；不参与当前决策信任链的 Session 和子代理内部行为。
 
 ## D-060: 受保护 Canonical 制品、窄 Admission 投影与有界求值
 
@@ -415,7 +415,7 @@ Canonical reject 使用本域封闭 code、source anchor 与资源分类；rende
 
 **Why:** 某些工作流需要保留工程原则与按需技能，但不希望 AKeel 对工具调用施加操作准入。将默认选择放在全局 `policy.yaml` 中，并在会话内支持受控的双向热切换，兼顾了灵活性与重启后的安全基线复原。
 
-**Impact:** Access Gate 处于 `off` 期间，不对 Direct/Shell 操作执行准入或路径检查；Footer 徽标显示为 `🛡️ off`。通过 `/policy <preset>` 启用 Gate 时原子装配 Session 并恢复准入。
+**Impact:** Access Gate 处于 `off` 期间，不对 Direct/Shell 操作执行准入或路径检查；宿主 status 显示为 `🛡️ off`。通过 `/policy <preset>` 启用 Gate 时原子装配 Session 并恢复准入。
 
 **Rejected:**
 
@@ -469,11 +469,11 @@ Canonical reject 使用本域封闭 code、source anchor 与资源分类；rende
 
 **Policy file loading:** 用户全局 Policy 输入固定为 `$PI_CODING_AGENT_DIR/akeel/policy.yaml`，默认目录为 `~/.pi/agent`。flat `paths`/`commands` 形式表示使用完整定义的单一静态 policy，不提供 preset registry 或会话切换；具名 `presets` 形式以三个内置 preset 为注册表基础，并可增加合法的完整自定义 preset。自定义 preset 允许可选 `badge` 字段自定义 1~4 字符短码，未指定时按 kebab-case 首字母或前缀确定性消歧。外置文件缺失、为空、格式/schema 错误、根非 mapping、必需字段缺失或其他不可用状态时，整体忽略并使用内置 `review` 基线，不部分采用无效内容。唯一合法的 `accessGate: off` 形式及其运行时语义由 D-066 规定。
 
-**User interaction surface:** 在原生 TUI 模式下，`/policy` 无参数打开临时的 Policy Preset 选择面板，供用户选择当前已加载的内置或自定义 preset，以及 `off` 模式。用户完成选择并确认后，runtime 按会话边界原子替换不可变 Policy Snapshot 并触发 UI 重绘；取消、关闭或无效选择保持当前策略不变。`/policy <preset>` 显式切换入口与 `/policy status` 状态查询保留。状态显示采用链式 Footer 装饰器：将紧凑 Badge（如 `🛡️ R`、`🛡️ G`、`🛡️ D`、自定义 badge 或消歧短码，关闭时为 `🛡️ off`）右对齐合成进原生第 1 行末尾，严格保持 2 行高度，并链式保留下游插件的 Footer 输出。非 TUI 模式下 `/policy` 不打开原生面板，提供状态查询或静态使用提示。交互面板与状态显示均为 human-only UI。
+**User interaction surface:** 原生 TUI 中，`/policy` 无参数打开临时选择面板，供用户选择已加载的 preset 或 `off`；确认后通过宿主公开的 `ui.setStatus` 同步策略 Badge（如 `🛡️ R`、`🛡️ G`、`🛡️ D`、自定义 badge 或消歧短码，关闭时为 `🛡️ off`），会话结束时清除。取消或无效选择保持不变。`/policy <preset>` 与 `/policy status` 保留；非 TUI 模式不打开面板。交互与状态均为 human-only UI。
 
-**Why:** 固定的三个内置定位提供稳定、无需配置的默认选择；自定义 preset 支持真实工作流的权限和空间差异，而不迫使用户修改内置语义。允许 preset-specific scope 满足空间隔离需求；将系统 hard boundary 与 preset scope 分层，避免策略配置削弱安全底线。对不可用外置文件整体回退到内置 `review`，避免配置损坏导致半配置或意外关闭门禁。链式 Footer 装饰器将紧凑徽标并入第 1 行末尾并锁定严格 2 行，既避免了新增独立状态行挤压垂直空间，又通过链式委托避免破坏其他插件对 Footer 的修改。
+**Why:** 固定的三个内置定位提供稳定、无需配置的默认选择；自定义 preset 支持独立的权限和空间范围。系统 hard boundary 始终优先；无效外置文件整体回退到内置 `review`。使用宿主公开的 `ui.setStatus` 发布 Badge，避免引入额外的宿主 UI 依赖。
 
-**Impact:** policy adapter 将内置定义与合法用户 preset 合并为一个注册表并发行独立 snapshot；schema 接受合法自定义名称和独立 scope，同时保留内置声明兼容形式。Policy loader 对外置文件采用整体有效性判定，无效时不产生部分 snapshot，也不激活 off 模式。`destroy: allow` 是合法配置值但不产生授权，仍由 D-071 的 hard boundary 拒绝。选择面板显示所有已加载 preset，命令保留字 `status` 不进入注册表。运行时在会话生命周期与策略切换时维护链式 Footer 并实时重绘。
+**Impact:** policy adapter 将内置定义与合法用户 preset 合并为注册表并发行 snapshot；schema 接受合法自定义名称和独立 scope。无效外置文件整体回退到内置 `review`；`destroy: allow` 仍受 D-071 的 hard boundary 拒绝。
 
 **Rejected:**
 
@@ -483,12 +483,10 @@ Canonical reject 使用本域封闭 code、source anchor 与资源分类；rende
 - **通过 preset 解除系统 hard boundary：** 混淆可配置策略与系统安全底线，违反 fail-closed 边界。
 - **把无效外置文件部分解析为可用 preset：** 避免产生未经验证的组合状态。
 - **把 Policy 文件缺失视为 Gate 缺失：** 配置缺失仍应保持安全门禁启用。
-- **恢复旧 Profile Footer（破坏性覆盖）：** 产生独占式常驻 UI 状态、多行占用与展示耦合，破坏其他插件排版；当前使用链式合成装饰器严格锁定 2 行并保留下游插件。
-- **使用 `ui.setStatus` 状态行：** 宿主会单独开辟第 3 行，破坏紧凑 2 行布局。
 - **在 `/policy` 面板中支持逐项编辑策略：** 扩展为复杂策略编辑器会扩大配置校验与权限变更证明范围。
 - **无 UI 时自动选择更宽 preset：** 缺少用户显式授权，违反 fail-closed 边界。
 
-**Out of Scope:** 多个 Policy 文件、项目级配置和子代理策略；preset 继承、逐项策略编辑、旧 Profile alias、独占式自定义 Footer、子代理 preset 传播、网络独立授权和 OS sandbox。
+**Out of Scope:** 多个 Policy 文件、项目级配置和子代理策略；preset 继承、逐项策略编辑、旧 Profile alias、子代理 preset 传播、网络独立授权和 OS sandbox。
 
 ## D-070: 宿主凭据工件的系统硬边界与分类规则
 

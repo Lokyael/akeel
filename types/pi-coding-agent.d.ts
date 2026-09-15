@@ -1,22 +1,4 @@
 declare module "@earendil-works/pi-coding-agent" {
-  export interface TUI {
-    requestRender(force?: boolean): void;
-  }
-
-  export interface FooterTheme {
-    fg(color: string, text: string): string;
-  }
-
-  export interface FooterDataProvider {
-    getGitBranch(): string | null;
-    getExtensionStatuses?(): ReadonlyMap<string, string>;
-  }
-
-  export interface FooterComponent {
-    render(width: number): string[];
-    invalidate(): void;
-  }
-
   export interface SessionManager {
     getSessionId(): string;
     getCwd(): string;
@@ -36,11 +18,6 @@ declare module "@earendil-works/pi-coding-agent" {
     select(prompt: string, options: string[], settings?: unknown): Promise<string | undefined>;
     notify(message: string, level?: "info" | "warning" | "error"): void;
     setStatus(id: string, text: string | undefined): void;
-    setFooter(
-      factory:
-        | ((tui: TUI, theme: FooterTheme, footerData: FooterDataProvider) => FooterComponent)
-        | undefined,
-    ): void;
   }
 
   export interface ExtensionContext {

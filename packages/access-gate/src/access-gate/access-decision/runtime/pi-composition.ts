@@ -35,64 +35,6 @@ type SessionProject = Readonly<{
   readonly dispose?: () => void;
 }>;
 
-interface FooterTheme {
-  fg(color: string, text: string): string;
-}
-
-interface FooterDataProvider {
-  getGitBranch(): string | null;
-  getExtensionStatuses?(): ReadonlyMap<string, string>;
-}
-
-interface FooterComponent {
-  render(width: number): string[];
-  invalidate(): void;
-}
-
-type NativeFooterConstructor = new (session: unknown, footerData: unknown) => FooterComponent;
-
-let NativeFooter: NativeFooterConstructor | undefined;
-try {
-  const piModule = await import("@earendil-works/pi-coding-agent");
-  NativeFooter = (piModule as { FooterComponent?: NativeFooterConstructor }).FooterComponent;
-} catch {
-  NativeFooter = undefined;
-}
-
-function stripAnsi(text: string): string {
-  return text.replace(/\x1b\[[0-?]*[ -/]*[@-~]/g, "");
-}
-
-function visibleWidth(text: string): number {
-  return stripAnsi(text).length;
-}
-
-function truncateText(text: string, maxWidth: number): string {
-  if (maxWidth <= 0) return "";
-  const plain = stripAnsi(text);
-  if (plain.length <= maxWidth) return text;
-  if (maxWidth <= 3) return plain.slice(0, maxWidth);
-  return `${plain.slice(0, maxWidth - 3)}...`;
-}
-
-function appendBadgeRight(left: string, badge: string, width: number): string {
-  if (width <= 0) return "";
-  const badgeLen = visibleWidth(badge);
-  if (badgeLen >= width) return badge.slice(0, width);
-
-  const leftLen = visibleWidth(left);
-  const availableLeft = width - badgeLen - 2;
-
-  if (leftLen <= availableLeft) {
-    const padding = " ".repeat(Math.max(1, width - leftLen - badgeLen));
-    return `${left}${padding}${badge}`;
-  }
-
-  const truncatedLeft = truncateText(left, availableLeft);
-  const padding = " ".repeat(Math.max(1, width - visibleWidth(truncatedLeft) - badgeLen));
-  return `${truncatedLeft}${padding}${badge}`;
-}
-
 const INITIALIZATION_FAILURE_REASON = "Blocked because the decision service is not initialized.";
 const BUILTIN_POLICY_PRESET_LABELS: Readonly<Record<string, string>> = Object.freeze({
   review: "review — Read-only review",
@@ -177,11 +119,6 @@ function installComposition(
   let project: ProjectLifecycle | undefined;
   let sessionHome: string | undefined;
   let currentConfiguration: DecodedPolicyConfiguration | undefined = policyProvider();
-  let currentTui: { requestRender: () => void } | undefined;
-  let downstreamFooterFactory:
-    | ((tui: unknown, theme: FooterTheme, footerData: FooterDataProvider) => FooterComponent)
-    | undefined = undefined;
-  let restoreOriginalSetFooter: (() => void) | undefined = undefined;
   const pathEvidence = createLinuxPathEvidence();
   const protectedRoots = credentialRoots(agentDir);
 
@@ -192,96 +129,9 @@ function installComposition(
     return formatPolicyBadge(policyStatus(currentConfiguration, session), currentConfiguration);
   }
 
-  function fallbackFooterLines(context: any, footerData: FooterDataProvider): string[] {
-    const branch = footerData.getGitBranch?.();
-    const branchStr = branch ? ` (${branch})` : "";
-    const cwd = context.sessionManager?.getCwd?.() ?? context.cwd ?? "";
-    const sessionName = context.sessionManager?.getSessionName?.();
-    const nameStr = sessionName ? ` • ${sessionName}` : "";
-    return [`${cwd}${branchStr}${nameStr}`, ""];
-  }
-
-  function setupChainedFooter(context: any): void {
-    if (!context.ui?.setFooter) return;
-
-    context.ui.setStatus?.(POLICY_STATUS_ID, undefined);
-
-    const originalSetFooter = context.ui.setFooter.bind(context.ui);
-
-    function compositeFactory(tui: any, theme: FooterTheme, footerData: FooterDataProvider): FooterComponent {
-      currentTui = tui;
-      let downstreamComponent: FooterComponent | undefined;
-      if (downstreamFooterFactory) {
-        try {
-          downstreamComponent = downstreamFooterFactory(tui, theme, footerData);
-        } catch {
-          downstreamComponent = undefined;
-        }
-      }
-
-      let nativeFooter: FooterComponent | undefined;
-      if (!downstreamComponent && NativeFooter) {
-        try {
-          nativeFooter = new NativeFooter(
-            {
-              get state() {
-                return { model: context.model, thinkingLevel: "" };
-              },
-              sessionManager: context.sessionManager,
-              getContextUsage: () => context.getContextUsage?.(),
-              modelRuntime: { isUsingOAuth: () => false, isUsingSubscription: () => false },
-            },
-            footerData,
-          );
-        } catch {
-          nativeFooter = undefined;
-        }
-      }
-
-      return {
-        render(width: number): string[] {
-          let baseLines: string[];
-          if (downstreamComponent) {
-            baseLines = downstreamComponent.render(width);
-          } else if (nativeFooter) {
-            baseLines = nativeFooter.render(width);
-          } else {
-            baseLines = fallbackFooterLines(context, footerData);
-          }
-
-          const badge = currentBadge();
-          const line0 = appendBadgeRight(baseLines[0] ?? "", badge, width);
-          const line1 = baseLines[1] ?? "";
-          return [line0, line1];
-        },
-        invalidate(): void {
-          downstreamComponent?.invalidate();
-          nativeFooter?.invalidate();
-        },
-      };
-    }
-
-    context.ui.setFooter = (factory: any) => {
-      if (factory === compositeFactory) {
-        originalSetFooter(factory);
-        return;
-      }
-      downstreamFooterFactory = factory;
-      originalSetFooter(compositeFactory);
-    };
-
-    originalSetFooter(compositeFactory);
-    restoreOriginalSetFooter = () => {
-      context.ui.setFooter = originalSetFooter;
-      originalSetFooter(downstreamFooterFactory ?? undefined);
-    };
-  }
-
-  function teardownChainedFooter(): void {
-    restoreOriginalSetFooter?.();
-    restoreOriginalSetFooter = undefined;
-    downstreamFooterFactory = undefined;
-    currentTui = undefined;
+  function syncPolicyStatus(context: any): void {
+    const status = currentConfiguration === undefined ? undefined : currentBadge();
+    context.ui?.setStatus?.(POLICY_STATUS_ID, status);
   }
 
   function activatePresetOrOff(name: string, context: any): boolean {
@@ -356,7 +206,7 @@ function installComposition(
       if (!confirmed) return;
     }
     activatePresetOrOff("off", context);
-    currentTui?.requestRender();
+    syncPolicyStatus(context);
     notifyPolicy(context, "Access Gate turned off for this session. Tools will passthrough.", "warning");
   }
 
@@ -384,7 +234,7 @@ function installComposition(
         }
 
         if (activatePresetOrOff(selectedPreset, context)) {
-          currentTui?.requestRender();
+          syncPolicyStatus(context);
           notifyPolicy(context, `Active AKeel policy: ${policyStatus(currentConfiguration, session)}.`);
         } else {
           notifyPolicy(context, "Unknown AKeel policy preset selection.", "error");
@@ -403,7 +253,7 @@ function installComposition(
       }
 
       if (activatePresetOrOff(requested, context)) {
-        currentTui?.requestRender();
+        syncPolicyStatus(context);
         notifyPolicy(context, `Active AKeel policy: ${policyStatus(currentConfiguration, session)}.`);
       } else {
         notifyPolicy(context, `Unknown AKeel policy preset: ${requested}.`, "error");
@@ -414,7 +264,7 @@ function installComposition(
   pi.on("session_start", (_event, context) => {
     session?.close();
     project?.dispose();
-    teardownChainedFooter();
+    context.ui?.setStatus?.(POLICY_STATUS_ID, undefined);
     session = undefined;
     project = undefined;
     sessionHome = captureSessionHome();
@@ -423,8 +273,7 @@ function installComposition(
       return;
     }
     if (currentConfiguration.kind === "off") {
-      setupChainedFooter(context);
-      currentTui?.requestRender();
+      syncPolicyStatus(context);
       return;
     }
     try {
@@ -439,8 +288,7 @@ function installComposition(
         configuration: currentConfiguration,
         pathEvidence,
       });
-      setupChainedFooter(context);
-      currentTui?.requestRender();
+      syncPolicyStatus(context);
     } catch {
       session = undefined;
       project?.dispose();
@@ -451,7 +299,6 @@ function installComposition(
   pi.on("session_shutdown", (_event, context) => {
     session?.close();
     project?.dispose();
-    teardownChainedFooter();
     context.ui?.setStatus?.(POLICY_STATUS_ID, undefined);
     session = undefined;
     project = undefined;
