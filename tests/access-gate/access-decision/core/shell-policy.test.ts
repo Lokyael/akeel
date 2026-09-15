@@ -517,6 +517,35 @@ test("recursive grep without an explicit path checks the current directory", () 
   }
 });
 
+test("trusted path-form Git mutations retain path and helper boundaries", () => {
+  const develop = freezeShellPolicySnapshot({
+    ...policy,
+    inspect: "allow",
+    modify: "allow",
+    execute: "allow",
+    opaque: "allow",
+    unknown: "allow",
+    allowedRoots: ["/workspace/project"],
+    blockedRoots: [],
+  });
+
+  assert.deepEqual(evaluateShellAdmission(admission("/usr/bin/git add .git/hooks/pre-commit"), develop), {
+    kind: "deny",
+    code: "hard-boundary",
+  });
+  assert.deepEqual(evaluateShellAdmission(admission("/bin/git commit --file .git/config"), develop), {
+    kind: "deny",
+    code: "hard-boundary",
+  });
+  assert.deepEqual(evaluateShellAdmission(admission("/usr/bin/git add src/app.ts"), develop), {
+    kind: "allow",
+  });
+  assert.deepEqual(evaluateShellAdmission(admission("/usr/bin/git push origin main"), develop), {
+    kind: "deny",
+    code: "hard-boundary",
+  });
+});
+
 test("Git inspect commands are admitted under develop and review while helper commands remain hard-boundary", () => {
   const develop = freezeShellPolicySnapshot({
     ...policy,

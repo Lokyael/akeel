@@ -1,4 +1,5 @@
 import type { ShellWord } from "../language";
+import { analyzeFindProgram, analyzeFindProgramInvocation } from "./find";
 import { analyzeGitProgram } from "./git";
 import { analyzeHerdrProgram } from "./herdr";
 import { analyzeInterpreterProgram, INTERPRETERS } from "./interpreters";
@@ -17,6 +18,8 @@ export type {
 } from "./types";
 
 export {
+  analyzeFindProgram,
+  analyzeFindProgramInvocation,
   analyzeGitProgram,
   analyzeHerdrProgram,
   analyzeInterpreterProgram,
@@ -28,6 +31,7 @@ export {
 type ProgramAnalyzer = (name: string, args: readonly ShellWord[]) => ProgramSemantic;
 
 const PROGRAM_ANALYZERS: ReadonlyMap<string, ProgramAnalyzer> = new Map([
+  ["find", (_name, args) => analyzeFindProgram(args)],
   ["git", (_name, args) => analyzeGitProgram(args)],
   ["herdr", (_name, args) => analyzeHerdrProgram(args)],
   ["uv", (_name, args) => analyzeUvProgram(args)],
@@ -36,11 +40,17 @@ const PROGRAM_ANALYZERS: ReadonlyMap<string, ProgramAnalyzer> = new Map([
   ...[...PACKAGE_MANAGERS].map((name) => [name, (_name: string, args: readonly ShellWord[]) => analyzePackageManagerProgram(name, args)] as const),
 ]);
 
+function isTrustedSystemGit(executable: string, name: string): boolean {
+  return name === "git" && (executable === "/bin/git" || executable === "/usr/bin/git");
+}
+
 export function analyzeProgramCommand(invocation: ProgramInvocation): ProgramSemantic | undefined {
   const name = commandName(invocation.executable).toLowerCase();
   const analyzer = PROGRAM_ANALYZERS.get(name);
   if (analyzer === undefined) return undefined;
   const semantic = analyzer(name, invocation.arguments);
-  if (!invocation.executable.includes("/") || semantic.commandClass === "destroy") return semantic;
+  if (!invocation.executable.includes("/") || semantic.commandClass === "destroy" || isTrustedSystemGit(invocation.executable, name)) {
+    return semantic;
+  }
   return result("execute", ["execute"], [], { opaque: true, hardBoundary: semantic.hardBoundary });
 }

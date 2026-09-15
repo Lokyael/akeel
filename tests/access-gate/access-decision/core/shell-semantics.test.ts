@@ -124,12 +124,60 @@ test("Git rm is a destructive operation", () => {
   assert.deepEqual(semantic.effects, ["delete"]);
 });
 
-test("path-form Git helper boundaries are retained as opaque execution", () => {
-  const semantic = analyzeProgramCommand({ executable: "/usr/bin/git", arguments: [word("commit", 0)] });
+test("non-system path-form Git helper boundaries remain opaque execution", () => {
+  const semantic = analyzeProgramCommand({ executable: "/tmp/git", arguments: [word("commit", 0)] });
   assert.ok(semantic);
   assert.equal(semantic.commandClass, "execute");
   assert.equal(semantic.opaque, true);
   assert.equal(semantic.hardBoundary, true);
+});
+
+test("fixed system path-form Git reuses bare-name semantics", () => {
+  for (const executable of ["/bin/git", "/usr/bin/git"]) {
+    const semantic = analyzeProgramCommand({ executable, arguments: [word("add", 0), word(".git/hooks/pre-commit", 4)] });
+    assert.ok(semantic);
+    assert.equal(semantic.commandClass, "modify", executable);
+    assert.deepEqual(semantic.effects, ["read", "write"], executable);
+    assert.deepEqual(semantic.paths.map((entry) => entry.path), [
+      { text: ".", role: "source" },
+      { text: ".git/hooks/pre-commit", role: "source" },
+    ], executable);
+    assert.equal(semantic.opaque, false, executable);
+    assert.equal(semantic.hardBoundary, false, executable);
+  }
+});
+
+test("path traversal and non-system Git paths do not obtain system identity", () => {
+  for (const executable of ["/usr/bin/../bin/git", "/workspace/bin/git", "/usr/bin/GIT"]) {
+    const semantic = analyzeProgramCommand({ executable, arguments: [word("add", 0), word("src/app.ts", 4)] });
+    assert.ok(semantic);
+    assert.equal(semantic.commandClass, "execute", executable);
+    assert.equal(semantic.opaque, true, executable);
+  }
+});
+
+test("bounded find predicates expose only recursive start paths", () => {
+  const semantic = analyzeProgramCommand({
+    executable: "find",
+    arguments: [
+      word("src", 0),
+      word("lib", 4),
+      word("-name", 8),
+      word("*.ts", 14),
+      word("-type", 19),
+      word("f", 25),
+      word("-maxdepth", 27),
+      word("2", 37),
+    ],
+  });
+  assert.ok(semantic);
+  assert.equal(semantic.commandClass, "inspect");
+  assert.deepEqual(semantic.effects, ["read"]);
+  assert.deepEqual(semantic.paths.map(({ path: value }) => value), [
+    { text: "src", role: "source" },
+    { text: "lib", role: "source" },
+  ]);
+  assert.equal(semantic.recursive, true);
 });
 
 test("a supported inspection command has explicit class and read effect", () => {

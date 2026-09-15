@@ -255,8 +255,6 @@ test("unmodeled file-valued options fail closed instead of hiding paths", () => 
     "ls -R --dereference /workspace/project",
     "grep -R pattern /workspace/project",
     "find -L /workspace/project",
-    "find -name marker",
-    "find . -name marker",
     "rg --files /etc/passwd",
     "grep --exclude-from=/etc/passwd pattern",
     "grep -ePAT /etc/passwd",
@@ -268,6 +266,18 @@ test("unmodeled file-valued options fail closed instead of hiding paths", () => 
     const result = compileShell({ ...request, arguments: { command } });
     if (!isShellReject(result)) assert.fail(`expected rejection for ${command}`);
     assert.equal(result.code, "unsupported-syntax", command);
+  }
+});
+
+test("bounded find predicates consume values without turning them into paths", () => {
+  for (const [command, expectedPath] of [
+    ["find . -name marker -type f -maxdepth 2", "/workspace/project"],
+    ["find src -iname '*.ts' -path './src/*' -ipath './SRC/*' -mindepth 1", "/workspace/project/src"],
+    ["find -name marker", "/workspace/project"],
+  ] as const) {
+    const compilation = compileShell({ ...request, arguments: { command } });
+    if (isShellReject(compilation)) assert.fail(`expected bounded find predicates to compile for ${command}`);
+    assert.deepEqual(shellCompilationFacts(compilation)?.resolvedPaths[0]?.map((path) => path.candidate), [expectedPath], command);
   }
 });
 
@@ -290,10 +300,35 @@ test("rg value options consume their operands before path extraction", () => {
 });
 
 test("find action options fail closed before nested commands execute", () => {
-  for (const command of ["find . -exec rm /tmp/x \\;", "find . -delete"]) {
+  for (const command of [
+    "find . -exec rm /tmp/x \\;",
+    "find . -execdir rm /tmp/x \\;",
+    "find . -ok rm /tmp/x \\;",
+    "find . -okdir rm /tmp/x \\;",
+    "find . -delete",
+    "find . -fls /tmp/out",
+    "find . -fprint /tmp/out",
+    "find . -fprint0 /tmp/out",
+    "find . -fprintf /tmp/out %p",
+  ]) {
     const result = compileShell({ ...request, arguments: { command } });
     if (!isShellReject(result)) assert.fail(`expected rejection for ${command}`);
     assert.equal(result.code, "security-boundary", command);
+  }
+});
+
+test("find expressions outside the bounded subset remain unsupported", () => {
+  for (const command of [
+    "find . -name",
+    "find . -type z",
+    "find . -maxdepth nope",
+    "find . -printf '%p\\n'",
+    "find . -o -name marker",
+    "find -L .",
+  ]) {
+    const result = compileShell({ ...request, arguments: { command } });
+    if (!isShellReject(result)) assert.fail(`expected rejection for ${command}`);
+    assert.equal(result.code, "unsupported-syntax", command);
   }
 });
 

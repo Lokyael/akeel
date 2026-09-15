@@ -110,7 +110,7 @@
   - **Filesystem adapter family:** 旧版 filesystem adapter 覆盖 `rm/rmdir/touch/mkdir/cp/mv/ln/tee/dd/chmod/chown/install/mktemp/truncate/shred` 等文件系统操作；当前只保留较小基础子集，`tee`/`dd` 等未建模形态进入更保守的边界处理。候选问题：逐项判断缺失命令是否恢复或退役。
   - **Permission-change effect:** 旧版 `chmod/chown` 等权限类操作可承载 `permissionChange` effect；当前没有独立 permission-change effect，相关命令多落入未建模/unknown 或被更窄命令集合拒绝。候选问题：是否恢复权限变更专门分类、并定义其与 write/destroy 的策略关系。
   - **Read adapter family:** 旧版 read adapter 实际覆盖 `cat/head/tail/wc/cut/diff/less/more/file/stat/du/df/od`；当前只保留部分基础 inspect 命令。候选问题：逐项判断缺失读命令是否恢复或改用 Direct 工具。
-  - **Search adapter family:** 旧版 search adapter 覆盖 `find/tree/grep/rg/ls` 等，并建模部分输出文件/action 选项；当前保留 `find/grep/rg/ls` 的较小可证明子集，`find -exec/-delete` 等 fail-closed。候选问题：逐项判断高级搜索选项是否恢复。
+  - **Search adapter family:** 旧版 search adapter 覆盖 `find/tree/grep/rg/ls` 等，并建模部分输出文件/action 选项；当前 `find` 已支持 bounded 的 `-name`、`-iname`、`-path`、`-ipath`、`-type`、`-maxdepth`、`-mindepth` inspect 子集，start path 仍进入 recursive boundary，`find -exec/-delete` 等副作用形式继续 fail-closed。候选问题：逐项判断更复杂的搜索表达式和输出/action 选项是否恢复。
   - **Text-transform adapter family:** 旧版 text-transform adapter 覆盖 `sed/awk/sort/uniq/tr` 等，含 in-place/output 选项建模；当前未见等价专用家族。候选问题：是否恢复只读 transform 与写入 transform 的分层语义。
   - **Build adapter family:** 旧版 build adapter 覆盖 cargo/go/make 等构建工具语义；当前未见等价专用家族。候选问题：是否按真实构建工作流恢复，或依赖 execute/unknown 策略处理。
   - **Date adapter family:** 旧版 date adapter 区分 inspect 与 `--set` modify；当前未见等价专用家族。候选问题：是否明确退役或恢复 inspect-only 支持。
@@ -304,15 +304,6 @@
 - **Exploration Direction:** 先确认实际消费者和不可替代的使用场景，再比较三种处置：保留为内部测试 seam、重新定义为有界的 public diagnostic seam，或明确退役为实现细节。复核应区分 trace 对测试、诊断和外部集成的不同责任，核对其与 Canonical、Admission、Policy、Display、render 的边界，并保持现有模型上下文、Policy 数据、session 持久化和运行时审计边界不被隐式扩大。
 - **Revisit condition:** 出现外部消费者依赖当前 trace、现有测试或诊断因缺少稳定观测接缝而无法满足真实需求，或用户明确要求重新评估该 trace seam。
 - **Out of Scope:** 在本候选被明确采纳前，不承诺稳定事件 schema、运行时审计日志、session entry、LLM context 注入、Policy 数据暴露、TUI renderer 改造或实现 Task；C-040 的 Pi render-only tool-result renderer 仍是独立候选。
-
-## C-043: Path-form Git 本地变更的边界复核
-
-> 本条记录 Access Gate 中 path-form Git 可执行文件与有界本地 `add`/`commit` 语义之间的独立边界问题；不改变当前准入行为，不构成实现承诺。
-
-- **Why Not Now:** D-067 当前规定含 `/` 的可执行文件不因 basename 获得已知程序语义，而本地 `git add`/`git commit` 已从 helper hard boundary 转为有界 `modify`。两条规则组合后，`/usr/bin/git add ...` 或 `/usr/bin/git commit -m ...` 可能落入 `opaque execute`，在允许 opaque 的策略下绕过有界 Git 语义。该问题需要重新决定 path-form Git 的安全边界，不能通过局部测试调整或默认策略说明静默解决。
-- **Exploration Direction:** 在不放宽 `git push`、`fetch`、`pull`、`remote`、`config` 等网络/配置边界的前提下，比较：①对 path-form Git 本地变更保持 hard boundary；②为 path-form Git 建立独立、可证明且不伪造路径事实的语义合同；③维持 opaque 语义并明确其对本地 Git 变更的残余风险。复核必须覆盖 `add`、`commit -m/-F`、交互/未建模选项、wrapper、`opaque` preset、控制面写保护以及裸名与 path-form 的一致性。
-- **Revisit condition:** 真实工作流需要绝对路径调用 Git 本地变更，或出现 path-form Git 绕过有界语义的安全/误操作证据；也可由用户明确启动该边界复核。
-- **Out of Scope:** 不在本候选中放行 `fetch`/`push` 或其他网络操作；不处理 Hook 依赖脚本、全局 Git 配置、`.git/info/attributes` 等更广泛的 Hook 信任链；不修改 D-067、不创建实现 Task，除非候选被用户明确采纳。
 
 ## C-044: 待创建
 

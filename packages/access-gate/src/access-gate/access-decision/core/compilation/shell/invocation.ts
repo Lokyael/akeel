@@ -1,5 +1,5 @@
 import { scanSimpleShellFlow } from "./flow";
-import { analyzeProgramCommand } from "./programs/index";
+import { analyzeFindProgramInvocation, analyzeProgramCommand } from "./programs/index";
 import {
   INTERPRETERS,
   isInterpreterInspection,
@@ -37,11 +37,10 @@ export type ShellCommandAnalysis =
       readonly resourceClass: "security" | "syntax";
     }>;
 
-const inspectionCommands = new Set(["cat", "head", "tail", "grep", "rg", "find", "ls", "od"]);
+const inspectionCommands = new Set(["cat", "head", "tail", "grep", "rg", "ls", "od"]);
 const modificationCommands = new Set(["mkdir", "touch", "cp", "mv", "ln"]);
 const destructionCommands = new Set(["rm", "rmdir", "unlink", "truncate"]);
 const executionCommands = new Set([...INTERPRETERS]);
-const findActionOptions = new Set(["-exec", "-execdir", "-ok", "-okdir", "-delete", "-fls", "-fprint", "-fprint0", "-fprintf"]);
 const unsupportedCommandWords = new Set([
   "case", "do", "done", "elif", "else", "esac", "fi", "for", "function", "if", "in", "select", "then", "time", "until", "while",
 ]);
@@ -160,9 +159,6 @@ function unmodeledPathOption(executable: string, words: readonly ShellWord[]): S
       return word;
     }
     if (executable === "cat" && (word.text === "--files0-from" || word.text.startsWith("--files0-from="))) {
-      return word;
-    }
-    if (executable === "find" && (word.text === "-files0-from" || word.text.startsWith("-files0-from="))) {
       return word;
     }
     if (executable === "touch" && (
@@ -349,11 +345,10 @@ export function analyzeShellCommandWords(words: readonly ShellWord[]): ShellComm
   if (executable === "cd" && (index !== 0 || hasRedirection || commandArguments.length !== 1 || commandArguments[0]!.text.startsWith("-"))) {
     return rejectOperator(commandArguments[0] ?? executableWord);
   }
-  if (executableName === "find") {
-    const action = commandArguments.find((word) => findActionOptions.has(word.text));
-    if (action !== undefined) return rejectSecurityBoundary(action);
-    const unsupportedOption = commandArguments.find((word) => word.text.startsWith("-"));
-    if (unsupportedOption !== undefined) return rejectOperator(unsupportedOption);
+  const findAnalysis = executableName === "find" ? analyzeFindProgramInvocation(commandArguments) : undefined;
+  if (findAnalysis?.kind === "reject") {
+    if (findAnalysis.code === "security-boundary") return rejectSecurityBoundary(findAnalysis.word);
+    return rejectOperator(findAnalysis.word);
   }
   const pathOption = unmodeledPathOption(executableName, commandArguments);
   if (pathOption !== undefined) return rejectOperator(pathOption);
@@ -367,7 +362,9 @@ export function analyzeShellCommandWords(words: readonly ShellWord[]): ShellComm
     addEffect(effects, "cwd-change");
     addPath(pathFromWord(commandArguments[0]!, "source"), commandArguments[0]!.start);
   }
-  const programSemantic = analyzeProgramCommand({ executable, arguments: commandArguments });
+  const programSemantic = findAnalysis?.kind === "complete"
+    ? findAnalysis.semantic
+    : analyzeProgramCommand({ executable, arguments: commandArguments });
   const classification = programSemantic?.commandClass ?? commandClass(executable, commandArguments);
   if (programSemantic !== undefined) {
     for (const effect of programSemantic.effects) addEffect(effects, effect);
@@ -406,7 +403,7 @@ export function analyzeShellCommandWords(words: readonly ShellWord[]): ShellComm
       hasPathOperand = true;
       addPath(pathFromWord(word, "source"), word.start);
     }
-    if ((executableName === "ls" || executableName === "find" || executableName === "rg" || executableName === "grep") && !hasPathOperand) {
+    if ((executableName === "ls" || executableName === "rg" || executableName === "grep") && !hasPathOperand) {
       addPath(Object.freeze({ text: ".", role: "source" }), executableWord.end);
     }
   }

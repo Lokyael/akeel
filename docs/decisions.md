@@ -437,14 +437,15 @@ Canonical reject 使用本域封闭 code、source anchor 与资源分类；rende
 
 **Executable identity 与 path-form boundary:**
 
-- Canonical 将 executable token 中包含 `/` 的形式识别为 path-form executable，不解析 PATH，也不因文件系统探测改变命令身份。
-- path-form executable 默认归类为 `execute`；已声明的破坏性 basename 或已证明的破坏性子命令仍归类为 `destroy`。非破坏性 path-form 程序统一为 opaque execute，不因 basename 匹配已知程序族获得 `inspect`/`modify` 语义，也不伪造额外 path operand；其未证明访问由独立 `commands.opaque` 策略控制。
+- Canonical 将 executable token 中包含 `/` 的形式识别为 path-form executable，不解析 PATH，也不因文件系统探测或 symlink 解析改变命令身份。
+- 对 Git 仅接受两个固定的词法系统路径形式 `/bin/git` 与 `/usr/bin/git` 作为已声明身份；它们复用裸名 `git` 的完整 analyzer 语义，包括 command class、effects、路径事实、CWD facts 和 hard-boundary。该约定不证明二进制真实性，不接受用户配置的 trusted roots，也不做运行期文件验证。
+- 其他非破坏性 path-form 程序，以及不匹配上述固定形式的 path-form Git，统一为 opaque execute，不因 basename 匹配已知程序族获得 `inspect`/`modify` 语义，也不伪造额外 path operand；其未证明访问由独立 `commands.opaque` 策略控制。含 `..`、重复路径分隔符、大小写变体或其他前缀的形式不获得固定系统路径身份。
 - 裸名 `tsx` 与 Python、Node、Ruby、Perl 属于封闭 interpreter 族：单一 `--version`/`-v`/`--help` 信息调用为 `inspect`，脚本或其他调用为 `execute`，脚本 operand 是 source path；path-form interpreter 统一为 opaque execute。`npx tsx` 保持 `execute + opaque`，即使参数看似信息调用。
 - `od` 是封闭的只读检查例外，产生 `inspect + read`，不构成任意工具自动加入内置语义的先例；裸名未知命令保持 `unknown`。
 
 **Why:** Git、包管理器和语言运行时共享“程序自有参数语言 + 子命令分类 + 路径/委托执行”的结构，但把它们塞进 Shell lexer 或 Policy Kernel 会造成职责泄漏和重复解析。`uv run` 可能同步环境、解析或下载依赖并启动任意子进程，因此不能当作普通只读命令；版本/帮助调用与未建模顶层子命令则需要独立分类。opaque 仍必须保持独立事实，但其风险是否可接受属于用户策略选择：`review`、`guided`、`develop` 分别提供拒绝、审批和便利路径；这不宣称 allowed roots 能限制脚本运行期访问，真实执行仍受操作系统权限约束。
 
-**Impact:** 生产入口仍只切换新 Canonical pipeline；新增命令族只需增加 core 语义模块和 public seam 测试，不恢复旧 `command-semantics` 依赖。当前覆盖 Git 常用 inspect/modify/destroy 分类（有界本地 `add` 与 `commit` 接入 modify 策略并受 Git 控制面写保护约束，网络/远程 transport、helper-capable 操作与 `config` 固定 hard-boundary）、解释器信息命令、Python 质量工具、uv 的 `run`/信息/未知子命令分类、herdr 的 inspect/execute/modify 分类（工作区创建提取 `--cwd`/`--path` 路径事实，worktree remove 与 workspace close 归入 modify）和 npm 族常用分类；Git `-C`、`--git-dir`、`--work-tree` 和项目内显式 `file://` remote 的 command-local location 已覆盖，完整 CLI 方言、完整 Git pathspec 语法、HTTPS/SSH 等外部 transport、hosted `file://`、alias/间接 config remote、`clone --separate-git-dir` 和网络/执行隔离不在本条内。
+**Impact:** 生产入口仍只切换新 Canonical pipeline；新增命令族只需增加 core 语义模块和 public seam 测试，不恢复旧 `command-semantics` 依赖。当前覆盖 Git 常用 inspect/modify/destroy 分类（有界本地 `add` 与 `commit` 接入 modify 策略并受 Git 控制面写保护约束，网络/远程 transport、helper-capable 操作与 `config` 固定 hard-boundary）、裸名 `find` 的 bounded inspect/read 表达式（`-name`、`-iname`、`-path`、`-ipath`、`-type`、`-maxdepth`、`-mindepth`，start path 进入 recursive boundary）、解释器信息命令、Python 质量工具、uv 的 `run`/信息/未知子命令分类、herdr 的 inspect/execute/modify 分类（工作区创建提取 `--cwd`/`--path` 路径事实，worktree remove 与 workspace close 归入 modify）和 npm 族常用分类；Git `-C`、`--git-dir`、`--work-tree` 和项目内显式 `file://` remote 的 command-local location 已覆盖，完整 CLI 方言、完整 Git pathspec 语法、HTTPS/SSH 等外部 transport、hosted `file://`、alias/间接 config remote、`clone --separate-git-dir` 和网络/执行隔离不在本条内。
 
 **Rejected:**
 
