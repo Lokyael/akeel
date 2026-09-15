@@ -103,13 +103,21 @@ test("loads named policy presets and active selection", () => {
   }
 });
 
-test("loads the explicit access-gate disabled mode", () => {
+test("loads the explicit access-gate off mode", () => {
   const agent = agentDir();
   try {
-    writeFileSync(join(agent.path, "akeel", "policy.yaml"), "accessGate: disabled\n");
-    assert.deepEqual(loadDecodedPolicyFile(agent.path), { kind: "disabled" });
+    writeFileSync(join(agent.path, "akeel", "policy.yaml"), "accessGate: off\n");
+    const result = loadDecodedPolicyFile(agent.path);
+    assert.equal(result.kind, "off");
+    assert.equal(result.badges.review, "R");
+    assert.equal(result.snapshots.develop.paths.write, "allow");
 
-    writeFileSync(join(agent.path, "akeel", "policy.yaml"), "accessGate: disabled\npaths:\n  read: allow\n");
+    writeFileSync(join(agent.path, "akeel", "policy.yaml"), "accessGate: disabled\n");
+    const disabledFallback = loadDecodedPolicyFile(agent.path);
+    assert.equal(disabledFallback.kind, "enabled");
+    assert.equal(disabledFallback.activePreset, "review");
+
+    writeFileSync(join(agent.path, "akeel", "policy.yaml"), "accessGate: off\npaths:\n  read: allow\n");
     const fallback = loadDecodedPolicyFile(agent.path);
     assert.equal(fallback.kind, "enabled");
     assert.equal(fallback.activePreset, "review");

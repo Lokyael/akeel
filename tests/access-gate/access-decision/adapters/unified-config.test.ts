@@ -39,8 +39,11 @@ test("one policy decode issues a tagged registry of unified snapshots", () => {
   assert.ok(Object.isFrozen(decoded.snapshots.focus));
 });
 
-test("the explicit disabled form does not manufacture an authorization snapshot", () => {
-  assert.deepEqual(decodePolicyConfiguration({ accessGate: "disabled" }), { kind: "disabled" });
+test("the explicit off form configures off mode with baseline presets", () => {
+  const decoded = decodePolicyConfiguration({ accessGate: "off" });
+  assert.equal(decoded.kind, "off");
+  assert.equal(decoded.badges.review, "R");
+  assert.equal(decoded.snapshots.develop.paths.write, "allow");
 });
 
 test("built-in presets assign independent opaque execution modes", () => {
@@ -261,4 +264,61 @@ test("explicit edit mode is independent and omission denies by default", () => {
   assert.equal(fallback.kind, "enabled");
   assert.equal(fallback.snapshots.static.paths.write, "ask");
   assert.equal(fallback.snapshots.static.paths.edit, "deny");
+});
+
+test("supports explicit custom badge and automatic disambiguation", () => {
+  const decoded = decodePolicyConfiguration({
+    presets: {
+      custom: {
+        badge: "CUST",
+        paths: { read: "allow", write: "ask", edit: "ask", list: "allow", search: "allow", allowedRoots: [], blockedRoots: [], blockedPaths: [] },
+        commands: { inspect: "allow", modify: "ask", execute: "deny", opaque: "deny", destroy: "deny", unknown: "deny" },
+      },
+      audit: {
+        paths: { read: "allow", write: "deny", edit: "deny", list: "allow", search: "allow", allowedRoots: [], blockedRoots: [], blockedPaths: [] },
+        commands: { inspect: "allow", modify: "deny", execute: "deny", opaque: "deny", destroy: "deny", unknown: "deny" },
+      },
+      auto: {
+        paths: { read: "allow", write: "deny", edit: "deny", list: "allow", search: "allow", allowedRoots: [], blockedRoots: [], blockedPaths: [] },
+        commands: { inspect: "allow", modify: "deny", execute: "deny", opaque: "deny", destroy: "deny", unknown: "deny" },
+      },
+      release: {
+        paths: { read: "allow", write: "deny", edit: "deny", list: "allow", search: "allow", allowedRoots: [], blockedRoots: [], blockedPaths: [] },
+        commands: { inspect: "allow", modify: "deny", execute: "deny", opaque: "deny", destroy: "deny", unknown: "deny" },
+      },
+    },
+    activePreset: "custom",
+  });
+
+  assert.equal(decoded.kind, "enabled");
+  assert.equal(decoded.badges.review, "R");
+  assert.equal(decoded.badges.guided, "G");
+  assert.equal(decoded.badges.develop, "D");
+  assert.equal(decoded.badges.custom, "CUST");
+  assert.equal(decoded.badges.audit, "A");
+  assert.equal(decoded.badges.auto, "AU");
+  // release avoids R (used by review) and disambiguates to RE
+  assert.equal(decoded.badges.release, "RE");
+});
+
+test("rejects malformed badge values and builtin badge overrides", () => {
+  assert.throws(() => decodePolicyConfiguration({
+    presets: { custom: { badge: "" } },
+    activePreset: "custom",
+  }), /invalid policy config/);
+
+  assert.throws(() => decodePolicyConfiguration({
+    presets: { custom: { badge: "TOOLONG" } },
+    activePreset: "custom",
+  }), /invalid policy config/);
+
+  assert.throws(() => decodePolicyConfiguration({
+    presets: { custom: { badge: "bad\n" } },
+    activePreset: "custom",
+  }), /invalid policy config/);
+
+  assert.throws(() => decodePolicyConfiguration({
+    presets: { review: { badge: "REV" } },
+    activePreset: "review",
+  }), /invalid policy config/);
 });

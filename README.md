@@ -96,15 +96,15 @@ Policy configuration rules:
 - `ask` requires interactive host confirmation, never executes automatically, and shows bounded summaries with the literal Shell command form. Opaque approval is labeled as not fully statically verified; summaries never include file content or policy data.
 - Malformed YAML, unknown fields, incomplete definitions, conflicting names, and legacy fields cause the complete file to be ignored and the built-in `review` baseline to be used.
 
-## Access Gate disabled mode
+## Access Gate off mode
 
-For a session that should retain only AKeel's bootstrap principles and skills, explicitly disable the Access Gate in `policy.yaml`:
+For a session that should retain only AKeel's bootstrap principles and skills, explicitly turn off the Access Gate in `policy.yaml`:
 
 ```yaml
-accessGate: disabled
+accessGate: off
 ```
 
-This form is the only policy field and takes effect after a session restart. All Pi `tool_call` requests then pass through without AKeel operation or path admission; bootstrap and skills remain active. AKeel supplies no tool-call admission, path-boundary, Shell, or approval guarantee in this mode. Remove the setting and restart the session to restore the Gate.
+This form is the only policy field. When configured, all Pi `tool_call` requests pass through without AKeel operation or path admission; bootstrap and skills remain active. In native TUI mode, the Gate can be dynamically enabled for the session at any time via `/policy <preset>` (or turned off via `/policy off`).
 
 ## Test output context pruning
 

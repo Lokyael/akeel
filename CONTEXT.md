@@ -14,7 +14,7 @@
 - **Policy Snapshot**：与配置格式无关、不可变的授权值；只由新 policy.yaml adapter 发行。
 - **Policy Preset**：会话可绑定的完整策略定位；内置 `review`、`guided`、`develop`，并可加载合法的自定义 preset；不使用继承式 Profile，`status` 是命令保留字。
 - **Human-only Status**：只面向用户显示、不会进入 LLM context、tool description 或 system prompt 的策略状态或选择界面。
-- **Access Gate Disabled Mode**：用户在 `policy.yaml` 中显式设置 `accessGate: disabled` 后，仅保留 bootstrap 与 skills，Access Gate 不执行 tool-call 准入。
+- **Access Gate Off Mode**：用户在 `policy.yaml` 中显式设置 `accessGate: off` 或会话内 `/policy off` 后，仅保留 bootstrap 与 skills，Access Gate 不执行 tool-call 准入。
 - **Policy Kernel**：Configured Policy 阶段中只消费 Admission Plan 与 Policy Snapshot 的同步纯函数，不读取原始请求、配置 loader、Shell parser 或 host UI。
 - **Gate Session**：绑定单次 Pi session 的 runtime aggregate，拥有固定 Access Root、session-start `$HOME`、活动 Policy Snapshot、credential boundary 与 lifecycle。
 - **Guidance**：从决策代码到静态 bounded host-facing 文案的封闭映射，不携带可执行 Shell。
@@ -56,9 +56,9 @@
 - Access Decision Pipeline（D-059/D-060/D-087）已完成单一授权信任链的原子生产切换。一个 `compileManagedCall` facade 对每个请求只解释一次并发行内部判别车道的 opaque Compilation；同一制品只投影一次 sealed Admission，Display 仅在 `approval-required` 时按需投影。Mandatory Boundary 先于只消费 Admission + 单一 Policy Snapshot 的 Configured Policy，Authorization verdict 不读取 UI；Pi host 再把 approval requirement 映射为 confirm 或静态 no-UI block。Canonical pathname evidence 在同一 CWD 状态/source token 上只获取一次并保留 lexical 与 symlink-target traversal prefixes；Direct search 与 Shell recursive path 均在 blocked descendants 上 fail-closed，有显式 path boundary 时 unknown/unbounded Shell path access 也不得放行。path-form executable 不因已知 basename 获得 inspect/modify 语义，非破坏性形式统一按 opaque execute 处理；Git 显式项目内 `file://` remote 转为 path fact，mutating helper-capable Git 操作、显式 external driver、`git config`、host、alias 和间接 config remote 继续 fail-closed。
 - 受管辖 surface 为 Direct `read`、`write`、`edit`、`find`、`grep`、`ls` 与 Shell `bash`。无效 host context、unsupported syntax 和硬安全边界 fail-closed；外置 `policy.yaml` 缺失、为空或不可用时整体忽略并使用内置 `review` 基线，不部分采用无效内容；未拥有的工具 passthrough。
 - 生产入口只读取 `$PI_CODING_AGENT_DIR/akeel/policy.yaml`（默认 `~/.pi/agent/akeel/policy.yaml`）。内置 `review`、`guided`、`develop` 不依赖外置文件；文件缺失、为空、格式/schema/legacy 不可用时整体忽略并使用内置 `review`，不部分采用、不读取旧 config/Profile schema，也不使用旧 fallback。
-- Policy Preset 当前由 D-069 规定为内置 `review`、`guided`、`develop` 加 `policy.yaml` 自定义 preset；外部 flat policy 与自定义 preset 均使用完整的 `paths` 与 `commands` 定义，缺失必需字段时整体回退到内置 `review`；每个 preset 可拥有独立 path scope，系统 hard boundary 始终优先。`commands.destroy` 可在自定义 preset 中配置为 `allow`，但 D-071 规定所有 destroy/delete 操作永久 hard-deny，不产生 ask。用户交互入口由 D-069 定案：原生 TUI 中 `/policy` 无参数打开临时 human-only 选择面板，显示所有已加载 preset，显式 `/policy <preset>` 入口保留，策略状态不常驻 UI。Delegated child 按任务类型的能力分层与风险边界仍属 C-009 候选范围。
+- Policy Preset 当前由 D-069 规定为内置 `review`、`guided`、`develop` 加 `policy.yaml` 自定义 preset；外部 flat policy 与自定义 preset 均使用完整的 `paths` 与 `commands` 定义，缺失必需字段时整体回退到内置 `review`；每个 preset 可拥有独立 path scope，系统 hard boundary 始终优先。`commands.destroy` 可在自定义 preset 中配置为 `allow`，但 D-071 规定所有 destroy/delete 操作永久 hard-deny，不产生 ask。用户交互入口由 D-069 定案：原生 TUI 中 `/policy` 无参数打开临时 human-only 选择面板，显示所有已加载 preset，显式 `/policy <preset>` 入口保留；状态通过链式 Footer 装饰器合成至原生第 1 行末尾（紧凑 Badge 如 `🛡️ R`/`G`/`D`、自定义 badge 或消歧短码，关闭时为 `🛡️ off`），严格保持 2 行高度并链式保留下游扩展的 Footer 输出。Delegated child 按任务类型的能力分层与风险边界仍属 C-009 候选范围。
 - 宿主拥有且用于保存实时凭据的凭据工件由 D-070 归入系统 hard boundary：对 Canonical 阶段明确识别的受管路径操作 `read`、`write`、`edit`、`list`、`search` 一律拒绝，preset 不得放宽；模板类工件不属于该类别。分类依据是受信任 agent 目录下的路径身份契约，不读取内容；递归 search 若候选路径与 credential root 相交则硬拒绝，非递归的 agent 目录访问仍按既有路径策略处理，也不为无法发行具体路径的 opaque Shell access 增加凭据专用拒绝。
-- Access Gate 默认启用；D-066 允许用户以唯一配置 `accessGate: disabled` 进入仅 bootstrap/skills 模式。禁用期间 AKeel 不提供 tool-call 操作准入或路径安全保证，重新启用需修改 policy.yaml 并重启会话。
+- Access Gate 默认启用；D-066 允许用户在 `policy.yaml` 中以 `accessGate: off` 或在会话内通过 `/policy off` 进入关闭模式（仅保留 bootstrap/skills，tool-call 直通）；off 模式下可随时通过 `/policy <preset>` 动态启用 Access Gate。
 - Prompt Surface（D-030/D-053/D-023）：Policy Snapshot、policy.yaml 和活动 policy 状态不进入 context 消息、tool description 或 system prompt；模型可见的政策相关文本只有受 D-023 限定的静态失败 Guidance。
 - 旧决策实现、旧测试与 archive 不属于当前依赖边界，也不是 parity oracle。Static Flow、Explanation Replay 与 Runtime Content Flow 不属于 T-069。
 
@@ -82,7 +82,7 @@
 - [D-059 Greenfield Access Decision Pipeline 与原子替换](docs/decisions.md#d-059-greenfield-access-decision-pipeline-与原子替换)
 - [D-060 受保护 Canonical 制品、窄 Admission 投影与有界求值](docs/decisions.md#d-060-受保护-canonical-制品窄-admission-投影与有界求值)
 - [D-063 Direct edit 独立策略与显式本地配置](docs/decisions.md#d-063-direct-edit-独立策略与显式本地配置)
-- [D-066 Access Gate 显式禁用与仅技能运行模式](docs/decisions.md#d-066-access-gate-显式禁用与仅技能运行模式)
+- [D-066 Access Gate 显式关闭与仅技能运行模式（off）](docs/decisions.md#d-066-access-gate-显式关闭与仅技能运行模式off)
 - [D-067 Canonical 程序语义族、可执行文件身份与委托执行边界](docs/decisions.md#d-067-canonical-程序语义族可执行文件身份与委托执行边界)
 - [D-069 Policy 配置文件、Preset 注册表与用户交互界面](docs/decisions.md#d-069-policy-配置文件preset-注册表与用户交互界面)
 - [D-070 宿主凭据工件的系统硬边界与分类规则](docs/decisions.md#d-070-宿主凭据工件的系统硬边界与分类规则)

@@ -83,10 +83,10 @@ test("Pi composition rejects a project root that differs from the session cwd", 
   );
 });
 
-test("explicitly disabled access gate passes managed calls while retaining the extension", async () => {
+test("explicitly off access gate passes managed calls while retaining the extension and enables via policy command", async () => {
   const { handlers, commands, pi } = fakePi();
   installPiAccessDecision(pi, {
-    policyConfig: { accessGate: "disabled" },
+    policyConfig: { accessGate: "off" },
     projectRoot: "/workspace/project",
     stagingRoot: "/tmp/akeel",
   });
@@ -96,11 +96,6 @@ test("explicitly disabled access gate passes managed calls while retaining the e
   });
 
   await invoke(handlers, "session_start", {}, hostContext);
-
-  const policyCommand = commands.get("policy");
-  assert.ok(policyCommand);
-  await policyCommand!("develop", hostContext);
-  assert.equal(notification, "Access Gate is disabled; bootstrap and skills remain active.");
 
   assert.equal(
     await invoke(handlers, "tool_call", { toolName: "write", input: "not-an-object" }, hostContext),
@@ -115,6 +110,11 @@ test("explicitly disabled access gate passes managed calls while retaining the e
     undefined,
   );
   assert.equal(await invoke(handlers, "tool_call", null, hostContext), undefined);
+
+  const policyCommand = commands.get("policy");
+  assert.ok(policyCommand);
+  await policyCommand!("develop", hostContext);
+  assert.equal(notification, "Active AKeel policy: develop.");
 });
 
 test("Pi composition hard-denies an agent credential variant under an allowing policy", async () => {
@@ -257,6 +257,7 @@ test("native TUI policy command presents presets and applies the selected preset
     "guided — Interactive approval",
     "develop — Daily development",
     "audit",
+    "off — Bypass Access Gate for this session",
   ]);
   assert.equal(
     await invoke(handlers, "tool_call", { toolName: "write", input: { path: "notes.md", content: "updated\\n" } }, hostContext),

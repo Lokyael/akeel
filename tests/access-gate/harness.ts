@@ -14,14 +14,25 @@ export interface Harness {
   setConfirmResult(value: boolean): void;
   getConfirmCalls(): number;
   hasFooterFactory(): boolean;
+  getStatus(id: string): string | undefined;
+  renderFooter(width?: number): string[];
 }
 
 function createHarness(root: string): Harness {
   const commands = new Map<string, (args: string, ctx: ExtensionContext) => Promise<void>>();
   const handlers = new Map<string, Handler>();
+  const statuses = new Map<string, string>();
   let confirmResult = false;
   let confirmCalls = 0;
-  let footerInstalled = false;
+  let footerFactory:
+    | ((tui: unknown, theme: unknown, footerData: unknown) => { render(width: number): string[]; invalidate(): void })
+    | undefined = undefined;
+  const fakeTui = { requestRender: () => {} };
+  const fakeTheme = { fg: (_color: string, text: string) => text };
+  const fakeFooterData = {
+    getGitBranch: () => "main",
+    getExtensionStatuses: () => new Map<string, string>(),
+  };
   const sessionManager = {
     getSessionId: () => "test-session",
     getCwd: () => root,
@@ -46,9 +57,14 @@ function createHarness(root: string): Harness {
         confirmCalls++;
         return confirmResult;
       },
-      setFooter: () => {
-        footerInstalled = true;
+      setFooter: (factory: any) => {
+        footerFactory = factory;
       },
+      setStatus: (id: string, text: string | undefined) => {
+        if (text === undefined) statuses.delete(id);
+        else statuses.set(id, text);
+      },
+      notify: () => {},
     },
   } as unknown as ExtensionContext;
 
@@ -59,7 +75,13 @@ function createHarness(root: string): Harness {
     pi,
     setConfirmResult: (value) => { confirmResult = value; },
     getConfirmCalls: () => confirmCalls,
-    hasFooterFactory: () => footerInstalled,
+    hasFooterFactory: () => footerFactory !== undefined,
+    getStatus: (id: string) => statuses.get(id),
+    renderFooter: (width = 120) => {
+      if (!footerFactory) return [];
+      const comp = footerFactory(fakeTui, fakeTheme, fakeFooterData);
+      return comp.render(width);
+    },
   };
 }
 
