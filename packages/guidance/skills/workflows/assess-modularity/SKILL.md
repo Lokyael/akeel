@@ -6,7 +6,7 @@ disable-model-invocation: true
 
 # Assess Codebase Modularity
 
-Surface structural friction and report **modularity findings** — evidence that module boundaries expose too much complexity, scatter responsibilities, or prevent testing through stable seams. A mid-task friction proposal (per principles.md Proposal signals) remains a one-line report until the user explicitly requests this assessment; the scan turns approved scope into findings, not Project Records. Run the exploration within that scope in a Herdr Agent; the Task Owner coordinator waits for its result artifact, writes the HTML report, and presents it to the user.
+Surface structural friction and report **modularity findings** — evidence that module boundaries expose too much complexity, scatter responsibilities, or prevent testing through stable seams. A mid-task friction proposal (per principles.md Proposal signals) remains a one-line report until the user explicitly requests this assessment; the scan turns approved scope into findings, not Project Records. Before delegating, reserve an `assess-modularity` run with `akeel_run_artifact` (per `herdr`). Run the exploration within that scope in a Herdr Agent; the Task Owner coordinator waits for its verified result artifact, writes the HTML report under `/tmp/akeel/runs/<run-id>/report.html`, and presents it to the user.
 
 This workflow discovers unknown structural problems across repository boundaries. When a concrete module or interface question is ready for design, use `module-design` instead.
 
@@ -31,7 +31,7 @@ Read the project's `CONTEXT.md` and relevant entries in `docs/decisions.md` firs
 
 ### 2. Present Findings as HTML Report
 
-Write a self-contained HTML file to `/tmp/akeel/modularity-assessment-<timestamp>.html` (per principles.md Quick Reference — Temporary Resources). Open it for the user where a GUI is available (`xdg-open <path>` on Linux); in a headless environment, report the file path and ask the user to open it.
+Write a self-contained HTML file to `/tmp/akeel/runs/<run-id>/report.html` under the reserved run. Open it for the user where a GUI is available (`xdg-open <path>` on Linux); in a headless environment, report the file path and ask the user to open it.
 
 For each finding, render a card with:
 
