@@ -189,7 +189,7 @@ test("opaque policy does not bypass unknown command policy", () => {
 
 test("opaque policy does not bypass hard boundaries", () => {
   assert.deepEqual(evaluateShellAdmission(
-    admission("rm /workspace/project/file"),
+    admission("/bin/rm /workspace/project/file"),
     freezeShellPolicySnapshot({ ...policy, destroy: "allow", opaque: "allow" }),
   ), { kind: "deny", code: "hard-boundary" });
 });
@@ -331,7 +331,7 @@ test("read-write redirection follows the write-side policy contract", () => {
 });
 
 test("redirection uncertainty retains a destructive fallback", () => {
-  assert.deepEqual(evaluateShellAdmission(admission("true < missing || rm -rf /tmp/marker"), freezeShellPolicySnapshot(policy)), {
+  assert.deepEqual(evaluateShellAdmission(admission("true < missing || /bin/rm /tmp/marker"), freezeShellPolicySnapshot(policy)), {
     kind: "deny",
     code: "hard-boundary",
   });
@@ -347,7 +347,7 @@ test("a hard path boundary wins over an allow policy", () => {
 
 test("a destructive command remains a hard boundary even when its class is allowed", () => {
   assert.deepEqual(
-    evaluateShellAdmission(admission("rm /tmp/output"), freezeShellPolicySnapshot(policy)),
+    evaluateShellAdmission(admission("/bin/rm /tmp/output"), freezeShellPolicySnapshot(policy)),
     { kind: "deny", code: "hard-boundary" },
   );
   assert.equal(policyContract.referenceStatus, "newly-adopted");
@@ -1097,6 +1097,75 @@ test("Shell write and modification reject Git control artifacts even under allow
   ]) {
     assert.deepEqual(evaluateShellAdmission(admission(command), develop), {
       kind: "allow",
+    }, command);
+  }
+});
+
+test("bounded rm enters policy evaluation while sensitive boundaries remain hard-boundary", () => {
+  const askDestroy = freezeShellPolicySnapshot({
+    ...policy,
+    read: "allow",
+    write: "allow",
+    destroy: "ask",
+    allowedRoots: ["/workspace/project"],
+    blockedRoots: [],
+  });
+
+  const denyDestroy = freezeShellPolicySnapshot({
+    ...policy,
+    read: "allow",
+    write: "allow",
+    destroy: "deny",
+    allowedRoots: ["/workspace/project"],
+    blockedRoots: [],
+  });
+
+  const allowDestroy = freezeShellPolicySnapshot({
+    ...policy,
+    read: "allow",
+    write: "allow",
+    destroy: "allow",
+    allowedRoots: ["/workspace/project"],
+    blockedRoots: [],
+  });
+
+  // Policy evaluation for bounded rm with UI
+  assert.deepEqual(evaluateShellAdmission(admission("rm file.txt", true), askDestroy), {
+    kind: "ask",
+    executed: false,
+  });
+  assert.deepEqual(evaluateShellAdmission(admission("rm -f a.txt b.txt", true), askDestroy), {
+    kind: "ask",
+    executed: false,
+  });
+  // No UI fails closed with no-ui code
+  assert.deepEqual(evaluateShellAdmission(admission("rm file.txt", false), askDestroy), {
+    kind: "deny",
+    code: "no-ui",
+  });
+  // Policy deny
+  assert.deepEqual(evaluateShellAdmission(admission("rm file.txt", true), denyDestroy), {
+    kind: "deny",
+    code: "policy-denied",
+  });
+  // Policy allow
+  assert.deepEqual(evaluateShellAdmission(admission("rm file.txt", true), allowDestroy), {
+    kind: "allow",
+  });
+
+  // Sensitive and unbounded boundaries remain hard-boundary even under allowDestroy
+  for (const command of [
+    "rm /__test-agent-dir__/auth.json",
+    "rm /__test-agent-dir__/auth.json.bak",
+    "rm .git/config",
+    "rm .gitattributes",
+    "rm /etc/passwd",
+    "/bin/rm file.txt",
+    "rmdir empty_dir",
+  ]) {
+    assert.deepEqual(evaluateShellAdmission(admission(command, true), allowDestroy), {
+      kind: "deny",
+      code: "hard-boundary",
     }, command);
   }
 });

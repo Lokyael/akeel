@@ -160,12 +160,12 @@
 
 ## C-028: Destroy 操作边界与可审批准入复核
 
-> 本条记录未来重新评估 D-071 的探索方向，不构成恢复 destroy 审批、修改当前 hard boundary 或创建实施任务的承诺。
+> 本条记录对更宽破坏操作（递归删除、目录删除、Git 破坏性操作等）的未来评估方向。单文件非递归裸 `rm` 的有界证明与 `ask` 准入已在 T-0117 / D-071 落地；本候选只保留剩余未证明破坏操作的探索。
 
-- **Why Not Now:** 当前所有 `destroy`/`delete` 永久 hard-deny 已足够满足现阶段需求；本轮没有深入证明递归删除、`rmdir -p` 父级影响、未知删除选项、blocked descendants、凭据/路径边界、无 UI 和 mixed flow 聚合等场景。
-- **Exploration Direction:** 在新的 Canonical → Admission → Policy seam 下，重新判断是否能为明确、有界的破坏操作建立完整路径与影响范围证明，并在证明成立后设计每次用户确认的 `ask` 合同。复核应覆盖可支持的命令/选项 allowlist、递归和父级删除范围、路径与凭据 hard boundary、unknown/opaque 形态、混合 flow 聚合、用户批准/拒绝和无 UI 行为；同时重新决定 `commands.destroy: allow` 的配置值是否继续保留及其语义。
-- **Revisit condition:** 用户明确要求重新评估 D-071，或真实工作流因永久拒绝 destroy 而受阻，并能提供足够的外部语义证据与 public seam 验证方案。
-- **Out of Scope:** 在该候选被明确采纳前，不修改 D-071、不放行或审批任何 destroy/delete 操作、不创建实现 Task，也不把旧实现或旧测试当作正确性 oracle。
+- **Why Not Now:** T-0117 已解决日常单文件清理痛点；当前未深入证明递归删除（`-r`）、父级目录影响（`rmdir -p`）、通配符展开、Git 高危子命令（`reset --hard`、`clean -f`、`branch -D`）以及混合 flow 聚合等更宽场景。
+- **Exploration Direction:** 在现有单文件有界证明基础上，评估是否能进一步为受限目录删除或特定 Git 丢弃操作建立形式化边界证明，并在证明成立后引入受控的审批合同。复核需覆盖递归影响界限、路径和凭据硬边界、unknown 形态和无 UI 行为。
+- **Revisit condition:** 真实工作流反复因无法删除目录或执行特定 Git 清理受阻，且可提供完整的外部语义证据与边界证明方案；或者用户明确启动更宽破坏操作的独立评估。
+- **Out of Scope:** 本候选未被进一步采纳前，递归删除、`rmdir`、Git 高危破坏子命令继续永久 hard-deny，不创建实现 Task。
 
 ## C-029: 有界静态迭代语义（Shell `for`）复核
 

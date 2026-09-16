@@ -91,6 +91,12 @@ const contracts: ReadonlyMap<string, BoundedOptionContract> = new Map([
       unsupported("-t", "--target-directory", "-r", "--relative", "-L", "--logical"),
     ],
   }],
+  ["rm", {
+    options: [
+      flag("-f", "--force", "-v", "--verbose"),
+      unsupported("-r", "-R", "--recursive", "-d", "--dir", "-i", "-I", "--no-preserve-root", "--preserve-root"),
+    ],
+  }],
 ]);
 
 function syntheticPath(): ShellWord {
@@ -116,7 +122,14 @@ function hasOption(options: readonly ParsedBoundedOption[], ...names: string[]):
 function analyzeCoreutilsComplete(name: string, options: readonly ParsedBoundedOption[], operands: readonly ShellWord[]): ProgramSemantic {
   const inspection = new Set(["cat", "head", "tail", "grep", "rg", "ls", "od"]);
   const modification = new Set(["mkdir", "touch", "cp", "mv", "ln"]);
-  const commandClass = inspection.has(name) ? "inspect" : modification.has(name) ? "modify" : "unknown";
+  const destruction = new Set(["rm"]);
+  const commandClass = inspection.has(name)
+    ? "inspect"
+    : modification.has(name)
+      ? "modify"
+      : destruction.has(name)
+        ? "destroy"
+        : "unknown";
   const paths: ProgramPath[] = [];
   let recursive = false;
 
@@ -135,12 +148,20 @@ function analyzeCoreutilsComplete(name: string, options: readonly ParsedBoundedO
       paths.push(...pathsFor(operands.slice(0, -1), "source"));
       paths.push(...pathsFor(operands.slice(-1), "target"));
     }
+  } else if (name === "rm") {
+    paths.push(...pathsFor(operands, "target"));
   } else {
     paths.push(...pathsFor(operands, commandClass === "modify" ? "target" : "source"));
   }
 
   if (name === "cp" || name === "mv" || name === "ln") recursive = true;
-  const effects: ProgramSemantic["effects"] = commandClass === "inspect" ? ["read"] : name === "mkdir" || name === "touch" ? ["write"] : ["read", "write"];
+  const effects: ProgramSemantic["effects"] = commandClass === "inspect"
+    ? ["read"]
+    : name === "rm"
+      ? ["delete"]
+      : name === "mkdir" || name === "touch"
+        ? ["write"]
+        : ["read", "write"];
   return result(commandClass, effects, paths, { recursive });
 }
 
@@ -149,6 +170,10 @@ export function analyzeCoreutilsProgram(name: string, args: readonly ShellWord[]
   if (contract === undefined) return undefined;
   const parsed = parseBoundedOptions(args, contract);
   if (parsed.kind === "reject") return rejectFrom(parsed);
+  if (name === "rm" && parsed.operands.length === 0) {
+    const word = args[args.length - 1] ?? syntheticPath();
+    return Object.freeze({ kind: "reject" as const, code: "unsupported-syntax" as const, word });
+  }
   return complete(analyzeCoreutilsComplete(name, parsed.options, parsed.operands));
 }
 

@@ -248,3 +248,55 @@ test("publishes custom preset badges through the host status API", async () => {
     assert.equal(harness.getStatus("akeel-policy"), "🛡️ AT");
   });
 });
+
+test("bounded rm integrates with host approval across review, develop, and no-UI modes", async () => {
+  await withAgentFiles(undefined, undefined, async (_agentDir, harness) => {
+    await harness.handlers.get("session_start")!(undefined, harness.ctx);
+
+    // review preset denies rm
+    assert.deepEqual(
+      await invoke(harness, { toolName: "bash", input: { command: "rm temp.txt" } }),
+      { block: true, reason: "Blocked by access policy." },
+    );
+
+    // Switch to develop preset (where destroy is ask)
+    const policyCommand = harness.commands.get("policy");
+    assert.ok(policyCommand);
+    await policyCommand("develop", harness.ctx);
+
+    // User confirms: allowed
+    harness.setConfirmResult(true);
+    assert.equal(
+      await invoke(harness, { toolName: "bash", input: { command: "rm temp.txt" } }),
+      undefined,
+    );
+
+    // User denies: blocked
+    harness.setConfirmResult(false);
+    assert.deepEqual(
+      await invoke(harness, { toolName: "bash", input: { command: "rm temp.txt" } }),
+      { block: true, reason: "Blocked by user." },
+    );
+
+    // Hard boundary (e.g. sensitive path) remains blocked even in develop
+    assert.deepEqual(
+      await invoke(harness, { toolName: "bash", input: { command: "rm .git/config" } }),
+      { block: true, reason: "Blocked by a security boundary." },
+    );
+
+    // Recursive rm remains blocked by security boundary
+    assert.deepEqual(
+      await invoke(harness, { toolName: "bash", input: { command: "rm -r temp_dir" } }),
+      { block: true, reason: "Blocked because the shell syntax is unsupported." },
+    );
+
+    // No-UI context fails closed
+    const noUiCtx = { ...harness.ctx, hasUI: false };
+    const handler = harness.handlers.get("tool_call");
+    assert.ok(handler);
+    assert.deepEqual(
+      await handler({ toolName: "bash", input: { command: "rm temp.txt" } }, noUiCtx),
+      { block: true, reason: "Blocked because approval UI is unavailable." },
+    );
+  });
+});

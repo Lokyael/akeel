@@ -51,6 +51,9 @@ export function analyzeProgramInvocation(invocation: ProgramInvocation): Program
   const name = commandName(invocation.executable).toLowerCase();
   if (isCoreutilsProgram(name)) {
     if (invocation.executable.includes("/")) {
+      if (name === "rm") {
+        return { kind: "complete", semantic: result("destroy", ["delete"], [], { hardBoundary: true }) };
+      }
       return { kind: "complete", semantic: result("execute", ["execute"], [], { opaque: true }) };
     }
     return analyzeCoreutilsProgram(name, invocation.arguments);

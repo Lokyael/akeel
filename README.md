@@ -68,7 +68,7 @@ presets:
       modify: ask
       execute: ask
       opaque: ask
-      destroy: deny
+      destroy: ask
       unknown: deny
   develop:
     paths:
@@ -82,7 +82,7 @@ presets:
       modify: allow
       execute: allow
       opaque: allow
-      destroy: deny
+      destroy: ask
       unknown: ask
 activePreset: develop
 ```
@@ -94,7 +94,7 @@ Policy configuration rules:
 - A non-empty `allowedRoots` list limits managed paths to those roots and their descendants. When it is omitted or empty, the runtime supplies the session Access Root, session staging root, and `/tmp/akeel` as defaults. `blockedRoots` rejects each listed root and its descendants, while `blockedPaths` rejects exact paths; recursive search is also rejected when its starting path could reach a blocked descendant. Blocked scope wins over allowed scope, and path-scope violations cannot be approved through an `ask` mode.
 - A flat `paths`/`commands` policy uses the same complete schema as custom presets and is a single static policy without runtime switching.
 - In native TUI mode, `/policy` opens the temporary selector for all loaded presets; `/policy status` reports the active preset; `/policy <preset>` switches it for the session. Outside native TUI, `/policy` reports status and does not switch automatically.
-- Path and command modes are `allow`, `ask`, or `deny`. `commands.opaque` is an independent mode for commands whose runtime path effects cannot be statically proven: built-in `review` denies, `guided` asks, and `develop` allows. It does not provide a sandbox or make `allowedRoots` enforce runtime script access. `destroy`/`delete` operations remain a permanent hard boundary even when `commands.destroy: allow` is configured. System hard boundaries take precedence over every preset.
+- Path and command modes are `allow`, `ask`, or `deny`. `commands.opaque` is an independent mode for commands whose runtime path effects cannot be statically proven: built-in `review` denies, `guided` asks, and `develop` allows. It does not provide a sandbox or make `allowedRoots` enforce runtime script access. Unbounded or unproven `destroy`/`delete` operations (recursive deletions, directory removals, unmodeled commands, and path-form executables) remain a permanent hard boundary even when `commands.destroy: allow` is configured. Only bounded non-recursive `rm` commands with verified target paths are admitted through the configured `destroy` mode (built-in `review` denies, while `guided` and `develop` require interactive host confirmation `ask`; headless/no-UI fails closed). System hard boundaries take precedence over every preset.
 - `ask` requires interactive host confirmation, never executes automatically, and shows bounded summaries with the literal Shell command form. Opaque approval is labeled as not fully statically verified; summaries never include file content or policy data.
 - Malformed YAML, unknown fields, incomplete definitions, conflicting names, and legacy fields cause the complete file to be ignored and the built-in `review` baseline to be used.
 

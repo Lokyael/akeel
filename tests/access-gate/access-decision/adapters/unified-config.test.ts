@@ -70,7 +70,7 @@ test("named presets preserve built-in semantics and select the active snapshot",
   assert.equal(decoded.snapshots.review.paths.write, "deny");
   assert.equal(decoded.snapshots.guided.paths.edit, "ask");
   assert.equal(decoded.snapshots.develop.paths.edit, "allow");
-  assert.equal(decoded.snapshots.develop.commands.destroy, "deny");
+  assert.equal(decoded.snapshots.develop.commands.destroy, "ask");
 
   const builtinsDefaulted = decodePolicyConfiguration({
     presets: {

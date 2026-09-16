@@ -510,23 +510,25 @@ Canonical reject 使用本域封闭 code、source anchor 与资源分类；rende
 
 **Out of Scope:** 其他文件中的偶然凭据、宿主外部扩展的直接访问、Gate 禁用后的安全保证、模板类工件的具体 preset 配置，以及大小写折叠或大小写不敏感文件系统上的凭据别名保证；AKeel 只保证默认大小写敏感的本地 Linux 文件系统语义。
 
-## D-071: Destroy 操作永久硬拒绝
+## D-071: Destroy 操作永久硬拒绝与有界单文件受审批准入
 
 **Reversal surface:** user-boundary
 
-**Decision:** 所有 Canonical 阶段识别为 `destroy` 的命令，以及带有 `delete` effect 的操作，均属于永久系统 hard boundary。Policy Kernel 在路径策略、命令模式和 UI 审批之前拒绝这些操作，结果固定为 `hard-boundary`；它们不会因 `commands.destroy: allow` 或 `ask`、路径范围、preset 切换或用户确认而放行。`policy.yaml` 的 flat policy 和自定义 preset 仍允许 `commands.destroy: allow`、`ask` 或 `deny`，该值保留在 Policy Snapshot 中但不授予 destroy/delete 操作权限；内置 preset 使用 `destroy: deny`。
+**Decision:** 无法建立完备影响范围证明的破坏操作——包括目录删除命令（`rmdir`）、递归删除（`-r`、`-R`、`--recursive`）、目录删除标志（`-d`、`--dir`）、未知选项、未建模破坏命令、路径形式破坏可执行文件（如 `/bin/rm`）、无提取路径的破坏操作，以及任何命中凭据工件（D-070）、Git 控制工件或超出路径策略根的破坏操作——均属于永久系统 hard boundary。Policy Kernel 在路径策略和 UI 审批之前拒绝这些无界破坏操作，结果固定为 `hard-boundary`。
 
-**Why:** 破坏操作的影响不可逆或难以恢复，现有 Canonical 语义尚未能对递归删除、父目录删除和未知删除选项建立足够完整的边界证明；将其交给 `ask` 会把不完整的静态证明转化为用户审批风险。保留配置值的合法性与既有命令策略 schema 一致，但不把无效的授权期待变成安全承诺。
+对通过 Canonical 完备证明的单文件/多文件非递归裸 `rm` 命令，且所有目标路径均通过 Mandatory Boundary 核验的操作，解除硬边界短路，受管地进入 Policy Kernel 求值与宿主 UI `ask` 审批。内置 `guided` 与 `develop` 预设将 `commands.destroy` 设为 `ask`，`review` 预设保持 `deny`。无 UI 环境下严格 fail-closed 为无 UI 阻断。自定义 preset 可显式配置 `destroy` 模式；未建立有界证明的操作继续被系统硬边界永久拒绝。
 
-**Impact:** `rm`、`rmdir -p`、危险 Git 操作、`ruff clean` 及其他 Canonical destroy/delete 事实继续 fail-closed；混合 Shell flow 只要包含此类操作即由 hard boundary 聚合拒绝。运行时不生成 destroy 的 ask，也不因有 UI 而改变结果。自定义 preset 可声明 `destroy: allow`，但该字段不会解除系统边界。
+**Why:** 破坏操作的影响不可逆或难以恢复，递归删除、父目录删除、通配符和未知选项无法在静态分析中排除扩散风险，用户确认不能替代系统边界证明，故无界破坏操作必须保持永久硬拒绝。而对显式指定操作数、禁止递归、路径逐一规范化证明且未触及凭据与 Git 控制工件的单文件 `rm`，其影响范围完全确定且与普通覆盖写入对等；将其接入知情同意（`ask`）机制既满足日常清理构建产物与测试临时文件的真实需要，又确保每次删除均经用户确认与无 UI 保护。
+
+**Impact:** `rm single_file.txt` 在 `guided` 和 `develop` 下受管触发 `ui.confirm`；无 UI（headless/CI）运行时严格 fail-closed。`rmdir`、`rm -r`、高危 Git 操作（`reset --hard`、`clean -f`、`branch -D`）、`ruff clean`、`/bin/rm` 及未完全证明的破坏命令继续由 hard boundary 永久拒绝。
 
 **Rejected:**
 
-- **将有界 destroy 改为每次 ask：** 当前无法完整证明递归、父级删除和未知 option 的影响范围；用户确认不能替代 Canonical 边界证明。
-- **拒绝 `destroy: allow` 配置：** 会把配置 schema 的合法值与实际授权边界混为一谈；保留该值可表达配置输入，但运行时仍固定 hard deny。
-- **由用户确认覆盖 hard boundary：** 审批不是系统安全边界，不能放宽永久拒绝。
+- **全量无条件放开 `rm` 到 `ask`：** 递归、通配符与未建模选项会把无法证明的系统风险转化为用户盲审。
+- **在 `develop` 预设中将 `destroy` 设为 `allow`：** 破坏性操作具有不可逆性，日常开发下仍需每次知情同意，不应静默放行。
+- **允许无 UI 环境下静默删除：** 无 UI 下缺少知情同意途径，必须 fail-closed 阻断。
 
-**Out of Scope:** 新增破坏操作支持、递归删除边界的扩大、运行时文件恢复或删除审计；只有建立独立、完整的 Canonical 证明并经新的 user-boundary Decision，才重新评估 destroy。
+**Out of Scope:** 目录删除与递归删除支持、Git 破坏性子命令的放宽、通配符静态展开、运行时文件恢复或删除审计；更宽的破坏操作复核继续由 C-028 承载。
 
 ## D-072: Session 启动 cwd 作为访问根与 `$HOME` 的受限 tilde 语义
 

@@ -465,6 +465,10 @@ test("bounded coreutils option values do not become path operands", () => {
     ["grep --include '*.ts' pattern README.md", ["README.md"]],
     ["ls -la README.md", ["README.md"]],
     ["head -- -file", ["-file"]],
+    ["rm file.txt", ["file.txt"]],
+    ["rm -f a.txt b.txt", ["a.txt", "b.txt"]],
+    ["rm -v file.txt", ["file.txt"]],
+    ["rm -- -file.txt", ["-file.txt"]],
   ] as const) {
     const analysis = analyzeShellCommand(command);
     assert.equal(analysis.kind, "complete", command);
@@ -473,11 +477,40 @@ test("bounded coreutils option values do not become path operands", () => {
 });
 
 test("known coreutils reject options outside their bounded contract", () => {
-  for (const command of ["head --unknown README.md", "touch --unknown file", "head --lines", "tail -n", "grep --color=always pattern README.md", "ln -L source link"]) {
+  for (const command of [
+    "head --unknown README.md",
+    "touch --unknown file",
+    "head --lines",
+    "tail -n",
+    "grep --color=always pattern README.md",
+    "ln -L source link",
+    "rm -r dir",
+    "rm -R dir",
+    "rm --recursive dir",
+    "rm -d empty_dir",
+    "rm --dir empty_dir",
+    "rm -i file",
+    "rm --no-preserve-root file",
+    "rm",
+    "rm -f",
+  ]) {
     const analysis = analyzeShellCommand(command);
     assert.equal(analysis.kind, "reject", command);
     if (analysis.kind === "reject") assert.equal(analysis.code, "unsupported-syntax", command);
   }
+});
+
+test("bounded rm extracts target paths and destroy command class", () => {
+  const analysis = complete("rm -f file.txt");
+  assert.equal(analysis.commandClass, "destroy");
+  assert.deepEqual(analysis.effects, ["delete", "write"]);
+  assert.deepEqual(analysis.paths, [{ text: "file.txt", role: "target" }]);
+  assert.equal(analysis.semantic.recursive, false);
+  assert.equal(analysis.semantic.hardBoundary, false);
+
+  const pathForm = complete("/bin/rm file.txt");
+  assert.equal(pathForm.commandClass, "destroy");
+  assert.equal(pathForm.semantic.hardBoundary, true);
 });
 
 test("copy-like commands distinguish source and target operands", () => {
