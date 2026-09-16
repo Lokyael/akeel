@@ -496,6 +496,7 @@ test("Herdr commands map to inspect, execute, and modify semantics with path ext
     "herdr -V",
     "herdr --help",
     "herdr status",
+    "herdr agent",
     "herdr agent list",
     "herdr agent get child1",
     "herdr agent read child1 --source recent-unwrapped --lines 80",

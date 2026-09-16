@@ -65,7 +65,10 @@ export function analyzeHerdrProgram(args: readonly ShellWord[]): ProgramSemantic
   }
 
   if (subcommand === "agent") {
-    if (action !== undefined && INSPECT_ACTIONS.has(action)) {
+    if (action === undefined) {
+      return result("inspect", ["read"]);
+    }
+    if (INSPECT_ACTIONS.has(action)) {
       return result("inspect", ["read"]);
     }
     if (action !== undefined && EXECUTE_ACTIONS.has(action)) {

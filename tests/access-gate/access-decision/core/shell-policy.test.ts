@@ -1027,6 +1027,9 @@ test("herdr commands follow policy classification and path boundaries", () => {
     blockedRoots: [],
   });
 
+  assert.deepEqual(evaluateShellAdmission(admission("herdr agent"), develop), {
+    kind: "allow",
+  });
   assert.deepEqual(evaluateShellAdmission(admission("herdr agent get child1"), develop), {
     kind: "allow",
   });
