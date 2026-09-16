@@ -189,7 +189,7 @@
 > 本条承接 C-025 中关于路径策略语言、旧 glob matcher 与规则顺序的差异核对，只记录未来重新评估方向，不恢复旧 Profile/config 兼容、运行时 glob 或 Shell glob 展开，也不构成实施承诺。
 
 - **Why Not Now:** D-059 在 T-069 中明确排除旧 Profile/config schema 的兼容读取、转换器与迁移期 fallback；D-069 当前以绝对 `allowedRoots`、`blockedRoots`、`blockedPaths` 表达路径范围。当前没有真实工作流证据表明该表达不足，也没有足够证据证明旧 glob 规则可以无损转换。
-- **Exploration Direction:** 未来若重新评估，先用真实工作流确认当前路径范围表达的具体缺口，再区分三种不同方向：①运行时接受旧路径 glob；②提供一次性、显式报告不可表达项的迁移器；③只补充当前绝对路径表达的文档。旧 matcher 的 `*`、`?`、`**`、大小写、绝对路径、blocked-pattern 与 first-match 等语义只是历史参考；只有确定需要兼容或迁移时，才逐项重新证明。任何迁移结果都不得静默扩大或缩小授权范围，无法等价表达的规则必须报告为未转换。路径规则顺序也必须在当前 Policy Snapshot 与 hard-boundary 语义下重新决定，不自动继承旧 first-match 行为。
+- **Exploration Direction:** 未来若重新评估，先用真实工作流确认当前路径范围表达的具体缺口，再区分三种不同方向：①运行时接受旧路径 glob；②提供一次性、显式报告不可表达项的迁移器；③只补充当前绝对路径表达的文档。旧 matcher 的 `*`、`?`、`**`、大小写、绝对路径、blocked-pattern 与 first-match，以及 `project/`、`staging/`、`~/` 虚拟命名空间、按操作定义的路径规则和 Profile 继承产生的规则顺序，都只是历史参考；只有确定需要兼容或迁移时，才逐项重新证明。任何迁移结果都不得静默扩大或缩小授权范围，无法等价表达的规则必须报告为未转换。路径规则顺序也必须在当前 Policy Snapshot 与 hard-boundary 语义下重新决定，不自动继承旧 first-match 或 Profile 继承顺序。
 - **Revisit condition:** 真实工作流因当前路径表达被阻塞；用户明确要求转换既有旧 policy；或获得一组有界旧规则样本及足够的外部语义证据，能够验证转换是否保持权限范围。
 - **Out of Scope:** 在本候选明确采纳前，不恢复运行时 glob 兼容，不提供静默迁移或迁移期 fallback，不恢复旧 Profile/config schema，不改变 D-018 的 Shell glob 边界，不把旧 matcher 测试直接当作当前合同，也不创建实现 Task。
 - **Origin:** C-025
