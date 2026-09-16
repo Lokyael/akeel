@@ -15,7 +15,7 @@ Verify the current session is inside Herdr:
 printenv HERDR_ENV
 ```
 
-Use `akeel_run_artifact` action `reserve` to create one run with an Owner-published `packet` slot and one child-published artifact slot per child. Publish the complete packet with action `put`; use only the returned run ID, exact paths, and opaque child capabilities. A missing Artifact Exchange tool blocks formal delegation rather than authorizing an ad hoc `/tmp/akeel/<workflow>` path.
+Use `akeel_run_artifact` action `reserve` to create one run with an Owner-published `packet` slot and one child-published artifact slot per child. Publish the complete packet with action `put`; use only the returned run ID, exact paths, and opaque child capabilities. A missing Artifact Exchange tool blocks formal delegation.
 
 Create the workspace matching the child's effective capability:
 

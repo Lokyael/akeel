@@ -866,11 +866,11 @@ Canonical compiler 通过受信任、不可由 policy 或用户配置替换的 L
 
 **Why:** Staging 没有独立生命周期，属于创建它的 Pi session；session envelope 使 metadata、lock、staging 和回收 owner 保持局部一致。Workflow run 与 handoff 具有不同 owner 和保留条件，不能进入同一回收扫描。TTL 与双配额兼顾异常排查和磁盘边界，manifest/provenance 守卫防止按前缀认领未知内容。
 
-**Impact:** GateSession 继续把实际 `stagingRoot` 加入默认允许根；其路径现为 `/tmp/akeel/sessions/session-<random>/staging/`。Access Gate package 只拥有 `sessions/`，不扫描或清理 Guidance package 的 workflow run 与 handoff。
+**Impact:** GateSession 继续把实际 `stagingRoot` 加入默认允许根；其路径为 `/tmp/akeel/sessions/session-<random>/staging/`。Access Gate package 只拥有 `sessions/`，不扫描或清理 Guidance package 的 workflow run 与 handoff。
 
 **Rejected:**
 
-- **继续以顶层 `staging/stage-*` 表达 session 资源：** 隐藏了真实 lifecycle owner，并使 metadata 与暂存内容没有统一 envelope。
+- **独立顶层 `staging/` 目录：** 隐藏了真实 lifecycle owner，并使 metadata 与暂存内容缺乏统一 envelope。
 - **把 staging 放入 workflow run：** 一个 session 可创建多个 run，一个 run 也可包含多个 child session；错误的一对一关系会造成过早删除或无限保留。
 - **按名称认领或同步删除全部历史目录：** 无法证明未知目录归属，且会破坏 crash 现场。
 - **无配额上限的纯时间保留：** 短期大量暂存数据仍可耗尽磁盘。
@@ -883,11 +883,11 @@ Canonical compiler 通过受信任、不可由 policy 或用户配置替换的 L
 
 **Decision:** Guidance package 提供独立于 Access Gate Policy 的 Artifact Exchange 与 Handoff Store。Artifact Exchange 为结果返回同一 Task Owner 的 bounded workflow 创建 `/tmp/akeel/runs/run-<random>/`：可信 `control/` 保存 immutable manifest、Herdr binding 与 publication receipt，`packet/` 保存 Owner 输入，`artifacts/` 保存 child 结果，`quarantine/` 保存不可自动消费的恢复残留，`transport/herdr/` 只保存 bounded 执行诊断。Handoff Store 为 source→successor session 转交创建 `/tmp/akeel/handoffs/handoff-<random>/`，不把 authority transfer 伪装成返回原 Owner 的 workflow run。
 
-Child artifact slot 使用预定、单 slot、单次、24 小时有效的 opaque capability；raw capability 不落盘，manifest 只保存 digest。Owner 把 slot 绑定到确切 Herdr workspace、pane 和 Agent，child Pi 通过 `--akeel-artifact-capability` 激活唯一 publisher，接口只接受 UTF-8 content，不接受 path、run、append、overwrite 或 mode。每 slot 上限 1 MiB、每 run 最多 4 slots、每 Owner session 最多 8 runs。Publisher 在校验 capability、binding、Pi/Herdr identity 和预算后 no-clobber 发布 artifact，最后发行包含 digest 与长度的 receipt；Owner collect 在同一次调用中重新核验并返回内容。Herdr settle、完成文本或 terminal read 不是 receipt。
+Child artifact slot 使用预定、单 slot、单次、24 小时有效的 opaque capability；raw capability 不落盘，manifest 只保存 digest。Owner 把 slot 绑定到确切 Herdr workspace、pane 和 Agent，child Pi 通过 `--akeel-artifact-capability` 激活唯一 publisher，参数封闭为单一 `content` 字符串。每 slot 上限 1 MiB、每 run 最多 4 slots、每 Owner session 最多 8 runs。Publisher 在校验 capability、binding、Pi/Herdr identity 和预算后 no-clobber 发布 artifact，最后发行包含 digest 与长度的 receipt；Owner collect 在同一次调用中重新核验并返回内容。Herdr settle、完成文本或 terminal read 不是 receipt。
 
-三类生产临时资源按 lifecycle owner 分开：Access Gate 拥有 `sessions/`，Artifact Exchange 拥有 `runs/`，Handoff Store 拥有 `handoffs/`。新目录默认 `0700`、文件 `0600`；受控 root 必须为当前用户所有、非 symlink 且不可由 group/other 写入。测试 fixture、第三方 cache 和普通探测不建立生产顶层目录；按 skill 命名的 `grill/`、`reviews/`、`preflight/`、`test/`、`external/` 不属于现行命名空间。既有未知内容不迁移、不认领、不删除。
+三类生产临时资源按 lifecycle owner 分开：Access Gate 拥有 `sessions/`，Artifact Exchange 拥有 `runs/`，Handoff Store 拥有 `handoffs/`。新目录默认 `0700`、文件 `0600`；受控 root 必须为当前用户所有、非 symlink 且不可由 group/other 写入。生产临时资源严格限定在上述三类顶级命名空间；未建模目录或未知内容不自动认领与清理，测试 fixture 与第三方工具缓存不占用生产命名空间。
 
-Artifact tools 是自授权 custom Pi surfaces，Access Gate 继续只管理既有 Direct/Shell surfaces；capability publication 不改变 `review` 或任何 path/command Policy，也不授予普通写入、验证、修改代码、任意执行、验收或清理。Run 与 handoff 初版不自动 GC；Artifact Exchange 不提供删除操作，精确清理由用户批准后在其控制面完成。
+Artifact tools 是独立自授权的 Pi custom tool surfaces，不改变 Access Gate 的 path/command Policy，也不扩展普通文件访问权限。Run 与 handoff 不执行自动 GC，保留至用户批准清理。
 
 **Why:** 普通 `write` 的 Gate 只拥有执行前准入，不能保证单次 capability、原子 no-clobber、receipt 或 verified collect；放宽 `review` 会扩大所有写权限。Herdr 0.9.0 只提供 Agent 状态和终端读取，没有结构化 artifact API。Pi custom tool 与 custom flag 可把复杂度封装在窄接口内，同时保持 Herdr 负责执行拓扑、AKeel 负责结果 transport。按 owner/lifecycle 分类避免 staging GC 删除未裁决结果，也避免把跨 session handoff 的 authority transfer 泄漏进普通 run。
 

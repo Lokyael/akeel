@@ -19,7 +19,7 @@
 - **Gate Session**：绑定单次 Pi session 的 runtime aggregate，拥有固定 Access Root、session-start `$HOME`、活动 Policy Snapshot、credential boundary 与 lifecycle。
 - **Session Resource Envelope**：Access Gate 为一个 Pi session 在 `/tmp/akeel/sessions/session-*/` 创建的受管临时资源，包含 metadata、lock 与唯一 stagingRoot；正常 shutdown 删除，异常 residue 进入 D-088 retention。
 - **Workflow Run**：同一 Task Owner 拥有的一次 bounded 临时 workflow attempt，位于 `/tmp/akeel/runs/run-*/`；它不是 Task Record，可包含 packet、child artifacts、control receipts、quarantine 与 transport diagnostics。
-- **Artifact Capability**：Artifact Exchange 为一个 child result slot 发行的 opaque、单次、有时限发布权；只允许发布有界文本，不授予普通写入、执行、验收或清理。
+- **Artifact Capability**：Artifact Exchange 为一个 child result slot 发行的 opaque、单次、有时限有界文本发布权。
 - **Formal Artifact Handoff**：child publication 经 binding、receipt、长度与 digest 核验后由原 Task Owner collect 的结果交接；Herdr settled state 与 terminal read 不构成该结果。
 - **Session Handoff**：source session 通过 Handoff Store 发布、由 successor session 按 receipt 核验的 authority-context 转交；其 consumer 与 owner 会转移，不属于普通 Workflow Run。
 - **Guidance**：从决策代码到静态 bounded host-facing 文案的封闭映射，不携带可执行 Shell。

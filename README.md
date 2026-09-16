@@ -114,7 +114,7 @@ AKeel trims output from model-invoked `bash` tool results for standalone `npm te
 
 ## Workflow artifacts and temporary resources
 
-Guidance supplies a formal text-artifact channel for synchronous Herdr children. The Task Owner reserves a run and packet, binds one result slot to the exact Herdr workspace/pane/Agent, and starts Pi with that slot's opaque capability. The child can publish at most one bounded artifact through `akeel_publish_artifact`; it cannot choose a path or gain ordinary write permission. The Owner accepts a result only after `akeel_run_artifact` verifies its receipt, length, digest, and binding. Herdr `idle`/`done` and terminal output are diagnostic state, not artifact delivery.
+Guidance supplies a formal text-artifact channel for synchronous Herdr children. The Task Owner reserves a run and packet, binds one result slot to the exact Herdr workspace/pane/Agent, and starts Pi with that slot's opaque capability. The child publishes its single bounded artifact through `akeel_publish_artifact`, with destination, limits, and binding determined by the capability. The Owner accepts a result only after `akeel_run_artifact` verifies its receipt, length, digest, and binding. Herdr `idle`/`done` and terminal output are diagnostic state, not artifact delivery.
 
 AKeel-owned temporary resources are classified by lifecycle:
 
@@ -125,7 +125,7 @@ AKeel-owned temporary resources are classified by lifecycle:
   handoffs/handoff-<random>/          # source-to-successor session handoff
 ```
 
-New controlled directories use private permissions. Session residue is reclaimed under the documented retention policy; workflow runs and handoffs are not automatically deleted. AKeel does not migrate, claim, or remove legacy and unknown `/tmp/akeel` content.
+New controlled directories use private permissions. Session residue is reclaimed under the documented retention policy; workflow runs and handoffs are retained for explicit user cleanup. Unrecognized filesystem entries are not claimed or removed.
 
 ## Companion tools
 

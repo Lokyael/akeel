@@ -38,7 +38,7 @@ Apply the narrowest handling:
 
 When the run ledger, non-sensitive classification, recovery artifact, quarantine move, or post-action verification is unavailable, report the required action without modifying files. Deep cleanup requires separate authorization through `code-cleanup`.
 
-Quarantine is a run-scoped recovery aid, not a project artifact or formal child result. Retain it through validation and Code Review; it blocks automatic run cleanup while non-empty. After the Review Surface is accepted, the Task is completed, or the run is explicitly abandoned, report the exact run path and obtain user approval for cleanup. Artifact Exchange does not delete runs or quarantine, and initial workflow runs have no automatic retention sweep. Never expand cleanup to another run ID or use force deletion.
+Quarantine is a run-scoped recovery aid, not a project artifact or formal child result. Retain it through validation and Code Review; it blocks automatic run cleanup while non-empty. After the Review Surface is accepted, the Task is completed, or the run is explicitly abandoned, report the exact run path and obtain user approval for cleanup. Artifact Exchange does not delete runs or quarantine, and workflow runs have no automatic retention sweep. Never expand cleanup to another run ID or use force deletion.
 
 ## 3. Check Readiness
 

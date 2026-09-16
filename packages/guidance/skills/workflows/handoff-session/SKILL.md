@@ -26,6 +26,6 @@ Include:
 
 If the user passed arguments, treat them as the successor's focus and tailor the handoff accordingly.
 
-Call `akeel_handoff` action `publish` with the complete Markdown document. The Handoff Store creates one owner-controlled `/tmp/akeel/handoffs/handoff-<random>/` envelope and atomically publishes `handoff.json`, `handoff.md`, and `receipt.json` with private permissions. Do not use ordinary `write`, create a legacy flat handoff file, or choose the path yourself.
+Call `akeel_handoff` action `publish` with the complete Markdown document. The Handoff Store creates one owner-controlled `/tmp/akeel/handoffs/handoff-<random>/` envelope and atomically publishes `handoff.json`, `handoff.md`, and `receipt.json` with private permissions. Destination paths and envelope structure are managed exclusively by the store.
 
 Return the exact published `handoff.md` path and a brief summary. The successor calls `akeel_handoff` action `verify` with that exact path before relying on its content. Missing or mismatched manifest, content, or receipt is a failed handoff; do not reconstruct it from terminal output. Handoff Store does not delete the envelope, so the successor reports the exact retained path for explicit user-managed cleanup after successful takeover.
