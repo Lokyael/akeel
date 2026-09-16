@@ -54,14 +54,14 @@
 - **Exploration Direction:** 若未来具备真实 seam，重新探索以下边界：Operation Admission 与 Content Flow 独立；静态 Normalized Flow 与运行时 Evidence 分离；Publication、Network Send、Process Start、File Commit 各自拥有 checkpoint 规则、授权、enforcement 和 receipt；只有受控绑定的 `exact` evidence 才能参与进一步判断，`unknown`/`unavailable`/`no-coverage` 不得解释为 clean、safe 或 permit；payload、lineage 和运行时授权不进入 `CompleteAccessPlan`。
 - **Revisit condition:** 用户明确启动 Content Flow 方向的探索，或宿主提供可测试的发布/发送/进程/提交 enforcement seam，并出现真实 producer/consumer 工作流。
 
-## C-021: 命令执行的 OS-level confinement
+## C-021: 受管执行的 OS-level confinement
 
-> 本条只记录执行期物理隔离的未来探索；当前不引入 sandbox runtime，也不改变 Operation Admission 边界。
+> 本条只记录宿主执行期物理隔离的未来探索；不把 sandbox runtime 纳入当前 Access Decision Core。
 
-- **Why Not Now:** Canonical 与 Policy 只能在执行前决定是否准入，不能约束已放行进程随后触发的依赖生命周期脚本、helper、子进程、文件系统访问或网络外发。OS confinement 需要重新核对 Pi 的 tool operations/sandbox seam、Linux 宿主能力、依赖检测、性能、交互命令和失败模式；当前没有不可信仓库自动执行的高频业务证据，也不能把某个具体 sandbox 工具预先定为方案。
-- **Exploration Direction:** 比较可验证的 Linux 非特权隔离方案，为受管命令建立物理文件系统与网络边界：工作区按需求读写挂载、系统依赖只读、宿主凭据不可见，本地测试或构建可在明确模式下隔离网络。准入语义与执行期 confinement 保持分层；worktree、path admission 或 preset 不能被描述为 OS sandbox。任何方案都需证明不可用宿主、无 UI、嵌套工具、进程树终止、输出与凭据处理，以及 Gate disabled 时的诚实边界。
-- **Out of Scope:** 不可信内容的指令权由 C-038 评估；参数级隐式执行分类由对应程序语义合同评估；现行 lexical/symlink traversal 继续由当前 Canonical 合同承载。`@keel/core` 与 DSH 双宿主战略没有独立复审条件，不由本候选保留。
-- **Revisit condition:** 用户正式启动外部不可信仓库的自动化审计、构建或重构流水线；供应链脚本或 helper 执行成为高频实际威胁；或用户明确要求评估 Linux OS-level confinement。
+- **Why Not Now:** Access Gate 当前只拥有 tool-call 准入权，不拥有已放行进程、helper、子进程或 socket 的执行控制权。仅增加 `network` 标签、preset 或路径策略不能限制运行期外联；Pi 也尚未提供可验证的执行包装与隔离 seam。
+- **Exploration Direction:** 只有宿主提供实际执行接缝后，才比较由独立 provider 建立的 Linux 隔离配置。provider 必须能证明文件系统、网络、凭据可见性、子进程、进程树终止和输出处理；Access Gate 只声明所需能力，不自行调用 Shell 包装器。若策略要求隔离而 provider 不可用，结果必须是拒绝；`prefer` 式降级只能明确表示“未隔离”，不能继续作出隔离承诺。
+- **Boundary:** provider 不改变 Canonical、Admission、Mandatory Boundary 或 Policy 的语义；worktree、path admission、preset 和 Gate disabled 都不能被描述为 OS sandbox。C-039 只处理已知外部状态变更，C-020/C-038 分别处理内容流与不可信输入权威。
+- **Revisit condition:** 用户正式启动外部不可信仓库的自动化审计、构建或重构流水线；供应链脚本或 helper 执行成为高频实际威胁；Pi 提供可测试的执行接缝；或用户明确要求评估 Linux OS-level confinement。
 
 
 ## C-023: 项目级 Policy 单向收紧
@@ -118,7 +118,6 @@
   - **User command overrides:** 旧版 `commands/aliases/reclassify` 允许用户声明式扩展命令语义；当前无等价入口。候选问题：是否在新 Canonical 架构下重新设计用户扩展 seam，或明确不支持。
   - **Git semantics:** 旧版 Git adapter 覆盖较广但重构任务记录了 path-boundary 风险；当前重点强化 `-C`、`--git-dir`、`--work-tree`、local `file://`、clone/fetch/pull/push/submodule 等 hard-boundary 回归。候选问题：是否只补可证明 Git 子集，而非追求旧 adapter parity。
   - **Package managers:** 旧版 npm/pnpm/yarn/npx adapter 更宽；当前分类常见 inspect/modify/execute，脚本、install、npx 等委托执行 opaque，在 path boundary 下 hard-deny。候选问题：是否按真实用例增加 bounded package-manager 子命令。
-  - **Network effect:** 旧版 Git/package/build 语义会为 `fetch/pull/push/clone/ls-remote/submodule`、`npm install/publish/audit/whoami/ping`、`cargo/go` 联网子命令等标注 `network`，并可触发网络侧审批；当前没有独立 network effect 或 network policy 轴，网络风险由 execute/opaque/hard-boundary 与 Negative Space 承担。候选问题：是否明确退役网络 effect，或作为未来细粒度策略重新设计。
   - **uv:** 旧版已有 `uv run` execute 语义；当前保留 `uv run` execute/opaque、help/version inspect、未知 fail-closed。候选问题：是否扩展 uv 其他顶层子命令。
   - **Python tools:** 旧版覆盖 `ruff/mypy/black/isort/pylint/pytest/pyright` 等；当前保留同族核心分类，但 `pytest` 与委托执行 opaque，`ruff clean` destroy。候选问题：是否按工具逐项补 option/path matrix。
   - **Interpreters:** 旧版区分 interpreter info 与 execute；当前保留，并把脚本 operand 纳入 path admission，`-e/-c` 等脚本选项 fail-closed。候选问题：是否补文档说明“脚本路径可见但内联代码不执行分析”。
@@ -256,11 +255,14 @@
 - **Exploration Direction:** 若宿主提供真实 seam，区分用户/系统指令与外部数据来源，为 web search/fetch、不可信变更说明和第三方文件保留 provenance，并验证 consuming agent 不把其中指令提升为更高权威。未知、丢失或跨工具未传播的 provenance 不得解释为可信。该输入解释权与 C-020 的输出 Content Flow checkpoint、C-021 的 OS confinement 和 Access Gate 的操作准入保持独立。
 - **Revisit condition:** 外部不可信内容成为自动化审计或重构的高频输入，并出现间接提示词注入实证；或 Pi 提供可测试的 provenance 与指令权 enforcement seam。
 
-## C-039: 网络副作用的独立 Operation Admission 轴
+## C-039: 已知外部状态变更的准入边界
 
-- **Why Not Now:** 当前没有独立 network effect 或 network policy；外部 Git transport、package scripts 和其他未建模联网行为由 execute/opaque/hard-boundary 与 Negative Space 承担。网络能力跨程序方言且可能隐式启动 helper，过早增加统一轴会把“已识别网络动作”误称为完整网络隔离。
-- **Exploration Direction:** 只在 Canonical 能依据外部程序合同发行有界网络副作用事实时，评估将远端 push/fetch、依赖发布或其他明确外发动作从常规本地修改中分离，并定义 allow/ask/deny、混合 flow、无 UI 和未知 transport 行为。参数级 helper/任意执行仍由对应程序语义合同处理；payload 内容与 lineage 由 C-020 处理；执行期网络 namespace 由 C-021 处理。Operation Admission 的允许不构成 OS-level 网络阻断保证。
-- **Revisit condition:** 真实工作流需要阻断未经授权的网络外发、远端变更或依赖发布，且当前 execute/opaque 边界过宽或过窄；或用户明确选择设计独立 network policy axis。
+> 本条不恢复通用 `network` effect，也不提供网络防火墙；只记录未来对少数可证明外部写入动作的复核。
+
+- **Why Not Now:** Access Gate 是执行前的语义准入系统，无法限制已放行脚本、helper、依赖生命周期或未知命令的运行期 socket。通用 network policy 会混合远程读取、外部写入和 opaque 行为，扩大命令方言与虚假安全承诺；当前 Git 远程/transport 边界已有更窄的 hard-boundary 处理。
+- **Open Question:** 若真实工作流证明当前 `opaque` 或既有 hard-boundary 过宽/过窄，是否在 Canonical/Admission 中增加少数“已知外部状态变更”事实，并为 `git push`、package publish/upload 等明确动作定义统一的策略、混合 flow、无 UI 和显示合同。分类必须依赖完整的程序/选项合同，不因命令名称、URL 或参数外观猜测运行期行为。
+- **Safety Boundary:** 该候选只保护被静态识别的外部状态变更；未知脚本、helper、依赖执行和任意网络外联仍是 `opaque`，不因该分类获得路径或网络隔离。审批不表示已执行；C-021 拥有执行期隔离，C-020 拥有 payload/lineage，C-038 拥有不可信输入 provenance。
+- **Revisit condition:** 真实工作流证明显式外部状态变更需要区别于本地 `write`/`execute`，且现有边界无法合理表达；或用户明确启动该狭窄准入复核。未满足前，不新增 network policy axis 或实现 Task。
 
 ## C-040: Pi render-only tool-result renderer 与测试模型视图
 
@@ -278,21 +280,12 @@
 - **Revisit condition:** 再次修改 `CONTEXT.md`，或有实际证据表明 Architecture 段落成为主要上下文负载时，重新评估其内容归属和压缩空间。
 - **Out of Scope:** 本候选未被明确采纳前，不重写 `CONTEXT.md`，不修改 `principles.md`、skills、插件代码或 Project Record 生命周期，也不把候选内容当作当前架构结论。
 
-## C-042: Runtime trace observer seam 的职责与可见性
-
-> 本条从 C-025 独立抽取，记录运行时 trace 的消费者与职责评估；不构成当前公共接口或实现承诺。
-
-- **Why Not Now:** 当前 service 已产生有序的运行时 trace events（`adapt`、`compile`、`admission`、`evaluate`、`display`、`render` 等），但尚未证明存在需要依赖它的外部消费者。将其提升为公共 seam 会引入事件顺序、数据范围和兼容责任；仅为测试保留或完全删除又可能丢失对 pipeline 行为的验证与诊断价值。
-- **Exploration Direction:** 先确认实际消费者和不可替代的使用场景，再比较三种处置：保留为内部测试 seam、重新定义为有界的 public diagnostic seam，或明确退役为实现细节。复核应区分 trace 对测试、诊断和外部集成的不同责任，核对其与 Canonical、Admission、Policy、Display、render 的边界，并保持现有模型上下文、Policy 数据、session 持久化和运行时审计边界不被隐式扩大。
-- **Revisit condition:** 出现外部消费者依赖当前 trace、现有测试或诊断因缺少稳定观测接缝而无法满足真实需求，或用户明确要求重新评估该 trace seam。
-- **Out of Scope:** 在本候选被明确采纳前，不承诺稳定事件 schema、运行时审计日志、session entry、LLM context 注入、Policy 数据暴露、TUI renderer 改造或实现 Task；C-040 的 Pi render-only tool-result renderer 仍是独立候选。
-
 ## C-044: 非 bounded 程序的参数级隐式执行与选项消费边界
 
 > 本条记录当前基础命令选项合同之外的残留复核；不改变现行 Canonical、Admission、Policy 或 `opaque` 语义。
 
 - **Why Not Now:** 当前已为一组 bounded coreutils 建立命令专属 option/value 合同，`find` 也有独立的 bounded expression analyzer；Git、Python、uv、herdr 和 npm 族仍由各自语义模块及既有 scanner 处理。已知的 Git helper/`-c`、`find -exec` 等形态已有 hard boundary，但未知程序及脚本内容（例如 `awk` 的 `system()`、其他工具的 helper 选项）仍按 `unknown + opaque` 处理。现在引入通用 option engine 或递归解释脚本会扩大 CLI 方言、执行语义和维护成本，且尚无新的安全实证或高频工作流证据要求改变该边界。
-- **Open Question:** 是否继续维持“已证明的命令专属合同 + 未证明形态 opaque”的分层，还是为剩余程序族与未知程序重新设计更统一的参数级安全合同。复核必须分别判断：选项值消费是否完整、值是否产生路径事实、参数是否可能启动 helper/子进程/网络或破坏动作，以及 `opaque` 策略是否足以表达未证明风险；不能把这些问题合并为通用 Shell 解析或 OS-level confinement。
+- **Open Question:** 是否继续维持“已证明的命令专属合同 + 未证明形态 opaque”的分层，还是为剩余程序族与未知程序重新设计更统一的参数级安全合同。复核必须分别判断：选项值消费是否完整、值是否产生路径事实、参数是否可能启动 helper/子进程、外部状态变更或破坏动作，以及 `opaque` 策略是否足以表达未证明风险；不能把这些问题合并为通用 Shell 解析、网络策略或 OS-level confinement。
 - **Scope:** 只复核当前 Git/Python/uv/herdr/npm 族的 option scanner 覆盖与高风险选项边界，并核对未知命令的 `unknown`、`opaque`、路径边界和策略组合。外部实现（包括 pi-guard）只能作为可核查语料或合同参考，不作为正确性 oracle。
 - **Safety Boundary:** 不因命令名称或选项外观推断脚本、helper 或运行期访问已经被分析；未知、动态、未消费或无法证明的值不得静默变成 positional path 或更宽授权。任何复核方案都不得削弱 D-018 的 fail-closed 规则、D-067 的 opaque 分层、Git/`find` 现有 hard boundary、D-071 的 destroy 永久拒绝或把 `allowedRoots` 描述为 opaque 运行期强制。
 - **Revisit condition:** 出现真实安全证据表明参数级 helper/隐式执行可穿过当前边界，或真实工作流因已知程序的选项消费误判而受阻；或者用户明确启动剩余程序族与未知命令的参数级安全合同复核。

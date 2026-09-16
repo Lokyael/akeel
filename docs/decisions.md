@@ -856,4 +856,26 @@ Canonical compiler 通过受信任、不可由 policy 或用户配置替换的 L
 
 **Out of Scope:** 新增或放宽 Shell 语法、程序族、destroy/delete、网络或路径能力；改变 `policy.yaml` 用户 schema、内置 preset、凭据分类、Access Root、staging lifecycle 或 `accessGate: disabled` 语义；OS sandbox、fd broker、TOCTOU 消除、执行期子进程/网络隔离；Static Flow、Explanation Replay、Runtime Audit、Runtime Content Flow 和 delegated child policy。
 
-## D-088: 待创建
+## D-088: 单用户 Staging 生命周期与保留策略
+
+**Reversal surface:** engineering
+
+**Decision:** AKeel 运行于本地单用户环境。运行时 staging 根目录固定位于 `/tmp/akeel/staging/`，各会话在此目录下创建独立的临时工作目录 `/tmp/akeel/staging/stage-<random>/` 作为 `stagingRoot`。
+
+Staging 目录采用双维度保留策略：默认保留 7 天以内的历史目录供任务中断排查与运行轨迹回溯；同时设立容量与目录数量配额（默认 500MB 与 200 个目录）。超出保留期或配额的无主目录在会话启动时以非阻塞方式异步回收，优先按最后修改时间淘汰最旧项。
+
+会话在创建 staging 目录时写入包含进程标识的锁文件，回收调度运行时排除活跃会话目录。
+
+**Why:** 统一在 `/tmp/akeel/staging/` 下以 `stage-` 前缀命名暂存目录，与暂存根职能严格呼应，保持了临时工作区结构清晰，与交接目录等其他工件自然分层。7 天保留窗口保障长任务中断或异常调试时的现场可追溯，容量与数量配额提供确定性的存储资源边界，防止无主目录无限累积。
+
+**Impact:** GateSession 默认允许根包含 `/tmp/akeel`；project-lifecycle 的 staging 根与清理调度统一收敛至 `/tmp/akeel/staging/`。清理调度在会话启动时按每日至多一次节流执行，不影响主流程响应速度。
+
+**Rejected:**
+
+- **会话结束时同步强行清理所有目录：** 阻断了任务中断或调试时的状态核验与痕迹排查。
+- **无配额上限的纯时间保留：** 存在短期生成大量临时数据导致磁盘资源耗尽的风险。
+
+**Out of Scope:** 跨机器的临时文件同步与操作系统全局临时文件系统调度策略。
+
+## D-089: 待创建
+
