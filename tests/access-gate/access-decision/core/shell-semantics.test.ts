@@ -446,6 +446,50 @@ test("Git option values and revisions are not mistaken for file paths", () => {
   });
 });
 
+test("bounded coreutils option values do not become path operands", () => {
+  for (const [command, expectedPaths] of [
+    ["head -n 5 README.md", ["README.md"]],
+    ["head -n5 README.md", ["README.md"]],
+    ["head --lines=5 README.md", ["README.md"]],
+    ["tail --lines 5 README.md", ["README.md"]],
+    ["tail -n -5 README.md", ["README.md"]],
+    ["mkdir -m 755 dist", ["dist"]],
+    ["touch -d 2020-01-01 file", ["file"]],
+    ["od -A x file", ["file"]],
+    ["od -Ax file", ["file"]],
+    ["od -w file", ["file"]],
+    ["od --strings file", ["file"]],
+    ["od -w16 file", ["file"]],
+    ["touch -d -5 file", ["file"]],
+    ["grep --color pattern README.md", ["README.md"]],
+    ["grep --include '*.ts' pattern README.md", ["README.md"]],
+    ["ls -la README.md", ["README.md"]],
+    ["head -- -file", ["-file"]],
+  ] as const) {
+    const analysis = analyzeShellCommand(command);
+    assert.equal(analysis.kind, "complete", command);
+    assert.deepEqual(analysis.paths.map(({ text }) => text), expectedPaths, command);
+  }
+});
+
+test("known coreutils reject options outside their bounded contract", () => {
+  for (const command of ["head --unknown README.md", "touch --unknown file", "head --lines", "tail -n", "grep --color=always pattern README.md", "ln -L source link"]) {
+    const analysis = analyzeShellCommand(command);
+    assert.equal(analysis.kind, "reject", command);
+    if (analysis.kind === "reject") assert.equal(analysis.code, "unsupported-syntax", command);
+  }
+});
+
+test("copy-like commands distinguish source and target operands", () => {
+  for (const command of ["cp source destination", "mv source destination", "ln source link"]) {
+    const analysis = complete(command);
+    assert.deepEqual(analysis.paths, [
+      { text: "source", role: "source" },
+      { text: command.startsWith("ln ") ? "link" : "destination", role: "target" },
+    ], command);
+  }
+});
+
 test("Herdr commands map to inspect, execute, and modify semantics with path extraction", () => {
   for (const command of [
     "herdr --version",

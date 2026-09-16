@@ -269,6 +269,14 @@ test("unmodeled file-valued options fail closed instead of hiding paths", () => 
   }
 });
 
+test("optional od arguments preserve independent file operands", () => {
+  for (const command of ["od -w /etc/passwd", "od --strings /etc/passwd", "od -w16 /etc/passwd"]) {
+    const compilation = compileShell({ ...request, arguments: { command } });
+    if (isShellReject(compilation)) assert.fail(`expected bounded od command to compile for ${command}`);
+    assert.deepEqual(shellCompilationFacts(compilation)?.resolvedPaths[0]?.map((path) => path.candidate), ["/etc/passwd"], command);
+  }
+});
+
 test("bounded find predicates consume values without turning them into paths", () => {
   for (const [command, expectedPath] of [
     ["find . -name marker -type f -maxdepth 2", "/workspace/project"],

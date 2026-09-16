@@ -108,7 +108,7 @@
 **Out of Scope:**
 
 - 逐命令拆分审批：批准粒度仍是 tool-call 级。
-- 对 unknown/opaque 命令补充运行期语义：属于当前程序语义候选边界（C-027）。
+- 对 unknown/opaque 命令补充运行期语义：属于当前程序语义合同边界。
 - 宿主对工具调用历史、执行输出或其他 extension 通道的脱敏与审计：不属于 renderer 合同。
 
 ## D-028: 统一 Project Record 模型与 Candidate 显式复审
@@ -213,7 +213,7 @@ Task 是实质活动工作的权威输入；若创建与清档都发生在未提
 
 **Out of Scope:**
 
-- 扩展 wrapper 名称或完整 POSIX/Bash wrapper 语义；新增形态需按 C-027 重新证明。
+- 扩展 wrapper 名称或完整 POSIX/Bash wrapper 语义；新增形态需按当前程序语义合同重新证明。
 - `env -S` 等未建模 option-with-value 形式。
 - wrapper 执行期启动的脚本、子进程和环境副作用的递归解释。
 
@@ -429,7 +429,7 @@ Canonical reject 使用本域封闭 code、source anchor 与资源分类；rende
 
 **Reversal surface:** engineering
 
-**Decision:** Canonical Shell 在词法与 flow 解析之后增加独立的 `core/compilation/shell/programs/` 语义层。该层只把已扫描的程序调用转换为命令分类、effects、路径事实和 bounded/opaque 路径知识；registry 只负责可执行文件分派，Policy、配置和 host 不进入该层。Git、解释器、Python 工具、uv、herdr 与 npm/pnpm/yarn/npx 使用各自的声明表和少量专用分析器；未知程序和未知子命令保持 `unknown + opaque`。`uv run` 与 `herdr agent start/prompt` 分类为 `execute`；uv 与 herdr 的版本/帮助调用、状态查询和只读观测分类为 `inspect`，其他未建模顶层子命令保持 `unknown + opaque`。
+**Decision:** Canonical Shell 在词法与 flow 解析之后增加独立的 `core/compilation/shell/programs/` 语义层。该层只把已扫描的程序调用转换为命令分类、effects、路径事实和 bounded/opaque 路径知识；registry 只负责可执行文件分派，Policy、配置和 host 不进入该层。Git、bounded coreutils、解释器、Python 工具、uv、herdr 与 npm/pnpm/yarn/npx 使用各自的声明表和少量专用分析器；已注册程序的未知选项和未声明值形态在 Canonical 阶段 fail-closed，未知程序和未知子命令保持 `unknown + opaque`。`uv run` 与 `herdr agent start/prompt` 分类为 `execute`；uv 与 herdr 的版本/帮助调用、状态查询和只读观测分类为 `inspect`，其他未建模顶层子命令保持 `unknown + opaque`。
 
 已知且路径访问可完整证明、且不依赖仓库或用户配置执行 helper 的命令可进入普通 `inspect`/`modify`/`execute` 策略；其中纯只读审查命令（`git status`、`diff`、`log`、`show` 等，未显式声明 `--ext-diff` 或 `--textconv`）作为 bounded inspect read 进入常规策略求值，在 `review`、`guided`、`develop` 预设下均直接放行；有界本地变更命令 `git add`（无未建模或交互式选项）与 `git commit`（必须显式包含非空 `-m`/`--message` 或 `--file`/`-F`，且无 `-c`、`-e`、`-p` 或外部驱动参数）在 Git 控制面工件（`.git/hooks/**`、`.husky/**`、`.githooks/**`、`.lefthook/**`、`.git/config*`、`.gitattributes`）获得系统级绝对不可变写保护的前提下，归类为 `modify` 并进入常规策略求值。显式声明 external driver（`--ext-diff`、`--textconv`）、无消息或交互式的 commit、涉及外部 transport 或 network helper 的操作（如 `push`、`fetch`、`pull`、`clone`、`init`、`help`、`grep`、`blame`、`gc`、checkout/switch/restore、merge/rebase/tag/reset/cherry-pick/revert/stash/submodule 等已建模操作），以及 `git config`，固定进入 hard boundary。解释器脚本、`uv run`、`pytest`、`npm/pnpm/yarn` 的脚本或安装执行、`npx` 以及含未建模运行期访问的命令标记 opaque；opaque 风险由独立的 `commands.opaque` 策略轴控制，并与命令类别策略同时求值，不因显式 `allowedRoots`、`blockedRoots` 或 `blockedPaths` 自动升级为 hard boundary。`develop` 默认允许 opaque，`guided` 默认要求审批，`review` 默认拒绝；程序语义不递归解释委托的子命令或脚本内容。
 
@@ -445,7 +445,7 @@ Canonical reject 使用本域封闭 code、source anchor 与资源分类；rende
 
 **Why:** Git、包管理器和语言运行时共享“程序自有参数语言 + 子命令分类 + 路径/委托执行”的结构，但把它们塞进 Shell lexer 或 Policy Kernel 会造成职责泄漏和重复解析。`uv run` 可能同步环境、解析或下载依赖并启动任意子进程，因此不能当作普通只读命令；版本/帮助调用与未建模顶层子命令则需要独立分类。opaque 仍必须保持独立事实，但其风险是否可接受属于用户策略选择：`review`、`guided`、`develop` 分别提供拒绝、审批和便利路径；这不宣称 allowed roots 能限制脚本运行期访问，真实执行仍受操作系统权限约束。
 
-**Impact:** 生产入口仍只切换新 Canonical pipeline；新增命令族只需增加 core 语义模块和 public seam 测试，不恢复旧 `command-semantics` 依赖。当前覆盖 Git 常用 inspect/modify/destroy 分类（有界本地 `add` 与 `commit` 接入 modify 策略并受 Git 控制面写保护约束，网络/远程 transport、helper-capable 操作与 `config` 固定 hard-boundary）、裸名 `find` 的 bounded inspect/read 表达式（`-name`、`-iname`、`-path`、`-ipath`、`-type`、`-maxdepth`、`-mindepth`，start path 进入 recursive boundary）、解释器信息命令、Python 质量工具、uv 的 `run`/信息/未知子命令分类、herdr 的 inspect/execute/modify 分类（工作区创建提取 `--cwd`/`--path` 路径事实，worktree remove 与 workspace close 归入 modify）和 npm 族常用分类；Git `-C`、`--git-dir`、`--work-tree` 和项目内显式 `file://` remote 的 command-local location 已覆盖，完整 CLI 方言、完整 Git pathspec 语法、HTTPS/SSH 等外部 transport、hosted `file://`、alias/间接 config remote、`clone --separate-git-dir` 和网络/执行隔离不在本条内。
+**Impact:** 生产入口仍只切换新 Canonical pipeline；新增命令族只需增加 core 语义模块和 public seam 测试，不恢复旧 `command-semantics` 依赖。当前覆盖 Git 常用 inspect/modify/destroy 分类（有界本地 `add` 与 `commit` 接入 modify 策略并受 Git 控制面写保护约束，网络/远程 transport、helper-capable 操作与 `config` 固定 hard-boundary）、bounded coreutils 的封闭 option/value 消费与基础 inspect/modify 语义、裸名 `find` 的 bounded inspect/read 表达式（`-name`、`-iname`、`-path`、`-ipath`、`-type`、`-maxdepth`、`-mindepth`，start path 进入 recursive boundary）、解释器信息命令、Python 质量工具、uv 的 `run`/信息/未知子命令分类、herdr 的 inspect/execute/modify 分类（工作区创建提取 `--cwd`/`--path` 路径事实，worktree remove 与 workspace close 归入 modify）和 npm 族常用分类；Git `-C`、`--git-dir`、`--work-tree` 和项目内显式 `file://` remote 的 command-local location 已覆盖，完整 CLI 方言、完整 Git pathspec 语法、HTTPS/SSH 等外部 transport、hosted `file://`、alias/间接 config remote、`clone --separate-git-dir` 和网络/执行隔离不在本条内。
 
 **Rejected:**
 

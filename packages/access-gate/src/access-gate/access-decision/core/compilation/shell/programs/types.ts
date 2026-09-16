@@ -20,6 +20,17 @@ export type ProgramPath = Readonly<{
   readonly base: ProgramPathBase;
 }>;
 
+export type ProgramAnalysis =
+  | Readonly<{
+      readonly kind: "complete";
+      readonly semantic: ProgramSemantic;
+    }>
+  | Readonly<{
+      readonly kind: "reject";
+      readonly code: "unsupported-syntax" | "security-boundary";
+      readonly word: ShellWord;
+    }>;
+
 export type ProgramSemantic = Readonly<{
   readonly commandClass: ShellCommandClass;
   readonly effects: readonly ShellEffect[];

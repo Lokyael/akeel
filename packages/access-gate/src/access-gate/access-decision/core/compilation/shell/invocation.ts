@@ -1,5 +1,5 @@
 import { scanSimpleShellFlow } from "./flow";
-import { analyzeFindProgramInvocation, analyzeProgramCommand } from "./programs/index";
+import { analyzeFindProgramInvocation, analyzeProgramInvocation } from "./programs/index";
 import {
   INTERPRETERS,
   isInterpreterInspection,
@@ -136,86 +136,6 @@ function commandClass(executable: string, words: readonly ShellWord[] = []): She
   return "unknown";
 }
 
-function unmodeledPathOption(executable: string, words: readonly ShellWord[]): ShellWord | undefined {
-  for (let wordIndex = 0; wordIndex < words.length; wordIndex += 1) {
-    const word = words[wordIndex]!;
-    const shortOptions = word.text.startsWith("-") && !word.text.startsWith("--") ? word.text.slice(1) : "";
-    if (executable === "rg" && (word.text === "--follow" || shortOptions.includes("L"))) return word;
-    if ((executable === "cp" || executable === "mv" || executable === "ln") && (shortOptions.includes("L") || word.text === "--dereference")) return word;
-    if (executable === "ls" && (shortOptions.includes("L") || word.text === "--dereference")) return word;
-    if (executable === "grep" && (shortOptions.includes("R") || word.text === "--dereference-recursive")) return word;
-    if (executable === "rg" && (rgValueOptionMissing(word.text, words[wordIndex + 1]) || isUnmodeledRgOption(word.text))) return word;
-    if (executable === "grep" && (
-      shortOptions.includes("f") || word.text === "-f" || word.text.startsWith("-f") || word.text === "--file" ||
-      word.text.startsWith("--file=") || word.text === "--exclude-from" || word.text.startsWith("--exclude-from=") ||
-      word.text === "-e" || word.text.startsWith("-e") || word.text === "--regexp" || word.text.startsWith("--regexp=")
-    )) {
-      return word;
-    }
-    if (executable === "rg" && (
-      shortOptions.includes("f") || shortOptions.includes("e") || word.text === "-f" || word.text.startsWith("-f") || word.text === "--file" || word.text.startsWith("--file=") ||
-      word.text === "--ignore-file" || word.text.startsWith("--ignore-file=") || word.text === "--regexp"
-    )) {
-      return word;
-    }
-    if (executable === "cat" && (word.text === "--files0-from" || word.text.startsWith("--files0-from="))) {
-      return word;
-    }
-    if (executable === "touch" && (
-      shortOptions.includes("r") || word.text === "-r" || word.text.startsWith("-r") || word.text === "--reference" || word.text.startsWith("--reference=")
-    )) {
-      return word;
-    }
-    if ((executable === "cp" || executable === "mv" || executable === "ln") &&
-      (shortOptions.includes("t") || word.text === "-t" || word.text.startsWith("-t") || word.text === "--target-directory" || word.text.startsWith("--target-directory="))) {
-      return word;
-    }
-    if (executable === "rg" && (word.text === "--pre" || word.text.startsWith("--pre="))) return word;
-  }
-  return undefined;
-}
-
-function isRecursiveCommand(executableName: string, words: readonly ShellWord[]): boolean {
-  if (["rg", "find", "cp", "mv"].includes(executableName)) return true;
-  if (executableName !== "ls" && executableName !== "grep") return false;
-  if (words.some((word) =>
-    word.text === "--recursive" || word.text === "--dereference-recursive" || word.text === "--directories=recurse" ||
-    (word.text.startsWith("-") && !word.text.startsWith("--") &&
-      (word.text.slice(1).includes("r") || word.text.slice(1).includes("R")))
-  )) return true;
-  return executableName === "grep" && words.some((word, index) =>
-    (word.text === "-d" || word.text === "--directories") && words[index + 1]?.text === "recurse"
-  );
-}
-
-const rgValueOptions = ["--max-columns", "--type-not", "--threads", "--engine", "--replace"] as const;
-const rgShortValueOptions = ["M", "T", "j", "r"] as const;
-
-function rgValueOption(value: string): boolean {
-  if (rgValueOptions.some((option) => value === option || value.startsWith(`${option}=`))) return true;
-  return rgShortValueOptions.some((option) => value === `-${option}` || value.startsWith(`-${option}`) && value.length > 2);
-}
-
-function rgValueOptionNeedsSeparateValue(value: string): boolean {
-  return rgValueOptions.some((option) => value === option) || rgShortValueOptions.some((option) => value === `-${option}`);
-}
-
-function rgValueOptionMissing(value: string, next: ShellWord | undefined): boolean {
-  if (rgValueOptionNeedsSeparateValue(value)) return next === undefined;
-  return rgValueOptions.some((option) => value === `${option}=`);
-}
-
-function isUnmodeledRgOption(value: string): boolean {
-  if (!value.startsWith("-") || value === "--") return false;
-  if (value.startsWith("--")) {
-    if (value.includes("=")) return !rgValueOption(value);
-    return ["--glob", "--iglob", "--type", "--type-add", "--files-from", "--files", "--max-count", "--after-context", "--before-context", "--context", "--pre"].includes(value);
-  }
-  return value.slice(1).includes("g") || value.slice(1).includes("t") || value.slice(1).includes("m") ||
-    value.slice(1).includes("A") || value.slice(1).includes("B") || value.slice(1).includes("C") ||
-    value.slice(1).includes("S") || value.slice(1).includes("f");
-}
-
 function wrapperOption(
   words: readonly ShellWord[],
   name: string,
@@ -350,8 +270,6 @@ export function analyzeShellCommandWords(words: readonly ShellWord[]): ShellComm
     if (findAnalysis.code === "security-boundary") return rejectSecurityBoundary(findAnalysis.word);
     return rejectOperator(findAnalysis.word);
   }
-  const pathOption = unmodeledPathOption(executableName, commandArguments);
-  if (pathOption !== undefined) return rejectOperator(pathOption);
   const effects: ShellEffect[] = [];
   if (hasInputRedirection) addEffect(effects, "read");
   if (scriptPath !== undefined) {
@@ -362,9 +280,15 @@ export function analyzeShellCommandWords(words: readonly ShellWord[]): ShellComm
     addEffect(effects, "cwd-change");
     addPath(pathFromWord(commandArguments[0]!, "source"), commandArguments[0]!.start);
   }
-  const programSemantic = findAnalysis?.kind === "complete"
-    ? findAnalysis.semantic
-    : analyzeProgramCommand({ executable, arguments: commandArguments });
+  const programAnalysis = findAnalysis?.kind === "complete"
+    ? { kind: "complete" as const, semantic: findAnalysis.semantic }
+    : analyzeProgramInvocation({ executable, arguments: commandArguments });
+  if (programAnalysis?.kind === "reject") {
+    return programAnalysis.code === "security-boundary"
+      ? rejectSecurityBoundary(programAnalysis.word)
+      : rejectOperator(programAnalysis.word);
+  }
+  const programSemantic = programAnalysis?.kind === "complete" ? programAnalysis.semantic : undefined;
   const classification = programSemantic?.commandClass ?? commandClass(executable, commandArguments);
   if (programSemantic !== undefined) {
     for (const effect of programSemantic.effects) addEffect(effects, effect);
@@ -376,37 +300,6 @@ export function analyzeShellCommandWords(words: readonly ShellWord[]): ShellComm
   if (classification === "destroy") addEffect(effects, "delete");
   if (classification === "execute") addEffect(effects, "execute");
   if (paths.some(({ path }) => path.role === "target")) addEffect(effects, "write");
-  if (!opaquePathForm && (
-    inspectionCommands.has(executableName) ||
-    modificationCommands.has(executableName) ||
-    destructionCommands.has(executableName)
-  )) {
-    let optionsEnded = false;
-    let hasPathOperand = false;
-    let patternSeen = executableName !== "rg" && executableName !== "grep";
-    const argumentWords = commandWords.slice(index + 1);
-    for (let argumentIndex = 0; argumentIndex < argumentWords.length; argumentIndex += 1) {
-      const word = argumentWords[argumentIndex]!;
-      if (!optionsEnded && word.text === "--") {
-        optionsEnded = true;
-        continue;
-      }
-      if (!optionsEnded && executableName === "rg" && rgValueOption(word.text)) {
-        if (rgValueOptionNeedsSeparateValue(word.text)) argumentIndex += 1;
-        continue;
-      }
-      if (!optionsEnded && word.text.startsWith("-") && word.text !== "-") continue;
-      if (!patternSeen) {
-        patternSeen = true;
-        continue;
-      }
-      hasPathOperand = true;
-      addPath(pathFromWord(word, "source"), word.start);
-    }
-    if ((executableName === "ls" || executableName === "rg" || executableName === "grep") && !hasPathOperand) {
-      addPath(Object.freeze({ text: ".", role: "source" }), executableWord.end);
-    }
-  }
   if ((executableName === "cp" || executableName === "mv" || executableName === "ln" || executableName === "cd") &&
     paths.some(({ path }) => path.role === "source")) {
     addEffect(effects, "read");
@@ -421,7 +314,7 @@ export function analyzeShellCommandWords(words: readonly ShellWord[]): ShellComm
       executable.includes("/") && classification !== "destroy" ||
       executableName === "uv" && classification === "execute",
     hardBoundary: programSemantic?.hardBoundary === true,
-    recursive: programSemantic?.recursive === true || isRecursiveCommand(executableName, commandWords),
+    recursive: programSemantic?.recursive === true,
   });
   const result = {
     kind: "complete" as const,

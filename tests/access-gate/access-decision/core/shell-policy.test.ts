@@ -420,6 +420,16 @@ test("execute and unknown classes use their own closed policy modes", () => {
   );
 });
 
+test("optional od operands remain subject to path boundaries", () => {
+  assert.deepEqual(evaluateShellAdmission(
+    admission("od -w /etc/passwd"),
+    freezeShellPolicySnapshot({ ...policy, read: "allow", inspect: "allow", blockedPaths: ["/etc/passwd"] }),
+  ), {
+    kind: "deny",
+    code: "hard-boundary",
+  });
+});
+
 test("od is governed by read policy instead of unknown policy", () => {
   assert.deepEqual(
     evaluateShellAdmission(admission("od /etc/passwd"), freezeShellPolicySnapshot({
