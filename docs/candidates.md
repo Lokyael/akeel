@@ -92,7 +92,6 @@
 
   - **Effect vocabulary / policy axis:** 旧版封闭 effect 词汇含 `read/search/write/delete/permissionChange/execute/network/cwdChange`，并区分 path/shell effect axis；当前 Shell effect 收敛为 `read/write/delete/execute/cwd-change`，Policy Kernel 对每个 operation 同时按 effect（`read`/`cwd-change` 使用 read policy，`write`/`delete` 使用 write policy）与 command class 决策，`delete`/`destroy` 仍优先进入 hard boundary。当前 Shell effects 由 Canonical/Admission 承载并仍被 Policy 消费，`write`、`delete`、`cwd-change` 等事实不能在没有消费者与安全边界证明时因“精简”而裁剪；目前也没有可测 plan 体积问题。复核是否确认当前词汇与投影、明确退役旧 effect 轴、恢复经证明的 effect、记录架构差异，或在出现新消费者/性能证据后重新设计。
   - **Resource and analysis limits:** 旧版主要由 parser/plan 结构失败与旧 preflight 约束；当前新增显式资源上限，包括 Direct 文本字节、Shell command 字节、Shell command 数、cwd state 数与 edit entry 数。候选问题：是否把这些上限作为新安全/性能合同文档化，并确认默认值是否合适。
-  - **Path scope expression:** 旧版路径规则与当前绝对路径范围的独立未来处置方向已移至 C-030；本条仅保留该差异作为复核索引。
   - **Policy path canonicalization:** 旧版配置路径规则作为 glob/virtual path 规则加载；当前 `allowedRoots`、`blockedRoots`、`blockedPaths` 在 policy adapter 加载时经 `resolveExistingPath` 规范化，并在 symlink 解析失败时拒绝配置。候选问题：是否把配置侧 canonicalization 作为独立安全合同、迁移约束或实现细节记录。
   - **Symlink/traversal:** 旧版有 path resolve 与 blocked glob；当前 Canonical resolution 同时保留 lexical 与 symlink-target traversal prefixes，Direct search 与 Shell recursive path 在 blocked descendants 上 fail-closed。候选问题：是否把该增强写成迁移说明中的“非 parity 安全提升”。
 ### Shell grammar、flow、wrapper 与 redirection
