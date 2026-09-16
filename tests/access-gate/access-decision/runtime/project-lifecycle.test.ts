@@ -21,6 +21,7 @@ test("project lifecycle uses the session cwd as access root and owns staging", (
     assert.equal(lifecycle.context.cwd, fixture.nested);
     assert.equal(lifecycle.context.projectRoot, fixture.nested);
     assert.equal(existsSync(lifecycle.context.stagingRoot), true);
+    assert.equal(existsSync(join(lifecycle.context.stagingRoot, ".session.lock")), true);
 
     lifecycle.dispose();
     assert.equal(existsSync(lifecycle.context.stagingRoot), false);
@@ -29,12 +30,11 @@ test("project lifecycle uses the session cwd as access root and owns staging", (
   }
 });
 
-test("project lifecycle isolates staging root by process uid", () => {
-  const cwd = mkdtempSync(join(tmpdir(), "akeel-uid-test-"));
+test("project lifecycle places staging root under /tmp/akeel/staging with stage- prefix", () => {
+  const cwd = mkdtempSync(join(tmpdir(), "akeel-stage-test-"));
   try {
     const lifecycle = createProjectLifecycle(cwd);
-    const uid = typeof process.getuid === "function" ? process.getuid() : "user";
-    assert.match(lifecycle.context.stagingRoot, new RegExp(`akeel-${uid}[/\\\\]access-decision-`));
+    assert.match(lifecycle.context.stagingRoot, /[/\\\\]tmp[/\\\\]akeel[/\\\\]staging[/\\\\]stage-[A-Za-z0-9]+/);
     lifecycle.dispose();
   } finally {
     rmSync(cwd, { recursive: true, force: true });
@@ -93,9 +93,9 @@ test("project lifecycle ignores Git file metadata", () => {
 
 test("project lifecycle rejects relative cwd before creating staging", () => {
   const fixture = project();
-  const stagingParent = join(tmpdir(), "akeel");
+  const stagingParent = join(tmpdir(), "akeel", "staging");
   const entries = (): string[] => existsSync(stagingParent)
-    ? readdirSync(stagingParent).filter((entry) => entry.startsWith("access-decision-"))
+    ? readdirSync(stagingParent).filter((entry) => entry.startsWith("stage-"))
     : [];
   const before = entries();
   try {

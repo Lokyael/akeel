@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createProjectContext } from "./project-context";
 import type { ProjectContext } from "./project-context";
+import { tryScheduleStagingRetention, writeSessionLock } from "./staging-retention";
 
 export type ProjectLifecycle = Readonly<{
   readonly context: ProjectContext;
@@ -24,10 +25,11 @@ export function createProjectLifecycle(cwd: string): ProjectLifecycle {
     throw new TypeError("invalid project lifecycle");
   }
   const root = accessRoot(cwd);
-  const uid = typeof process.getuid === "function" ? process.getuid() : "user";
-  const stagingParent = join(tmpdir(), `akeel-${uid}`);
+  const stagingParent = join(tmpdir(), "akeel", "staging");
   mkdirSync(stagingParent, { recursive: true });
-  const stagingRoot = mkdtempSync(join(stagingParent, "access-decision-"));
+  const stagingRoot = mkdtempSync(join(stagingParent, "stage-"));
+  writeSessionLock(stagingRoot);
+  tryScheduleStagingRetention(stagingParent, stagingRoot);
   let disposed = false;
   return Object.freeze({
     context: createProjectContext({ cwd, projectRoot: root, stagingRoot }),
