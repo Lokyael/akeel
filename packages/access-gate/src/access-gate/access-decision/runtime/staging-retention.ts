@@ -1,12 +1,13 @@
-import { existsSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, lstatSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { basename, join } from "node:path";
 
 export const RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
 export const MAX_STAGING_DIR_COUNT = 200;
 export const MAX_STAGING_SIZE_BYTES = 500 * 1024 * 1024;
 export const CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000;
-export const STAGING_PREFIX = "stage-";
-export const LOCK_FILENAME = ".session.lock";
+export const SESSION_PREFIX = "session-";
+export const LOCK_FILENAME = "lock.json";
+export const MANIFEST_FILENAME = "session.json";
 export const STAMP_FILENAME = ".last_gc_check";
 
 export type RetentionOptions = Readonly<{
@@ -16,18 +17,29 @@ export type RetentionOptions = Readonly<{
   readonly maxSizeBytes?: number;
 }>;
 
-type StagingDirCandidate = Readonly<{
+type SessionCandidate = Readonly<{
   readonly fullPath: string;
   readonly mtimeMs: number;
   readonly sizeBytes: number;
 }>;
 
-export function writeSessionLock(stagingRoot: string): void {
+export function writeSessionManifest(sessionRoot: string): void {
+  writeFileSync(join(sessionRoot, MANIFEST_FILENAME), JSON.stringify({
+    schemaVersion: 1,
+    kind: "session",
+    sessionId: basename(sessionRoot),
+    createdAt: Date.now(),
+  }), { encoding: "utf8", mode: 0o600 });
+}
+
+export function writeSessionLock(sessionRoot: string): void {
   try {
-    const lockPath = join(stagingRoot, LOCK_FILENAME);
-    writeFileSync(lockPath, JSON.stringify({ pid: process.pid, createdAt: Date.now() }), "utf8");
+    writeFileSync(join(sessionRoot, LOCK_FILENAME), JSON.stringify({
+      pid: process.pid,
+      createdAt: Date.now(),
+    }), { encoding: "utf8", mode: 0o600 });
   } catch {
-    // Non-fatal error during lock writing
+    // A missing lock makes an interrupted envelope eligible only after retention.
   }
 }
 
@@ -41,15 +53,28 @@ export function isProcessAlive(pid: number): boolean {
   }
 }
 
-function isOrphanDirectory(stagingPath: string): boolean {
+function isOwnedSessionEnvelope(sessionPath: string): boolean {
   try {
-    const lockPath = join(stagingPath, LOCK_FILENAME);
-    if (!existsSync(lockPath)) return true;
-    const lock = JSON.parse(readFileSync(lockPath, "utf8"));
-    if (typeof lock === "object" && lock !== null && typeof lock.pid === "number") {
-      return !isProcessAlive(lock.pid);
-    }
-    return true;
+    const sessionStats = lstatSync(sessionPath);
+    const manifestStats = lstatSync(join(sessionPath, MANIFEST_FILENAME));
+    if (!sessionStats.isDirectory() || sessionStats.isSymbolicLink() || (sessionStats.mode & 0o022) !== 0 ||
+      !manifestStats.isFile() || manifestStats.isSymbolicLink() ||
+      typeof process.getuid === "function" && sessionStats.uid !== process.getuid()) return false;
+    const manifest = JSON.parse(readFileSync(join(sessionPath, MANIFEST_FILENAME), "utf8"));
+    return typeof manifest === "object" && manifest !== null &&
+      manifest.schemaVersion === 1 && manifest.kind === "session" &&
+      manifest.sessionId === basename(sessionPath);
+  } catch {
+    return false;
+  }
+}
+
+function isOrphanDirectory(sessionPath: string): boolean {
+  try {
+    const lock = JSON.parse(readFileSync(join(sessionPath, LOCK_FILENAME), "utf8"));
+    return typeof lock === "object" && lock !== null && typeof lock.pid === "number"
+      ? !isProcessAlive(lock.pid)
+      : true;
   } catch {
     return true;
   }
@@ -58,28 +83,24 @@ function isOrphanDirectory(stagingPath: string): boolean {
 function computeDirectorySizeBytes(dirPath: string): number {
   let total = 0;
   try {
-    const entries = readdirSync(dirPath, { withFileTypes: true });
-    for (const entry of entries) {
+    for (const entry of readdirSync(dirPath, { withFileTypes: true })) {
       const fullPath = join(dirPath, entry.name);
       try {
-        if (entry.isDirectory()) {
-          total += computeDirectorySizeBytes(fullPath);
-        } else if (entry.isFile()) {
-          total += statSync(fullPath).size;
-        }
+        if (entry.isDirectory()) total += computeDirectorySizeBytes(fullPath);
+        else if (entry.isFile()) total += statSync(fullPath).size;
       } catch {
-        // Skip inaccessible entries
+        // Inaccessible entries are not counted and therefore are not deletion evidence.
       }
     }
   } catch {
-    // Skip unreadable directory
+    // An inaccessible candidate contributes no quota evidence.
   }
   return total;
 }
 
 export function executeRetentionSweep(
-  stagingParent: string,
-  currentStagingRoot: string,
+  sessionsParent: string,
+  currentSessionRoot: string,
   options: RetentionOptions = {},
 ): void {
   const now = options.now ?? Date.now();
@@ -88,16 +109,12 @@ export function executeRetentionSweep(
   const maxSizeBytes = options.maxSizeBytes ?? MAX_STAGING_SIZE_BYTES;
 
   try {
-    if (!existsSync(stagingParent)) return;
-    const entries = readdirSync(stagingParent, { withFileTypes: true });
-    const candidates: StagingDirCandidate[] = [];
-
-    for (const entry of entries) {
-      if (!entry.isDirectory() || !entry.name.startsWith(STAGING_PREFIX)) continue;
-      const fullPath = join(stagingParent, entry.name);
-      if (fullPath === currentStagingRoot) continue;
-      if (!isOrphanDirectory(fullPath)) continue;
-
+    if (!existsSync(sessionsParent)) return;
+    const candidates: SessionCandidate[] = [];
+    for (const entry of readdirSync(sessionsParent, { withFileTypes: true })) {
+      if (!entry.isDirectory() || !entry.name.startsWith(SESSION_PREFIX)) continue;
+      const fullPath = join(sessionsParent, entry.name);
+      if (fullPath === currentSessionRoot || !isOwnedSessionEnvelope(fullPath) || !isOrphanDirectory(fullPath)) continue;
       try {
         const stats = statSync(fullPath);
         candidates.push(Object.freeze({
@@ -106,31 +123,20 @@ export function executeRetentionSweep(
           sizeBytes: computeDirectorySizeBytes(fullPath),
         }));
       } catch {
-        // Skip invalid directory entry
+        // Invalid candidates are retained.
       }
     }
 
     const toDelete = new Set<string>();
-
-    // Step 1: TTL eviction (older than 7 days)
     for (const item of candidates) {
-      if (now - item.mtimeMs > retentionMs) {
-        toDelete.add(item.fullPath);
-      }
+      if (now - item.mtimeMs > retentionMs) toDelete.add(item.fullPath);
     }
 
-    // Step 2: LRU eviction for remaining candidates (oldest first)
     const remaining = candidates
       .filter((item) => !toDelete.has(item.fullPath))
       .sort((a, b) => a.mtimeMs - b.mtimeMs);
+    while (remaining.length > maxCount) toDelete.add(remaining.shift()!.fullPath);
 
-    // Enforce count quota
-    while (remaining.length > maxCount) {
-      const oldest = remaining.shift()!;
-      toDelete.add(oldest.fullPath);
-    }
-
-    // Enforce size quota
     let currentTotalSize = remaining.reduce((sum, item) => sum + item.sizeBytes, 0);
     while (currentTotalSize > maxSizeBytes && remaining.length > 0) {
       const oldest = remaining.shift()!;
@@ -138,39 +144,26 @@ export function executeRetentionSweep(
       currentTotalSize -= oldest.sizeBytes;
     }
 
-    // Step 3: Remove selected directories
     for (const path of toDelete) {
       try {
         rmSync(path, { recursive: true, force: true });
       } catch {
-        // Non-fatal deletion failure
+        // Retention is best-effort and never blocks session startup.
       }
     }
   } catch {
-    // Non-fatal sweep failure
+    // Retention is best-effort and never blocks session startup.
   }
 }
 
-export function tryScheduleStagingRetention(
-  stagingParent: string,
-  currentStagingRoot: string,
-): void {
-  const stampPath = join(stagingParent, STAMP_FILENAME);
+export function tryScheduleStagingRetention(sessionsParent: string, currentSessionRoot: string): void {
+  const stampPath = join(sessionsParent, STAMP_FILENAME);
   const now = Date.now();
-
   try {
-    if (existsSync(stampPath)) {
-      const stampStat = statSync(stampPath);
-      if (now - stampStat.mtimeMs < CHECK_INTERVAL_MS) {
-        return;
-      }
-    }
-    writeFileSync(stampPath, "", "utf8");
+    if (existsSync(stampPath) && now - statSync(stampPath).mtimeMs < CHECK_INTERVAL_MS) return;
+    writeFileSync(stampPath, "", { encoding: "utf8", mode: 0o600 });
   } catch {
     return;
   }
-
-  setImmediate(() => {
-    executeRetentionSweep(stagingParent, currentStagingRoot);
-  });
+  setImmediate(() => executeRetentionSweep(sessionsParent, currentSessionRoot));
 }

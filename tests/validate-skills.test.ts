@@ -138,12 +138,35 @@ test("delegated review and grilling publish fail-closed owner cleanup contracts"
     assert.match(contract, /do not (?:expose|copy)[^.]*workspace lists[^.]*terminal history/i);
     assert.doesNotMatch(contract, /no active process remains/i);
     assert.match(contract, /never use[^.]*prefix-based[^.]*deletion/i);
+    assert.match(contract, /akeel_run_artifact/i);
+    assert.match(contract, /verified[^.]*collect|status[^.]*collect/i);
+    assert.match(contract, /agent read[^.]*diagnostic/i);
+    assert.match(contract, /Artifact Exchange never (?:removes|deletes)/i);
+    assert.doesNotMatch(contract, /\/tmp\/akeel\/(?:grill|reviews)\//i);
   }
 
   assert.ok(
     review.indexOf("## 5. Clean Up Child Resources") > review.indexOf("## 4. Check Staleness"),
     "review cleanup must follow result reporting and staleness checking",
   );
+});
+
+test("handoff and preflight use their distinct temporary-resource lifecycles", () => {
+  const handoff = readFileSync(
+    new URL("../packages/guidance/skills/workflows/handoff-session/SKILL.md", import.meta.url),
+    "utf8",
+  );
+  const preflight = readFileSync(
+    new URL("../packages/guidance/skills/disciplines/change-preflight/SKILL.md", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(handoff, /akeel_handoff[^.]*publish/i);
+  assert.match(handoff, /successor[^.]*verify/i);
+  assert.match(handoff, /handoffs\/handoff-<random>/i);
+  assert.doesNotMatch(handoff, /handoff-<timestamp>\.md/i);
+  assert.match(preflight, /runs\/<run-id>\/quarantine/);
+  assert.doesNotMatch(preflight, /\/tmp\/akeel\/preflight\//);
 });
 
 test("debugging skills publish the current reproduction and causal-debugging contracts", () => {

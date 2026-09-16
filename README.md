@@ -13,7 +13,7 @@ pi install git:github.com/Lokyael/akeel
 The package is also split into independently installable capabilities:
 
 ```bash
-pi install npm:akeel-guidance        # bootstrap principles + skills
+pi install npm:akeel-guidance        # bootstrap + skills + workflow artifact transport
 pi install npm:akeel-access-gate     # tool-call access decisions
 pi install npm:akeel-context-pruner  # test-output context pruning
 ```
@@ -24,7 +24,7 @@ AKeel provides bootstrap principles and on-demand engineering skills. It does no
 
 ## Access decisions
 
-AKeel governs the managed `read`, `write`, `edit`, `find`, `grep`, `ls`, and `bash` tool surfaces. Other tool surfaces pass through unchanged. Private Direct and Shell semantic lanes converge on one sealed admission and authorization chain based on the supported Linux pathname contract; mandatory system boundaries precede configurable policy, while approval availability remains a Pi-host concern. System hard boundaries and unsupported forms fail closed.
+AKeel governs the managed `read`, `write`, `edit`, `find`, `grep`, `ls`, and `bash` tool surfaces. Other tool surfaces pass through unchanged. Guidance's `akeel_run_artifact`, `akeel_publish_artifact`, and `akeel_handoff` are separate self-authorizing custom tools: their bounded capability and receipt contracts do not widen ordinary Access Gate policy. Private Direct and Shell semantic lanes converge on one sealed admission and authorization chain based on the supported Linux pathname contract; mandatory system boundaries precede configurable policy, while approval availability remains a Pi-host concern. System hard boundaries and unsupported forms fail closed.
 
 Shell analysis covers bounded Git operations, interpreter information commands, Python quality tools, and common uv/npm/pnpm/yarn/npx classifications. Git operations that may invoke repository or user-configured helpers remain hard-denied, including `status`, `diff`, `log`, `show`, `add`, `commit`, fetch/push/clone, related mutations, and `git config`. Script/package/download delegates and unknown subcommands remain opaque; explicit project path boundaries hard-deny them, and `develop` does not widen that boundary. Path-form executables remain opaque `execute` operations, while destructive forms remain hard-denied. Git `-C`, `--git-dir`, `--work-tree`, and explicit project-local `file://` paths are canonicalized; HTTPS/SSH, hosted `file://`, aliases, indirect config remotes, `clone --separate-git-dir`, and other unmodeled locations fail closed.
 
@@ -111,6 +111,21 @@ This form is the only policy field. When configured, all Pi `tool_call` requests
 ## Test output context pruning
 
 AKeel trims output from model-invoked `bash` tool results for standalone `npm test` and `npm run test` commands only when building model context. A run becomes `All tests passed` only when the host reports success and the output contains a recognized positive test-runner summary; arbitrary success text, zero-test runs, skipped/todo results, warnings, and uncertain formats remain unchanged. Failed runs retain failure cases, diagnostics, and stack traces. Cancelled or truncated results, non-test commands, and user-entered `!`/`!!` `bashExecution` messages are outside this feature and are never pruned. The original tool result remains in the session; this feature does not call a model.
+
+## Workflow artifacts and temporary resources
+
+Guidance supplies a formal text-artifact channel for synchronous Herdr children. The Task Owner reserves a run and packet, binds one result slot to the exact Herdr workspace/pane/Agent, and starts Pi with that slot's opaque capability. The child can publish at most one bounded artifact through `akeel_publish_artifact`; it cannot choose a path or gain ordinary write permission. The Owner accepts a result only after `akeel_run_artifact` verifies its receipt, length, digest, and binding. Herdr `idle`/`done` and terminal output are diagnostic state, not artifact delivery.
+
+AKeel-owned temporary resources are classified by lifecycle:
+
+```text
+/tmp/akeel/
+  sessions/session-<random>/staging/  # Access Gate session; crash retention applies
+  runs/run-<random>/                  # Owner workflow packet/artifacts/control/quarantine
+  handoffs/handoff-<random>/          # source-to-successor session handoff
+```
+
+New controlled directories use private permissions. Session residue is reclaimed under the documented retention policy; workflow runs and handoffs are not automatically deleted. AKeel does not migrate, claim, or remove legacy and unknown `/tmp/akeel` content.
 
 ## Companion tools
 

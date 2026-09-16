@@ -601,7 +601,7 @@ Tilde expansion 仅适用于受支持 Shell word 中位于开头、未引用、�
 
 **Decision:** 委托同时受权威所有权、上下文准入、执行面路由与 checkout 隔离约束。**Task Owner Session** 是对一个 Task 持有用户原始意图、Requirements、已采纳范围/架构/政策裁决、finding disposition、最终验收、发布与 Project Record 更新权的唯一会话；同一 Task 或 Decision 同时只有一个 Owner。用户可把互斥、可独立验收的长期工作明确授权给新的 Task Owner Session；若新会话仍需把结果交回既有 Owner 裁决，它在语义上仍是 delegated child，而不是第二个 Owner。
 
-所有需要隔离过程上下文、且结果返回既有 Task Owner 裁决的委托统一使用 Herdr；AKeel 不维护第二套委托执行面，也不把 Herdr 声明为 runtime dependency。Herdr child 可在已定约束内处理开放问题并形成 verified candidate。当前 child 委托只使用同步 fork-join：Owner 预定结果 artifact，等待 child settle 后按路径拉取，不要求 child 通过 prompt 把完成状态或结果推回 Owner。Artifact 承载 verified candidate 及理解、审计、质疑或继续结果所必需的上下文：影响结论的推理与被拒方案、引用证据、变更、验证、未决问题和残余风险；搜索轨迹、完整日志、重复失败、未影响结论的假设、工具时间线和中间草稿留在隔离会话或 artifact。可得的 child session 引用只作按需 forensic 追踪，不自动载入 Owner 上下文。
+所有需要隔离过程上下文、且结果返回既有 Task Owner 裁决的委托统一使用 Herdr；AKeel 不维护第二套委托执行面，也不把 Herdr 声明为 runtime dependency。Herdr child 可在已定约束内处理开放问题并形成 verified candidate。当前 child 委托只使用同步 fork-join：Owner 通过 Artifact Exchange 预定 run、packet 与单 child slot，把 slot capability 绑定到确切 Herdr workspace/pane/Agent 后启动 child；child 只通过专用 publisher 发布一次有界文本结果。Owner 等待 child settle 后执行 verified collect；只有 run、binding、receipt、长度与 digest 同时有效才构成正式交接，`idle`、`done`、完成 prompt 或 `herdr agent read` 终端文本均不能替代。Artifact 承载 verified candidate 及理解、审计、质疑或继续结果所必需的上下文：影响结论的推理与被拒方案、引用证据、变更、验证、未决问题和残余风险；搜索轨迹、完整日志、重复失败、未影响结论的假设、工具时间线和中间草稿留在隔离会话或 diagnostic transport。可得的 child session 引用只作按需 forensic 追踪，不自动载入 Owner 上下文。
 
 **Routing:** 用户未指定执行面时，按以下封闭顺序决定：
 
@@ -615,15 +615,15 @@ Tilde expansion 仅适用于受支持 Shell word 中位于开头、未引用、�
 
 **Why:** “主 Agent 技术上能完成”不能判断原始探索是否值得污染长期 Owner 上下文；独立 Agent 的价值包括上下文隔离，而不只包括并发。同步 artifact pull 避免 child 自由文本 callback 形成重复 user-role 消息、额外上下文和交付竞态；长期独立工作直接拥有自己的 Owner，则无需把全过程回灌旧会话。唯一 Owner 与互斥范围防止多个会话对 Requirements、验收和权威记录形成 split-brain。当前工作需要可见的 Agent、pane、worktree、状态和人工裁决，Herdr 已直接覆盖这些目标；统一执行面保持上下文、交接和生命周期合同一致。按有效写能力强制 worktree 可避免真实工具权限污染共享 checkout。
 
-**Impact:** `principles.md`、README、CONTEXT、skills 和委托相关 Decision 统一描述 Herdr 执行面、Task Owner、同步委托路由和 worktree 不变量；`grill-docs` 通过预定 verified candidate 完成交互式讨论和结果拉取，不发送完成 prompt。当前委托通过 Herdr 完成 Agent 启动、状态观察、worktree 管理和同步 artifact 交接，不新增 AKeel 自动编排运行时。独立 Task Owner Session 是用户授权与记录所有权边界，不是新的 Herdr primitive。
+**Impact:** `principles.md`、README、CONTEXT、skills 和委托相关 Decision 统一描述 Herdr 执行面、Task Owner、同步委托路由、正式 Artifact Exchange 和 worktree 不变量；`grill-docs` 通过预定 slot 完成交互式讨论和 verified collect，不发送完成 prompt。Herdr 继续负责 Agent 启动、状态观察和 worktree 管理，Guidance package 的 Artifact Exchange 只负责 bounded result transport，不构成第二套 agent orchestrator。独立 Task Owner Session 是用户授权与记录所有权边界，不是新的 Herdr primitive。
 
 **Rejected:** 以“可能更快/多一个视角/适合时”触发委托（不可判定且扩大调用）；当前 Owner 可完成即一律直接执行（忽略上下文污染）；维护第二套委托执行面（当前没有真实需求证明其额外编排能力值得承担独立的上下文、结果和生命周期合同）；同步 child 向 Owner prompt 完成状态或结果（重复交付、增加上下文且不是处理 ACK）；把长任务默认变成异步 child（增加 mailbox、恢复和去重状态而无当前需求）；把同一 Task 交给多个 Owner（权威 split-brain）；child literal self-delete（会使 join 失去正常 settle 结果，且 child 无法确认自身清理成功）；所有隔离工作无条件创建 worktree（应按有效写能力与 tracked side effect 判断）；worktree 内“100% 自由/零审批”（隔离不产生授权）；由 Grill Agent 直接写权威记录（跨 worktree 制造第二 writer 与未经 Owner 导入的权威变更）。
 
 **Out of Scope:**
 
 - **异步 child 与无人值守 orchestration:** mailbox、receipt、跨重启恢复、重复通知去重、自动续跑和聚合由 C-031 保持为未采纳候选；出现真实长周期从属任务后再评估。
-- **渐进式多文件结果协议与确定性 Herdr extension:** 当前单一 verified candidate 没有可复现的体积或协议偏差，不新增 TypeScript 自动化层；出现不可接受的上下文负载或可复现执行偏差时再评估。
-- **确定性 child 资源自动回收:** 持久 owned-run registry、artifact receipt、commit-preservation、跨重启 reconciliation 和无人值守生命周期由 C-034 保持为未采纳候选；当前手工合同不提供这些能力。
+- **渐进式、多段或二进制结果协议:** 当前单一 bounded UTF-8 artifact 足以承载 verified candidate；出现不可接受的体积或真实非文本结果后再评估。
+- **确定性 child 资源自动回收:** run receipt 只证明结果发布，不证明验收、worktree 可丢弃或 commit 已保留；accepted/abandoned 终态、commit-preservation、跨重启 reconciliation 和无人值守生命周期仍由 C-034 保持为未采纳候选。
 - **Access Gate 父子 Policy Snapshot 传播:** 当前没有可验证的宿主策略 seam；相关子代理能力上限与风险边界由 C-009 作为未采纳方向评估，本条不改变准入实现。
 - **模型行为基准:** 当前没有固定模型与 consuming-agent 评测 harness，不以字符串存在测试冒充行为证明。Revisit when 项目采纳可重复的 prompt 行为评测。
 
@@ -700,7 +700,7 @@ Tilde expansion 仅适用于受支持 Shell word 中位于开头、未引用、�
 
 **Why:** 三者分别拥有 current-change preparation、independent finding generation 和 approved-scope mutation 三种不同输入、权限与产物。原设计把当前变更卫生收敛进 preflight，是为了保留低成本提交门禁并避免浪费独立审查上下文；但模型可调用 skill 没有天然事务、备份或 provenance hook，自动删除 untracked 内容会把恢复风险和认知负担转给用户。只读优先、强 provenance 的安全自治和分层 Review Surface 保留自动化收益，同时把不可逆或归属不明的动作挡在用户确认之外。
 
-**Impact:** `change-preflight` 承载只读优先的提交前守卫和受限安全自治；quarantine 是本次运行的仓外临时恢复工件，保留到验证与 Code Review 完成、Review Surface 接受、Task 完成或运行明确放弃，异常运行按有界保留期清理。通用 fresh-evidence 规则仍只由 `principles.md §6` 定义，动作特有核对留在 preflight。`implement-work` 在最终 commit 前编排文档同步、验证、适用的专项审查、preflight 与独立 code review；明确提交可由固定 OID 直接进入只读 code review。任何相关修改重新进入该闭环。技能来源映射、调用引用和 validator 合同统一使用现行名称。
+**Impact:** `change-preflight` 承载只读优先的提交前守卫和受限安全自治；quarantine 是当前 AKeel run 内的仓外临时恢复工件，保留到验证与 Code Review 完成、Review Surface 接受、Task 完成或运行明确放弃，非空 quarantine 阻止自动 run 清理，初版由用户批准后精确清理。通用 fresh-evidence 规则仍只由 `principles.md §6` 定义，动作特有核对留在 preflight。`implement-work` 在最终 commit 前编排文档同步、验证、适用的专项审查、preflight 与独立 code review；明确提交可由固定 OID 直接进入只读 code review。任何相关修改重新进入该闭环。技能来源映射、调用引用和 validator 合同统一使用现行名称。
 
 **Rejected:**
 
@@ -813,9 +813,9 @@ Plan 使用 `Plan Slice` 作为内部执行单元。每个 Slice 承载目标、
 
 **Reversal surface:** user-boundary
 
-**Decision:** AKeel 的分发面由三个可独立安装的 Pi package 组成：`akeel-guidance`（bootstrap 与 skills）、`akeel-access-gate`（Access Gate）和 `akeel-context-pruner`（测试输出上下文裁剪）。仓库根 `akeel` 保留为全量分发入口，一次加载三类能力且不重复加载资源。运行时职责可以继续在包内保持独立，但不因此增加额外的可安装包边界；`principles.md` 继续只有 Guidance package 中的单一来源。
+**Decision:** AKeel 的分发面由三个可独立安装的 Pi package 组成：`akeel-guidance`（bootstrap、skills 与 workflow artifact/handoff transport）、`akeel-access-gate`（Access Gate）和 `akeel-context-pruner`（测试输出上下文裁剪）。仓库根 `akeel` 保留为全量分发入口，一次加载三类能力且不重复加载资源。运行时职责可以继续在包内保持独立，但不因此增加额外的可安装包边界；`principles.md` 继续只有 Guidance package 中的单一来源。
 
-**Why:** Guidance 中的 bootstrap 与 skills 共同构成工程指导能力，skills 又依赖原则的单一来源；将两者拆成独立包会产生不完整的 Guidance 安装。Access Gate 和 context-pruner 的触发事件、风险边界和依赖独立，适合单独选择。保留全量入口可以维持现有一条命令安装体验。
+**Why:** Guidance 中的 bootstrap、skills 与其正式 artifact/handoff transport 共同构成可执行工程工作流；拆开会使委托 skill 在 `review` 下缺少正式结果通道。Artifact Exchange 自行验证 narrow capability，不进入 Access Gate Policy；Access Gate 和 context-pruner 的触发事件、风险边界和依赖仍独立。保留全量入口维持现有一条命令安装体验。
 
 **Impact:** 每个 package root 必须拥有自己的 `pi` manifest 和运行时依赖声明；根 manifest 负责全量组合。资源过滤仍可作为 Pi 原生的高级加载方式，但不替代独立 package。未安装 Access Gate 时，AKeel 不提供工具调用准入保证；未安装 context-pruner 时，不提供测试输出上下文裁剪。
 
@@ -828,7 +828,7 @@ Plan 使用 `Plan Slice` 作为内部执行单元。每个 Slice 承载目标、
 **Out of Scope:**
 
 - **发布流水线与版本联动：** 当前先建立可发布 package root 和 manifest 合同；接入真实 registry 发布时再定义自动化策略。
-- **三类能力的运行时语义变更：** 本决策只定义分发边界；若要改变 Access Gate、bootstrap 或 context-pruner 行为，另立决策。
+- **各能力的领域语义变更：** 本决策只定义分发边界；Access Gate、Artifact Exchange、bootstrap 或 context-pruner 的行为分别由其领域决策拥有。
 
 ## D-087: Access Gate 双语义车道与单一授权信任链
 
@@ -856,26 +856,52 @@ Canonical compiler 通过受信任、不可由 policy 或用户配置替换的 L
 
 **Out of Scope:** 新增或放宽 Shell 语法、程序族、destroy/delete、网络或路径能力；改变 `policy.yaml` 用户 schema、内置 preset、凭据分类、Access Root、staging lifecycle 或 `accessGate: disabled` 语义；OS sandbox、fd broker、TOCTOU 消除、执行期子进程/网络隔离；Static Flow、Explanation Replay、Runtime Audit、Runtime Content Flow 和 delegated child policy。
 
-## D-088: 单用户 Staging 生命周期与保留策略
+## D-088: Session-owned Staging 生命周期与保留策略
 
 **Reversal surface:** engineering
 
-**Decision:** AKeel 运行于本地单用户环境。运行时 staging 根目录固定位于 `/tmp/akeel/staging/`，各会话在此目录下创建独立的临时工作目录 `/tmp/akeel/staging/stage-<random>/` 作为 `stagingRoot`。
+**Decision:** Access Gate runtime 为每个 Pi session 创建 `/tmp/akeel/sessions/session-<random>/` envelope，其中 `session.json` 声明受管身份，`lock.json` 记录进程，`staging/` 是该 session 唯一的 `stagingRoot`。Session 正常 shutdown 删除整个 envelope；异常退出留下的合法、无主 session envelope 由后续 session 启动时非阻塞回收。
 
-Staging 目录采用双维度保留策略：默认保留 7 天以内的历史目录供任务中断排查与运行轨迹回溯；同时设立容量与目录数量配额（默认 500MB 与 200 个目录）。超出保留期或配额的无主目录在会话启动时以非阻塞方式异步回收，优先按最后修改时间淘汰最旧项。
+回收只认领 `sessions/` 中 manifest 身份匹配、非活跃、非当前且 provenance 可验证的 `session-*` 目录；未知、malformed、symlink 或归属不明内容保留。合法 crash residue 默认保留 7 天，并受 200 个目录和 500MB 总量配额约束，超额时按最后修改时间优先淘汰最旧项；调度每日至多一次。
 
-会话在创建 staging 目录时写入包含进程标识的锁文件，回收调度运行时排除活跃会话目录。
+**Why:** Staging 没有独立生命周期，属于创建它的 Pi session；session envelope 使 metadata、lock、staging 和回收 owner 保持局部一致。Workflow run 与 handoff 具有不同 owner 和保留条件，不能进入同一回收扫描。TTL 与双配额兼顾异常排查和磁盘边界，manifest/provenance 守卫防止按前缀认领未知内容。
 
-**Why:** 统一在 `/tmp/akeel/staging/` 下以 `stage-` 前缀命名暂存目录，与暂存根职能严格呼应，保持了临时工作区结构清晰，与交接目录等其他工件自然分层。7 天保留窗口保障长任务中断或异常调试时的现场可追溯，容量与数量配额提供确定性的存储资源边界，防止无主目录无限累积。
-
-**Impact:** GateSession 默认允许根包含 `/tmp/akeel`；project-lifecycle 的 staging 根与清理调度统一收敛至 `/tmp/akeel/staging/`。清理调度在会话启动时按每日至多一次节流执行，不影响主流程响应速度。
+**Impact:** GateSession 继续把实际 `stagingRoot` 加入默认允许根；其路径现为 `/tmp/akeel/sessions/session-<random>/staging/`。Access Gate package 只拥有 `sessions/`，不扫描或清理 Guidance package 的 workflow run 与 handoff。
 
 **Rejected:**
 
-- **会话结束时同步强行清理所有目录：** 阻断了任务中断或调试时的状态核验与痕迹排查。
-- **无配额上限的纯时间保留：** 存在短期生成大量临时数据导致磁盘资源耗尽的风险。
+- **继续以顶层 `staging/stage-*` 表达 session 资源：** 隐藏了真实 lifecycle owner，并使 metadata 与暂存内容没有统一 envelope。
+- **把 staging 放入 workflow run：** 一个 session 可创建多个 run，一个 run 也可包含多个 child session；错误的一对一关系会造成过早删除或无限保留。
+- **按名称认领或同步删除全部历史目录：** 无法证明未知目录归属，且会破坏 crash 现场。
+- **无配额上限的纯时间保留：** 短期大量暂存数据仍可耗尽磁盘。
 
-**Out of Scope:** 跨机器的临时文件同步与操作系统全局临时文件系统调度策略。
+**Out of Scope:** Workflow run、handoff、跨机器同步和操作系统全局临时文件系统调度；这些资源不进入 session retention。
 
-## D-089: 待创建
+## D-089: Capability Artifact Exchange 与临时资源分类
+
+**Reversal surface:** user-boundary
+
+**Decision:** Guidance package 提供独立于 Access Gate Policy 的 Artifact Exchange 与 Handoff Store。Artifact Exchange 为结果返回同一 Task Owner 的 bounded workflow 创建 `/tmp/akeel/runs/run-<random>/`：可信 `control/` 保存 immutable manifest、Herdr binding 与 publication receipt，`packet/` 保存 Owner 输入，`artifacts/` 保存 child 结果，`quarantine/` 保存不可自动消费的恢复残留，`transport/herdr/` 只保存 bounded 执行诊断。Handoff Store 为 source→successor session 转交创建 `/tmp/akeel/handoffs/handoff-<random>/`，不把 authority transfer 伪装成返回原 Owner 的 workflow run。
+
+Child artifact slot 使用预定、单 slot、单次、24 小时有效的 opaque capability；raw capability 不落盘，manifest 只保存 digest。Owner 把 slot 绑定到确切 Herdr workspace、pane 和 Agent，child Pi 通过 `--akeel-artifact-capability` 激活唯一 publisher，接口只接受 UTF-8 content，不接受 path、run、append、overwrite 或 mode。每 slot 上限 1 MiB、每 run 最多 4 slots、每 Owner session 最多 8 runs。Publisher 在校验 capability、binding、Pi/Herdr identity 和预算后 no-clobber 发布 artifact，最后发行包含 digest 与长度的 receipt；Owner collect 在同一次调用中重新核验并返回内容。Herdr settle、完成文本或 terminal read 不是 receipt。
+
+三类生产临时资源按 lifecycle owner 分开：Access Gate 拥有 `sessions/`，Artifact Exchange 拥有 `runs/`，Handoff Store 拥有 `handoffs/`。新目录默认 `0700`、文件 `0600`；受控 root 必须为当前用户所有、非 symlink 且不可由 group/other 写入。测试 fixture、第三方 cache 和普通探测不建立生产顶层目录；按 skill 命名的 `grill/`、`reviews/`、`preflight/`、`test/`、`external/` 不属于现行命名空间。既有未知内容不迁移、不认领、不删除。
+
+Artifact tools 是自授权 custom Pi surfaces，Access Gate 继续只管理既有 Direct/Shell surfaces；capability publication 不改变 `review` 或任何 path/command Policy，也不授予普通写入、验证、修改代码、任意执行、验收或清理。Run 与 handoff 初版不自动 GC；Artifact Exchange 不提供删除操作，精确清理由用户批准后在其控制面完成。
+
+**Why:** 普通 `write` 的 Gate 只拥有执行前准入，不能保证单次 capability、原子 no-clobber、receipt 或 verified collect；放宽 `review` 会扩大所有写权限。Herdr 0.9.0 只提供 Agent 状态和终端读取，没有结构化 artifact API。Pi custom tool 与 custom flag 可把复杂度封装在窄接口内，同时保持 Herdr 负责执行拓扑、AKeel 负责结果 transport。按 owner/lifecycle 分类避免 staging GC 删除未裁决结果，也避免把跨 session handoff 的 authority transfer 泄漏进普通 run。
+
+**Impact:** Guidance package 除 bootstrap/skills 外加载 Artifact Exchange extension；正式 delegation 使用 reserve→packet→bind→capability start→publish→status/collect。`handoff-session` 通过 Handoff Store 原子发布并由 successor verify。Quarantine 归所属 run 且非空时阻止未来自动清理；transport diagnostics 和 `herdr agent read` 不能进入 result authority。
+
+**Rejected:**
+
+- **允许普通 write 写特定 `/tmp` 路径：** host write 不由 AKeel 执行，无法提供发布与 receipt 原子性。
+- **复用 session staging：** session 与 workflow 是多对多关系且 retention 不同。
+- **抓取 terminal output 或 Herdr plugin 作为结果协议：** 终端可能截断或混入 UI，plugin 又引入额外 runtime dependency 和宽系统权限。
+- **单一全局 TemporaryResourceManager：** 会耦合三个独立安装 package，并把不同 owner/lifecycle 变成浅 dispatcher。
+- **把 handoff 作为普通 run kind：** successor ownership transfer 会迫使所有 run 承担 adoption 状态和跨 session authority。
+
+**Out of Scope:** 自动 run/handoff/Herdr resource GC、accepted/abandoned 状态、跨 Owner 自动 adoption、异步 mailbox、binary/streaming/multipart artifact、多用户或恶意同 uid 隔离、OS sandbox、fd broker 和完整 filesystem TOCTOU 消除。
+
+## D-090: 待创建
 

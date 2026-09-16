@@ -53,6 +53,21 @@ declare module "@earendil-works/pi-coding-agent" {
     tool_call: ToolCallEvent;
   }
 
+  export interface ExtensionToolDefinition {
+    name: string;
+    label: string;
+    description: string;
+    parameters: unknown;
+    executionMode?: "sequential" | "parallel";
+    execute(
+      toolCallId: string,
+      params: any,
+      signal: AbortSignal | undefined,
+      onUpdate: ((result: unknown) => void) | undefined,
+      ctx: ExtensionContext,
+    ): unknown | Promise<unknown>;
+  }
+
   export interface ExtensionAPI {
     on<K extends keyof ExtensionEventMap>(
       event: K,
@@ -68,5 +83,10 @@ declare module "@earendil-works/pi-coding-agent" {
         handler: (args: string, ctx: ExtensionContext) => unknown | Promise<unknown>;
       },
     ): void;
+    registerFlag(name: string, options: { description: string; type: "boolean" | "string" | "number"; default?: unknown }): void;
+    getFlag(name: string): unknown;
+    registerTool(definition: ExtensionToolDefinition): void;
+    getActiveTools(): string[];
+    setActiveTools(names: string[]): void;
   }
 }

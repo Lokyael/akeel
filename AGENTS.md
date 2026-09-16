@@ -18,6 +18,8 @@ AKeel 是 [pi](https://pi.dev) 的插件包：以 **扩展（extensions）** 注
 
 ```
 packages/guidance/src/bootstrap/          # 扩展：Session 注入原则（principles.md + index.ts）
+packages/guidance/src/artifact-exchange/  # 扩展：workflow run、capability artifact 与 Pi tool composition
+packages/guidance/src/handoff-store/      # Guidance runtime：source→successor handoff envelope
 packages/access-gate/src/access-gate/        # 扩展：policy.yaml adapter、Canonical access-decision 与 Pi runtime composition
   access-decision/core/authorization/ # sealed Admission、Mandatory Boundary、Configured Policy 与统一 verdict
   access-decision/core/compilation/   # 单一 Canonical facade、Linux Path Evidence 与私有 Direct/Shell 语义车道

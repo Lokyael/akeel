@@ -14,12 +14,12 @@ If the appended user arguments contain `--role grill-agent --packet <path>`, thi
 
 Otherwise, run the coordinator in the Task Owner Session with Herdr as the fixed execution surface:
 
-1. Reserve a unique run ID under `/tmp/akeel/grill/<run-id>/` and the exact `verified-candidate.md` path before starting the Agent.
-2. Fix the source snapshot as a base ref and resolved base commit OID. If relevant state is uncommitted, include a bounded diff artifact; a new worktree never inherits dirty state implicitly.
-3. A child with `write`, `edit`, or file-modifying Shell uses `herdr worktree create ... --no-focus`; a genuinely read-only child may share the checkout. Select a unique branch that did not exist and record it as created by this run. Capture the server/session route from the coordinator and the returned workspace, repository, checkout, and branch facts. Herdr owns this worktree lifecycle. Never use `--trust-repository` without the user's verified approval.
-4. After topology is known, write only the run, goal, authoritative records, source snapshot and optional diff, settled constraints, open decisions, verified-candidate path, child Agent/workspace/pane IDs, bounded resource record, and trace protocol. Do not copy the Task Owner transcript, workspace lists, command output, or terminal history.
-5. Start one uniquely named Agent with `herdr agent start <agent> --kind pi --pane <root-pane-id> --timeout 30000`. Relay the user's explicit invocation with `herdr agent prompt <agent> "/skill:grill-docs --role grill-agent --packet <path>" --wait --timeout 120000`. This is continuation of the user's manual workflow, not permission for the model to invoke unrelated manual skills. Store successful Herdr JSON responses in the run directory and expose only parsed required IDs and terminal state to the Owner context; on failure expose the bounded error code needed for recovery, not terminal history.
-6. Follow the Agent until it settles as `idle`, `done`, or `blocked` for user input. On `idle` or `done`, read the already-reserved verified-candidate path; a missing or incomplete artifact is a failed handoff. A timeout does not prove that the prompt was not delivered, so inspect the Agent before retrying. Focus changes are optional human navigation and never carry the result.
+1. Use `akeel_run_artifact` to reserve one `grill-docs` run with an Owner packet slot and a child `verified-candidate` slot. Publish the complete packet through the Owner tool; use only its returned run ID, exact paths, and opaque child capability.
+2. Fix the source snapshot as a base ref and resolved base commit OID. If relevant state is uncommitted, include a bounded diff artifact in the packet; a new worktree never inherits dirty state implicitly.
+3. A child with `write`, `edit`, or file-modifying Shell uses `herdr worktree create ... --no-focus`; a genuinely read-only child may share the checkout. Select a unique branch that did not exist and record it as created by this run. Capture the server/session route and returned workspace, repository, checkout, and branch facts. Herdr owns this worktree lifecycle. Never use `--trust-repository` without the user's verified approval.
+4. After topology is known, bind the result slot to the exact Agent/workspace/root-pane identity. The packet contains only the run, goal, authoritative records, source snapshot and optional diff, settled constraints, open decisions, result contract, bounded resource record, and trace protocol. Do not copy the Task Owner transcript, workspace lists, command output, or terminal history.
+5. Start one uniquely named Agent with `herdr agent start <agent> --kind pi --pane <root-pane-id> --timeout 30000 -- --akeel-artifact-capability <opaque-capability>`. Relay the user's explicit invocation with `herdr agent prompt <agent> "/skill:grill-docs --role grill-agent --packet <exact-packet-path>" --wait --timeout 120000`. This continues the user's manual workflow; it does not permit unrelated manual skills. Store bounded successful Herdr control responses only under this run's `transport/herdr/`; on failure expose only the recovery error code, not terminal history.
+6. Follow the Agent until it settles as `idle`, `done`, or `blocked`. On `idle` or `done`, call `akeel_run_artifact` status and collect for the bound result slot. Missing, incomplete, expired, or unverifiable publication is a failed handoff. `herdr agent read` is diagnostic only. A timeout does not prove the prompt was not delivered, so inspect before retrying; focus never carries the result.
 
 The coordinator reads the verified candidate after the Agent settles and completes the import protocol in section 6. The child does not send a completion prompt to the Owner.
 
@@ -95,7 +95,7 @@ Finalize only when:
 - every remaining uncertainty has an explicit prototype or unresolved-question entry;
 - no known contradiction remains in the candidate.
 
-Write `verified-candidate.md` atomically with:
+Publish the verified candidate once through `akeel_publish_artifact` with:
 
 - the verified candidate and confirmed user decisions;
 - result-necessary context: material reasoning, rejected alternatives that affect the result, and facts corrected during grilling;
@@ -107,11 +107,11 @@ Write `verified-candidate.md` atomically with:
 
 Do not include search trails, full logs, repeated failures, immaterial hypotheses, tool chronology, or intermediate drafts. Session references are forensic pointers; child transcripts remain unloaded by default. Authoritative project records are updated only from the Task Owner Session.
 
-After `verified-candidate.md` is complete, finish the response so Herdr can observe the Agent settle. Do not prompt or focus the Task Owner as a completion channel, and do not remove the child pane, workspace, or worktree.
+After `akeel_publish_artifact` succeeds, finish the response so Herdr can observe the Agent settle. Do not write another result path, prompt or focus the Task Owner as a completion channel, or remove the child pane, workspace, or worktree.
 
 ## 6. Import and Record in the Task Owner Session
 
-After the Agent settles, the coordinator reads the exact `verified-candidate.md`, verifies its run and child identity, source snapshot, and result-necessary context, presents an import summary, and asks the user once whether to import the verified candidate. Keep the discussion focused on the verified artifact, reading child session transcripts or reopening discussion only if the artifact is incomplete or contradicts current evidence.
+After the Agent settles, the coordinator formally collects the bound `verified-candidate` slot, verifies its run and child identity, source snapshot, and result-necessary context, presents an import summary, and asks the user once whether to import the verified candidate. Keep the discussion focused on the verified artifact, reading child session transcripts or reopening discussion only if the artifact is incomplete or contradicts current evidence.
 
 After confirmation, apply the domain-modeling discipline:
 
@@ -130,4 +130,4 @@ After approval, use the recorded server/session and verify the repository, works
 
 For an eligible child, run exact non-force removal in order: `herdr worktree remove --workspace <workspace-id>`, then, only after that worktree is gone, `git -C <owner-checkout> branch -d -- <branch>`. Never use `--force`, `-D`, or prefix-based discovery or deletion. Verify the exact workspace, checkout, and branch are absent. On retry, a missing worktree permits branch cleanup only when the unchanged record still proves repository identity, branch ownership, and branch tip; absence alone never authorizes deletion.
 
-Report updated record paths, unresolved questions, the cleanup result, and the exact next action.
+Report updated record paths, unresolved questions, the cleanup result, the exact retained `/tmp/akeel/runs/<run-id>/` path, and the next action. Artifact Exchange never deletes the run directory.

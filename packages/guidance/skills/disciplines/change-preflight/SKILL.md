@@ -25,7 +25,7 @@ Preflight is read-only by default. It must not directly modify user files, delet
 
 A safe autonomous action is allowed only when all conditions hold:
 
-- the outer flow supplies a `run-id` and a creation ledger proving the current run created the residue;
+- the outer flow reserves an AKeel `change-preflight` run and supplies its run ID plus a creation ledger proving the current run created the residue;
 - the item is non-sensitive, non-semantic, and recoverable;
 - the action does not touch an existing user-owned or unknown path; and
 - the recovery or quarantine step succeeds before the original path is changed.
@@ -33,12 +33,12 @@ A safe autonomous action is allowed only when all conditions hold:
 Apply the narrowest handling:
 
 - disposable residue in a dedicated temporary directory created by this run may be removed;
-- residue inside the repository must be moved, never deleted, to `/tmp/akeel/preflight/<run-id>/quarantine/`, with a manifest containing its original path and content fingerprint;
+- residue inside the repository must be moved, never deleted, to the exact `/tmp/akeel/runs/<run-id>/quarantine/` owned by that run, with a manifest containing its original path and content fingerprint;
 - possible credentials, sensitive material, ordinary untracked files, ambiguous residue, and any semantic change are reported without touching them and make the result `BLOCKED` when they affect the surface.
 
 When the run ledger, non-sensitive classification, recovery artifact, quarantine move, or post-action verification is unavailable, report the required action without modifying files. Deep cleanup requires separate authorization through `code-cleanup`.
 
-Quarantine is a run-scoped recovery aid, not a project artifact. Retain it through validation and Code Review; after the Review Surface is accepted, the Task is completed, or the run is explicitly abandoned, remove only that run's quarantine. An interrupted run may leave it until its bounded retention period expires. Never expand cleanup to other run IDs or use force deletion.
+Quarantine is a run-scoped recovery aid, not a project artifact or formal child result. Retain it through validation and Code Review; it blocks automatic run cleanup while non-empty. After the Review Surface is accepted, the Task is completed, or the run is explicitly abandoned, report the exact run path and obtain user approval for cleanup. Artifact Exchange does not delete runs or quarantine, and initial workflow runs have no automatic retention sweep. Never expand cleanup to another run ID or use force deletion.
 
 ## 3. Check Readiness
 

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
-import { join, relative } from "node:path";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
+import { dirname, join, relative } from "node:path";
 import { tmpdir } from "node:os";
 import { createProjectLifecycle } from "../../../../packages/access-gate/src/access-gate/access-decision/runtime/index";
 
@@ -21,20 +21,27 @@ test("project lifecycle uses the session cwd as access root and owns staging", (
     assert.equal(lifecycle.context.cwd, fixture.nested);
     assert.equal(lifecycle.context.projectRoot, fixture.nested);
     assert.equal(existsSync(lifecycle.context.stagingRoot), true);
-    assert.equal(existsSync(join(lifecycle.context.stagingRoot, ".session.lock")), true);
+    const sessionRoot = dirname(lifecycle.context.stagingRoot);
+    assert.equal(existsSync(join(sessionRoot, "lock.json")), true);
+    assert.equal(existsSync(join(sessionRoot, "session.json")), true);
+    assert.equal(statSync(sessionRoot).mode & 0o777, 0o700);
+    assert.equal(statSync(lifecycle.context.stagingRoot).mode & 0o777, 0o700);
+    assert.equal(statSync(join(sessionRoot, "session.json")).mode & 0o777, 0o600);
+    const manifest = JSON.parse(readFileSync(join(sessionRoot, "session.json"), "utf8"));
+    assert.equal(manifest.sessionId, sessionRoot.split("/").at(-1));
 
     lifecycle.dispose();
-    assert.equal(existsSync(lifecycle.context.stagingRoot), false);
+    assert.equal(existsSync(sessionRoot), false);
   } finally {
     fixture.cleanup();
   }
 });
 
-test("project lifecycle places staging root under /tmp/akeel/staging with stage- prefix", () => {
-  const cwd = mkdtempSync(join(tmpdir(), "akeel-stage-test-"));
+test("project lifecycle places staging inside a session envelope", () => {
+  const cwd = mkdtempSync(join(tmpdir(), "akeel-session-test-"));
   try {
     const lifecycle = createProjectLifecycle(cwd);
-    assert.match(lifecycle.context.stagingRoot, /[/\\\\]tmp[/\\\\]akeel[/\\\\]staging[/\\\\]stage-[A-Za-z0-9]+/);
+    assert.match(lifecycle.context.stagingRoot, /[/\\\\]tmp[/\\\\]akeel[/\\\\]sessions[/\\\\]session-[A-Za-z0-9]+[/\\\\]staging$/);
     lifecycle.dispose();
   } finally {
     rmSync(cwd, { recursive: true, force: true });
@@ -93,9 +100,9 @@ test("project lifecycle ignores Git file metadata", () => {
 
 test("project lifecycle rejects relative cwd before creating staging", () => {
   const fixture = project();
-  const stagingParent = join(tmpdir(), "akeel", "staging");
-  const entries = (): string[] => existsSync(stagingParent)
-    ? readdirSync(stagingParent).filter((entry) => entry.startsWith("stage-"))
+  const sessionsParent = join(tmpdir(), "akeel", "sessions");
+  const entries = (): string[] => existsSync(sessionsParent)
+    ? readdirSync(sessionsParent).filter((entry) => entry.startsWith("session-"))
     : [];
   const before = entries();
   try {

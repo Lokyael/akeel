@@ -1,12 +1,15 @@
 {
   "name": "akeel-guidance",
   "version": "0.1.0",
-  "description": "AKeel engineering principles and on-demand skills for Pi",
+  "description": "AKeel engineering guidance and bounded workflow artifact transport for Pi",
   "license": "MIT",
   "keywords": ["pi-package"],
   "type": "module",
+  "peerDependencies": {
+    "typebox": "*"
+  },
   "pi": {
-    "extensions": ["./src/bootstrap/index.ts"],
+    "extensions": ["./src/bootstrap/index.ts", "./src/artifact-exchange/pi-composition.ts"],
     "skills": ["./skills/disciplines", "./skills/workflows"]
   }
 }

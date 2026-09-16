@@ -5,9 +5,9 @@ description: Use when delegating isolated work to a synchronous Herdr child agen
 
 # Herdr Delegation
 
-Use Herdr when process context must stay separate and the current Task Owner retains final authority (per principles.md §11). The owning skill defines the task and artifact contract; Herdr manages child execution and artifact handoff.
+Use Herdr when process context must stay separate and the current Task Owner retains final authority (per principles.md §11). The owning skill defines the task, packet, and result contract; Herdr manages child execution while AKeel Artifact Exchange owns formal result publication.
 
-## Start
+## Start the run
 
 Verify the current session is inside Herdr:
 
@@ -15,7 +15,9 @@ Verify the current session is inside Herdr:
 printenv HERDR_ENV
 ```
 
-Create the workspace matching the child's capability:
+Use `akeel_run_artifact` action `reserve` to create one run with an Owner-published `packet` slot and one child-published artifact slot per child. Publish the complete packet with action `put`; use only the returned run ID, exact paths, and opaque child capabilities. A missing Artifact Exchange tool blocks formal delegation rather than authorizing an ad hoc `/tmp/akeel/<workflow>` path.
+
+Create the workspace matching the child's effective capability:
 
 - **Modifying child** (`write`, `edit`, or file-changing Shell) — create an independent worktree on a unique branch:
   ```bash
@@ -26,30 +28,36 @@ Create the workspace matching the child's capability:
   herdr workspace create --cwd . --label "<label>" --no-focus
   ```
 
-Start the child in the returned root pane:
+Use `akeel_run_artifact` action `bind` to bind each child slot to the returned workspace ID, root pane ID, and planned unique Agent name. Then start Pi with only that slot's opaque capability:
 
 ```bash
-herdr agent start <unique-name> --kind pi --pane <root-pane-id> --timeout 30000
+herdr agent start <unique-name> --kind pi --pane <root-pane-id> --timeout 30000 -- --akeel-artifact-capability <opaque-capability>
 ```
+
+The capability grants only one bounded artifact publication. It does not grant ordinary file writes, validation, code changes, arbitrary execution, acceptance, or cleanup.
 
 ## Run and join
 
-Reserve the artifact path, pass the bounded contract, and wait for settlement:
+Prompt the child with the exact packet path and require it to finish by calling `akeel_publish_artifact` once with the contracted result:
 
 ```bash
-herdr agent prompt <name> "<task and artifact contract>" --wait --timeout 120000
+herdr agent prompt <name> "Read <exact-packet-path>, perform the bounded task, and publish the required result with akeel_publish_artifact." --wait --timeout 120000
 ```
 
-Read the completed artifact from the reserved path. If the wait times out or the child pauses for input, inspect its state before continuing:
+After Herdr settles, call `akeel_run_artifact` action `status`, then `collect`. Formal handoff succeeds only when collect verifies the bound identity, receipt, byte count, and digest and returns the artifact. `idle`, `done`, or terminal completion text alone is not success.
+
+If the wait times out, stalls, or the child pauses for input, inspect its state before retrying:
 
 ```bash
 herdr agent get <name>
 herdr agent read <name> --source recent-unwrapped --lines 80
 ```
 
+`herdr agent read` is diagnostic only. Never copy terminal output into a replacement artifact or silently treat it as formal delivery. A missing, partial, expired, replayed, or unverifiable artifact is a failed handoff and must be reported to the Task Owner.
+
 ## Cleanup
 
-After integrating results and receiving user approval, the Task Owner removes the resources created for this run:
+After verified collection, Owner disposition, and user approval, remove only the exact Herdr resources recorded for this run:
 
 - **Worktree run**:
   ```bash
@@ -60,3 +68,5 @@ After integrating results and receiving user approval, the Task Owner removes th
   ```bash
   herdr workspace close <workspace-id>
   ```
+
+The child never cleans itself. Artifact Exchange does not delete run directories; report the exact `/tmp/akeel/runs/<run-id>/` path for explicit user-managed cleanup. Never infer ownership from a prefix or clean another run.
