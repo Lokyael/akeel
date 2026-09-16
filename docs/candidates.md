@@ -104,7 +104,6 @@
 
   - **Shell base inspection commands:** 当前基础集合保留 `cat/head/tail/grep/rg/find/ls/od` 等 inspect 命令；候选问题：逐项确认旧 read/search adapter 的 inspect 用例是否已由基础集合或 program semantics 覆盖。
   - **Shell base modification commands:** 当前基础集合保留 `mkdir/touch/cp/mv` 等 modify 命令；候选问题：逐项确认旧 filesystem adapter 中同类写入命令是否需要恢复。
-  - **Shell base destructive commands:** 当前基础集合保留 `rm/rmdir` destroy 分类且 destructive command hard-boundary 优先；候选问题：逐项确认旧 filesystem destroy 行为是否已充分覆盖。
   - **Shell deterministic/noop commands:** 当前保留 `true/false/echo/printf` 等确定性或无路径命令；旧版 noop 还包含 `:`，当前 `:` 落入 unknown。候选问题：对照旧 noop/date/read adapter，确认哪些 inspect-only 命令应恢复。
   - **Filesystem adapter family:** 旧版 filesystem adapter 覆盖 `rm/rmdir/touch/mkdir/cp/mv/ln/tee/dd/chmod/chown/install/mktemp/truncate/shred` 等文件系统操作；当前只保留较小基础子集，`tee`/`dd` 等未建模形态进入更保守的边界处理。候选问题：逐项判断缺失命令是否恢复或退役。
   - **Permission-change effect:** 旧版 `chmod/chown` 等权限类操作可承载 `permissionChange` effect；当前没有独立 permission-change effect，相关命令多落入未建模/unknown 或被更窄命令集合拒绝。候选问题：是否恢复权限变更专门分类、并定义其与 write/destroy 的策略关系。
