@@ -49,8 +49,15 @@ const PROGRAM_ANALYZERS: ReadonlyMap<string, ProgramAnalyzer> = new Map([
   ...[...PACKAGE_MANAGERS].map((name) => [name, (_name: string, args: readonly ShellWord[]) => analyzePackageManagerProgram(name, args)] as const),
 ]);
 
+const DETERMINISTIC_PROGRAMS = new Set(["true", "false", ":"]);
+
 export function isKnownProgram(name: string): boolean {
-  return name === "chmod" || isCoreutilsProgram(name) || PROGRAM_ANALYZERS.has(name);
+  return (
+    name === "chmod" ||
+    isCoreutilsProgram(name) ||
+    PROGRAM_ANALYZERS.has(name) ||
+    DETERMINISTIC_PROGRAMS.has(name)
+  );
 }
 
 export function analyzeProgramInvocation(invocation: ProgramInvocation): ProgramAnalysis | undefined {
@@ -62,6 +69,9 @@ export function analyzeProgramInvocation(invocation: ProgramInvocation): Program
     }
     if (identity.name === "chmod") {
       return analyzeChmodProgram(invocation.arguments);
+    }
+    if (DETERMINISTIC_PROGRAMS.has(identity.name)) {
+      return { kind: "complete", semantic: result("inspect", [], []) };
     }
     if (isCoreutilsProgram(identity.name)) {
       return analyzeCoreutilsProgram(identity.name, invocation.arguments);
@@ -77,7 +87,7 @@ export function analyzeProgramInvocation(invocation: ProgramInvocation): Program
   if (basename === "rm" || (isCoreutilsProgram(basename) && basename === "rm")) {
     return { kind: "complete", semantic: result("destroy", ["delete"], [], { hardBoundary: true }) };
   }
-  if (basename === "chmod" || isCoreutilsProgram(basename)) {
+  if (basename === "chmod" || isCoreutilsProgram(basename) || DETERMINISTIC_PROGRAMS.has(basename)) {
     return { kind: "complete", semantic: result("execute", ["execute"], [], { opaque: true }) };
   }
   const analyzer = PROGRAM_ANALYZERS.get(basename);

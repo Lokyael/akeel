@@ -541,3 +541,11 @@ test("supported descriptor redirections compile to bounded canonical path facts"
   ]);
 });
 
+test("deterministic commands true, false, and colon compile to complete shell compilations without path facts", () => {
+  for (const command of ["true", "false", ":", "/bin/true", "/usr/bin/false", "echo ok || true"]) {
+    const compilation = compileShell({ ...request, arguments: { command } });
+    assert.equal(isShellReject(compilation), false, command);
+  }
+});
+
+

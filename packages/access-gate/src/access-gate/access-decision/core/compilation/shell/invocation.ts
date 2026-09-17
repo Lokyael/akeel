@@ -50,6 +50,7 @@ const inspectionCommands = new Set([
 const modificationCommands = new Set(["mkdir", "touch", "cp", "mv", "ln", "chmod"]);
 const destructionCommands = new Set(["rm", "rmdir", "unlink", "truncate"]);
 const executionCommands = new Set([...INTERPRETERS]);
+const deterministicCommands = new Set(["true", "false", ":"]);
 const unsupportedCommandWords = new Set([
   "case", "do", "done", "elif", "else", "esac", "fi", "for", "function", "if", "in", "select", "then", "time", "until", "while",
 ]);
@@ -90,8 +91,11 @@ export function shellCommandSemanticFacts(value: unknown): ShellCommandSemanticF
 
 export function shellCommandOutcomes(analysis: ShellCommandAnalysis): readonly ShellCommandStatus[] {
   if (analysis.kind === "reject") return [];
-  if (analysis.effects.length === 0 && analysis.executable === "true") return ["success"];
-  if (analysis.effects.length === 0 && analysis.executable === "false") return ["failure"];
+  const name = analysis.executable.includes("/")
+    ? analysis.executable.slice(analysis.executable.lastIndexOf("/") + 1)
+    : analysis.executable;
+  if (analysis.effects.length === 0 && (name === "true" || name === ":")) return ["success"];
+  if (analysis.effects.length === 0 && name === "false") return ["failure"];
   return ["success", "failure"];
 }
 
@@ -143,7 +147,7 @@ function commandClass(
   if (modificationCommands.has(name)) return "modify";
   if (destructionCommands.has(name)) return "destroy";
   if (executionCommands.has(name)) return "execute";
-  if (name === "printf" || name === "echo") return "inspect";
+  if (name === "printf" || name === "echo" || deterministicCommands.has(name)) return "inspect";
   return "unknown";
 }
 

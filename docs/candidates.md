@@ -81,7 +81,7 @@
 - **Review Contract:** 每个检查点分别核对 historical evidence、current evidence、外部合同与安全不变量，再由用户选择“确认当前行为 / 重新设计或恢复经证明的子集 / 文档同步 / 明确退役 / 发现实现与存活 Decision 不一致 / 迁移为独立 Task、Decision 或 Candidate”。清单覆盖保留不变、增强、收窄和删除项，按可独立判断的行为族组织，不按旧测试数量追求 parity；命令、选项、输入边界和测试细节归入对应功能族或横切检查项。当前实现、已有 Decision 和相关 Candidate 只构成证据或交叉引用；相关 Candidate 可以承载独立未来设计，但不能替代本记录的历史差异问题，未逐项裁决前也不得删除本地检查语义或预选结论。
 - **Current external dispositions pending this review:**
   - **Resolved cluster:** `Project root and session lifecycle` 与 `Home resolution authority` 当前由 [D-072](decisions.md#d-072-session-启动-cwd-作为访问根与-home-的受限-tilde-语义) 定义；这约束现行行为，但不证明 C-025 已核对旧 Git-root 前置、额外 host `home` 字段及其全部外部场景。正式复核不得无授权逆转 D-072，也不得把 Decision 的存在当作该检查已完成。
-  - **Migrated cluster:** `Bounded static iteration semantics` 已由 C-029 独立保存未来设计边界；`Pipeline and tee streaming write semantics` 已由 C-047 独立保存未来设计边界；C-025 仍保留“旧 reducer 与当前 unsupported `for` 的差异是否被正确处置”这一历史核对，不以迁移本身视为完成。
+  - **Migrated cluster:** `Bounded static iteration semantics` 已由 C-029 独立保存未来设计边界；`Pipeline and tee streaming write semantics` 已由 C-047 独立保存未来设计边界；`Build adapter family 语义与委托执行边界` 已由 C-048 独立保存未来设计边界；C-025 仍保留“旧 reducer 与当前 unsupported `for` 的差异是否被正确处置”这一历史核对，不以迁移本身视为完成。
 
 ### Host、runtime 与 Direct tool 合同
 
@@ -102,9 +102,8 @@
 ### Program semantics 与命令族覆盖
 
   - **Shell base modification commands:** 当前基础集合保留 `mkdir/touch/cp/mv` 等 modify 命令；候选问题：逐项确认旧 filesystem adapter 中同类写入命令是否需要恢复。
-  - **Shell deterministic/noop commands:** 当前保留 `true/false/echo/printf` 等确定性或无路径命令；旧版 noop 还包含 `:`，当前 `:` 落入 unknown。候选问题：对照旧 noop/date/read adapter，确认哪些 inspect-only 命令应恢复。
+  - **Shell deterministic/noop commands:** `true`、`false`、`:` 已由 T-0126 识别为确定性 inspect 命令并支持规范系统路径。候选问题：对照旧 date/read adapter，确认哪些 inspect-only 命令应恢复。
   - **Search adapter family:** 旧版 search adapter 覆盖 `find/tree/grep/rg/ls` 等，并建模部分输出文件/action 选项；当前 `find` 已支持 bounded 的 `-name`、`-iname`、`-path`、`-ipath`、`-type`、`-maxdepth`、`-mindepth` inspect 子集，start path 仍进入 recursive boundary，`find -exec/-delete` 等副作用形式继续 fail-closed。候选问题：逐项判断更复杂的搜索表达式和输出/action 选项是否恢复。
-  - **Build adapter family:** 旧版 build adapter 覆盖 cargo/go/make 等构建工具语义；当前未见等价专用家族。候选问题：是否按真实构建工作流恢复，或依赖 execute/unknown 策略处理。
   - **Date adapter family:** 旧版 date adapter 区分 inspect 与 `--set` modify；当前未见等价专用家族。候选问题：是否明确退役或恢复 inspect-only 支持。
   - **Shell builtins adapter family:** 旧版 `source`/`.` 归为 execute；当前 compound/解释器边界更保守。候选问题：是否补充 shell builtin 分类矩阵。
   - **User command overrides:** 旧版 `commands/aliases/reclassify` 允许用户声明式扩展命令语义；当前无等价入口。候选问题：是否在新 Canonical 架构下重新设计用户扩展 seam，或明确不支持。
@@ -320,5 +319,17 @@
 - **Out of Scope:** 通用无界管道链、动态管道构建、后台并发执行、未隔离的数据流外联或实现 Task。
 - **Origin:** C-025
 
-## C-048: 待创建
+## C-048: 构建工具族（cargo/go/make）语义与委托执行边界（探索方向）
 
+> 本条只记录未来对构建工具族（如 `cargo`、`go`、`make`）语义分类、有界检查与委托执行边界的探索，不改变当前命令分类行为，不构成实现承诺。
+
+- **Why Not Now:** 当前 AKeel 尚无真实工作流实证表明必须为构建工具族引入专用分析器，目前没有必要在核心中新增此类专用工具族。构建工具（如 `cargo build/test`、`go test`、`make`）涉及编译期图灵完备代码执行（`build.rs`、Makefile、测试二进制派生）及隐式依赖拉取，无法在纯准入层做出静态安全证明；若日常开发需要运行，可通过现有 `develop` 预设的 `commands.opaque` 策略或临时 `/policy off` 处理，过早引入专用家族会增加维护负担并产生虚假安全保证。
+- **Exploration Direction:** 若未来重新评估，探索建立类似 `package-managers` 的分层语义模型：
+  - 信息与只读检查层：将纯元信息与版本调用（`--version`、`--help`、`help`）及明确的无副作用查询（如 `cargo metadata`、`cargo tree`、`go version`、`go env`、`make -p -q`）识别为 `inspect + read` 并安全放行；
+  - 破坏性清理层：将 `cargo clean`、`make clean` 等批量/目录清理归入 `destroy + delete`，维持系统硬拒绝；
+  - 有界构建/测试委托执行：将 `build`、`test`、`run` 等归入 `execute + opaque`，消费工作区变异参数（如 `cargo --manifest-path`、`make -C`、`go -C`）并提取工作区路径事实，受预设 `commands.opaque` 与 Mandatory Boundary 管辖，避免因 `unknown` 触发无界路径硬拦截。
+- **Boundary & Scope:** 不做通用语言工具链深度 AST 解释；不将测试/构建伪装为只读 `inspect`；不放宽 Mandatory Boundary（凭据与 Git 控制面写保护）。
+- **Revisit condition:** 真实多语言开发工作流因缺少构建工具语义而受阻，且现有 `commands.opaque` 或会话策略无法满足需求；或用户明确要求引入特定构建工具族的有界支持。
+- **Out of Scope:** 在本候选被明确采纳前，不新增构建工具分析器，不改变现行 `unknown + opaque` 分类行为，不创建实现 Task。
+
+## C-049: 待创建

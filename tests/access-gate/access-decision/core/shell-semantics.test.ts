@@ -25,8 +25,42 @@ function complete(command: string) {
 test("true and false have deterministic command outcomes without execution", () => {
   assert.deepEqual(shellCommandOutcomes(analyzeShellCommand("true")), ["success"]);
   assert.deepEqual(shellCommandOutcomes(analyzeShellCommand("false")), ["failure"]);
+  assert.deepEqual(shellCommandOutcomes(analyzeShellCommand(":")), ["success"]);
   assert.equal(policyContract.source, "new-policy");
 });
+
+test("deterministic commands true, false, and colon are inspect with zero effects and zero paths", () => {
+  for (const cmd of ["true", "false", ":"]) {
+    const analysis = complete(cmd);
+    assert.equal(analysis.commandClass, "inspect", cmd);
+    assert.deepEqual(analysis.effects, [], cmd);
+    assert.deepEqual(analysis.paths, [], cmd);
+    const semantic = (analysis as { readonly semantic?: { readonly opaquePathAccess?: boolean } }).semantic;
+    assert.equal(semantic?.opaquePathAccess, false, cmd);
+  }
+});
+
+test("system path-form true and false reuse bare inspect semantics", () => {
+  for (const cmd of ["/bin/true", "/usr/bin/true", "/bin/false", "/usr/bin/false"]) {
+    const analysis = complete(cmd);
+    assert.equal(analysis.commandClass, "inspect", cmd);
+    assert.deepEqual(analysis.effects, [], cmd);
+    assert.deepEqual(analysis.paths, [], cmd);
+    const semantic = (analysis as { readonly semantic?: { readonly opaquePathAccess?: boolean } }).semantic;
+    assert.equal(semantic?.opaquePathAccess, false, cmd);
+  }
+});
+
+test("colon with target redirection contributes target path and write effect", () => {
+  const analysis = complete(": > output.txt");
+  assert.equal(analysis.commandClass, "inspect");
+  assert.deepEqual(analysis.effects, ["write"]);
+  assert.equal(analysis.paths.length, 1);
+  assert.equal(analysis.paths[0]?.text, "output.txt");
+  assert.equal(analysis.paths[0]?.role, "target");
+  assert.deepEqual(shellCommandOutcomes(analysis), ["success", "failure"]);
+});
+
 
 test("redirection makes otherwise deterministic commands outcome-uncertain", () => {
   assert.deepEqual(shellCommandOutcomes(analyzeShellCommand("true < missing")), ["success", "failure"]);

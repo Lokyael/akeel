@@ -1656,5 +1656,60 @@ test("descriptor redirections and discard streams respect policy and mandatory b
   });
 });
 
+test("deterministic commands true, false, and colon are admitted under review policy", () => {
+  const developPolicy = freezeShellPolicySnapshot({
+    read: "allow",
+    write: "allow",
+    inspect: "allow",
+    modify: "allow",
+    execute: "allow",
+    opaque: "allow",
+    destroy: "allow",
+    unknown: "allow",
+    allowedRoots: ["/workspace/project"],
+    blockedRoots: [],
+    blockedPaths: ["/etc/passwd"],
+  });
+
+  const reviewPolicy = freezeShellPolicySnapshot({
+    read: "allow",
+    write: "deny",
+    inspect: "allow",
+    modify: "deny",
+    execute: "deny",
+    opaque: "deny",
+    destroy: "deny",
+    unknown: "deny",
+    allowedRoots: ["/workspace/project"],
+    blockedRoots: [],
+    blockedPaths: ["/etc/passwd"],
+  });
+
+  // 1. Bare and system-form deterministic commands are inspect without opaque, so they are allowed under review
+  for (const cmd of ["true", "false", ":", "/bin/true", "/usr/bin/false", "echo ok || true"]) {
+    assert.deepEqual(evaluateShellAdmission(admission(cmd, false), reviewPolicy), {
+      kind: "allow",
+    }, cmd);
+  }
+
+  // 2. Colon with write redirection is policy-denied under review because write is deny
+  assert.deepEqual(evaluateShellAdmission(admission(": > out.log", false), reviewPolicy), {
+    kind: "deny",
+    code: "policy-denied",
+  });
+
+  // 3. Colon with write redirection is allowed under develop in workspace
+  assert.deepEqual(evaluateShellAdmission(admission(": > out.log", false), developPolicy), {
+    kind: "allow",
+  });
+
+  // 4. Colon with write redirection into credential boundary is hard-boundary
+  assert.deepEqual(evaluateShellAdmission(admission(": > /__test-agent-dir__/auth.json", true), developPolicy), {
+    kind: "deny",
+    code: "hard-boundary",
+  });
+});
+
+
 
 
