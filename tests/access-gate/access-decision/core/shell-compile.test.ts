@@ -522,3 +522,22 @@ test("a flow whose CWD candidate set exceeds its bound is rejected", () => {
     resourceClass: "input",
   });
 });
+
+test("supported descriptor redirections compile to bounded canonical path facts", () => {
+  const fileComp = compileShell({ ...request, arguments: { command: "cat README.md 2> err.log 1>> out.log" } });
+  assert.equal(isShellReject(fileComp), false);
+  const facts = shellCompilationFacts(fileComp);
+  assert.deepEqual(facts?.resolvedPaths[0]?.map((p) => p.candidate), [
+    "/workspace/project/README.md",
+    "/workspace/project/err.log",
+    "/workspace/project/out.log",
+  ]);
+
+  const nullComp = compileShell({ ...request, arguments: { command: "cat README.md 2>/dev/null 2>&1" } });
+  assert.equal(isShellReject(nullComp), false);
+  const nullFacts = shellCompilationFacts(nullComp);
+  assert.deepEqual(nullFacts?.resolvedPaths[0]?.map((p) => p.candidate), [
+    "/workspace/project/README.md",
+  ]);
+});
+

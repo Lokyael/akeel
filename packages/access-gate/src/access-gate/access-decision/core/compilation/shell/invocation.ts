@@ -54,6 +54,8 @@ const unsupportedCommandWords = new Set([
   "case", "do", "done", "elif", "else", "esac", "fi", "for", "function", "if", "in", "select", "then", "time", "until", "while",
 ]);
 const wrappers = new Set(["env", "timeout", "command", "nohup", "exec"]);
+const TARGET_REDIRECTIONS = new Set([">", ">>", "<>", "1>", "1>>", "2>", "2>>", "2<>"]);
+const ALL_REDIRECTIONS = new Set([">", ">>", "<", "<>", "0<", "1>", "1>>", "2>", "2>>", "2<>", "2>&1"]);
 
 export type ShellCommandSemanticFacts = Readonly<{
   readonly pathBases: readonly ProgramPathBase[];
@@ -206,6 +208,9 @@ export function analyzeShellCommandWords(words: readonly ShellWord[]): ShellComm
   for (let wordIndex = 0; wordIndex < words.length; wordIndex += 1) {
     const word = words[wordIndex]!;
     if (redirectRole !== undefined) {
+      if (word.quote === "bare" && ALL_REDIRECTIONS.has(word.text)) {
+        return rejectOperator(word);
+      }
       if (word.text === "/dev/null") {
         redirectRole = undefined;
         continue;
@@ -215,12 +220,15 @@ export function analyzeShellCommandWords(words: readonly ShellWord[]): ShellComm
       redirectRole = undefined;
       continue;
     }
-    if (word.text === ">" || word.text === ">>" || word.text === "<>") {
+    if (word.quote === "bare" && TARGET_REDIRECTIONS.has(word.text)) {
       redirectRole = "target";
       continue;
     }
-    if (word.text === "<") {
+    if (word.quote === "bare" && (word.text === "<" || word.text === "0<")) {
       redirectRole = "source";
+      continue;
+    }
+    if (word.quote === "bare" && word.text === "2>&1") {
       continue;
     }
     const next = words[wordIndex + 1];
@@ -229,7 +237,7 @@ export function analyzeShellCommandWords(words: readonly ShellWord[]): ShellComm
       word.quote === "bare" &&
       next !== undefined &&
       next.quote === "bare" &&
-      (next.text === ">" || next.text === ">>" || next.text === "<" || next.text === "<>") &&
+      ALL_REDIRECTIONS.has(next.text) &&
       word.end === next.start
     ) {
       continue;
@@ -274,7 +282,7 @@ export function analyzeShellCommandWords(words: readonly ShellWord[]): ShellComm
   if (scriptOption !== undefined) return rejectSecurityBoundary(scriptOption);
   const scriptPath = interpreterScriptPath(resolvedName, commandArguments);
   const hasRedirection = words.some((word) =>
-    word.quote === "bare" && (word.text === ">" || word.text === ">>" || word.text === "<" || word.text === "<>")
+    word.quote === "bare" && ALL_REDIRECTIONS.has(word.text)
   );
   if (executable === "cd" && (index !== 0 || hasRedirection || commandArguments.length !== 1 || commandArguments[0]!.text.startsWith("-"))) {
     return rejectOperator(commandArguments[0] ?? executableWord);

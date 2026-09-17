@@ -1050,6 +1050,62 @@ test("Git non-inspect subcommands isolate inspect-only options and do not permit
   assert.equal(addWithInspectOpt.semantic.opaquePathAccess || addWithInspectOpt.semantic.hardBoundary, true);
 });
 
+test("standard descriptor redirections emit target path and write effect", () => {
+  const errWrite = complete("echo 'error message' 2> err.log");
+  assert.equal(errWrite.commandClass, "inspect");
+  assert.deepEqual(errWrite.effects, ["write"]);
+  assert.deepEqual(errWrite.paths, [{ text: "err.log", role: "target" }]);
+
+  const appendWrite = complete("echo 'line' 1>> out.log 2>> err.log");
+  assert.equal(appendWrite.commandClass, "inspect");
+  assert.deepEqual(appendWrite.effects, ["write"]);
+  assert.deepEqual(appendWrite.paths, [
+    { text: "out.log", role: "target" },
+    { text: "err.log", role: "target" },
+  ]);
+});
+
+test("generalized /dev/null discard redirection emits no target path or write effect", () => {
+  const inspectWithDiscard = complete("cat README.md 2> /dev/null");
+  assert.equal(inspectWithDiscard.commandClass, "inspect");
+  assert.deepEqual(inspectWithDiscard.effects, ["read"]);
+  assert.deepEqual(inspectWithDiscard.paths, [{ text: "README.md", role: "source" }]);
+
+  const statusWithDiscard = complete("git status 2>> /dev/null");
+  assert.equal(statusWithDiscard.commandClass, "inspect");
+  assert.deepEqual(statusWithDiscard.effects, ["read"]);
+  assert.deepEqual(statusWithDiscard.paths, [{ text: ".", role: "source" }]);
+
+  const attachedDiscard = complete("echo test 2>/dev/null");
+  assert.deepEqual(attachedDiscard.paths, []);
+  assert.deepEqual(attachedDiscard.effects, []);
+});
+
+test("2>&1 stream duplication modifier emits no target path or write effect", () => {
+  const inspectWithDup = complete("git log 2>&1");
+  assert.equal(inspectWithDup.commandClass, "inspect");
+  assert.deepEqual(inspectWithDup.effects, ["read"]);
+  assert.deepEqual(inspectWithDup.paths, [{ text: ".", role: "source" }]);
+
+  const combined = complete("git status 1> status.txt 2>&1");
+  assert.deepEqual(combined.effects, ["read", "write"]);
+  assert.deepEqual(combined.paths, [
+    { text: ".", role: "source" },
+    { text: "status.txt", role: "target" },
+  ]);
+});
+
+test("malformed descriptor redirections fail closed", () => {
+  for (const cmd of ["cat 2>", "cat 1>>", "cat 2> 2>&1", "cat 2> > out"]) {
+    const analysis = analyzeShellCommand(cmd);
+    assert.equal(analysis.kind, "reject", cmd);
+    if (analysis.kind === "reject") {
+      assert.equal(analysis.code, "unsupported-syntax", cmd);
+    }
+  }
+});
+
+
 
 
 

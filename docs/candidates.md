@@ -99,7 +99,7 @@
   - **Shell grammar:** 旧版受限 Shell IR 覆盖更多形态；当前支持更小的 simple flow 与有界 `&&/||/;`，pipeline/background/compound/newline 多数 fail-closed。候选问题：是否恢复部分旧 Shell 形态，或保持 Greenfield 收窄。
   - **CWD / control-flow tracing:** 旧版 `control-flow.ts` 建模 `cd`、`cd -`、`pushd/popd`、`&&/||/;/newline` 下的 cwd 候选与 opaque 分支；当前 `core/compilation/shell/flow.ts` 追踪有界 reachable commands 与 `cd` 后 cwd states，但 newline 不作为 flow operator，`pushd/popd` 不再作为专门 cwd 变异族。候选问题：逐项确认旧 cwd 候选语义是否需要恢复、文档化退役，或仅保留当前 bounded flow seam。
   - **Wrapper handling:** 旧版建模 `env`、`timeout`、`command`、`nohup`、`exec` wrapper 链；当前仍有 wrapper 集合并测试底层语义保留。候选问题：是否补齐旧 wrapper 边角语料。
-  - **Redirection 与流式管道写入:** 旧版支持重定向且 `<>/2<>` 按 write 侧建模，并覆盖 `tee` 流式分支写入；当前保留 read-write redirection write-side contract，unsupported clobber fail-closed，`tee` 随 pipeline fail-closed 保持未建模。候选问题：补全重定向支持矩阵，并评估若开放有界管道时 `tee` 的目标文件写入准入与策略边界。
+  - **Redirection 与流式管道写入:** 旧版支持重定向且 `<>/2<>` 按 write 侧建模，并覆盖 `tee` 流式分支写入；当前标准文件描述符重定向（`0<`、`1>`、`1>>`、`2>`、`2>>`、`<>`、`2<>`）、`/dev/null` 丢弃流与 `2>&1` 合流修饰符已由 T-0125 定性闭环，unsupported clobber fail-closed，`tee` 随 pipeline fail-closed 保持未建模。候选问题：评估若开放有界管道时 `tee` 的目标文件写入准入与策略边界。
 ### Program semantics 与命令族覆盖
 
   - **Shell base modification commands:** 当前基础集合保留 `mkdir/touch/cp/mv` 等 modify 命令；候选问题：逐项确认旧 filesystem adapter 中同类写入命令是否需要恢复。
@@ -125,7 +125,7 @@
   - **Test strategy:** 不按数量追求 parity；只把旧测试中仍代表外部行为的部分转写到新 public seam。
 - **Supplementary cross-cutting checks:** 以下横切行为尚未在高层点中单独拆项，纳入本候选的待核对范围：
   - **Command prefix normalization:** 旧 `normalize.ts`、`prefix.ts`、`args.ts` 处理 `builtin`、`time`、`!`、env assignment、wrapper positional 和位置参数；当前 wrapper/命令分类是否保留同等边界需核对。
-  - **Redirection matrix:** 除 `<>`/`2<>` 和 clobber 外，还需逐项核对 `2>`、`&>`、`&>>`、fd duplicate/close、heredoc、here-string、循环级重定向及 source/target 顺序。
+  - **Redirection matrix:** 标准描述符 `0<`、`1>`、`1>>`、`2>`、`2>>`、`2>&1` 与 `/dev/null` 丢弃流已由 T-0125 闭环；其余 `&>`、`&>>`、fd close、heredoc、here-string、循环级重定向及管道继续保持 fail-closed。
   - **Host boundary and passthrough:** 旧 Gate 与当前 host adapter 对未知工具 passthrough、无效 host context、非法输入和受管 surface 的边界行为需逐项对照。
   - **Canonical trust boundary:** 旧 CompleteAccessPlan/verifier/coverage 与当前一次 Canonical 编译、sealed Admission、Display 分离、伪造对象拒绝之间的安全和可观察差异需单独记录。
   - **Approval evidence contract:** 路径证据聚合去重、literal command 展示、bounded reason、无 UI deny，以及 deny 路径/内容不回显等行为需与旧 approval/render contract 对照。

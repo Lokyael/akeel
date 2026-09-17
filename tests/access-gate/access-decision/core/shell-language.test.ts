@@ -74,3 +74,59 @@ test("double quote escaping follows POSIX rules and retains non-special backslas
     ],
   });
 });
+
+test("standard descriptor redirections and 2>&1 are tokenized as distinct operators", () => {
+  const result = scanShellWords("cat 1> out1 1>> out2 2> err1 2>> err2 2>&1");
+  assert.deepEqual(result, {
+    kind: "complete",
+    words: [
+      { text: "cat", start: 0, end: 3, quote: "bare" },
+      { text: "1>", start: 4, end: 6, quote: "bare" },
+      { text: "out1", start: 7, end: 11, quote: "bare" },
+      { text: "1>>", start: 12, end: 15, quote: "bare" },
+      { text: "out2", start: 16, end: 20, quote: "bare" },
+      { text: "2>", start: 21, end: 23, quote: "bare" },
+      { text: "err1", start: 24, end: 28, quote: "bare" },
+      { text: "2>>", start: 29, end: 32, quote: "bare" },
+      { text: "err2", start: 33, end: 37, quote: "bare" },
+      { text: "2>&1", start: 38, end: 42, quote: "bare" },
+    ],
+  });
+});
+
+test("descriptor redirections attached to target paths split cleanly", () => {
+  const result = scanShellWords("echo 2>err.log 1>>out.log");
+  assert.deepEqual(result, {
+    kind: "complete",
+    words: [
+      { text: "echo", start: 0, end: 4, quote: "bare" },
+      { text: "2>", start: 5, end: 7, quote: "bare" },
+      { text: "err.log", start: 7, end: 14, quote: "bare" },
+      { text: "1>>", start: 15, end: 18, quote: "bare" },
+      { text: "out.log", start: 18, end: 25, quote: "bare" },
+    ],
+  });
+});
+
+test("unmodeled descriptor redirections and copy forms fail closed as unsupported-syntax", () => {
+  for (const input of [
+    "cat 3> out",
+    "cat 3>> out",
+    "cat 4< in",
+    "cat 12> out",
+    "cat 2>&2",
+    "cat 2>&-",
+    "cat 2>&10",
+    "cat >& out",
+    "cat <& 0",
+    "cat << EOF",
+    "cat <<< 'text'",
+  ]) {
+    const result = scanShellWords(input);
+    assert.equal(result.kind, "reject", `expected rejection for ${input}`);
+    if (result.kind === "reject") {
+      assert.equal(result.code, "unsupported-syntax", `expected unsupported-syntax for ${input}`);
+    }
+  }
+});
+

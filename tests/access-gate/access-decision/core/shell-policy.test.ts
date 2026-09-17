@@ -1593,4 +1593,68 @@ test("Git inspect subcommands with safe filter options are allowed across develo
   });
 });
 
+test("descriptor redirections and discard streams respect policy and mandatory boundaries", () => {
+  const developPolicy = freezeShellPolicySnapshot({
+    read: "allow",
+    write: "allow",
+    inspect: "allow",
+    modify: "allow",
+    execute: "allow",
+    opaque: "allow",
+    destroy: "allow",
+    unknown: "allow",
+    allowedRoots: ["/workspace/project"],
+    blockedRoots: [],
+    blockedPaths: ["/etc/passwd"],
+  });
+
+  const reviewPolicy = freezeShellPolicySnapshot({
+    read: "allow",
+    write: "deny",
+    inspect: "allow",
+    modify: "deny",
+    execute: "deny",
+    opaque: "deny",
+    destroy: "deny",
+    unknown: "deny",
+    allowedRoots: ["/workspace/project"],
+    blockedRoots: [],
+    blockedPaths: ["/etc/passwd"],
+  });
+
+  // 1. 2>/dev/null is inspect without write, so it is allowed under review
+  assert.deepEqual(evaluateShellAdmission(admission("cat README.md 2> /dev/null", false), reviewPolicy), {
+    kind: "allow",
+  });
+  assert.deepEqual(evaluateShellAdmission(admission("cat README.md 2>&1", false), reviewPolicy), {
+    kind: "allow",
+  });
+
+  // 2. 2> file is write, so it is policy-denied under review
+  assert.deepEqual(evaluateShellAdmission(admission("cat README.md 2> err.log", false), reviewPolicy), {
+    kind: "deny",
+    code: "policy-denied",
+  });
+
+  // 3. 2> file is allowed under develop in workspace
+  assert.deepEqual(evaluateShellAdmission(admission("cat README.md 2> err.log", false), developPolicy), {
+    kind: "allow",
+  });
+
+  // 4. 2> credential artifact or git hook remains hard-boundary even under develop
+  assert.deepEqual(evaluateShellAdmission(admission("cat README.md 2> /__test-agent-dir__/auth.json", true), developPolicy), {
+    kind: "deny",
+    code: "hard-boundary",
+  });
+  assert.deepEqual(evaluateShellAdmission(admission("cat README.md 2> .git/hooks/pre-commit", true), developPolicy), {
+    kind: "deny",
+    code: "hard-boundary",
+  });
+  assert.deepEqual(evaluateShellAdmission(admission("cat README.md 2> /etc/passwd", true), developPolicy), {
+    kind: "deny",
+    code: "hard-boundary",
+  });
+});
+
+
 
