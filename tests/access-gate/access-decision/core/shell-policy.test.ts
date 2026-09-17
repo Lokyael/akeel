@@ -220,6 +220,16 @@ test("path-form destructive executables retain their command and path semantics"
     blockedPaths: [],
   })), {
     kind: "deny",
+    code: "hard-boundary",
+  });
+  assert.deepEqual(evaluateShellAdmission(admission("/tmp/cat README.md"), freezeShellPolicySnapshot({
+    ...policy,
+    execute: "allow",
+    allowedRoots: ["/workspace/project", "/tmp"],
+    blockedRoots: [],
+    blockedPaths: [],
+  })), {
+    kind: "deny",
     code: "policy-denied",
   });
 });
@@ -517,7 +527,8 @@ test("wc, cut, and stat operands remain subject to hard path boundaries", () => 
   assert.deepEqual(evaluateShellAdmission(admission("wc -l /workspace/project/secret.txt"), restricted), { kind: "deny", code: "hard-boundary" });
   assert.deepEqual(evaluateShellAdmission(admission("cut -f1 /workspace/project/.git/config"), restricted), { kind: "deny", code: "hard-boundary" });
   assert.deepEqual(evaluateShellAdmission(admission("stat /etc/passwd"), restricted), { kind: "deny", code: "hard-boundary" });
-  assert.deepEqual(evaluateShellAdmission(admission("/usr/bin/wc /workspace/project/README.md"), restricted), { kind: "deny", code: "policy-denied" });
+  assert.deepEqual(evaluateShellAdmission(admission("/usr/bin/wc /workspace/project/README.md"), restricted), { kind: "allow" });
+  assert.deepEqual(evaluateShellAdmission(admission("/usr/bin/wc /workspace/project/secret.txt"), restricted), { kind: "deny", code: "hard-boundary" });
 });
 
 test("diff, file, du, and df are governed by inspect and read policy instead of unknown policy", () => {
@@ -561,7 +572,8 @@ test("diff, file, du, and df operands and recursiveness remain subject to hard p
   assert.deepEqual(evaluateShellAdmission(admission("file /etc/passwd"), restricted), { kind: "deny", code: "hard-boundary" });
   assert.deepEqual(evaluateShellAdmission(admission("du /workspace/project"), restricted), { kind: "deny", code: "hard-boundary" });
   assert.deepEqual(evaluateShellAdmission(admission("diff -r /workspace/project /workspace/project/backup"), restricted), { kind: "deny", code: "hard-boundary" });
-  assert.deepEqual(evaluateShellAdmission(admission("/usr/bin/diff /workspace/project/a.txt /workspace/project/b.txt"), restricted), { kind: "deny", code: "policy-denied" });
+  assert.deepEqual(evaluateShellAdmission(admission("/usr/bin/diff /workspace/project/a.txt /workspace/project/b.txt"), restricted), { kind: "allow" });
+  assert.deepEqual(evaluateShellAdmission(admission("/usr/bin/diff /workspace/project/a.txt /workspace/project/secret.txt"), restricted), { kind: "deny", code: "hard-boundary" });
 });
 
 test("uv run is governed by execute policy instead of unknown policy", () => {
@@ -1290,4 +1302,72 @@ test("bounded rm enters policy evaluation while sensitive boundaries remain hard
       code: "hard-boundary",
     }, command);
   }
+});
+
+test("dual-plane executable identity enforces operand and artifact boundaries end-to-end", () => {
+  const developPolicy = freezeShellPolicySnapshot({
+    read: "allow",
+    write: "allow",
+    inspect: "allow",
+    modify: "allow",
+    execute: "allow",
+    opaque: "allow",
+    destroy: "allow",
+    unknown: "allow",
+    allowedRoots: ["/workspace/project"],
+    blockedRoots: ["/workspace/project/blocked"],
+    blockedPaths: ["/etc/passwd"],
+  });
+
+  const reviewPolicy = freezeShellPolicySnapshot({
+    read: "allow",
+    write: "deny",
+    inspect: "allow",
+    modify: "deny",
+    execute: "deny",
+    opaque: "deny",
+    destroy: "deny",
+    unknown: "deny",
+    allowedRoots: ["/workspace/project"],
+    blockedRoots: [],
+    blockedPaths: ["/etc/passwd"],
+  });
+
+  // 1. System path-form reading credential -> hard-boundary even under develop
+  assert.deepEqual(evaluateShellAdmission(admission("/usr/bin/cat /__test-agent-dir__/auth.json", true), developPolicy), {
+    kind: "deny",
+    code: "hard-boundary",
+  });
+
+  // 2. System path-form reading blocked path -> hard-boundary
+  assert.deepEqual(evaluateShellAdmission(admission("/usr/bin/cat /etc/passwd", true), developPolicy), {
+    kind: "deny",
+    code: "hard-boundary",
+  });
+
+  // 3. Custom path-form executable inside credential root -> hard-boundary
+  assert.deepEqual(evaluateShellAdmission(admission("/__test-agent-dir__/auth.json", true), developPolicy), {
+    kind: "deny",
+    code: "hard-boundary",
+  });
+
+  // 4. Custom path-form executable inside blocked root -> hard-boundary
+  assert.deepEqual(evaluateShellAdmission(admission("/workspace/project/blocked/evil.sh", true), developPolicy), {
+    kind: "deny",
+    code: "hard-boundary",
+  });
+
+  // 5. System path-form inspection tool reading allowed file under review -> allow
+  assert.deepEqual(evaluateShellAdmission(admission("/bin/cat README.md", true), reviewPolicy), {
+    kind: "allow",
+  });
+
+  // 6. Custom path-form in allowed workspace: develop allows, review denies
+  assert.deepEqual(evaluateShellAdmission(admission("./scripts/build.sh", true), developPolicy), {
+    kind: "allow",
+  });
+  assert.deepEqual(evaluateShellAdmission(admission("./scripts/build.sh", true), reviewPolicy), {
+    kind: "deny",
+    code: "policy-denied",
+  });
 });

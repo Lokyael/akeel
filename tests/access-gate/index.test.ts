@@ -381,3 +381,28 @@ test("bounded coreutils inspection tools diff, file, du, and df are admitted end
     );
   });
 });
+
+test("system path-form coreutils inspection tools are admitted end-to-end under review mode while custom scripts and rm are blocked", async () => {
+  await withAgentFiles(undefined, undefined, async (_agentDir, harness) => {
+    await harness.handlers.get("session_start")!(undefined, harness.ctx);
+
+    assert.equal(
+      await invoke(harness, { toolName: "bash", input: { command: "/bin/cat README.md" } }),
+      undefined,
+    );
+    assert.equal(
+      await invoke(harness, { toolName: "bash", input: { command: "/usr/bin/diff README.md package.json" } }),
+      undefined,
+    );
+
+    assert.deepEqual(
+      await invoke(harness, { toolName: "bash", input: { command: "/bin/rm README.md" } }),
+      { block: true, reason: "Blocked by a security boundary." },
+    );
+
+    assert.deepEqual(
+      await invoke(harness, { toolName: "bash", input: { command: "./scripts/build.sh" } }),
+      { block: true, reason: "Blocked by access policy." },
+    );
+  });
+});

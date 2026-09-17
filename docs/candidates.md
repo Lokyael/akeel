@@ -128,7 +128,6 @@
   - **Test strategy:** 不按数量追求 parity；只把旧测试中仍代表外部行为的部分转写到新 public seam。
 - **Supplementary cross-cutting checks:** 以下横切行为尚未在高层点中单独拆项，纳入本候选的待核对范围：
   - **Command prefix normalization:** 旧 `normalize.ts`、`prefix.ts`、`args.ts` 处理 `builtin`、`time`、`!`、env assignment、wrapper positional 和位置参数；当前 wrapper/命令分类是否保留同等边界需核对。
-  - **Executable identity normalization:** 旧 registry 会把路径形式 executable 取 basename 后匹配内置 adapter（如 `/usr/bin/cat`）；当前只有已注册的 program-semantic family 走 basename 归一化，未建模路径形式命令可能落入 `execute`/opaque。需逐项确认这是刻意收窄还是遗漏。
   - **Redirection matrix:** 除 `<>`/`2<>` 和 clobber 外，还需逐项核对 `2>`、`&>`、`&>>`、fd duplicate/close、heredoc、here-string、循环级重定向及 source/target 顺序。
   - **Host boundary and passthrough:** 旧 Gate 与当前 host adapter 对未知工具 passthrough、无效 host context、非法输入和受管 surface 的边界行为需逐项对照。
   - **Canonical trust boundary:** 旧 CompleteAccessPlan/verifier/coverage 与当前一次 Canonical 编译、sealed Admission、Display 分离、伪造对象拒绝之间的安全和可观察差异需单独记录。

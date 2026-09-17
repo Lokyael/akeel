@@ -438,9 +438,14 @@ Canonical reject 使用本域封闭 code、source anchor 与资源分类；rende
 
 **Executable identity 与 path-form boundary:**
 
-- Canonical 将 executable token 中包含 `/` 的形式识别为 path-form executable，不解析 PATH，也不因文件系统探测或 symlink 解析改变命令身份。
-- 对 Git 仅接受两个固定的词法系统路径形式 `/bin/git` 与 `/usr/bin/git` 作为已声明身份；它们复用裸名 `git` 的完整 analyzer 语义，包括 command class、effects、路径事实、CWD facts 和 hard-boundary。该约定不证明二进制真实性，不接受用户配置的 trusted roots，也不做运行期文件验证。
-- 其他非破坏性 path-form 程序，以及不匹配上述固定形式的 path-form Git，统一为 opaque execute，不因 basename 匹配已知程序族获得 `inspect`/`modify` 语义，也不伪造额外 path operand；其未证明访问由独立 `commands.opaque` 策略控制。含 `..`、重复路径分隔符、大小写变体或其他前缀的形式不获得固定系统路径身份。
+- Canonical 将 executable token 识别为 `bare`、`system`、`system-unmodeled` 或 `path-form` 四类身份，不解析 PATH，也不因文件系统探测或 symlink 解析改变命令身份。
+- 对固定的词法系统路径形式（精确以 `/bin/` 或 `/usr/bin/` 开头，且去除前缀后无更多路径分隔符或 `..` 遍历）：
+  - 若匹配已注册的程序族（Git、bounded coreutils、解释器、Python 工具、包管理器、uv、herdr），作为已声明的系统程序身份复用对应裸名的完整 analyzer 语义，包括命令类别、effects 和操作数路径事实；其参数路径完全纳入 Mandatory Boundary 与路径策略核查，彻底封堵通过系统绝对路径绕过操作数安全检查的漏洞；
+  - 针对破坏性操作（如 `/bin/rm`、`/usr/bin/rm`），根据 D-071 依然保持永久系统 hard boundary，不放宽为单文件知情同意；
+  - 若为未注册的系统程序（如 `/usr/bin/whoami`），分类为 `unknown + opaque`。
+- 对自定义或非系统路径形式程序（含相对路径 `./script.sh`、其他绝对路径 `/tmp/tool`、包含 `..`、重复斜杠或大小写变体的形式）：
+  - 统一将其可执行文件自身提取为 `role: "source"` 的路径事实，强制纳入 Mandatory Boundary（凭据工件保护与 Git 控制面写保护）及路径策略检查，杜绝直接执行受阻或凭据目录下的二进制；
+  - 命令类别保持 `execute + opaque`，其未证明访问风险由独立的 `commands.opaque` 策略轴控制，不因 basename 匹配已知程序族而获得 `inspect`/`modify` 语义；支持从该命令提取重定向目标等标准外部路径。
 - 裸名 `tsx` 与 Python、Node、Ruby、Perl 属于封闭 interpreter 族：单一 `--version`/`-v`/`--help` 信息调用为 `inspect`，脚本或其他调用为 `execute`，脚本 operand 是 source path；path-form interpreter 统一为 opaque execute。`npx tsx` 保持 `execute + opaque`，即使参数看似信息调用。
 - `od` 是封闭的只读检查例外，产生 `inspect + read`，不构成任意工具自动加入内置语义的先例；裸名未知命令保持 `unknown`。
 

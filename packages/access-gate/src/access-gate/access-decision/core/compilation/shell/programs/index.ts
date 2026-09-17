@@ -6,9 +6,13 @@ import { analyzeHerdrProgram } from "./herdr";
 import { analyzeInterpreterProgram, INTERPRETERS } from "./interpreters";
 import { analyzePackageManagerProgram, PACKAGE_MANAGERS } from "./package-managers";
 import { analyzePythonToolProgram, PYTHON_TOOLS } from "./python-tools";
-import { commandName, result } from "./shared";
+import { result } from "./shared";
 import type { ProgramAnalysis, ProgramInvocation, ProgramSemantic } from "./types";
 import { analyzeUvProgram } from "./uv";
+import { resolveExecutableIdentity } from "./identity";
+
+export type { ExecutableIdentity } from "./identity";
+export { resolveExecutableIdentity } from "./identity";
 
 export type {
   ProgramAnalysis,
@@ -43,28 +47,44 @@ const PROGRAM_ANALYZERS: ReadonlyMap<string, ProgramAnalyzer> = new Map([
   ...[...PACKAGE_MANAGERS].map((name) => [name, (_name: string, args: readonly ShellWord[]) => analyzePackageManagerProgram(name, args)] as const),
 ]);
 
-function isTrustedSystemGit(executable: string, name: string): boolean {
-  return name === "git" && (executable === "/bin/git" || executable === "/usr/bin/git");
+export function isKnownProgram(name: string): boolean {
+  return isCoreutilsProgram(name) || PROGRAM_ANALYZERS.has(name);
 }
 
 export function analyzeProgramInvocation(invocation: ProgramInvocation): ProgramAnalysis | undefined {
-  const name = commandName(invocation.executable).toLowerCase();
-  if (isCoreutilsProgram(name)) {
-    if (invocation.executable.includes("/")) {
-      if (name === "rm") {
-        return { kind: "complete", semantic: result("destroy", ["delete"], [], { hardBoundary: true }) };
-      }
-      return { kind: "complete", semantic: result("execute", ["execute"], [], { opaque: true }) };
+  const identity = resolveExecutableIdentity(invocation.executable, isKnownProgram);
+
+  if (identity.kind === "bare" || identity.kind === "system") {
+    if (identity.kind === "system" && identity.name === "rm") {
+      return { kind: "complete", semantic: result("destroy", ["delete"], [], { hardBoundary: true }) };
     }
-    return analyzeCoreutilsProgram(name, invocation.arguments);
+    if (isCoreutilsProgram(identity.name)) {
+      return analyzeCoreutilsProgram(identity.name, invocation.arguments);
+    }
+    const analyzer = PROGRAM_ANALYZERS.get(identity.name);
+    if (analyzer !== undefined) {
+      return { kind: "complete", semantic: analyzer(identity.name, invocation.arguments) };
+    }
+    return undefined;
   }
-  const analyzer = PROGRAM_ANALYZERS.get(name);
+
+  const basename = identity.kind === "path-form" ? identity.basename.toLowerCase() : identity.name.toLowerCase();
+  if (basename === "rm" || (isCoreutilsProgram(basename) && basename === "rm")) {
+    return { kind: "complete", semantic: result("destroy", ["delete"], [], { hardBoundary: true }) };
+  }
+  if (isCoreutilsProgram(basename)) {
+    return { kind: "complete", semantic: result("execute", ["execute"], [], { opaque: true }) };
+  }
+  const analyzer = PROGRAM_ANALYZERS.get(basename);
   if (analyzer === undefined) return undefined;
-  const semantic = analyzer(name, invocation.arguments);
-  if (!invocation.executable.includes("/") || semantic.commandClass === "destroy" || isTrustedSystemGit(invocation.executable, name)) {
+  const semantic = analyzer(basename, invocation.arguments);
+  if (semantic.commandClass === "destroy") {
     return { kind: "complete", semantic };
   }
-  return { kind: "complete", semantic: result("execute", ["execute"], [], { opaque: true, hardBoundary: semantic.hardBoundary }) };
+  return {
+    kind: "complete",
+    semantic: result("execute", ["execute"], [], { opaque: true, hardBoundary: semantic.hardBoundary }),
+  };
 }
 
 export function analyzeProgramCommand(invocation: ProgramInvocation): ProgramSemantic | undefined {

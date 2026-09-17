@@ -750,3 +750,84 @@ test("Herdr commands map to inspect, execute, and modify semantics with path ext
     assert.equal(unknown.semantic.opaquePathAccess, true);
   }
 });
+
+test("fixed system path-form coreutils obtain system identity and reuse bare-name semantics", () => {
+  for (const executable of ["/bin/cat", "/usr/bin/cat"]) {
+    const semantic = analyzeProgramCommand({ executable, arguments: [word("README.md", 0)] });
+    assert.ok(semantic);
+    assert.equal(semantic.commandClass, "inspect", executable);
+    assert.deepEqual(semantic.effects, ["read"], executable);
+    assert.deepEqual(semantic.paths.map((entry) => entry.path), [
+      { text: "README.md", role: "source" },
+    ], executable);
+    assert.equal(semantic.opaque, false, executable);
+  }
+
+  for (const executable of ["/bin/diff", "/usr/bin/diff"]) {
+    const semantic = analyzeProgramCommand({ executable, arguments: [word("a.txt", 0), word("b.txt", 6)] });
+    assert.ok(semantic);
+    assert.equal(semantic.commandClass, "inspect", executable);
+    assert.deepEqual(semantic.effects, ["read"], executable);
+    assert.deepEqual(semantic.paths.map((entry) => entry.path), [
+      { text: "a.txt", role: "source" },
+      { text: "b.txt", role: "source" },
+    ], executable);
+  }
+});
+
+test("system path-form rm permanently retains destroy and hardBoundary", () => {
+  for (const executable of ["/bin/rm", "/usr/bin/rm"]) {
+    const semantic = analyzeProgramCommand({ executable, arguments: [word("file.txt", 0)] });
+    assert.ok(semantic);
+    assert.equal(semantic.commandClass, "destroy", executable);
+    assert.equal(semantic.hardBoundary, true, executable);
+  }
+});
+
+test("custom path-form and non-standard prefix executables remain opaque execution", () => {
+  for (const executable of ["/tmp/cat", "/opt/bin/cat", "/usr/local/bin/git"]) {
+    const semantic = analyzeProgramCommand({ executable, arguments: [word("arg", 0)] });
+    assert.ok(semantic);
+    assert.equal(semantic.commandClass, "execute", executable);
+    assert.equal(semantic.opaque, true, executable);
+  }
+
+  const scriptAnalysis = analyzeShellCommand("./tool.sh arg");
+  assert.equal(scriptAnalysis.kind, "complete");
+  if (scriptAnalysis.kind === "complete") {
+    assert.equal(scriptAnalysis.commandClass, "execute");
+    assert.equal(scriptAnalysis.semantic.opaquePathAccess, true);
+  }
+});
+
+test("system path-form invocation extracts operand paths and preserves transparent inspect semantics", () => {
+  const catAnalysis = complete("/usr/bin/cat foo.txt");
+  assert.equal(catAnalysis.commandClass, "inspect");
+  assert.deepEqual(catAnalysis.effects, ["read"]);
+  assert.deepEqual(catAnalysis.paths, [{ text: "foo.txt", role: "source" }]);
+  assert.equal(catAnalysis.semantic.opaquePathAccess, false);
+
+  const diffAnalysis = complete("/usr/bin/diff a.txt b.txt");
+  assert.equal(diffAnalysis.commandClass, "inspect");
+  assert.deepEqual(diffAnalysis.effects, ["read"]);
+  assert.deepEqual(diffAnalysis.paths, [
+    { text: "a.txt", role: "source" },
+    { text: "b.txt", role: "source" },
+  ]);
+  assert.equal(diffAnalysis.semantic.opaquePathAccess, false);
+});
+
+test("custom path-form invocation extracts executable as source path and marks opaque", () => {
+  const scriptAnalysis = complete("./scripts/build.sh");
+  assert.equal(scriptAnalysis.commandClass, "execute");
+  assert.equal(scriptAnalysis.semantic.opaquePathAccess, true);
+  assert.deepEqual(scriptAnalysis.paths, [{ text: "./scripts/build.sh", role: "source" }]);
+
+  const homeRelativeScript = complete("~/bin/custom.sh");
+  assert.equal(homeRelativeScript.commandClass, "execute");
+  assert.equal(homeRelativeScript.semantic.opaquePathAccess, true);
+  assert.deepEqual(homeRelativeScript.paths, [
+    { text: "~/bin/custom.sh", role: "source", pathKind: "home-relative" },
+  ]);
+});
+

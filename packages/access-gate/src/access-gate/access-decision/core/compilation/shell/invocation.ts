@@ -1,5 +1,11 @@
 import { scanSimpleShellFlow } from "./flow";
-import { analyzeFindProgramInvocation, analyzeProgramInvocation } from "./programs/index";
+import {
+  analyzeFindProgramInvocation,
+  analyzeProgramInvocation,
+  isKnownProgram,
+  resolveExecutableIdentity,
+} from "./programs/index";
+import type { ExecutableIdentity } from "./programs/index";
 import {
   INTERPRETERS,
   isInterpreterInspection,
@@ -118,19 +124,19 @@ function addEffect(effects: ShellEffect[], effect: ShellEffect): void {
   if (!effects.includes(effect)) effects.push(effect);
 }
 
-function commandName(executable: string): string {
-  const separator = executable.lastIndexOf("/");
-  return separator < 0 ? executable : executable.slice(separator + 1);
-}
-
-function commandClass(executable: string, words: readonly ShellWord[] = []): ShellCommandClass {
-  const name = commandName(executable);
+function commandClass(
+  identity: ExecutableIdentity,
+  words: readonly ShellWord[] = [],
+): ShellCommandClass {
+  const name = identity.kind === "path-form" ? identity.basename : identity.name;
   if (name === "npx" && words[0]?.text === "tsx") return "execute";
   if (name === "uv" && words[0]?.text === "run") return "execute";
   if (name === "uv" && (words[0]?.text === "help" ||
     (words.length === 1 && ["--version", "-V", "--help", "-h"].includes(words[0]!.text)))) return "inspect";
   if (isInterpreterInspection(name, words)) return "inspect";
-  if (executable.includes("/")) return destructionCommands.has(name) ? "destroy" : "execute";
+  if (identity.kind === "path-form" || identity.kind === "system-unmodeled") {
+    return destructionCommands.has(name) ? "destroy" : "execute";
+  }
   if (inspectionCommands.has(name)) return "inspect";
   if (modificationCommands.has(name)) return "modify";
   if (destructionCommands.has(name)) return "destroy";
@@ -257,22 +263,26 @@ export function analyzeShellCommandWords(words: readonly ShellWord[]): ShellComm
   const executableWord = commandWords[index];
   if (!executableWord) return rejectOperator(commandWords[commandWords.length - 1]!);
   const executable = executableWord.text;
-  const executableName = commandName(executable);
-  if (executable.includes("/") && wrappers.has(executableName)) return rejectOperator(executableWord);
+  const identity = resolveExecutableIdentity(executable, isKnownProgram);
+  const resolvedName = identity.kind === "path-form" ? identity.basename : identity.name;
+  if (executable.includes("/") && wrappers.has(resolvedName)) return rejectOperator(executableWord);
   if (executable === "eval" || executable === "source" || executable === ".") {
     return rejectSecurityBoundary(executableWord);
   }
   const commandArguments = commandWords.slice(index + 1);
-  const scriptOption = unsupportedInterpreterOption(executableName, commandArguments);
+  const scriptOption = unsupportedInterpreterOption(resolvedName, commandArguments);
   if (scriptOption !== undefined) return rejectSecurityBoundary(scriptOption);
-  const scriptPath = interpreterScriptPath(executableName, commandArguments);
+  const scriptPath = interpreterScriptPath(resolvedName, commandArguments);
   const hasRedirection = words.some((word) =>
     word.quote === "bare" && (word.text === ">" || word.text === ">>" || word.text === "<" || word.text === "<>")
   );
   if (executable === "cd" && (index !== 0 || hasRedirection || commandArguments.length !== 1 || commandArguments[0]!.text.startsWith("-"))) {
     return rejectOperator(commandArguments[0] ?? executableWord);
   }
-  const findAnalysis = executableName === "find" ? analyzeFindProgramInvocation(commandArguments) : undefined;
+  const isSystemOrBare = identity.kind === "bare" || identity.kind === "system";
+  const findAnalysis = (resolvedName === "find" && isSystemOrBare)
+    ? analyzeFindProgramInvocation(commandArguments)
+    : undefined;
   if (findAnalysis?.kind === "reject") {
     if (findAnalysis.code === "security-boundary") return rejectSecurityBoundary(findAnalysis.word);
     return rejectOperator(findAnalysis.word);
@@ -287,6 +297,9 @@ export function analyzeShellCommandWords(words: readonly ShellWord[]): ShellComm
     addEffect(effects, "cwd-change");
     addPath(pathFromWord(commandArguments[0]!, "source"), commandArguments[0]!.start);
   }
+  if (identity.kind === "path-form") {
+    addPath(pathFromWord(executableWord, "source"), executableWord.start);
+  }
   const programAnalysis = findAnalysis?.kind === "complete"
     ? { kind: "complete" as const, semantic: findAnalysis.semantic }
     : analyzeProgramInvocation({ executable, arguments: commandArguments });
@@ -296,18 +309,18 @@ export function analyzeShellCommandWords(words: readonly ShellWord[]): ShellComm
       : rejectOperator(programAnalysis.word);
   }
   const programSemantic = programAnalysis?.kind === "complete" ? programAnalysis.semantic : undefined;
-  const classification = programSemantic?.commandClass ?? commandClass(executable, commandArguments);
+  const classification = programSemantic?.commandClass ?? commandClass(identity, commandArguments);
   if (programSemantic !== undefined) {
     for (const effect of programSemantic.effects) addEffect(effects, effect);
     for (const programPath of programSemantic.paths) addPath(programPath.path, programPath.start, programPath.base);
   }
-  const opaquePathForm = executable.includes("/") && classification !== "destroy";
-  if (!opaquePathForm && inspectionCommands.has(executableName)) addEffect(effects, "read");
+  const opaquePathForm = !isSystemOrBare && classification !== "destroy";
+  if (!opaquePathForm && inspectionCommands.has(resolvedName)) addEffect(effects, "read");
   if (classification === "modify") addEffect(effects, "write");
   if (classification === "destroy") addEffect(effects, "delete");
   if (classification === "execute") addEffect(effects, "execute");
   if (paths.some(({ path }) => path.role === "target")) addEffect(effects, "write");
-  if ((executableName === "cp" || executableName === "mv" || executableName === "ln" || executableName === "cd") &&
+  if ((resolvedName === "cp" || resolvedName === "mv" || resolvedName === "ln" || resolvedName === "cd") &&
     paths.some(({ path }) => path.role === "source")) {
     addEffect(effects, "read");
   }
@@ -318,8 +331,8 @@ export function analyzeShellCommandWords(words: readonly ShellWord[]): ShellComm
     pathStarts: Object.freeze(orderedPaths.map(({ start }) => start)),
     cwdChanges: Object.freeze([...(programSemantic?.cwdChanges ?? [])]),
     opaquePathAccess: programSemantic?.opaque === true || classification === "unknown" ||
-      executable.includes("/") && classification !== "destroy" ||
-      executableName === "uv" && classification === "execute",
+      (!isSystemOrBare && classification !== "destroy") ||
+      (resolvedName === "uv" && classification === "execute"),
     hardBoundary: programSemantic?.hardBoundary === true,
     recursive: programSemantic?.recursive === true,
   });
