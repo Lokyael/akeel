@@ -300,3 +300,27 @@ test("bounded rm integrates with host approval across review, develop, and no-UI
     );
   });
 });
+
+test("redirection to /dev/null is admitted end-to-end under review mode", async () => {
+  await withAgentFiles(undefined, undefined, async (_agentDir, harness) => {
+    await harness.handlers.get("session_start")!(undefined, harness.ctx);
+
+    // review preset allows git status 2>/dev/null without block
+    assert.equal(
+      await invoke(harness, { toolName: "bash", input: { command: "git status 2>/dev/null" } }),
+      undefined,
+    );
+
+    // review preset allows echo hello > /dev/null
+    assert.equal(
+      await invoke(harness, { toolName: "bash", input: { command: "echo hello > /dev/null" } }),
+      undefined,
+    );
+
+    // Non-/dev/null redirection is blocked
+    assert.deepEqual(
+      await invoke(harness, { toolName: "bash", input: { command: "echo hello > /dev/sda" } }),
+      { block: true, reason: "Blocked by a security boundary." },
+    );
+  });
+});

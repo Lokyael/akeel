@@ -330,6 +330,43 @@ test("read-write redirection follows the write-side policy contract", () => {
   assert.deepEqual(evaluateShellAdmission(admission("printf x <> output.txt"), writeAllowed), { kind: "allow" });
 });
 
+test("redirection to /dev/null is admitted under review without write policy or path violation", () => {
+  const reviewPolicy = freezeShellPolicySnapshot({
+    read: "allow",
+    write: "deny",
+    inspect: "allow",
+    modify: "deny",
+    execute: "deny",
+    opaque: "deny",
+    destroy: "deny",
+    unknown: "deny",
+    allowedRoots: ["/workspace"],
+    blockedRoots: [],
+    blockedPaths: [],
+  });
+
+  assert.deepEqual(
+    evaluateShellAdmission(admission("git status 2>/dev/null"), reviewPolicy),
+    { kind: "allow" },
+  );
+  assert.deepEqual(
+    evaluateShellAdmission(admission("printf ok > /dev/null"), reviewPolicy),
+    { kind: "allow" },
+  );
+  assert.deepEqual(
+    evaluateShellAdmission(admission("cat < /dev/null"), reviewPolicy),
+    { kind: "allow" },
+  );
+  assert.deepEqual(
+    evaluateShellAdmission(admission("printf ok > /dev/sda"), reviewPolicy),
+    { kind: "deny", code: "hard-boundary" },
+  );
+  assert.deepEqual(
+    evaluateShellAdmission(admission("cat /dev/null"), reviewPolicy),
+    { kind: "deny", code: "hard-boundary" },
+  );
+});
+
 test("redirection uncertainty retains a destructive fallback", () => {
   assert.deepEqual(evaluateShellAdmission(admission("true < missing || /bin/rm /tmp/marker"), freezeShellPolicySnapshot(policy)), {
     kind: "deny",

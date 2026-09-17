@@ -58,6 +58,7 @@
 - 一个 tool call 的所有 ask intent 聚合为一次审批；无 UI 不执行 ask。
 - newline、pipeline、background、compound command、`for`、动态展开及其他不可证明形态继续在 Canonical 阶段拒绝，不引入猜测放行。
 - `<>`（O_RDWR 读写打开）按 write 侧建模：write 决策覆盖读面（write⇒read 一致性）；不以只读建模掩盖写侧。Policy adapter 必须拒绝矛盾的 write/read 组合，避免由配置产生未定义授权语义。
+- Shell 重定向（`>`、`>>`、`<>`、`<`）目标为字面 `/dev/null` 时作为无害丢弃流处理，不发行 target 路径事实、不污染写入 effect；作为命令常规操作数的 `/dev/null`、其它设备节点（如 `/dev/sda`、`/dev/zero`、`/dev/pts/*`）以及向外部非 `/dev/null` 路径的重定向继续受路径边界与安全策略硬拦截。
 
 **Enforcement scope:**
 

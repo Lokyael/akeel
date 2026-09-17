@@ -241,6 +241,57 @@ test("read-write redirection is governed by the write-side target contract", () 
   }
 });
 
+test("redirection to or from /dev/null is treated as a discard stream without paths or write effect", () => {
+  assert.deepEqual(analyzeShellCommand("git status 2>/dev/null"), {
+    kind: "complete",
+    executable: "git",
+    wrappers: [],
+    commandClass: "inspect",
+    effects: ["read"],
+    paths: [{ text: ".", role: "source" }],
+  });
+  assert.deepEqual(analyzeShellCommand("printf ok > /dev/null"), {
+    kind: "complete",
+    executable: "printf",
+    wrappers: [],
+    commandClass: "inspect",
+    effects: [],
+    paths: [],
+  });
+  assert.deepEqual(analyzeShellCommand("printf ok 2> /dev/null"), {
+    kind: "complete",
+    executable: "printf",
+    wrappers: [],
+    commandClass: "inspect",
+    effects: [],
+    paths: [],
+  });
+  assert.deepEqual(analyzeShellCommand("cat < /dev/null"), {
+    kind: "complete",
+    executable: "cat",
+    wrappers: [],
+    commandClass: "inspect",
+    effects: ["read"],
+    paths: [],
+  });
+  assert.deepEqual(analyzeShellCommand("cat '/dev/null'"), {
+    kind: "complete",
+    executable: "cat",
+    wrappers: [],
+    commandClass: "inspect",
+    effects: ["read"],
+    paths: [{ text: "/dev/null", role: "source" }],
+  });
+  assert.deepEqual(analyzeShellCommand("printf ok > /dev/sda"), {
+    kind: "complete",
+    executable: "printf",
+    wrappers: [],
+    commandClass: "inspect",
+    effects: ["write"],
+    paths: [{ text: "/dev/sda", role: "target" }],
+  });
+});
+
 test("source and target paths retain their command order", () => {
   assert.deepEqual(analyzeShellCommand("cat input.txt > output.txt"), {
     kind: "complete",

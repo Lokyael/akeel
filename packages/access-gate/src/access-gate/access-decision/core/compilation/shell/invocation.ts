@@ -197,6 +197,10 @@ export function analyzeShellCommandWords(words: readonly ShellWord[]): ShellComm
   for (let wordIndex = 0; wordIndex < words.length; wordIndex += 1) {
     const word = words[wordIndex]!;
     if (redirectRole !== undefined) {
+      if (word.text === "/dev/null") {
+        redirectRole = undefined;
+        continue;
+      }
       if (redirectRole === "source") hasInputRedirection = true;
       addPath(pathFromWord(word, redirectRole), word.start);
       redirectRole = undefined;
