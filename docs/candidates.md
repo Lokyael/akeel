@@ -294,5 +294,19 @@
 - **Revisit condition:** 真实工作流或关键外部构建工具必须依赖 Shell `mktemp` 且无法通过直接写入或现有 staging 替代；或用户明确要求启动受管临时文件准入设计。
 - **Out of Scope:** 全局 `/tmp/` 目录的随意读写放宽、跨用户共享临时文件、不安全命名模板展开、破坏性清理操作或实现 Task。
 
-## C-046: 待创建
+## C-046: 分层子命令声明式流形与跨程序语义归并（Subcommand Program Manifest）
+
+> 本条记录未来将分层子命令（如 Git、uv、Python 工具、包管理器）的解析机制从命令式手写循环归并为声明式流形的架构探索，不改变现行命令分析器行为，也不构成实现承诺。
+
+- **Why Not Now:** T-0124 已通过子命令作用域解耦与选项/操作数原子分离彻底解决了 `git.ts` 内部的高频审查痛点与伪路径溢出，当前所有功能与全量测试均已绿灯闭环；现存 `uv.ts`、`python-tools.ts` 与 `package-managers.ts` 虽然仍保留基于 `option-scanner.ts` 的手写循环与 ad-hoc 索引跳跃，但在当前支持子集下行为稳定，尚未出现阻塞性缺陷。过早发动跨 5 个文件的大一统通用抽象重写会扩大变更面，并带来过度工程风险。
+- **Exploration Direction:** 若未来重新评估或扩展新分层程序（如 `cargo`/`go`），探索建立轻量、正交、以数据驱动的声明式流形原语（`SubcommandProgramManifest`），取代分散的手工状态机：
+  - **全局上下文提取器 (Global Context Extractor)**：统一消费前置全局选项（如 `git -C`、`uv --directory`、`npm --prefix`），自动维护 `cwdChanges` 与全局路径事实；
+  - **子命令路由器 (Subcommand Router)**：精确识别子命令 token 并分派至独立子命令族契约，彻底消除选项跨子命令污染；
+  - **角色感知选项规范 (Role-Aware Option Spec)**：扩展 `bounded-options.ts`，在选项声明中直接绑定路径角色（如 `sourcePath`、`targetPath`）与安全拦截（`securityBoundary`），底层解析器直接发行带正确角色的 `ProgramPath`，消灭各命令内部手写 `if (name === '--output') paths.push(...)` 的样板逻辑；
+  - **声明式操作数位置策略 (Declarative Positional Policy)**：将操作数提取规则规范化为不可变策略枚举（如 `--` 分隔符后提取、尾部目标操作数、全部源操作数、禁止路径操作数等），消除手写下标运算；
+  - **领域微调逃生舱 (Domain Tailoring Hooks)**：保留纯函数定制钩子，优雅接纳 Git `-C` 叠加状态机、local `file://` transport 校验等特异性边界，避免大一统框架陷入僵化。
+- **Revisit condition:** `uv.ts`、`python-tools.ts` 或 `package-managers.ts` 出现选项与操作数混淆、参数值伪路径泄露或子命令选项污染的真实缺陷实证；或引入新的复杂子命令程序（如 `cargo`）需要统一架构支撑；或用户明确要求启动 Shell 语义分析层的架构一体化归并。
+- **Out of Scope:** 在本候选被明确采纳前，不重写现有各命令分析器，不引入通用动态 AST 引擎或动态 CLI 解释器，不改变现行 Canonical、Admission、Mandatory Boundary 或 Policy 决策语义。
+
+## C-047: 待创建
 
