@@ -525,6 +525,16 @@ test("bounded coreutils option values do not become path operands", () => {
     ["stat -c %s package.json", ["package.json"]],
     ["stat --printf=%s package.json", ["package.json"]],
     ["stat -L package.json", ["package.json"]],
+    ["diff -u fileA fileB", ["fileA", "fileB"]],
+    ["diff -U 3 fileA fileB", ["fileA", "fileB"]],
+    ["diff --unified=5 fileA fileB", ["fileA", "fileB"]],
+    ["file package.json", ["package.json"]],
+    ["file -b -i package.json", ["package.json"]],
+    ["du file", ["file"]],
+    ["du -d 2 file", ["file"]],
+    ["du", ["."]],
+    ["df file", ["file"]],
+    ["df -h", ["."]],
     ["rm file.txt", ["file.txt"]],
     ["rm -f a.txt b.txt", ["a.txt", "b.txt"]],
     ["rm -v file.txt", ["file.txt"]],
@@ -559,6 +569,19 @@ test("known coreutils reject options outside their bounded contract", () => {
     "stat --unknown file",
     "stat",
     "stat -L",
+    "diff --diff-program=prog a b",
+    "diff -D NAME a b",
+    "diff a",
+    "diff a b c",
+    "diff",
+    "file -z file",
+    "file -C file",
+    "file -f list",
+    "file",
+    "du --files0-from=file",
+    "du --unknown",
+    "df --output=source",
+    "df --unknown",
   ]) {
     const analysis = analyzeShellCommand(command);
     assert.equal(analysis.kind, "reject", command);
@@ -592,6 +615,41 @@ test("bounded wc, cut, and stat extract inspect class, read effects, and source 
   assert.equal(statWithFile.commandClass, "inspect");
   assert.deepEqual(statWithFile.effects, ["read"]);
   assert.deepEqual(statWithFile.paths, [{ text: "package.json", role: "source" }]);
+});
+
+test("bounded diff, file, du, and df extract inspect class, read effects, and correct recursiveness", () => {
+  const diffCmd = complete("diff -u a.txt b.txt");
+  assert.equal(diffCmd.commandClass, "inspect");
+  assert.deepEqual(diffCmd.effects, ["read"]);
+  assert.deepEqual(diffCmd.paths, [{ text: "a.txt", role: "source" }, { text: "b.txt", role: "source" }]);
+  assert.equal(diffCmd.semantic.recursive, false);
+
+  const diffRecursive = complete("diff -r dirA dirB");
+  assert.equal(diffRecursive.commandClass, "inspect");
+  assert.equal(diffRecursive.semantic.recursive, true);
+
+  const fileCmd = complete("file package.json");
+  assert.equal(fileCmd.commandClass, "inspect");
+  assert.deepEqual(fileCmd.effects, ["read"]);
+  assert.deepEqual(fileCmd.paths, [{ text: "package.json", role: "source" }]);
+  assert.equal(fileCmd.semantic.recursive, false);
+
+  const duCmd = complete("du -sh");
+  assert.equal(duCmd.commandClass, "inspect");
+  assert.deepEqual(duCmd.effects, ["read"]);
+  assert.deepEqual(duCmd.paths, [{ text: ".", role: "source" }]);
+  assert.equal(duCmd.semantic.recursive, true);
+
+  const duExplicit = complete("du -h src");
+  assert.equal(duExplicit.commandClass, "inspect");
+  assert.deepEqual(duExplicit.paths, [{ text: "src", role: "source" }]);
+  assert.equal(duExplicit.semantic.recursive, true);
+
+  const dfCmd = complete("df -h");
+  assert.equal(dfCmd.commandClass, "inspect");
+  assert.deepEqual(dfCmd.effects, ["read"]);
+  assert.deepEqual(dfCmd.paths, [{ text: ".", role: "source" }]);
+  assert.equal(dfCmd.semantic.recursive, false);
 });
 
 test("bounded rm extracts target paths and destroy command class", () => {

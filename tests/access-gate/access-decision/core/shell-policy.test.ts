@@ -520,6 +520,50 @@ test("wc, cut, and stat operands remain subject to hard path boundaries", () => 
   assert.deepEqual(evaluateShellAdmission(admission("/usr/bin/wc /workspace/project/README.md"), restricted), { kind: "deny", code: "policy-denied" });
 });
 
+test("diff, file, du, and df are governed by inspect and read policy instead of unknown policy", () => {
+  const allowPolicy = freezeShellPolicySnapshot({
+    ...policy,
+    read: "allow",
+    inspect: "allow",
+    unknown: "deny",
+    allowedRoots: ["/workspace/project"],
+    blockedPaths: [],
+  });
+  assert.deepEqual(evaluateShellAdmission(admission("diff /workspace/project/a.txt /workspace/project/b.txt"), allowPolicy), { kind: "allow" });
+  assert.deepEqual(evaluateShellAdmission(admission("file /workspace/project/README.md"), allowPolicy), { kind: "allow" });
+  assert.deepEqual(evaluateShellAdmission(admission("du /workspace/project/a.txt"), allowPolicy), { kind: "allow" });
+  assert.deepEqual(evaluateShellAdmission(admission("df /workspace/project"), allowPolicy), { kind: "allow" });
+
+  const denyRead = freezeShellPolicySnapshot({
+    ...policy,
+    read: "deny",
+    inspect: "allow",
+    unknown: "allow",
+    allowedRoots: ["/workspace/project"],
+    blockedPaths: [],
+  });
+  assert.deepEqual(evaluateShellAdmission(admission("diff /workspace/project/a.txt /workspace/project/b.txt"), denyRead), { kind: "deny", code: "policy-denied" });
+  assert.deepEqual(evaluateShellAdmission(admission("file /workspace/project/README.md"), denyRead), { kind: "deny", code: "policy-denied" });
+  assert.deepEqual(evaluateShellAdmission(admission("du /workspace/project/a.txt"), denyRead), { kind: "deny", code: "policy-denied" });
+  assert.deepEqual(evaluateShellAdmission(admission("df /workspace/project"), denyRead), { kind: "deny", code: "policy-denied" });
+});
+
+test("diff, file, du, and df operands and recursiveness remain subject to hard path boundaries", () => {
+  const restricted = freezeShellPolicySnapshot({
+    ...policy,
+    read: "allow",
+    inspect: "allow",
+    allowedRoots: ["/workspace/project"],
+    blockedRoots: ["/workspace/project/.git"],
+    blockedPaths: ["/workspace/project/secret.txt"],
+  });
+  assert.deepEqual(evaluateShellAdmission(admission("diff /workspace/project/a.txt /workspace/project/secret.txt"), restricted), { kind: "deny", code: "hard-boundary" });
+  assert.deepEqual(evaluateShellAdmission(admission("file /etc/passwd"), restricted), { kind: "deny", code: "hard-boundary" });
+  assert.deepEqual(evaluateShellAdmission(admission("du /workspace/project"), restricted), { kind: "deny", code: "hard-boundary" });
+  assert.deepEqual(evaluateShellAdmission(admission("diff -r /workspace/project /workspace/project/backup"), restricted), { kind: "deny", code: "hard-boundary" });
+  assert.deepEqual(evaluateShellAdmission(admission("/usr/bin/diff /workspace/project/a.txt /workspace/project/b.txt"), restricted), { kind: "deny", code: "policy-denied" });
+});
+
 test("uv run is governed by execute policy instead of unknown policy", () => {
   assert.deepEqual(
     evaluateShellAdmission(admission("uv run pytest tests/test_app.py"), freezeShellPolicySnapshot({

@@ -77,6 +77,52 @@ const contracts: ReadonlyMap<string, BoundedOptionContract> = new Map([
       flag("-L", "--dereference", "-f", "--file-system", "-t", "--terse"),
     ],
   }],
+  ["diff", {
+    options: [
+      flag(
+        "-a", "--text", "-b", "--ignore-space-change", "-B", "--ignore-blank-lines",
+        "-c", "-i", "--ignore-case", "-N", "--new-file", "-q", "--brief",
+        "-r", "-R", "--recursive", "-s", "--report-identical-files", "-t", "--expand-tabs",
+        "-u", "-w", "--ignore-all-space", "-y", "--side-by-side", "--normal",
+      ),
+      scalar("-C", "--context", "-U", "--unified", "--label", "-W", "--width"),
+      unsupported(
+        "--diff-program", "-D", "--ifdef", "--line-format", "--GTYPE-group-format",
+        "--exclude", "--exclude-from",
+      ),
+    ],
+  }],
+  ["file", {
+    options: [
+      flag(
+        "-b", "--brief", "-i", "--mime", "--mime-type", "--mime-encoding",
+        "-k", "--keep-going", "-L", "--dereference", "-h", "--no-dereference",
+        "-s", "--special-files", "-N", "--no-pad", "-p", "--preserve-date",
+      ),
+      unsupported("-z", "--uncompress", "-C", "--compile", "-f", "--files-from", "-m", "--magic-file"),
+    ],
+  }],
+  ["du", {
+    options: [
+      flag(
+        "-a", "--all", "-b", "--bytes", "-c", "--total", "-h", "--human-readable",
+        "-k", "-m", "-l", "--count-links", "-L", "--dereference", "-P", "--no-dereference",
+        "-s", "--summarize", "-S", "--separate-dirs", "-x", "--one-file-system", "--si", "-0", "--null",
+      ),
+      scalar("-d", "--max-depth", "-B", "--block-size", "--threshold"),
+      unsupported("--files0-from", "--exclude-from"),
+    ],
+  }],
+  ["df", {
+    options: [
+      flag(
+        "-a", "--all", "-h", "--human-readable", "-H", "--si", "-i", "--inodes",
+        "-k", "-l", "--local", "-P", "--portability", "--sync", "--no-sync", "-v",
+      ),
+      scalar("-B", "--block-size", "-t", "--type", "-x", "--exclude-type"),
+      unsupported("--output", "--total"),
+    ],
+  }],
   ["mkdir", {
     options: [
       scalar("-m", "--mode"),
@@ -138,7 +184,10 @@ function hasOption(options: readonly ParsedBoundedOption[], ...names: string[]):
 }
 
 function analyzeCoreutilsComplete(name: string, options: readonly ParsedBoundedOption[], operands: readonly ShellWord[]): ProgramSemantic {
-  const inspection = new Set(["cat", "head", "tail", "grep", "rg", "ls", "od", "wc", "cut", "stat"]);
+  const inspection = new Set([
+    "cat", "head", "tail", "grep", "rg", "ls", "od", "wc", "cut", "stat",
+    "diff", "file", "du", "df",
+  ]);
   const modification = new Set(["mkdir", "touch", "cp", "mv", "ln"]);
   const destruction = new Set(["rm"]);
   const commandClass = inspection.has(name)
@@ -158,9 +207,12 @@ function analyzeCoreutilsComplete(name: string, options: readonly ParsedBoundedO
     }
     recursive = name === "rg" || hasOption(options, "-r", "-R", "--recursive") ||
       options.some((option) => (option.name === "-d" || option.name === "--directories") && option.value?.text === "recurse");
-  } else if (name === "ls") {
+  } else if (name === "ls" || name === "du" || name === "df") {
     paths.push(...pathsFor(operands.length === 0 ? [syntheticPath()] : operands, "source"));
-    recursive = hasOption(options, "-R", "--recursive");
+    recursive = name === "du" || (name === "ls" && hasOption(options, "-R", "--recursive"));
+  } else if (name === "diff") {
+    paths.push(...pathsFor(operands, "source"));
+    recursive = hasOption(options, "-r", "-R", "--recursive");
   } else if (name === "cp" || name === "mv" || name === "ln") {
     if (operands.length > 0) {
       paths.push(...pathsFor(operands.slice(0, -1), "source"));
@@ -188,7 +240,11 @@ export function analyzeCoreutilsProgram(name: string, args: readonly ShellWord[]
   if (contract === undefined) return undefined;
   const parsed = parseBoundedOptions(args, contract);
   if (parsed.kind === "reject") return rejectFrom(parsed);
-  if ((name === "rm" || name === "stat") && parsed.operands.length === 0) {
+  if ((name === "rm" || name === "stat" || name === "file") && parsed.operands.length === 0) {
+    const word = args[args.length - 1] ?? syntheticPath();
+    return Object.freeze({ kind: "reject" as const, code: "unsupported-syntax" as const, word });
+  }
+  if (name === "diff" && parsed.operands.length !== 2) {
     const word = args[args.length - 1] ?? syntheticPath();
     return Object.freeze({ kind: "reject" as const, code: "unsupported-syntax" as const, word });
   }
