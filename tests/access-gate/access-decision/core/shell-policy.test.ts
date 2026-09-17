@@ -1432,3 +1432,93 @@ test("bounded tr, sort, and uniq are allowed under review while blocked paths an
   });
 });
 
+test("bounded chmod admits workspace files under develop, prompts in guided, denies in review, and hard-blocks credentials and git hooks", () => {
+  const developPolicy = freezeShellPolicySnapshot({
+    read: "allow",
+    write: "allow",
+    inspect: "allow",
+    modify: "allow",
+    execute: "allow",
+    opaque: "allow",
+    destroy: "allow",
+    unknown: "allow",
+    allowedRoots: ["/workspace/project"],
+    blockedRoots: [],
+    blockedPaths: ["/etc/passwd"],
+  });
+
+  const reviewPolicy = freezeShellPolicySnapshot({
+    read: "allow",
+    write: "deny",
+    inspect: "allow",
+    modify: "deny",
+    execute: "deny",
+    opaque: "deny",
+    destroy: "deny",
+    unknown: "deny",
+    allowedRoots: ["/workspace/project"],
+    blockedRoots: [],
+    blockedPaths: ["/etc/passwd"],
+  });
+
+  const guidedPolicy = freezeShellPolicySnapshot({
+    read: "allow",
+    write: "ask",
+    inspect: "allow",
+    modify: "ask",
+    execute: "ask",
+    opaque: "ask",
+    destroy: "deny",
+    unknown: "ask",
+    allowedRoots: ["/workspace/project"],
+    blockedRoots: [],
+    blockedPaths: ["/etc/passwd"],
+  });
+
+  // 1. In workspace under develop: allow
+  assert.deepEqual(evaluateShellAdmission(admission("chmod +x run.sh", true), developPolicy), {
+    kind: "allow",
+  });
+  assert.deepEqual(evaluateShellAdmission(admission("chmod 755 run.sh", true), developPolicy), {
+    kind: "allow",
+  });
+  assert.deepEqual(evaluateShellAdmission(admission("/bin/chmod +x run.sh", true), developPolicy), {
+    kind: "allow",
+  });
+
+  // 2. In workspace under review: policy-denied (write: deny)
+  assert.deepEqual(evaluateShellAdmission(admission("chmod +x run.sh", true), reviewPolicy), {
+    kind: "deny",
+    code: "policy-denied",
+  });
+
+  // 3. In workspace under guided: ask when UI present, no-ui deny when headless
+  assert.deepEqual(evaluateShellAdmission(admission("chmod +x run.sh", true), guidedPolicy), {
+    kind: "ask",
+    executed: false,
+  });
+  assert.deepEqual(evaluateShellAdmission(admission("chmod +x run.sh", false), guidedPolicy), {
+    kind: "deny",
+    code: "no-ui",
+  });
+
+  // 4. Critical: Mandatory Boundary hard-blocks credential and Git control artifacts EVEN under develop!
+  assert.deepEqual(evaluateShellAdmission(admission("chmod 777 /__test-agent-dir__/auth.json", true), developPolicy), {
+    kind: "deny",
+    code: "hard-boundary",
+  });
+  assert.deepEqual(evaluateShellAdmission(admission("chmod +x .git/hooks/pre-commit", true), developPolicy), {
+    kind: "deny",
+    code: "hard-boundary",
+  });
+  assert.deepEqual(evaluateShellAdmission(admission("chmod 600 .git/config", true), developPolicy), {
+    kind: "deny",
+    code: "hard-boundary",
+  });
+  assert.deepEqual(evaluateShellAdmission(admission("chmod 777 /etc/passwd", true), developPolicy), {
+    kind: "deny",
+    code: "hard-boundary",
+  });
+});
+
+

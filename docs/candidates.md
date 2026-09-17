@@ -104,8 +104,8 @@
 
   - **Shell base modification commands:** 当前基础集合保留 `mkdir/touch/cp/mv` 等 modify 命令；候选问题：逐项确认旧 filesystem adapter 中同类写入命令是否需要恢复。
   - **Shell deterministic/noop commands:** 当前保留 `true/false/echo/printf` 等确定性或无路径命令；旧版 noop 还包含 `:`，当前 `:` 落入 unknown。候选问题：对照旧 noop/date/read adapter，确认哪些 inspect-only 命令应恢复。
-  - **Filesystem adapter family:** 旧版 filesystem adapter 覆盖 `rm/rmdir/touch/mkdir/cp/mv/ln/tee/dd/chmod/chown/install/mktemp/truncate/shred` 等文件系统操作；当前只保留较小基础子集，`tee`/`dd` 等未建模形态进入更保守的边界处理。候选问题：逐项判断缺失命令是否恢复或退役。
-  - **Permission-change effect:** 旧版 `chmod/chown` 等权限类操作可承载 `permissionChange` effect；当前没有独立 permission-change effect，相关命令多落入未建模/unknown 或被更窄命令集合拒绝。候选问题：是否恢复权限变更专门分类、并定义其与 write/destroy 的策略关系。
+  - **Filesystem adapter family:** 旧版 filesystem adapter 覆盖 `rm/rmdir/touch/mkdir/cp/mv/ln/tee/dd/chmod/chown/install/mktemp/truncate/shred` 等文件系统操作；当前 `chmod` 已由 T-0123 / D-067 纳管为有界 modify 专用分析器（补全 Mandatory Boundary 路径提取，封死递归与 SUID/SGID 提权位），`mkdir/touch/cp/mv/ln` 已由 coreutils 纳管，`rm/rmdir` 由 D-071 裁决，特权/破坏性命令（`chown/dd/shred/truncate`）明确退役或保持 hard-boundary，`tee`/`mktemp` 移入对应管道/临时路径议题，旧文件系统家族的历史复核已定性闭环。
+  - **Permission-change effect:** 旧版 `chmod/chown` 等权限类操作可承载 `permissionChange` effect；当前 `chmod` 已由 T-0123 / D-067 纳管为 `modify` 并产生 `write` effect，独立的 `permissionChange` 策略轴明确退役并统一由现行 `write` 策略管控，无需增加独立策略轴。
   - **Search adapter family:** 旧版 search adapter 覆盖 `find/tree/grep/rg/ls` 等，并建模部分输出文件/action 选项；当前 `find` 已支持 bounded 的 `-name`、`-iname`、`-path`、`-ipath`、`-type`、`-maxdepth`、`-mindepth` inspect 子集，start path 仍进入 recursive boundary，`find -exec/-delete` 等副作用形式继续 fail-closed。候选问题：逐项判断更复杂的搜索表达式和输出/action 选项是否恢复。
   - **Build adapter family:** 旧版 build adapter 覆盖 cargo/go/make 等构建工具语义；当前未见等价专用家族。候选问题：是否按真实构建工作流恢复，或依赖 execute/unknown 策略处理。
   - **Date adapter family:** 旧版 date adapter 区分 inspect 与 `--set` modify；当前未见等价专用家族。候选问题：是否明确退役或恢复 inspect-only 支持。

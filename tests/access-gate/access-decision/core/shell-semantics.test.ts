@@ -913,4 +913,109 @@ test("uniq rejects multiple file operands to prevent silent file overwrites", ()
   }
 });
 
+test("bounded chmod extracts modify class, write effects, and target paths", () => {
+  const plusX = complete("chmod +x run.sh");
+  assert.equal(plusX.commandClass, "modify");
+  assert.deepEqual(plusX.effects, ["write"]);
+  assert.deepEqual(plusX.paths, [{ text: "run.sh", role: "target" }]);
+
+  const minusW = complete("chmod -w file.txt");
+  assert.equal(minusW.commandClass, "modify");
+  assert.deepEqual(minusW.effects, ["write"]);
+  assert.deepEqual(minusW.paths, [{ text: "file.txt", role: "target" }]);
+
+  const symbolicCompound = complete("chmod u=rwx,go=rx script.sh");
+  assert.equal(symbolicCompound.commandClass, "modify");
+  assert.deepEqual(symbolicCompound.effects, ["write"]);
+  assert.deepEqual(symbolicCompound.paths, [{ text: "script.sh", role: "target" }]);
+
+  const octalStandard = complete("chmod 755 run.sh");
+  assert.equal(octalStandard.commandClass, "modify");
+  assert.deepEqual(octalStandard.effects, ["write"]);
+  assert.deepEqual(octalStandard.paths, [{ text: "run.sh", role: "target" }]);
+
+  const octalZeroPrefix = complete("chmod 0644 file.txt");
+  assert.equal(octalZeroPrefix.commandClass, "modify");
+  assert.deepEqual(octalZeroPrefix.effects, ["write"]);
+  assert.deepEqual(octalZeroPrefix.paths, [{ text: "file.txt", role: "target" }]);
+
+  const withFlagsAndMulti = complete("chmod -v +x a.sh b.sh");
+  assert.equal(withFlagsAndMulti.commandClass, "modify");
+  assert.deepEqual(withFlagsAndMulti.effects, ["write"]);
+  assert.deepEqual(withFlagsAndMulti.paths, [
+    { text: "a.sh", role: "target" },
+    { text: "b.sh", role: "target" },
+  ]);
+
+  const endOfOptions = complete("chmod -- -x file.txt");
+  assert.equal(endOfOptions.commandClass, "modify");
+  assert.deepEqual(endOfOptions.effects, ["write"]);
+  assert.deepEqual(endOfOptions.paths, [{ text: "file.txt", role: "target" }]);
+
+  const systemChmod = complete("/bin/chmod +x run.sh");
+  assert.equal(systemChmod.commandClass, "modify");
+  assert.deepEqual(systemChmod.effects, ["write"]);
+  assert.deepEqual(systemChmod.paths, [{ text: "run.sh", role: "target" }]);
+
+  const pathFormChmod = complete("./chmod +x run.sh");
+  assert.equal(pathFormChmod.commandClass, "execute");
+  assert.equal(pathFormChmod.semantic.opaquePathAccess, true);
+  assert.deepEqual(pathFormChmod.paths, [{ text: "./chmod", role: "source" }]);
+});
+
+test("chmod rejects recursive options with security-boundary", () => {
+  for (const cmd of [
+    "chmod -R 755 dir",
+    "chmod --recursive +x dir",
+    "chmod -vR 755 dir",
+    "/usr/bin/chmod -R 755 dir",
+  ]) {
+    const analysis = analyzeShellCommand(cmd);
+    assert.equal(analysis.kind, "reject", cmd);
+    if (analysis.kind === "reject") {
+      assert.equal(analysis.code, "security-boundary", cmd);
+    }
+  }
+});
+
+test("chmod rejects privilege-elevation special bits with security-boundary", () => {
+  for (const cmd of [
+    "chmod 4755 exploit",
+    "chmod 2755 exploit",
+    "chmod 1777 exploit",
+    "chmod 6755 exploit",
+    "chmod u+s exploit",
+    "chmod g+s exploit",
+    "chmod +t exploit",
+    "chmod a+s exploit",
+    "chmod u=rws,g=rx exploit",
+  ]) {
+    const analysis = analyzeShellCommand(cmd);
+    assert.equal(analysis.kind, "reject", cmd);
+    if (analysis.kind === "reject") {
+      assert.equal(analysis.code, "security-boundary", cmd);
+    }
+  }
+});
+
+test("chmod rejects invalid modes, unsupported options, and missing operands", () => {
+  for (const cmd of [
+    "chmod",
+    "chmod +x",
+    "chmod 755",
+    "chmod --reference=ref.txt target.txt",
+    "chmod 888 file.txt",
+    "chmod 77777 file.txt",
+    "chmod invalid-mode file.txt",
+    "chmod --invalid-flag 755 file.txt",
+  ]) {
+    const analysis = analyzeShellCommand(cmd);
+    assert.equal(analysis.kind, "reject", cmd);
+    if (analysis.kind === "reject") {
+      assert.equal(analysis.code, "unsupported-syntax", cmd);
+    }
+  }
+});
+
+
 

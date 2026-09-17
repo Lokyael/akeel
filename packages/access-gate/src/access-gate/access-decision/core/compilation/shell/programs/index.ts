@@ -1,4 +1,5 @@
 import type { ShellWord } from "../language";
+import { analyzeChmodProgram } from "./chmod";
 import { analyzeCoreutilsProgram, isCoreutilsProgram } from "./coreutils";
 import { analyzeFindProgram, analyzeFindProgramInvocation } from "./find";
 import { analyzeGitProgram } from "./git";
@@ -24,6 +25,7 @@ export type {
 } from "./types";
 
 export {
+  analyzeChmodProgram,
   analyzeCoreutilsProgram,
   analyzeFindProgram,
   analyzeFindProgramInvocation,
@@ -48,7 +50,7 @@ const PROGRAM_ANALYZERS: ReadonlyMap<string, ProgramAnalyzer> = new Map([
 ]);
 
 export function isKnownProgram(name: string): boolean {
-  return isCoreutilsProgram(name) || PROGRAM_ANALYZERS.has(name);
+  return name === "chmod" || isCoreutilsProgram(name) || PROGRAM_ANALYZERS.has(name);
 }
 
 export function analyzeProgramInvocation(invocation: ProgramInvocation): ProgramAnalysis | undefined {
@@ -57,6 +59,9 @@ export function analyzeProgramInvocation(invocation: ProgramInvocation): Program
   if (identity.kind === "bare" || identity.kind === "system") {
     if (identity.kind === "system" && identity.name === "rm") {
       return { kind: "complete", semantic: result("destroy", ["delete"], [], { hardBoundary: true }) };
+    }
+    if (identity.name === "chmod") {
+      return analyzeChmodProgram(invocation.arguments);
     }
     if (isCoreutilsProgram(identity.name)) {
       return analyzeCoreutilsProgram(identity.name, invocation.arguments);
@@ -72,7 +77,7 @@ export function analyzeProgramInvocation(invocation: ProgramInvocation): Program
   if (basename === "rm" || (isCoreutilsProgram(basename) && basename === "rm")) {
     return { kind: "complete", semantic: result("destroy", ["delete"], [], { hardBoundary: true }) };
   }
-  if (isCoreutilsProgram(basename)) {
+  if (basename === "chmod" || isCoreutilsProgram(basename)) {
     return { kind: "complete", semantic: result("execute", ["execute"], [], { opaque: true }) };
   }
   const analyzer = PROGRAM_ANALYZERS.get(basename);

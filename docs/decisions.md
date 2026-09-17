@@ -451,7 +451,7 @@ Canonical reject 使用本域封闭 code、source anchor 与资源分类；rende
 
 **Why:** Git、包管理器和语言运行时共享“程序自有参数语言 + 子命令分类 + 路径/委托执行”的结构，但把它们塞进 Shell lexer 或 Policy Kernel 会造成职责泄漏和重复解析。`uv run` 可能同步环境、解析或下载依赖并启动任意子进程，因此不能当作普通只读命令；版本/帮助调用与未建模顶层子命令则需要独立分类。opaque 仍必须保持独立事实，但其风险是否可接受属于用户策略选择：`review`、`guided`、`develop` 分别提供拒绝、审批和便利路径；这不宣称 allowed roots 能限制脚本运行期访问，真实执行仍受操作系统权限约束。
 
-**Impact:** 生产入口仍只切换新 Canonical pipeline；新增命令族只需增加 core 语义模块和 public seam 测试，不恢复旧 `command-semantics` 依赖。当前覆盖 Git 常用 inspect/modify/destroy 分类（有界本地 `add` 与 `commit` 接入 modify 策略并受 Git 控制面写保护约束，网络/远程 transport、helper-capable 操作与 `config` 固定 hard-boundary）、bounded coreutils 的封闭 option/value 消费与基础 inspect/modify 语义（涵盖 `cat`、`head`、`tail`、`grep`、`rg`、`ls`、`od`、`wc`、`cut`、`stat`、`diff`、`file`、`du`、`df` 以及只读流工具 `tr`、白名单排序 `sort`、单操作数排重 `uniq`，破坏性写入与代码执行选项如 `sort -o`、`sort --compress-program` 及双操作数 `uniq` 强制 fail-closed，图灵脚本工具 `sed`/`awk` 维持 `unknown + opaque` 状态并由策略轴与 Direct-first 互补）、裸名 `find` 的 bounded inspect/read 表达式（`-name`、`-iname`、`-path`、`-ipath`、`-type`、`-maxdepth`、`-mindepth`，start path 进入 recursive boundary）、解释器信息命令、Python 质量工具、uv 的 `run`/信息/未知子命令分类、herdr 的 inspect/execute/modify 分类（工作区创建提取 `--cwd`/`--path` 路径事实，worktree remove 与 workspace close 归入 modify）和 npm 族常用分类；Git `-C`、`--git-dir`、`--work-tree` 和项目内显式 `file://` remote 的 command-local location 已覆盖，完整 CLI 方言、完整 Git pathspec 语法、HTTPS/SSH 等外部 transport、hosted `file://`、alias/间接 config remote、`clone --separate-git-dir` 和网络/执行隔离不在本条内。
+**Impact:** 生产入口仍只切换新 Canonical pipeline；新增命令族只需增加 core 语义模块和 public seam 测试，不恢复旧 `command-semantics` 依赖。当前覆盖 Git 常用 inspect/modify/destroy 分类（有界本地 `add` 与 `commit` 接入 modify 策略并受 Git 控制面写保护约束，网络/远程 transport、helper-capable 操作与 `config` 固定 hard-boundary）、bounded coreutils 的封闭 option/value 消费与基础 inspect/modify 语义（涵盖 `cat`、`head`、`tail`、`grep`、`rg`、`ls`、`od`、`wc`、`cut`、`stat`、`diff`、`file`、`du`、`df` 以及只读流工具 `tr`、白名单排序 `sort`、单操作数排重 `uniq`，破坏性写入与代码执行选项如 `sort -o`、`sort --compress-program` 及双操作数 `uniq` 强制 fail-closed，图灵脚本工具 `sed`/`awk` 维持 `unknown + opaque` 状态并由策略轴与 Direct-first 互补）、有界文件权限修改命令 `chmod` 专用分析器（将目标操作数提取为 `target` 路径事实并映射为 `modify` 与 `write` effect，支持常用无害 flag、标准符号模式与安全八进制，严禁 `-R`/`--recursive` 递归与 SUID/SGID/Sticky 提权位并报 `security-boundary`，使权限修改完全受 Mandatory Boundary 凭据与 Git 控制面硬保护；旧版独立的 `permissionChange` 策略轴明确退役并收敛为 `write` 策略）、裸名 `find` 的 bounded inspect/read 表达式（`-name`、`-iname`、`-path`、`-ipath`、`-type`、`-maxdepth`、`-mindepth`，start path 进入 recursive boundary）、解释器信息命令、Python 质量工具、uv 的 `run`/信息/未知子命令分类、herdr 的 inspect/execute/modify 分类（工作区创建提取 `--cwd`/`--path` 路径事实，worktree remove 与 workspace close 归入 modify）和 npm 族常用分类；Git `-C`、`--git-dir`、`--work-tree` 和项目内显式 `file://` remote 的 command-local location 已覆盖，完整 CLI 方言、完整 Git pathspec 语法、HTTPS/SSH 等外部 transport、hosted `file://`、alias/间接 config remote、`clone --separate-git-dir` 和网络/执行隔离不在本条内。
 
 **Rejected:**
 
@@ -461,6 +461,8 @@ Canonical reject 使用本域封闭 code、source anchor 与资源分类；rende
 - **用 `unknown: allow` 或删除 path boundary 放宽 opaque 命令：** 会把命令类别与未证明访问风险混为一谈，无法分别表达审查、审批和开发便利性。
 - **把 opaque 直接并入 `execute`：** 会让已证明的执行与黑盒脚本执行共享一个策略开关，丢失用户对未证明访问风险的独立选择。
 - **直接移植旧 command-semantics adapter：** 违反 D-059 的 Greenfield 边界；旧实现仅提供待重新证明的场景线索。
+- **恢复旧版独立 `permissionChange` 策略轴与 effect：** 权限变更属于 inode 元数据写入，恢复独立策略轴会导致 PolicySnapshot 与配置 schema 膨胀，且缺乏用户独立区分改权限与写文件的真实配置诉求。
+- **将 `chmod` 作为未建模未知命令放任自流：** 未知命令不提取路径事实，导致在 `develop` 预设下静默绕过宿主凭据和 Git 控制面写保护，造成严重安全不变量穿透。
 
 **Out of Scope:** 网络独立授权、OS sandbox、Git hooks/npm lifecycle 的执行期拦截、完整 Git pathspec、远程/容器工具链方言、命令执行后的审计和旧配置兼容。`commands.opaque` 只表达用户对未证明执行风险的策略选择，不提供运行期沙箱或路径强制。
 
