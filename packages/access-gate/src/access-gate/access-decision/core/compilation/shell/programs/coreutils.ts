@@ -161,6 +161,70 @@ const contracts: ReadonlyMap<string, BoundedOptionContract> = new Map([
       unsupported("-r", "-R", "--recursive", "-d", "--dir", "-i", "-I", "--no-preserve-root", "--preserve-root"),
     ],
   }],
+  ["tr", {
+    options: [
+      flag(
+        "-c", "-C", "--complement",
+        "-d", "--delete",
+        "-s", "--squeeze-repeats",
+        "-t", "--truncate-set1",
+      ),
+    ],
+  }],
+  ["sort", {
+    options: [
+      flag(
+        "-b", "--ignore-leading-blanks",
+        "-d", "--dictionary-order",
+        "-f", "--ignore-case",
+        "-g", "--general-numeric-sort",
+        "-h", "--human-numeric-sort",
+        "-i", "--ignore-nonprinting",
+        "-M", "--month-sort",
+        "-n", "--numeric-sort",
+        "-R", "--random-sort",
+        "-r", "--reverse",
+        "-s", "--stable",
+        "-u", "--unique",
+        "-V", "--version-sort",
+        "-z", "--zero-terminated",
+        "--batch-size",
+      ),
+      scalar(
+        "-k", "--key",
+        "-t", "--field-separator",
+        "-S", "--buffer-size",
+        "--parallel",
+        "--random-source",
+        "--sort",
+      ),
+      unsupported(
+        "-o", "--output",
+        "--compress-program",
+        "--files0-from",
+        "-T", "--temporary-directory",
+        "-m", "--merge",
+      ),
+    ],
+  }],
+  ["uniq", {
+    options: [
+      flag(
+        "-c", "--count",
+        "-d", "--repeated",
+        "-D", "--all-repeated",
+        "-i", "--ignore-case",
+        "-u", "--unique",
+        "-z", "--zero-terminated",
+      ),
+      scalar(
+        "-f", "--skip-fields",
+        "-s", "--skip-chars",
+        "-w", "--check-chars",
+        "--group",
+      ),
+    ],
+  }],
 ]);
 
 function syntheticPath(): ShellWord {
@@ -186,7 +250,7 @@ function hasOption(options: readonly ParsedBoundedOption[], ...names: string[]):
 function analyzeCoreutilsComplete(name: string, options: readonly ParsedBoundedOption[], operands: readonly ShellWord[]): ProgramSemantic {
   const inspection = new Set([
     "cat", "head", "tail", "grep", "rg", "ls", "od", "wc", "cut", "stat",
-    "diff", "file", "du", "df",
+    "diff", "file", "du", "df", "tr", "sort", "uniq",
   ]);
   const modification = new Set(["mkdir", "touch", "cp", "mv", "ln"]);
   const destruction = new Set(["rm"]);
@@ -220,13 +284,15 @@ function analyzeCoreutilsComplete(name: string, options: readonly ParsedBoundedO
     }
   } else if (name === "rm") {
     paths.push(...pathsFor(operands, "target"));
+  } else if (name === "tr") {
+    // tr takes character set operands, not file path operands
   } else {
     paths.push(...pathsFor(operands, commandClass === "modify" ? "target" : "source"));
   }
 
   if (name === "cp" || name === "mv" || name === "ln") recursive = true;
   const effects: ProgramSemantic["effects"] = commandClass === "inspect"
-    ? ["read"]
+    ? (name === "tr" ? [] : ["read"])
     : name === "rm"
       ? ["delete"]
       : name === "mkdir" || name === "touch"
@@ -246,6 +312,10 @@ export function analyzeCoreutilsProgram(name: string, args: readonly ShellWord[]
   }
   if (name === "diff" && parsed.operands.length !== 2) {
     const word = args[args.length - 1] ?? syntheticPath();
+    return Object.freeze({ kind: "reject" as const, code: "unsupported-syntax" as const, word });
+  }
+  if (name === "uniq" && parsed.operands.length > 1) {
+    const word = parsed.operands[1] ?? args[args.length - 1] ?? syntheticPath();
     return Object.freeze({ kind: "reject" as const, code: "unsupported-syntax" as const, word });
   }
   return complete(analyzeCoreutilsComplete(name, parsed.options, parsed.operands));

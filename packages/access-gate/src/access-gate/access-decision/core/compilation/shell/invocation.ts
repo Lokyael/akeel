@@ -45,7 +45,7 @@ export type ShellCommandAnalysis =
 
 const inspectionCommands = new Set([
   "cat", "head", "tail", "grep", "rg", "ls", "od", "wc", "cut", "stat",
-  "diff", "file", "du", "df",
+  "diff", "file", "du", "df", "tr", "sort", "uniq",
 ]);
 const modificationCommands = new Set(["mkdir", "touch", "cp", "mv", "ln"]);
 const destructionCommands = new Set(["rm", "rmdir", "unlink", "truncate"]);
@@ -315,7 +315,7 @@ export function analyzeShellCommandWords(words: readonly ShellWord[]): ShellComm
     for (const programPath of programSemantic.paths) addPath(programPath.path, programPath.start, programPath.base);
   }
   const opaquePathForm = !isSystemOrBare && classification !== "destroy";
-  if (!opaquePathForm && inspectionCommands.has(resolvedName)) addEffect(effects, "read");
+  if (!opaquePathForm && inspectionCommands.has(resolvedName) && resolvedName !== "tr") addEffect(effects, "read");
   if (classification === "modify") addEffect(effects, "write");
   if (classification === "destroy") addEffect(effects, "delete");
   if (classification === "execute") addEffect(effects, "execute");

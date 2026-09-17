@@ -831,3 +831,86 @@ test("custom path-form invocation extracts executable as source path and marks o
   ]);
 });
 
+test("bounded tr, sort, and uniq extract inspect class, read effects, and bounded paths", () => {
+  const trCmd = complete("tr 'a-z' 'A-Z'");
+  assert.equal(trCmd.commandClass, "inspect");
+  assert.deepEqual(trCmd.effects, []);
+  assert.deepEqual(trCmd.paths, []);
+
+  const trDelete = complete("tr -d '\\n'");
+  assert.equal(trDelete.commandClass, "inspect");
+  assert.deepEqual(trDelete.effects, []);
+  assert.deepEqual(trDelete.paths, []);
+
+  const sortFile = complete("sort file.txt");
+  assert.equal(sortFile.commandClass, "inspect");
+  assert.deepEqual(sortFile.effects, ["read"]);
+  assert.deepEqual(sortFile.paths, [{ text: "file.txt", role: "source" }]);
+
+  const sortMulti = complete("sort -u file1.txt file2.txt");
+  assert.equal(sortMulti.commandClass, "inspect");
+  assert.deepEqual(sortMulti.effects, ["read"]);
+  assert.deepEqual(sortMulti.paths, [
+    { text: "file1.txt", role: "source" },
+    { text: "file2.txt", role: "source" },
+  ]);
+
+  const sortOptions = complete("sort -n -r -k 2 file.txt");
+  assert.equal(sortOptions.commandClass, "inspect");
+  assert.deepEqual(sortOptions.effects, ["read"]);
+  assert.deepEqual(sortOptions.paths, [{ text: "file.txt", role: "source" }]);
+
+  const sortStdin = complete("sort");
+  assert.equal(sortStdin.commandClass, "inspect");
+  assert.deepEqual(sortStdin.effects, ["read"]);
+  assert.deepEqual(sortStdin.paths, []);
+
+  const uniqFile = complete("uniq file.txt");
+  assert.equal(uniqFile.commandClass, "inspect");
+  assert.deepEqual(uniqFile.effects, ["read"]);
+  assert.deepEqual(uniqFile.paths, [{ text: "file.txt", role: "source" }]);
+
+  const uniqFlags = complete("uniq -c -i file.txt");
+  assert.equal(uniqFlags.commandClass, "inspect");
+  assert.deepEqual(uniqFlags.effects, ["read"]);
+  assert.deepEqual(uniqFlags.paths, [{ text: "file.txt", role: "source" }]);
+
+  const uniqStdin = complete("uniq");
+  assert.equal(uniqStdin.commandClass, "inspect");
+  assert.deepEqual(uniqStdin.effects, ["read"]);
+  assert.deepEqual(uniqStdin.paths, []);
+});
+
+test("sort rejects output, temporary directory, and code-execution options", () => {
+  for (const cmd of [
+    "sort -o out.txt in.txt",
+    "sort --output=out.txt in.txt",
+    "sort --compress-program=gzip in.txt",
+    "sort --files0-from=files.txt",
+    "sort -T /tmp in.txt",
+    "sort --temporary-directory=/tmp in.txt",
+    "sort -m a.txt b.txt",
+    "sort --merge a.txt b.txt",
+  ]) {
+    const analysis = analyzeShellCommand(cmd);
+    assert.equal(analysis.kind, "reject", cmd);
+    if (analysis.kind === "reject") {
+      assert.equal(analysis.code, "unsupported-syntax", cmd);
+    }
+  }
+});
+
+test("uniq rejects multiple file operands to prevent silent file overwrites", () => {
+  for (const cmd of [
+    "uniq in.txt out.txt",
+    "uniq a.txt b.txt c.txt",
+  ]) {
+    const analysis = analyzeShellCommand(cmd);
+    assert.equal(analysis.kind, "reject", cmd);
+    if (analysis.kind === "reject") {
+      assert.equal(analysis.code, "unsupported-syntax", cmd);
+    }
+  }
+});
+
+

@@ -1371,3 +1371,64 @@ test("dual-plane executable identity enforces operand and artifact boundaries en
     code: "policy-denied",
   });
 });
+
+test("bounded tr, sort, and uniq are allowed under review while blocked paths and awk/sed remain denied", () => {
+  const reviewPolicy = freezeShellPolicySnapshot({
+    read: "allow",
+    write: "deny",
+    inspect: "allow",
+    modify: "deny",
+    execute: "deny",
+    opaque: "deny",
+    destroy: "deny",
+    unknown: "deny",
+    allowedRoots: ["/workspace/project"],
+    blockedRoots: [],
+    blockedPaths: ["/etc/passwd"],
+  });
+
+  // 1. sort, uniq, tr with allowed files under review preset are admitted
+  assert.deepEqual(evaluateShellAdmission(admission("sort file.txt", true), reviewPolicy), {
+    kind: "allow",
+  });
+  assert.deepEqual(evaluateShellAdmission(admission("sort -u file.txt", true), reviewPolicy), {
+    kind: "allow",
+  });
+  assert.deepEqual(evaluateShellAdmission(admission("uniq file.txt", true), reviewPolicy), {
+    kind: "allow",
+  });
+  assert.deepEqual(evaluateShellAdmission(admission("tr 'a-z' 'A-Z'", true), reviewPolicy), {
+    kind: "allow",
+  });
+
+  // 2. sort and uniq hitting credential roots trigger hard-boundary
+  assert.deepEqual(evaluateShellAdmission(admission("sort /__test-agent-dir__/auth.json", true), reviewPolicy), {
+    kind: "deny",
+    code: "hard-boundary",
+  });
+  assert.deepEqual(evaluateShellAdmission(admission("uniq /__test-agent-dir__/auth.json", true), reviewPolicy), {
+    kind: "deny",
+    code: "hard-boundary",
+  });
+
+  // 3. sort and uniq hitting blockedPaths trigger hard-boundary
+  assert.deepEqual(evaluateShellAdmission(admission("sort /etc/passwd", true), reviewPolicy), {
+    kind: "deny",
+    code: "hard-boundary",
+  });
+  assert.deepEqual(evaluateShellAdmission(admission("uniq /etc/passwd", true), reviewPolicy), {
+    kind: "deny",
+    code: "hard-boundary",
+  });
+
+  // 4. awk and sed remain unknown/opaque and are denied under review
+  assert.deepEqual(evaluateShellAdmission(admission("awk '{print $1}' file.txt", true), reviewPolicy), {
+    kind: "deny",
+    code: "policy-denied",
+  });
+  assert.deepEqual(evaluateShellAdmission(admission("sed 's/a/b/' file.txt", true), reviewPolicy), {
+    kind: "deny",
+    code: "policy-denied",
+  });
+});
+
