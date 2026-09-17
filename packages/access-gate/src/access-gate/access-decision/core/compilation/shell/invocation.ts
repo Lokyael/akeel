@@ -37,7 +37,7 @@ export type ShellCommandAnalysis =
       readonly resourceClass: "security" | "syntax";
     }>;
 
-const inspectionCommands = new Set(["cat", "head", "tail", "grep", "rg", "ls", "od"]);
+const inspectionCommands = new Set(["cat", "head", "tail", "grep", "rg", "ls", "od", "wc", "cut", "stat"]);
 const modificationCommands = new Set(["mkdir", "touch", "cp", "mv", "ln"]);
 const destructionCommands = new Set(["rm", "rmdir", "unlink", "truncate"]);
 const executionCommands = new Set([...INTERPRETERS]);

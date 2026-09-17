@@ -102,12 +102,12 @@
   - **Redirection:** 旧版支持重定向且 `<>/2<>` 按 write 侧建模；当前保留 read-write redirection write-side contract，unsupported clobber fail-closed。候选问题：是否补全 README 的重定向支持矩阵。
 ### Program semantics 与命令族覆盖
 
-  - **Shell base inspection commands:** 当前基础集合保留 `cat/head/tail/grep/rg/find/ls/od` 等 inspect 命令；候选问题：逐项确认旧 read/search adapter 的 inspect 用例是否已由基础集合或 program semantics 覆盖。
+  - **Shell base inspection commands:** 当前基础集合保留 `cat/head/tail/grep/rg/find/ls/od/wc/cut/stat` 等 inspect 命令；候选问题：逐项确认旧 read/search adapter 的剩余 inspect 用例是否已由基础集合或 program semantics 覆盖。
   - **Shell base modification commands:** 当前基础集合保留 `mkdir/touch/cp/mv` 等 modify 命令；候选问题：逐项确认旧 filesystem adapter 中同类写入命令是否需要恢复。
   - **Shell deterministic/noop commands:** 当前保留 `true/false/echo/printf` 等确定性或无路径命令；旧版 noop 还包含 `:`，当前 `:` 落入 unknown。候选问题：对照旧 noop/date/read adapter，确认哪些 inspect-only 命令应恢复。
   - **Filesystem adapter family:** 旧版 filesystem adapter 覆盖 `rm/rmdir/touch/mkdir/cp/mv/ln/tee/dd/chmod/chown/install/mktemp/truncate/shred` 等文件系统操作；当前只保留较小基础子集，`tee`/`dd` 等未建模形态进入更保守的边界处理。候选问题：逐项判断缺失命令是否恢复或退役。
   - **Permission-change effect:** 旧版 `chmod/chown` 等权限类操作可承载 `permissionChange` effect；当前没有独立 permission-change effect，相关命令多落入未建模/unknown 或被更窄命令集合拒绝。候选问题：是否恢复权限变更专门分类、并定义其与 write/destroy 的策略关系。
-  - **Read adapter family:** 旧版 read adapter 实际覆盖 `cat/head/tail/wc/cut/diff/less/more/file/stat/du/df/od`；当前只保留部分基础 inspect 命令。候选问题：逐项判断缺失读命令是否恢复或改用 Direct 工具。
+  - **Read adapter family:** 旧版 read adapter 覆盖 `cat/head/tail/wc/cut/diff/less/more/file/stat/du/df/od`；当前已将 `wc/cut/stat` 恢复为 bounded inspect 命令，`less/more` 等交互式命令退役，剩余 `diff/file/du/df` 保持未建模。候选问题：逐项判断剩余读命令是否恢复或改用 Direct 工具。
   - **Search adapter family:** 旧版 search adapter 覆盖 `find/tree/grep/rg/ls` 等，并建模部分输出文件/action 选项；当前 `find` 已支持 bounded 的 `-name`、`-iname`、`-path`、`-ipath`、`-type`、`-maxdepth`、`-mindepth` inspect 子集，start path 仍进入 recursive boundary，`find -exec/-delete` 等副作用形式继续 fail-closed。候选问题：逐项判断更复杂的搜索表达式和输出/action 选项是否恢复。
   - **Text-transform adapter family:** 旧版 text-transform adapter 覆盖 `sed/awk/sort/uniq/tr` 等，含 in-place/output 选项建模；当前未见等价专用家族。候选问题：是否恢复只读 transform 与写入 transform 的分层语义。
   - **Build adapter family:** 旧版 build adapter 覆盖 cargo/go/make 等构建工具语义；当前未见等价专用家族。候选问题：是否按真实构建工作流恢复，或依赖 execute/unknown 策略处理。

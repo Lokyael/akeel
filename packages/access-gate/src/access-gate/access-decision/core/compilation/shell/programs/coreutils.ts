@@ -59,6 +59,24 @@ const contracts: ReadonlyMap<string, BoundedOptionContract> = new Map([
       flag("-a", "-b", "-c", "-d", "-f", "-i", "-l", "-o", "-s", "-v", "-x"),
     ],
   }],
+  ["wc", {
+    options: [
+      flag("-c", "--bytes", "-m", "--chars", "-l", "--lines", "-w", "--words", "-L", "--max-line-length"),
+      unsupported("--files0-from"),
+    ],
+  }],
+  ["cut", {
+    options: [
+      scalar("-b", "--bytes", "-c", "--characters", "-d", "--delimiter", "-f", "--fields", "--output-delimiter"),
+      flag("-n", "-s", "--only-delimited", "--complement", "-z", "--zero-terminated"),
+    ],
+  }],
+  ["stat", {
+    options: [
+      scalar("-c", "--format", "--printf"),
+      flag("-L", "--dereference", "-f", "--file-system", "-t", "--terse"),
+    ],
+  }],
   ["mkdir", {
     options: [
       scalar("-m", "--mode"),
@@ -120,7 +138,7 @@ function hasOption(options: readonly ParsedBoundedOption[], ...names: string[]):
 }
 
 function analyzeCoreutilsComplete(name: string, options: readonly ParsedBoundedOption[], operands: readonly ShellWord[]): ProgramSemantic {
-  const inspection = new Set(["cat", "head", "tail", "grep", "rg", "ls", "od"]);
+  const inspection = new Set(["cat", "head", "tail", "grep", "rg", "ls", "od", "wc", "cut", "stat"]);
   const modification = new Set(["mkdir", "touch", "cp", "mv", "ln"]);
   const destruction = new Set(["rm"]);
   const commandClass = inspection.has(name)
@@ -170,7 +188,7 @@ export function analyzeCoreutilsProgram(name: string, args: readonly ShellWord[]
   if (contract === undefined) return undefined;
   const parsed = parseBoundedOptions(args, contract);
   if (parsed.kind === "reject") return rejectFrom(parsed);
-  if (name === "rm" && parsed.operands.length === 0) {
+  if ((name === "rm" || name === "stat") && parsed.operands.length === 0) {
     const word = args[args.length - 1] ?? syntheticPath();
     return Object.freeze({ kind: "reject" as const, code: "unsupported-syntax" as const, word });
   }

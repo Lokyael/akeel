@@ -324,3 +324,29 @@ test("redirection to /dev/null is admitted end-to-end under review mode", async 
     );
   });
 });
+
+test("bounded coreutils inspection tools wc, cut, and stat are admitted end-to-end under review mode", async () => {
+  await withAgentFiles(undefined, undefined, async (_agentDir, harness) => {
+    await harness.handlers.get("session_start")!(undefined, harness.ctx);
+
+    assert.equal(
+      await invoke(harness, { toolName: "bash", input: { command: "wc -l README.md" } }),
+      undefined,
+    );
+
+    assert.equal(
+      await invoke(harness, { toolName: "bash", input: { command: "cut -d: -f1 README.md" } }),
+      undefined,
+    );
+
+    assert.equal(
+      await invoke(harness, { toolName: "bash", input: { command: "stat README.md" } }),
+      undefined,
+    );
+
+    assert.deepEqual(
+      await invoke(harness, { toolName: "bash", input: { command: "wc --files0-from=file" } }),
+      { block: true, reason: "Blocked because the shell syntax is unsupported." },
+    );
+  });
+});

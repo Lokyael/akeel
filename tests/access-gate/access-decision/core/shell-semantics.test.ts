@@ -516,6 +516,15 @@ test("bounded coreutils option values do not become path operands", () => {
     ["grep --include '*.ts' pattern README.md", ["README.md"]],
     ["ls -la README.md", ["README.md"]],
     ["head -- -file", ["-file"]],
+    ["wc -l README.md", ["README.md"]],
+    ["wc -c -w file", ["file"]],
+    ["cut -d: -f1 README.md", ["README.md"]],
+    ["cut -d : -f 1 README.md", ["README.md"]],
+    ["cut -b 1-10 file", ["file"]],
+    ["cut --output-delimiter=, -f1 file", ["file"]],
+    ["stat -c %s package.json", ["package.json"]],
+    ["stat --printf=%s package.json", ["package.json"]],
+    ["stat -L package.json", ["package.json"]],
     ["rm file.txt", ["file.txt"]],
     ["rm -f a.txt b.txt", ["a.txt", "b.txt"]],
     ["rm -v file.txt", ["file.txt"]],
@@ -544,11 +553,45 @@ test("known coreutils reject options outside their bounded contract", () => {
     "rm --no-preserve-root file",
     "rm",
     "rm -f",
+    "wc --files0-from=file",
+    "wc --unknown",
+    "cut --unknown file",
+    "stat --unknown file",
+    "stat",
+    "stat -L",
   ]) {
     const analysis = analyzeShellCommand(command);
     assert.equal(analysis.kind, "reject", command);
     if (analysis.kind === "reject") assert.equal(analysis.code, "unsupported-syntax", command);
   }
+});
+
+test("bounded wc, cut, and stat extract inspect class, read effects, and source paths", () => {
+  const wcWithFile = complete("wc -l README.md");
+  assert.equal(wcWithFile.commandClass, "inspect");
+  assert.deepEqual(wcWithFile.effects, ["read"]);
+  assert.deepEqual(wcWithFile.paths, [{ text: "README.md", role: "source" }]);
+  assert.equal(wcWithFile.semantic.recursive, false);
+
+  const wcStdin = complete("wc -c -w");
+  assert.equal(wcStdin.commandClass, "inspect");
+  assert.deepEqual(wcStdin.effects, ["read"]);
+  assert.deepEqual(wcStdin.paths, []);
+
+  const cutWithFile = complete("cut -d: -f1 README.md");
+  assert.equal(cutWithFile.commandClass, "inspect");
+  assert.deepEqual(cutWithFile.effects, ["read"]);
+  assert.deepEqual(cutWithFile.paths, [{ text: "README.md", role: "source" }]);
+
+  const cutStdin = complete("cut -b 1-10");
+  assert.equal(cutStdin.commandClass, "inspect");
+  assert.deepEqual(cutStdin.effects, ["read"]);
+  assert.deepEqual(cutStdin.paths, []);
+
+  const statWithFile = complete("stat -c %s package.json");
+  assert.equal(statWithFile.commandClass, "inspect");
+  assert.deepEqual(statWithFile.effects, ["read"]);
+  assert.deepEqual(statWithFile.paths, [{ text: "package.json", role: "source" }]);
 });
 
 test("bounded rm extracts target paths and destroy command class", () => {
