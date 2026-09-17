@@ -1,5 +1,6 @@
 import {
-  exceedsDirectTextBudget,
+  exceedsDirectPayloadBudget,
+  exceedsPathBudget,
   exceedsShellCommandBudget,
   MAX_DIRECT_EDIT_ENTRIES,
   MAX_SHELL_COMMANDS,
@@ -217,19 +218,23 @@ export function compileManagedCall(
     if (!hasExactKeys(argumentsValue, ["path", "content"]) || typeof argumentsValue.content !== "string") {
       return reject("invalid-request");
     }
+    if (exceedsDirectPayloadBudget([argumentsValue.content])) return reject("resource-limit");
   } else if (surface === "edit") {
     if (!hasExactKeys(argumentsValue, ["path", "edits"]) || !Array.isArray(argumentsValue.edits) ||
       argumentsValue.edits.length === 0) {
       return reject("invalid-request");
     }
     if (argumentsValue.edits.length > MAX_DIRECT_EDIT_ENTRIES) return reject("resource-limit");
+    const editTexts: string[] = [];
     for (const edit of argumentsValue.edits) {
       if (!isRecord(edit) || !hasExactKeys(edit, ["oldText", "newText"]) ||
         typeof edit.oldText !== "string" || edit.oldText.includes("\u0000") ||
         typeof edit.newText !== "string" || edit.newText.includes("\u0000")) {
         return reject("invalid-request");
       }
+      editTexts.push(edit.oldText, edit.newText);
     }
+    if (exceedsDirectPayloadBudget(editTexts)) return reject("resource-limit");
   } else if (surface === "list") {
     if (!hasExactKeys(argumentsValue, hasPath ? ["path"] : [])) return reject("invalid-request");
   } else if (!hasExactKeys(argumentsValue, hasPath ? ["path", "pattern"] : ["pattern"]) ||
@@ -240,14 +245,9 @@ export function compileManagedCall(
 
   const path = hasPath ? argumentsValue.path : ".";
   if (typeof path !== "string" || path.length === 0 || path.includes("\u0000")) return reject("invalid-request");
-  const textValues = [path, compileEnvironment.cwd];
-  if (surface === "search") textValues.push(argumentsValue.pattern as string);
-  if (surface === "edit") {
-    for (const edit of argumentsValue.edits as readonly { oldText: string; newText: string }[]) {
-      textValues.push(edit.oldText, edit.newText);
-    }
-  }
-  if (exceedsDirectTextBudget(textValues)) return reject("resource-limit");
+  const pathValues = [path, compileEnvironment.cwd];
+  if (surface === "search") pathValues.push(argumentsValue.pattern as string);
+  if (exceedsPathBudget(pathValues)) return reject("resource-limit");
 
   const resolved = compileEnvironment.pathEvidence.resolve(compileEnvironment.cwd, path, { pathKind: "literal" });
   if (!validResolvedPath(resolved)) return reject("invalid-request");

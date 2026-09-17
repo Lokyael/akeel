@@ -2,8 +2,12 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { CANONICAL_OUTCOMES, REJECT_CODES, REJECT_PRIORITIES, hasUniqueValues } from "./fixtures";
 import {
+  exceedsDirectPayloadBudget,
   exceedsDirectTextBudget,
+  exceedsPathBudget,
+  MAX_DIRECT_PAYLOAD_BYTES,
   MAX_DIRECT_TEXT_BYTES,
+  MAX_PATH_BYTES,
 } from "../../../../packages/access-gate/src/access-gate/access-decision/core/limits";
 
 test("canonical outcome and reject vocabularies are closed", () => {
@@ -47,4 +51,14 @@ test("UTF-8 byte budget accurately calculates multi-byte and surrogate pair sequ
   assert.equal(exceedsDirectTextBudget([isolatedHigh]), false);
   assert.equal(exceedsDirectTextBudget(["a".repeat(MAX_DIRECT_TEXT_BYTES - 3) + isolatedHigh]), false);
   assert.equal(exceedsDirectTextBudget(["a".repeat(MAX_DIRECT_TEXT_BYTES - 2) + isolatedHigh]), true);
+});
+
+test("path budget accurately bounds paths to MAX_PATH_BYTES", () => {
+  assert.equal(exceedsPathBudget(["a".repeat(MAX_PATH_BYTES)]), false);
+  assert.equal(exceedsPathBudget(["a".repeat(MAX_PATH_BYTES + 1)]), true);
+});
+
+test("direct payload budget accurately bounds text to MAX_DIRECT_PAYLOAD_BYTES", () => {
+  assert.equal(exceedsDirectPayloadBudget(["a".repeat(MAX_DIRECT_PAYLOAD_BYTES)]), false);
+  assert.equal(exceedsDirectPayloadBudget(["a".repeat(MAX_DIRECT_PAYLOAD_BYTES + 1)]), true);
 });

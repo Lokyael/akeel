@@ -1047,7 +1047,7 @@ test("chmod rejects privilege-elevation special bits with security-boundary", ()
 });
 
 test("Git inspect subcommands accept safe display and filter options without becoming opaque or emitting pseudo-paths", () => {
-  const logSearch = complete("git log -S C-025 --oneline");
+  const logSearch = complete("git log -S needle --oneline");
   assert.equal(logSearch.commandClass, "inspect");
   assert.deepEqual(logSearch.effects, ["read"]);
   assert.deepEqual(logSearch.paths, [{ text: ".", role: "source" }]);
@@ -1153,7 +1153,65 @@ test("malformed descriptor redirections fail closed", () => {
   }
 });
 
+test("bounded git restore and git checkout single-file mutations extract target paths without hard-boundary", () => {
+  for (const cmd of [
+    "git restore src/app.ts",
+    "git restore --staged src/app.ts",
+    "git restore --worktree src/app.ts",
+    "git restore -W -S src/app.ts",
+    "git restore --source=HEAD src/app.ts",
+    "git restore -s HEAD src/app.ts",
+    "git restore --source=HEAD -- src/app.ts",
+    "git restore -- src/app.ts",
+    "git checkout -- src/app.ts",
+  ]) {
+    const result = analyzeProgramCommand({
+      executable: "git",
+      arguments: cmd.split(" ").slice(1).map((text, idx) => word(text, idx * 5)),
+    });
+    assert.ok(result, cmd);
+    assert.equal(result.commandClass, "modify", cmd);
+    assert.deepEqual(result.effects, ["read", "write"], cmd);
+    assert.equal(result.hardBoundary, false, cmd);
+    assert.deepEqual(
+      result.paths.map((p) => ({ text: p.path.text, role: p.path.role })),
+      [
+        { text: ".", role: "source" },
+        { text: "src/app.ts", role: "target" },
+      ],
+      cmd,
+    );
+  }
+});
 
-
+test("unsafe git restore and git checkout forms remain hard-boundary", () => {
+  for (const cmd of [
+    "git restore",
+    "git restore .",
+    "git restore src/a.ts src/b.ts",
+    "git restore '*.ts'",
+    "git restore -p src/app.ts",
+    "git restore --patch src/app.ts",
+    "git restore --ours src/app.ts",
+    "git restore --theirs src/app.ts",
+    "git restore --merge src/app.ts",
+    "git restore --conflict=diff3 src/app.ts",
+    "git restore --recurse-submodules src/app.ts",
+    "git restore --source=origin/main src/app.ts",
+    "git restore --source=main src/app.ts",
+    "git checkout src/app.ts",
+    "git checkout main",
+    "git checkout -b new-branch",
+    "git checkout -- .",
+    "git checkout -- src/a.ts src/b.ts",
+  ]) {
+    const result = analyzeProgramCommand({
+      executable: "git",
+      arguments: cmd.split(" ").slice(1).map((text, idx) => word(text, idx * 5)),
+    });
+    assert.ok(result, cmd);
+    assert.equal(result.hardBoundary, true, cmd);
+  }
+});
 
 

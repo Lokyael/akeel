@@ -148,3 +148,105 @@ test("bounded modify commands extract target paths and obey write policy and bou
   });
 });
 
+test("cross-surface policy evaluation verifies dual-axis tightening and path intent monotonicity", () => {
+  const exports = core as Record<string, Function>;
+  const environment = exports.createCompileEnvironment!({
+    cwd: "/workspace",
+    pathEvidence: Object.freeze({
+      resolve(base: string, path: string) {
+        const candidate = path.startsWith("/") ? path : `${base}/${path}`;
+        return Object.freeze({ candidate, traversed: Object.freeze([base, candidate]) });
+      },
+    }),
+  });
+
+  const mandatory = exports.createMandatoryBoundaries!({ credentialRoots: ["/agent"] });
+
+  // 1. Dual-axis tightening: Shell imposes commands axis in addition to path axis (no literal parity)
+  const askInspectPolicy = exports.freezeUnifiedPolicySnapshot!({
+    paths: {
+      read: "allow",
+      write: "deny",
+      edit: "deny",
+      list: "allow",
+      search: "allow",
+      allowedRoots: ["/workspace"],
+      blockedRoots: [],
+      blockedPaths: [],
+    },
+    commands: {
+      inspect: "ask",
+      modify: "deny",
+      execute: "deny",
+      opaque: "deny",
+      destroy: "deny",
+      unknown: "deny",
+    },
+  });
+
+  const directRead = exports.compileManagedCall!({
+    surface: "read",
+    arguments: { path: "file.txt" },
+  }, environment);
+  const directAdmission = exports.projectUnifiedAdmission!(directRead);
+  assert.deepEqual(exports.authorizeAdmission!(directAdmission, mandatory, askInspectPolicy), { kind: "allow" });
+
+  const shellRead = exports.compileManagedCall!({
+    surface: "bash",
+    arguments: { command: "cat file.txt" },
+  }, environment);
+  const shellAdmission = exports.projectUnifiedAdmission!(shellRead);
+  assert.deepEqual(exports.authorizeAdmission!(shellAdmission, mandatory, askInspectPolicy), { kind: "approval-required" });
+
+  // 2. Monotonicity: narrowing path intent does not weaken decisions or bypass boundaries
+  const normalPolicy = exports.freezeUnifiedPolicySnapshot!({
+    paths: {
+      read: "allow",
+      write: "allow",
+      edit: "allow",
+      list: "allow",
+      search: "allow",
+      allowedRoots: ["/workspace"],
+      blockedRoots: [],
+      blockedPaths: ["/workspace/blocked.txt"],
+    },
+    commands: {
+      inspect: "allow",
+      modify: "allow",
+      execute: "deny",
+      opaque: "deny",
+      destroy: "deny",
+      unknown: "deny",
+    },
+  });
+
+  // Allowed file within root is admitted under allowing policy
+  const allowedTouch = exports.compileManagedCall!({
+    surface: "bash",
+    arguments: { command: "touch file.txt" },
+  }, environment);
+  assert.deepEqual(exports.authorizeAdmission!(exports.projectUnifiedAdmission!(allowedTouch), mandatory, normalPolicy), {
+    kind: "allow",
+  });
+
+  // Blocked file remains hard-boundary even with specific path intent
+  const blockedTouch = exports.compileManagedCall!({
+    surface: "bash",
+    arguments: { command: "touch blocked.txt" },
+  }, environment);
+  assert.deepEqual(exports.authorizeAdmission!(exports.projectUnifiedAdmission!(blockedTouch), mandatory, normalPolicy), {
+    kind: "deny",
+    code: "hard-boundary",
+  });
+
+  // Path outside allowed roots remains hard-boundary
+  const outsideTouch = exports.compileManagedCall!({
+    surface: "bash",
+    arguments: { command: "touch /outside/file.txt" },
+  }, environment);
+  assert.deepEqual(exports.authorizeAdmission!(exports.projectUnifiedAdmission!(outsideTouch), mandatory, normalPolicy), {
+    kind: "deny",
+    code: "hard-boundary",
+  });
+});
+

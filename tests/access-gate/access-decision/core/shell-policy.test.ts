@@ -1565,13 +1565,13 @@ test("Git inspect subcommands with safe filter options are allowed across develo
   });
 
   // 1. git log -S under review, develop, and guided: all allow because inspect is allow, read is allow, not opaque!
-  assert.deepEqual(evaluateShellAdmission(admission("git log -S C-025 --oneline", false), reviewPolicy), {
+  assert.deepEqual(evaluateShellAdmission(admission("git log -S needle --oneline", false), reviewPolicy), {
     kind: "allow",
   });
-  assert.deepEqual(evaluateShellAdmission(admission("git log -S C-025 --oneline", false), developPolicy), {
+  assert.deepEqual(evaluateShellAdmission(admission("git log -S needle --oneline", false), developPolicy), {
     kind: "allow",
   });
-  assert.deepEqual(evaluateShellAdmission(admission("git log -S C-025 --oneline", false), guidedPolicy), {
+  assert.deepEqual(evaluateShellAdmission(admission("git log -S needle --oneline", false), guidedPolicy), {
     kind: "allow",
   });
 
@@ -1710,6 +1710,68 @@ test("deterministic commands true, false, and colon are admitted under review po
   });
 });
 
+test("Git bounded restore and checkout commands are admitted as modify operations while unsafe forms remain hard-boundary", () => {
+  const develop = freezeShellPolicySnapshot({
+    ...policy,
+    inspect: "allow",
+    modify: "allow",
+    execute: "allow",
+    allowedRoots: ["/workspace/project"],
+    blockedRoots: [],
+  });
+  const review = freezeShellPolicySnapshot({
+    ...policy,
+    inspect: "allow",
+    modify: "deny",
+    execute: "deny",
+    opaque: "deny",
+    allowedRoots: ["/workspace/project"],
+    blockedRoots: [],
+  });
+  const guided = freezeShellPolicySnapshot({
+    ...policy,
+    inspect: "allow",
+    modify: "ask",
+    execute: "ask",
+    opaque: "ask",
+    allowedRoots: ["/workspace/project"],
+    blockedRoots: [],
+  });
 
+  const safeCommands = [
+    "git restore src/app.ts",
+    "git restore --staged src/app.ts",
+    "git restore --source=HEAD src/app.ts",
+    "git restore -- src/app.ts",
+    "git checkout -- src/app.ts",
+  ];
 
+  for (const cmd of safeCommands) {
+    assert.deepEqual(evaluateShellAdmission(admission(cmd), develop), { kind: "allow" }, cmd);
+    assert.deepEqual(evaluateShellAdmission(admission(cmd), review), { kind: "deny", code: "policy-denied" }, cmd);
+    assert.deepEqual(evaluateShellAdmission(admission(cmd, true), guided), { kind: "ask", executed: false }, cmd);
+  }
+
+  const unsafeCommands = [
+    "git restore",
+    "git restore .",
+    "git restore src/a.ts src/b.ts",
+    "git restore '*.ts'",
+    "git restore -p src/app.ts",
+    "git restore --ours src/app.ts",
+    "git restore --theirs src/app.ts",
+    "git restore --source=origin/main src/app.ts",
+    "git checkout src/app.ts",
+    "git checkout main",
+    "git checkout -- .",
+    "git checkout -- src/a.ts src/b.ts",
+    "git restore .git/hooks/pre-commit",
+    "git restore .gitattributes",
+    "git restore /etc/passwd",
+  ];
+
+  for (const cmd of unsafeCommands) {
+    assert.deepEqual(evaluateShellAdmission(admission(cmd), develop), { kind: "deny", code: "hard-boundary" }, cmd);
+  }
+});
 

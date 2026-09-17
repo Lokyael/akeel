@@ -73,69 +73,6 @@
 - **Out of Scope:** 网络副作用授权由 C-039 评估；参数级隐式执行由对应程序语义合同评估；`.env` 受管面、历史敏感路径和 OS confinement 分别由 C-016/C-035/C-036、C-026 与 C-021 评估，不在本记录内组成统一“多维策略”。
 - **Revisit condition:** 真实复杂仓库反复出现需要项目局部限制、且全局 policy 无法合理表达的误操作风险；或用户明确要求只收紧、不放宽的项目级 Policy overlay。
 
-## C-025: Access Decision 历史差异复核清单（调查候选）
-
-> 本条保存 `c52bd1d` 重构前实现与当前 Access Decision Pipeline 的历史差异、风险和待核对问题。唯一候选事项是未来是否启动这次系统复核；清单不是功能 backlog、恢复授权、parity 目标或当前实现合同。
-
-- **Why Not Now:** 当前实现已按 D-059/D-060 完成 Greenfield trust path 与生产切换，目标不是复刻旧 `command-semantics/gate/profile` 行为；旧实现和旧测试只提供历史线索，不能作为正确性 oracle。完整复核会同时触及安全、配置、UI、可用性、迁移和子代理边界，尚未成为已承诺调查。
-- **Review Contract:** 每个检查点分别核对 historical evidence、current evidence、外部合同与安全不变量，再由用户选择“确认当前行为 / 重新设计或恢复经证明的子集 / 文档同步 / 明确退役 / 发现实现与存活 Decision 不一致 / 迁移为独立 Task、Decision 或 Candidate”。清单覆盖保留不变、增强、收窄和删除项，按可独立判断的行为族组织，不按旧测试数量追求 parity；命令、选项、输入边界和测试细节归入对应功能族或横切检查项。当前实现、已有 Decision 和相关 Candidate 只构成证据或交叉引用；相关 Candidate 可以承载独立未来设计，但不能替代本记录的历史差异问题，未逐项裁决前也不得删除本地检查语义或预选结论。
-- **Current external dispositions pending this review:**
-  - **Resolved cluster:** `Project root and session lifecycle` 与 `Home resolution authority` 当前由 [D-072](decisions.md#d-072-session-启动-cwd-作为访问根与-home-的受限-tilde-语义) 定义；这约束现行行为，但不证明 C-025 已核对旧 Git-root 前置、额外 host `home` 字段及其全部外部场景。正式复核不得无授权逆转 D-072，也不得把 Decision 的存在当作该检查已完成。Shell 确定性与无副作用命令（`true`/`false`/`:`/`echo`/`printf` 及规范系统路径）已由 T-0126 定性闭环。
-  - **Migrated cluster:** `Bounded static iteration semantics` 已由 C-029 独立保存未来设计边界；`Pipeline and tee streaming write semantics` 已由 C-047 独立保存未来设计边界；`Build adapter family 语义与委托执行边界` 已由 C-048 独立保存未来设计边界；C-025 仍保留“旧 reducer 与当前 unsupported `for` 的差异是否被正确处置”这一历史核对，不以迁移本身视为完成。
-
-### Host、runtime 与 Direct tool 合同
-
-  - **Production entry:** 当前入口只调用 `installGlobalPiAccessDecision()`。候选问题：是否需要重新暴露更丰富的 runtime 装配层。
-  - **Direct managed surfaces:** 旧版与当前均管理 `read`、`write`、`edit`、`find`、`grep`、`ls`；当前 host adapter 规范化为 `read/write/edit/list/search`。候选问题：是否补充 surface 映射文档。
-  - **Direct tool argument schema:** 旧版 Direct schema 允许 `grep.glob`，且 `read.offset/limit` 最小值按旧 schema 可为 0；旧 `find.path` 与 `find.pattern` 均可省略。当前 search 只接受 `path`/`pattern`，`list` 与 `search` 的 `path` 均可省略并默认当前 cwd，但统一 `search.pattern` 必须为非空字符串，`read.offset/limit` 必须为正整数，并对 `write/edit/search` 文本、NUL 与 key 集更严格。候选问题：是否恢复特定参数兼容、修正文档，或明确收窄。
-### Canonical、Admission 与路径事实
-
-  - **Effect vocabulary / policy axis:** 旧版封闭 effect 词汇含 `read/search/write/delete/permissionChange/execute/network/cwdChange`，并区分 path/shell effect axis；当前 Shell effect 收敛为 `read/write/delete/execute/cwd-change`，Policy Kernel 对每个 operation 同时按 effect（`read`/`cwd-change` 使用 read policy，`write`/`delete` 使用 write policy）与 command class 决策，`delete`/`destroy` 仍优先进入 hard boundary。当前 Shell effects 由 Canonical/Admission 承载并仍被 Policy 消费，`write`、`delete`、`cwd-change` 等事实不能在没有消费者与安全边界证明时因“精简”而裁剪；目前也没有可测 plan 体积问题。复核是否确认当前词汇与投影、明确退役旧 effect 轴、恢复经证明的 effect、记录架构差异，或在出现新消费者/性能证据后重新设计。
-  - **Resource and analysis limits:** 旧版主要由 parser/plan 结构失败与旧 preflight 约束；当前新增显式资源上限，包括 Direct 文本字节、Shell command 字节、Shell command 数、cwd state 数与 edit entry 数。候选问题：是否把这些上限作为新安全/性能合同文档化，并确认默认值是否合适。
-  - **Policy path canonicalization:** 旧版配置路径规则作为 glob/virtual path 规则加载；当前 `allowedRoots`、`blockedRoots`、`blockedPaths` 在 policy adapter 加载时经 `resolveExistingPath` 规范化，并在 symlink 解析失败时拒绝配置。候选问题：是否把配置侧 canonicalization 作为独立安全合同、迁移约束或实现细节记录。
-  - **Symlink/traversal:** 旧版有 path resolve 与 blocked glob；当前 Canonical resolution 同时保留 lexical 与 symlink-target traversal prefixes，Direct search 与 Shell recursive path 在 blocked descendants 上 fail-closed。候选问题：是否把该增强写成迁移说明中的“非 parity 安全提升”。
-### Shell grammar、flow、wrapper 与 redirection
-
-  - **Shell grammar:** 旧版受限 Shell IR 覆盖更多形态；当前支持更小的 simple flow 与有界 `&&/||/;`，pipeline/background/compound/newline 多数 fail-closed。候选问题：是否恢复部分旧 Shell 形态，或保持 Greenfield 收窄。
-  - **CWD / control-flow tracing:** 旧版 `control-flow.ts` 建模 `cd`、`cd -`、`pushd/popd`、`&&/||/;/newline` 下的 cwd 候选与 opaque 分支；当前 `core/compilation/shell/flow.ts` 追踪有界 reachable commands 与 `cd` 后 cwd states，但 newline 不作为 flow operator，`pushd/popd` 不再作为专门 cwd 变异族。候选问题：逐项确认旧 cwd 候选语义是否需要恢复、文档化退役，或仅保留当前 bounded flow seam。
-  - **Wrapper handling:** 旧版建模 `env`、`timeout`、`command`、`nohup`、`exec` wrapper 链；当前仍有 wrapper 集合并测试底层语义保留。候选问题：是否补齐旧 wrapper 边角语料。
-### Program semantics 与命令族覆盖
-
-  - **Shell base modification commands:** 当前基础集合保留 `mkdir/touch/cp/mv` 等 modify 命令；候选问题：逐项确认旧 filesystem adapter 中同类写入命令是否需要恢复。
-  - **Search adapter family:** 旧版 search adapter 覆盖 `find/tree/grep/rg/ls` 等，并建模部分输出文件/action 选项；当前 `find` 已支持 bounded 的 `-name`、`-iname`、`-path`、`-ipath`、`-type`、`-maxdepth`、`-mindepth` inspect 子集，start path 仍进入 recursive boundary，`find -exec/-delete` 等副作用形式继续 fail-closed。候选问题：逐项判断更复杂的搜索表达式和输出/action 选项是否恢复。
-  - **Date adapter family:** 旧版 date adapter 区分 inspect 与 `--set` modify；当前未见等价专用家族。候选问题：是否明确退役或恢复 inspect-only 支持。
-  - **Shell builtins adapter family:** 旧版 `source`/`.` 归为 execute，`read` 归为 inspect；当前 compound/解释器边界更保守。候选问题：是否补充 shell builtin（如 source/read 等）分类矩阵。
-  - **User command overrides:** 旧版 `commands/aliases/reclassify` 允许用户声明式扩展命令语义；当前无等价入口。候选问题：是否在新 Canonical 架构下重新设计用户扩展 seam，或明确不支持。
-  - **Git semantics:** 旧版 Git adapter 覆盖较广但重构任务记录了 path-boundary 风险；当前 `log/diff/show/blame/grep` 已由 T-0124 / D-067 建立专有的 Inspect 选项契约（支持 `-S/-G/--grep/--author/--since/--format` 等过滤标量与 `--graph/-p` 等展示标志，成对消费参数值防伪路径溢出，外部驱动 `--ext-diff/--textconv` 维持 hard-boundary），且 `-C`、`--git-dir`、`--work-tree`、local `file://`、clone/fetch/pull/push/submodule 已完成 hard-boundary 强化，只读审查过滤诉求已定性闭环。候选问题：是否继续为其他 Git modify 子命令补充有界选项子集，而非追求旧 adapter parity。
-  - **Package managers:** 旧版 npm/pnpm/yarn/npx adapter 更宽；当前分类常见 inspect/modify/execute，脚本、install、npx 等委托执行 opaque，在 path boundary 下 hard-deny。候选问题：是否按真实用例增加 bounded package-manager 子命令。
-  - **uv:** 旧版已有 `uv run` execute 语义；当前保留 `uv run` execute/opaque、help/version inspect、未知 fail-closed。候选问题：是否扩展 uv 其他顶层子命令。
-  - **Python tools:** 旧版覆盖 `ruff/mypy/black/isort/pylint/pytest/pyright` 等；当前保留同族核心分类，但 `pytest` 与委托执行 opaque，`ruff clean` destroy。候选问题：是否按工具逐项补 option/path matrix。
-  - **Interpreters:** 旧版区分 interpreter info 与 execute；当前保留，并把脚本 operand 纳入 path admission，`-e/-c` 等脚本选项 fail-closed。候选问题：是否补文档说明“脚本路径可见但内联代码不执行分析”。
-  - **Threat scan / hard preflight:** 旧版有 `threat-scan.ts`、下载管道执行硬规则、prompt-injection 文本扫描；当前未见等价 threat scanner，部分风险由更窄 Shell 语法、pipeline fail-closed 和解释器脚本选项 fail-closed 覆盖。候选问题：是否恢复 token-level threat scanner，或将其退役并同步决策。
-### Policy、Guidance、Approval 与诊断
-
-  - **Decision code and guidance taxonomy:** 旧版拥有较细的 DecisionCode、evidence kind、response kind 与 GuidanceId 映射，如 `dynamic-shell`、`compound-command`、`opaque-command`、`blocked-path`、`symlink-escape`、`profile-restriction`；当前 host-facing block code 更少，失败文案为静态 bounded reason，并新增只读策略切换提醒。候选问题：是否维持收敛后的 host 合同、恢复更细诊断，或把旧码表退役写入决策。
-  - **Approval UX:** 旧版 `ask` 走 UI select 的 Allow once/Deny；当前 `ask` 走 `ui.confirm`，无 UI 时 deny，批准摘要 bounded 且 Shell 包含 literal command。候选问题：是否恢复双按钮文案或保留 host confirm 合同。
-
-### 测试策略与 Greenfield 迁移一致性
-
-  - **Test strategy:** 不按数量追求 parity；只把旧测试中仍代表外部行为的部分转写到新 public seam。
-- **Supplementary cross-cutting checks:** 以下横切行为尚未在高层点中单独拆项，纳入本候选的待核对范围：
-  - **Command prefix normalization:** 旧 `normalize.ts`、`prefix.ts`、`args.ts` 处理 `builtin`、`time`、`!`、env assignment、wrapper positional 和位置参数；当前 wrapper/命令分类是否保留同等边界需核对。
-  - **Host boundary and passthrough:** 旧 Gate 与当前 host adapter 对未知工具 passthrough、无效 host context、非法输入和受管 surface 的边界行为需逐项对照。
-  - **Canonical trust boundary:** 旧 CompleteAccessPlan/verifier/coverage 与当前一次 Canonical 编译、sealed Admission、Display 分离、伪造对象拒绝之间的安全和可观察差异需单独记录。
-  - **Approval evidence contract:** 路径证据聚合去重、literal command 展示、bounded reason、无 UI deny，以及 deny 路径/内容不回显等行为需与旧 approval/render contract 对照。
-  - **Shell lexer/parser fidelity:** 旧低层 parser/lexer 测试覆盖 scan-time source span、重复 raw value span 稳定性、comment stripping 边界、quoted env-assignment 判别、numeric fd-prefix 与 quoted digit redirect disambiguation；这些不是当前 public seam，若恢复更宽 Shell 前端需先判定哪些是外部合同。
-  - **Command registry internals:** 旧 registry 测试覆盖 duplicate registration fail-fast、`scopeKey` 精确/前缀/最长前缀/`./` 归一化和非真前缀不命中；若重新设计用户命令扩展 seam，需把这些作为候选行为重新证明，而非隐式继承。
-  - **Read-only guidance narrow trigger:** 当前只读策略切换提醒只在 `review` 下 Direct `write`/`edit` 的普通 policy deny 生效，不覆盖 Shell、硬边界、未知、破坏性或敏感路径拒绝；后续文档/实现复核需保持这个窄触发，或显式重新设计。
-  - **Git hard-boundary/destructive subforms:** 当前 Git 语义对 `-c`、未知 global option、`pathspec-from-file`/NUL、upload/receive/exec hooks、global/system config、remote/archive/submodule hazard，以及 `push --force`、`reset --hard`、branch delete、stash clear 等 destructive 子形态有更细 hard-boundary/destroy 分类；后续 Git parity 不应只按“Git adapter”大项模糊处理。
-  - **Path input normalization and invalid forms:** 旧 resolver 还处理 `@` 前缀、拒绝 CR/LF 与 Windows/UNC 路径；当前 Direct canonicalization 与 Shell path resolver 主要显式拒绝 NUL、相对/绝对路径按新 seam 解析。需确认这些旧输入边界是公共兼容行为、安全合同，还是旧实现细节。
-  - **Direct/Shell equivalence invariants:** 旧测试把 Shell grep 与 Direct grep、Shell read 与 Direct read、写入拒绝等行为作为跨 surface 等价，并锁定“增加 path intent 不得使决策变弱”。当前 Canonical/Admission seam 需确认这些是公共安全不变量、测试 seam，还是随新 surface 收窄而重写的内部证明目标。
-  - **Stable legacy code contract:** 旧 `task2-contract` 锁定 headless approval、user denial、path policy deny、shell policy deny 等稳定 code；当前 host-facing block code 收敛且 reason 静态。后续若外部消费者依赖旧 code，需明确兼容、映射或退役，而不是只按 guidance taxonomy 大项处理。
-  - **Hard preflight subforms:** 旧 preflight 测试逐项覆盖 literal download-to-interpreter、quote-split interpreter、downloader later in a pipe/line、nested wrapper、`eval` command substitution、comment/string literal 排除与 threat token table。当前更窄 Shell grammar 覆盖部分风险，但若恢复 threat scanner 或解释器/pipeline 子集，需逐项重新采纳或退役这些硬规则。
-- **Decision reset / refresh queue:** 存活 Decision 与既有候选中凡是仍携带重构前结构、旧 Profile/config/schema、旧 plan/verifier/adapter/glob/for-reduction、T-069 前“当前基线”或其他已被 Greenfield Pipeline 重置的术语与结论，都需要逐一重审；未重审前只作为候选议题处理，不作为恢复旧行为的授权。重审时应按当前 Canonical/Admission/Display/Policy seam 迁移仍成立的安全意图，合并已被新决策吸收的内容，并把未承接部分退役或继续留作候选。
-- **Revisit condition:** 用户明确要求开展“重构前后功能 parity/取舍”任务；或出现旧行为缺失导致真实工作流阻塞；或安全复核确认当前实现与存活 Decision（尤其默认敏感路径边界）存在不一致。
-
 ## C-026: 旧敏感路径清单的独立分类与边界重建
 
 > 本条只记录未来对旧版敏感路径清单进行重新分类和重新证明的探索方向，不恢复旧 `DEFAULT_BLOCKED_PATHS`，不改变 D-070 当前边界，也不构成实现承诺。
@@ -156,7 +93,7 @@
 
 ## C-029: 有界静态迭代语义（Shell `for`）复核
 
-> 本条由 C-025 迁入，只记录未来对有限、静态、可证明 Shell 迭代语义的重新评估；不恢复旧 reducer、不追求 legacy parity，也不构成实现承诺。
+> 本条只记录未来对有限、静态、可证明 Shell 迭代语义的重新评估；不恢复旧 reducer、不追求 legacy parity，也不构成实现承诺。
 
 - **Why Not Now:** 当前 `for` 作为 unsupported compound keyword 处理；D-059 已将 Static Flow 排除在 Greenfield trust path 之外。静态迭代同时牵涉有限词表、变量绑定、循环 body、success/failure、逐轮 CWD、资源预算、effect hard boundary 及 approval/display evidence，尚无真实工作流证据证明应承担这组复杂度。
 - **Exploration Direction:** 若未来重新评估，应以新的外部语义合同定义“有界静态迭代”，而不是迁回旧 `for` reducer：
@@ -166,20 +103,18 @@
   - 每轮产生的 read/write/execute/destroy effect 都必须重新进入现行 Policy/Hard Boundary；静态可展开不改变 D-071 的 destroy 永久 hard-deny，也不使 opaque 委托执行获得放行。
   - 若存在 ask，必须重新定义原始循环、展开路径和 bounded evidence 的人类展示关系；不恢复旧 Explanation Replay 或旧 expanded-form 合同。
   - 验证以 Bash/Linux 外部行为、当前 Canonical/Admission/Display public seam 和安全不变量为依据；旧 reducer、旧测试数量及旧输出只能作为历史线索。
-- **Current Boundary:** 在本候选被明确采纳前，`for` 继续 fail-closed；不因 C-025 的 parity 清单或旧实现可检索而触发恢复。
+- **Current Boundary:** 在本候选被明确采纳前，`for` 继续 fail-closed；不因旧实现可检索而触发恢复。
 - **Revisit condition:** 出现真实工作流因有限静态迭代被阻塞，且可提供不依赖动态值、运行时 glob、命令替换或隐式执行的最小场景与外部语义证据；或者用户明确启动该语义的独立重新设计。
 - **Out of Scope:** 完整 Bash 循环语义、动态/运行时词表、旧 reducer 迁移、旧 Explanation Replay、Direct 工具等价物、通用 Static Flow、实现 Task，以及任何未经独立证明的旧循环行为。
-- **Origin:** C-025
 
 ## C-030: 路径范围表达与旧 Glob 规则处置
 
-> 本条承接 C-025 中关于路径策略语言、旧 glob matcher 与规则顺序的差异核对，只记录未来重新评估方向，不恢复旧 Profile/config 兼容、运行时 glob 或 Shell glob 展开，也不构成实施承诺。
+> 本条只记录未来对路径策略语言、旧 glob matcher 与规则顺序的重新评估方向，不恢复旧 Profile/config 兼容、运行时 glob 或 Shell glob 展开，也不构成实施承诺。
 
 - **Why Not Now:** D-059 在 T-069 中明确排除旧 Profile/config schema 的兼容读取、转换器与迁移期 fallback；D-069 当前以绝对 `allowedRoots`、`blockedRoots`、`blockedPaths` 表达路径范围。当前没有真实工作流证据表明该表达不足，也没有足够证据证明旧 glob 规则可以无损转换。
 - **Exploration Direction:** 未来若重新评估，先用真实工作流确认当前路径范围表达的具体缺口，再区分三种不同方向：①运行时接受旧路径 glob；②提供一次性、显式报告不可表达项的迁移器；③只补充当前绝对路径表达的文档。旧 matcher 的 `*`、`?`、`**`、大小写、绝对路径、blocked-pattern 与 first-match，以及 `project/`、`staging/`、`~/` 虚拟命名空间、按操作定义的路径规则和 Profile 继承产生的规则顺序，都只是历史参考；只有确定需要兼容或迁移时，才逐项重新证明。任何迁移结果都不得静默扩大或缩小授权范围，无法等价表达的规则必须报告为未转换。路径规则顺序也必须在当前 Policy Snapshot 与 hard-boundary 语义下重新决定，不自动继承这些旧顺序语义。
 - **Revisit condition:** 真实工作流因当前路径表达被阻塞；用户明确要求转换既有旧 policy；或获得一组有界旧规则样本及足够的外部语义证据，能够验证转换是否保持权限范围。
 - **Out of Scope:** 在本候选明确采纳前，不恢复运行时 glob 兼容，不提供静默迁移或迁移期 fallback，不恢复旧 Profile/config schema，不改变 D-018 的 Shell glob 边界，不把旧 matcher 测试直接当作当前合同，也不创建实现 Task。
-- **Origin:** C-025
 
 ## C-031: 异步 child 与无人值守自动多代理流水线
 
@@ -315,7 +250,6 @@
   - 有界拓扑与资源上限：深度严格限制为 2（单管道），禁止嵌套管道、后台流（`&`）或动态展开；超限或无法证明即 fail-closed。
 - **Revisit condition:** 真实工作流反复因缺少单级安全管道或 `tee` 流式写入受阻，且 Direct tools 无法合理替代；或宿主提供可验证的数据流隔离机制；或用户明确要求启动有界管道设计。
 - **Out of Scope:** 通用无界管道链、动态管道构建、后台并发执行、未隔离的数据流外联或实现 Task。
-- **Origin:** C-025
 
 ## C-048: 构建工具族（cargo/go/make）语义与委托执行边界（探索方向）
 
@@ -330,4 +264,19 @@
 - **Revisit condition:** 真实多语言开发工作流因缺少构建工具语义而受阻，且现有 `commands.opaque` 或会话策略无法满足需求；或用户明确要求引入特定构建工具族的有界支持。
 - **Out of Scope:** 在本候选被明确采纳前，不新增构建工具分析器，不改变现行 `unknown + opaque` 分类行为，不创建实现 Task。
 
-## C-049: 待创建
+## C-049: 宿主已注册技能与扩展资产的清单级只读准入（Dynamic Asset Manifest）
+
+> 本条记录未来基于 Pi 宿主已注册清单对技能（Skills）与扩展（Extensions）分发资产实施精准只读准入（Dynamic Asset Manifest）的架构探索，不弱化凭据与工作区边界，不改变现行 Policy Kernel 决策语义，也不构成实现承诺。
+
+- **Why Not Now:** 当前可通过显式配置 `policy.yaml` 中的 `allowedRoots`（如将 `~/.pi/agent/git`、`~/.pi/agent/node_modules` 等分发子目录加入只读白名单）避免阻断；Access Gate 的 Greenfield 决策管线刚完成原子切换，若直接在运行时引入动态宿主资产扫描与清单索引会增加会话启动耦合，且目前缺少跨包管理器（git、npm、standalone skills 等）统一且无损的宿主 API 查询缝隙。过早引入全量动态资产索引可能引入启动开销与宿主版本契约脆弱性。
+- **Exploration Direction:** 若未来重新评估，探索基于已注册清单的精确最小权限准入模型（Dynamic Asset Manifest）：
+  - **清单级索引与会话绑定（Session-Bound Manifest Discovery）**：在 `session_start` 时，由 Pi 组合适配层提取当前会话实际生效的技能与扩展入口（如解析 `ExtensionContext`、`package.json` 中的 `pi.skills`/`pi.extensions` 声明），生成只读的不可变注册资产集合（`registeredAssetRoots` 或精确 `registeredAssetPaths`）；
+  - **语义意图与路径角色分类（Capability Asset Read vs. Workspace Read）**：在 Direct 工具（特别是 `read` 与非递归 `ls`）准入检查中，若目标路径命中注册资产清单，将其识别为合法的“宿主能力资产检查（Capability Inspection）”，静默赋予只读准入，不再要求该路径必须位于项目 `cwd`（`allowedRoots`）内；
+  - **绝对只读与不可变性保证（Immutable Read-Only Invariant）**：命中资产清单的路径严格仅允许只读操作（`read`），任何对分发资产的写（`write`）、修改（`edit`）、删除（`destroy`）或 Shell 写入均触发系统硬拒绝（`hard-boundary`），杜绝运行时篡改分发物；
+  - **不可动摇的凭据硬隔离（Credential Boundary Dominance）**：`auth.json` 及其衍生凭据文件继续由 Mandatory Boundary 的 `credentialArtifact`（D-070）永久拦截，即使被误放入包目录也绝不放行；递归搜索与凭据根相交继续 fail-closed；
+  - **用户零配置体验（Zero-Config UX）**：彻底消除用户手动配置 npm、git、nvm、全局模块等底层目录的摩擦，且在普通用户项目中杜绝因找不到全局技能而向本地未提交脏源码退化的错误降级。
+- **Boundary & Scope:** 不放宽工作区外普通业务文件的读写限制；不为未注册的任意第三方或环境文件开特例；不对动态/未知 Shell 命令放开工作区外执行；不弱化 D-018 的语义准入与 D-072 的工作区访问根原则。
+- **Revisit condition:** 真实用户在独立业务项目中因技能加载被 Access Gate 拦截而频繁遇到死锁；或 Pi 官方提供稳定的已注册技能与扩展查询 API / Seam；或用户明确要求启动基于已注册清单的技能准入设计 Task。
+- **Out of Scope:** 在本候选被明确采纳前，不修改 `packages/access-gate` 现行授权内核代码，不引入动态资产扫描器，不放宽默认 `allowedRoots`，不创建实现 Task。
+
+## C-050: 待创建

@@ -1,11 +1,21 @@
-export const MAX_DIRECT_TEXT_BYTES = 16_384;
+export const MAX_PATH_BYTES = 4_096;
+export const MAX_DIRECT_PAYLOAD_BYTES = 262_144;
+export const MAX_DIRECT_TEXT_BYTES = MAX_DIRECT_PAYLOAD_BYTES;
 export const MAX_DIRECT_EDIT_ENTRIES = 64;
 export const MAX_SHELL_COMMAND_BYTES = 16_384;
 export const MAX_SHELL_COMMANDS = 128;
 export const MAX_SHELL_CWD_STATES = 256;
 
+export function exceedsPathBudget(values: readonly string[]): boolean {
+  return exceedsUtf8ByteBudget(values, MAX_PATH_BYTES);
+}
+
+export function exceedsDirectPayloadBudget(values: readonly string[]): boolean {
+  return exceedsUtf8ByteBudget(values, MAX_DIRECT_PAYLOAD_BYTES);
+}
+
 export function exceedsDirectTextBudget(values: readonly string[]): boolean {
-  return exceedsUtf8ByteBudget(values, MAX_DIRECT_TEXT_BYTES);
+  return exceedsDirectPayloadBudget(values);
 }
 
 export function exceedsShellCommandBudget(...values: readonly string[]): boolean {

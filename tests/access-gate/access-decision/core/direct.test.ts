@@ -344,6 +344,18 @@ test("admits a Direct write request whose content exceeds the path analysis budg
   assert.deepEqual(service.decide(request), { kind: "allow" });
 });
 
+test("rejects a Direct write request whose content exceeds the payload budget", () => {
+  const service = testService({ read: "allow", write: "allow", list: "deny", search: "deny" });
+  const request: DirectRequest = {
+    surface: "write",
+    arguments: { path: "huge.md", content: "x".repeat(262_145) },
+    cwd: "/workspace/project",
+    hasUI: false,
+  };
+
+  assert.deepEqual(service.decide(request), { kind: "deny", code: "resource-limit" });
+});
+
 test("admits a normalized Direct list request through the public service seam", () => {
   const service = testService({ read: "deny", write: "deny", list: "allow", search: "deny" });
   const request: DirectRequest = {
@@ -553,9 +565,21 @@ test("rejects a Direct edit request exceeding max edit entries limit", () => {
   }), { kind: "deny", code: "resource-limit" });
 });
 
-test("rejects a Direct edit request whose edits exceed the text budget", () => {
+test("admits a Direct edit request whose edits exceed the path budget but remain within payload budget", () => {
   const service = testService({ read: "allow", write: "allow", edit: "allow" });
   const edits = [{ oldText: "x".repeat(10_000), newText: "y".repeat(10_000) }];
+
+  assert.deepEqual(service.decide({
+    surface: "edit",
+    arguments: { path: "src/index.ts", edits },
+    cwd: "/workspace/project",
+    hasUI: false,
+  }), { kind: "allow" });
+});
+
+test("rejects a Direct edit request whose edits exceed the text budget", () => {
+  const service = testService({ read: "allow", write: "allow", edit: "allow" });
+  const edits = [{ oldText: "x".repeat(140_000), newText: "y".repeat(140_000) }];
 
   assert.deepEqual(service.decide({
     surface: "edit",
