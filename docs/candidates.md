@@ -80,7 +80,7 @@
 - **Why Not Now:** 当前实现已按 D-059/D-060 完成 Greenfield trust path 与生产切换，目标不是复刻旧 `command-semantics/gate/profile` 行为；旧实现和旧测试只提供历史线索，不能作为正确性 oracle。完整复核会同时触及安全、配置、UI、可用性、迁移和子代理边界，尚未成为已承诺调查。
 - **Review Contract:** 每个检查点分别核对 historical evidence、current evidence、外部合同与安全不变量，再由用户选择“确认当前行为 / 重新设计或恢复经证明的子集 / 文档同步 / 明确退役 / 发现实现与存活 Decision 不一致 / 迁移为独立 Task、Decision 或 Candidate”。清单覆盖保留不变、增强、收窄和删除项，按可独立判断的行为族组织，不按旧测试数量追求 parity；命令、选项、输入边界和测试细节归入对应功能族或横切检查项。当前实现、已有 Decision 和相关 Candidate 只构成证据或交叉引用；相关 Candidate 可以承载独立未来设计，但不能替代本记录的历史差异问题，未逐项裁决前也不得删除本地检查语义或预选结论。
 - **Current external dispositions pending this review:**
-  - **Resolved cluster:** `Project root and session lifecycle` 与 `Home resolution authority` 当前由 [D-072](decisions.md#d-072-session-启动-cwd-作为访问根与-home-的受限-tilde-语义) 定义；这约束现行行为，但不证明 C-025 已核对旧 Git-root 前置、额外 host `home` 字段及其全部外部场景。正式复核不得无授权逆转 D-072，也不得把 Decision 的存在当作该检查已完成。
+  - **Resolved cluster:** `Project root and session lifecycle` 与 `Home resolution authority` 当前由 [D-072](decisions.md#d-072-session-启动-cwd-作为访问根与-home-的受限-tilde-语义) 定义；这约束现行行为，但不证明 C-025 已核对旧 Git-root 前置、额外 host `home` 字段及其全部外部场景。正式复核不得无授权逆转 D-072，也不得把 Decision 的存在当作该检查已完成。Shell 确定性与无副作用命令（`true`/`false`/`:`/`echo`/`printf` 及规范系统路径）已由 T-0126 定性闭环。
   - **Migrated cluster:** `Bounded static iteration semantics` 已由 C-029 独立保存未来设计边界；`Pipeline and tee streaming write semantics` 已由 C-047 独立保存未来设计边界；`Build adapter family 语义与委托执行边界` 已由 C-048 独立保存未来设计边界；C-025 仍保留“旧 reducer 与当前 unsupported `for` 的差异是否被正确处置”这一历史核对，不以迁移本身视为完成。
 
 ### Host、runtime 与 Direct tool 合同
@@ -102,10 +102,9 @@
 ### Program semantics 与命令族覆盖
 
   - **Shell base modification commands:** 当前基础集合保留 `mkdir/touch/cp/mv` 等 modify 命令；候选问题：逐项确认旧 filesystem adapter 中同类写入命令是否需要恢复。
-  - **Shell deterministic/noop commands:** `true`、`false`、`:` 已由 T-0126 识别为确定性 inspect 命令并支持规范系统路径。候选问题：对照旧 date/read adapter，确认哪些 inspect-only 命令应恢复。
   - **Search adapter family:** 旧版 search adapter 覆盖 `find/tree/grep/rg/ls` 等，并建模部分输出文件/action 选项；当前 `find` 已支持 bounded 的 `-name`、`-iname`、`-path`、`-ipath`、`-type`、`-maxdepth`、`-mindepth` inspect 子集，start path 仍进入 recursive boundary，`find -exec/-delete` 等副作用形式继续 fail-closed。候选问题：逐项判断更复杂的搜索表达式和输出/action 选项是否恢复。
   - **Date adapter family:** 旧版 date adapter 区分 inspect 与 `--set` modify；当前未见等价专用家族。候选问题：是否明确退役或恢复 inspect-only 支持。
-  - **Shell builtins adapter family:** 旧版 `source`/`.` 归为 execute；当前 compound/解释器边界更保守。候选问题：是否补充 shell builtin 分类矩阵。
+  - **Shell builtins adapter family:** 旧版 `source`/`.` 归为 execute，`read` 归为 inspect；当前 compound/解释器边界更保守。候选问题：是否补充 shell builtin（如 source/read 等）分类矩阵。
   - **User command overrides:** 旧版 `commands/aliases/reclassify` 允许用户声明式扩展命令语义；当前无等价入口。候选问题：是否在新 Canonical 架构下重新设计用户扩展 seam，或明确不支持。
   - **Git semantics:** 旧版 Git adapter 覆盖较广但重构任务记录了 path-boundary 风险；当前 `log/diff/show/blame/grep` 已由 T-0124 / D-067 建立专有的 Inspect 选项契约（支持 `-S/-G/--grep/--author/--since/--format` 等过滤标量与 `--graph/-p` 等展示标志，成对消费参数值防伪路径溢出，外部驱动 `--ext-diff/--textconv` 维持 hard-boundary），且 `-C`、`--git-dir`、`--work-tree`、local `file://`、clone/fetch/pull/push/submodule 已完成 hard-boundary 强化，只读审查过滤诉求已定性闭环。候选问题：是否继续为其他 Git modify 子命令补充有界选项子集，而非追求旧 adapter parity。
   - **Package managers:** 旧版 npm/pnpm/yarn/npx adapter 更宽；当前分类常见 inspect/modify/execute，脚本、install、npx 等委托执行 opaque，在 path boundary 下 hard-deny。候选问题：是否按真实用例增加 bounded package-manager 子命令。
