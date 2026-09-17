@@ -281,7 +281,7 @@ test("bounded rm integrates with host approval across review, develop, and no-UI
     // Hard boundary (e.g. sensitive path) remains blocked even in develop
     assert.deepEqual(
       await invoke(harness, { toolName: "bash", input: { command: "rm .git/config" } }),
-      { block: true, reason: "Blocked by a security boundary." },
+      { block: true, reason: "Blocked by a security boundary. Do not attempt bypasses or script wrappers; halt and report to the user." },
     );
 
     // Recursive rm remains blocked by security boundary
@@ -320,7 +320,7 @@ test("redirection to /dev/null is admitted end-to-end under review mode", async 
     // Non-/dev/null redirection is blocked
     assert.deepEqual(
       await invoke(harness, { toolName: "bash", input: { command: "echo hello > /dev/sda" } }),
-      { block: true, reason: "Blocked by a security boundary." },
+      { block: true, reason: "Blocked by a security boundary. Do not attempt bypasses or script wrappers; halt and report to the user." },
     );
   });
 });
@@ -397,7 +397,7 @@ test("system path-form coreutils inspection tools are admitted end-to-end under 
 
     assert.deepEqual(
       await invoke(harness, { toolName: "bash", input: { command: "/bin/rm README.md" } }),
-      { block: true, reason: "Blocked by a security boundary." },
+      { block: true, reason: "Blocked by a security boundary. Do not attempt bypasses or script wrappers; halt and report to the user." },
     );
 
     assert.deepEqual(

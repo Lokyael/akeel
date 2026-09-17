@@ -77,14 +77,14 @@
 **Decision:** Host-facing rendering 只消费 Policy/Canonical 的结果和按需投影的 bounded `Display View`，不执行工具、不重新解释请求，也不生成可执行建议。它分为三条封闭路径：
 
 - **allow**：返回不带展示内容的允许结果。
-- **deny**：通过源码内置的静态 code→reason 映射返回 bounded block；reason 不拼接原始 Shell、用户路径、glob 或其他用户派生值，也不提供绕过硬边界的替代执行建议。
+- **deny**：通过源码内置的静态 code→reason 映射返回 bounded block；reason 不拼接原始 Shell、用户路径、glob 或其他用户派生值，也不提供绕过硬边界的替代执行建议。对于 `hard-boundary` 与 `security-boundary` 等安全硬边界，静态文案明确声明终态并禁止绕过（如包装脚本或变形重试），要求模型就地停机并向用户汇报。
 - **ask**：只返回 `executed: false` 的 confirm。Shell 展示已投影的 command class/effects 与 literal command，Direct 展示 operation/path；这些用户派生值只进入人类审批面，不进入 deny reason。没有 Display View 时使用静态的 `Approval required.`。
 
 所有 host-facing 结果均为 immutable 值；审批摘要最多 160 个字符并以省略号截断。没有可用审批 UI 时由 host composition 阻断，不执行请求。拒绝、确认和执行的职责保持分离：renderer 只产生 host-facing data，实际执行仍由宿主在明确批准后负责。
 
 **Security invariants:**
 
-- deny guidance 不携带用户派生值，不生成 Shell，不调用替代 tool；硬边界、策略拒绝、unsupported syntax 和动态输入都只能得到静态分类文案。
+- deny guidance 不携带用户派生值，不生成 Shell，不调用替代 tool；硬边界、策略拒绝、unsupported syntax 和动态输入都只能得到静态分类文案。安全边界阻断向模型明确传达防御终态与禁止绕过/脚本包装，阻断将安全门禁误判为可重试技术错误的模型偏置。
 - ask 侧向人类展示其需要否决的 bounded 事实；Shell 的 literal form 保留原始命令的知情同意价值，Direct 的 path 是对应文件操作的必要信息。
 - Display View 是授权域之外的按需投影；Kernel 不消费展示文本，renderer 不反向影响 Canonical 或 Policy。
 - unknown、动态值和其他未建模形态仍由 Canonical/Policy 合同决定其拒绝或 ask 结果；renderer 不通过展示层猜测其运行期语义。

@@ -131,7 +131,7 @@ test("Pi composition hard-denies an agent credential variant under an allowing p
 
     assert.deepEqual(
       await invoke(handlers, "tool_call", { toolName: "read", input: { path: join(agentDir, "auth.json.bak") } }, hostContext),
-      { block: true, reason: "Blocked by a security boundary." },
+      { block: true, reason: "Blocked by a security boundary. Do not attempt bypasses or script wrappers; halt and report to the user." },
     );
   } finally {
     rmSync(agentDir, { recursive: true, force: true });
