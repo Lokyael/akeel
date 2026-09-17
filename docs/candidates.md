@@ -99,7 +99,7 @@
   - **Shell grammar:** 旧版受限 Shell IR 覆盖更多形态；当前支持更小的 simple flow 与有界 `&&/||/;`，pipeline/background/compound/newline 多数 fail-closed。候选问题：是否恢复部分旧 Shell 形态，或保持 Greenfield 收窄。
   - **CWD / control-flow tracing:** 旧版 `control-flow.ts` 建模 `cd`、`cd -`、`pushd/popd`、`&&/||/;/newline` 下的 cwd 候选与 opaque 分支；当前 `core/compilation/shell/flow.ts` 追踪有界 reachable commands 与 `cd` 后 cwd states，但 newline 不作为 flow operator，`pushd/popd` 不再作为专门 cwd 变异族。候选问题：逐项确认旧 cwd 候选语义是否需要恢复、文档化退役，或仅保留当前 bounded flow seam。
   - **Wrapper handling:** 旧版建模 `env`、`timeout`、`command`、`nohup`、`exec` wrapper 链；当前仍有 wrapper 集合并测试底层语义保留。候选问题：是否补齐旧 wrapper 边角语料。
-  - **Redirection:** 旧版支持重定向且 `<>/2<>` 按 write 侧建模；当前保留 read-write redirection write-side contract，unsupported clobber fail-closed。候选问题：是否补全 README 的重定向支持矩阵。
+  - **Redirection 与流式管道写入:** 旧版支持重定向且 `<>/2<>` 按 write 侧建模，并覆盖 `tee` 流式分支写入；当前保留 read-write redirection write-side contract，unsupported clobber fail-closed，`tee` 随 pipeline fail-closed 保持未建模。候选问题：补全重定向支持矩阵，并评估若开放有界管道时 `tee` 的目标文件写入准入与策略边界。
 ### Program semantics 与命令族覆盖
 
   - **Shell base modification commands:** 当前基础集合保留 `mkdir/touch/cp/mv` 等 modify 命令；候选问题：逐项确认旧 filesystem adapter 中同类写入命令是否需要恢复。
@@ -281,5 +281,18 @@
 - **Safety Boundary:** 不因命令名称或选项外观推断脚本、helper 或运行期访问已经被分析；未知、动态、未消费或无法证明的值不得静默变成 positional path 或更宽授权。任何复核方案都不得削弱 D-018 的 fail-closed 规则、D-067 的 opaque 分层、Git/`find` 现有 hard boundary、D-071 的 destroy 永久拒绝或把 `allowedRoots` 描述为 opaque 运行期强制。
 - **Revisit condition:** 出现真实安全证据表明参数级 helper/隐式执行可穿过当前边界，或真实工作流因已知程序的选项消费误判而受阻；或者用户明确启动剩余程序族与未知命令的参数级安全合同复核。
 
-## C-045: 待创建
+## C-045: 受管会话临时文件创建与系统临时路径准入（mktemp 语义评估）
+
+> 本条只记录未来对受管会话临时文件创建（如 `mktemp`）及系统临时路径准入的重新评估，不放宽全局 `/tmp/` 访问，不改变现有 `stagingRoot` 生命周期，也不构成实现承诺。
+
+- **Why Not Now:** 当前工作流优先推荐在项目工作区内生成可跟踪工件，或利用会话生命周期的 `stagingRoot` 处理内部临时状态；无界的系统全局 `/tmp/` 缺乏会话隔离和清理保证，盲目放开容易引入符号链接攻击、文件冲突或跨进程信息泄露。目前尚无真实工作流因缺少 Shell `mktemp` 命令受阻。
+- **Exploration Direction:** 若未来重新评估，探索以下方向：
+  - 临时路径作用域锚定：将 `mktemp` 生成的目标路径默认约束在当前会话的 `stagingRoot` 或受管临时前缀下，而非全局开放任意 `/tmp/`；
+  - 选项与形态有界收敛：仅支持安全且有界的前缀模板及目录创建标志（如 `-d`），严禁包含未建模或不安全路径注入的选项；
+  - 生命周期与自动回收：明确临时文件的清理契约，与现有 retention sweep 或会话结束机制对齐；
+  - 权限与策略求值：在 Policy Kernel 中仍作为 `modify` 或受管临时写入处理，绝不通过放宽全局 `allowedRoots` 妥协安全底线。
+- **Revisit condition:** 真实工作流或关键外部构建工具必须依赖 Shell `mktemp` 且无法通过直接写入或现有 staging 替代；或用户明确要求启动受管临时文件准入设计。
+- **Out of Scope:** 全局 `/tmp/` 目录的随意读写放宽、跨用户共享临时文件、不安全命名模板展开、破坏性清理操作或实现 Task。
+
+## C-046: 待创建
 
