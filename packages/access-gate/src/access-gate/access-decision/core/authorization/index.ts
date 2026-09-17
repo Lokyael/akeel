@@ -289,7 +289,9 @@ function authorizeShell(
     const isModifying = operation.effects.includes("write") || operation.effects.includes("delete");
     const isUnboundedDestroy = (operation.commandClass === "destroy" || operation.effects.includes("delete")) &&
       (operation.recursive || operation.opaquePathAccess || operation.paths.length === 0);
-    if (isUnboundedDestroy || operation.hardBoundary ||
+    const isUnboundedModify = (operation.commandClass === "modify" || operation.effects.includes("write")) &&
+      !operation.opaquePathAccess && operation.paths.length === 0;
+    if (isUnboundedDestroy || isUnboundedModify || operation.hardBoundary ||
       operation.paths.some((path) => pathHitsMandatoryBoundary(path.evidence, mandatory, policy.paths)) ||
       (isModifying && operation.paths.some((path) => pathHitsGitControlArtifact(path.evidence))) ||
       operation.recursive && operation.paths.some((path) =>

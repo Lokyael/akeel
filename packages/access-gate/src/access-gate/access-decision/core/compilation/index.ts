@@ -349,13 +349,7 @@ function compileShellOperation(
     cwdTimeline.push(Object.freeze({ start: change.start, cwd: commandCwd }));
   }
 
-  const hasImplicitPath = analysis.paths.length === 0 &&
-    (semantic.recursive || analysis.executable === "ls" || analysis.executable === "find");
-  const pathIntents = analysis.paths.length > 0
-    ? analysis.paths
-    : hasImplicitPath
-      ? [Object.freeze({ text: ".", role: "source" as const, pathKind: undefined })]
-      : [];
+  const pathIntents = analysis.paths;
   const paths: ShellCompilationPath[] = [];
   for (let index = 0; index < pathIntents.length; index += 1) {
     const intent = pathIntents[index]!;

@@ -616,6 +616,20 @@ test("known coreutils reject options outside their bounded contract", () => {
     "du --unknown",
     "df --output=source",
     "df --unknown",
+    "touch",
+    "touch -c",
+    "mkdir",
+    "mkdir -p",
+    "mkdir -m 755",
+    "cp",
+    "cp -r",
+    "cp source",
+    "mv",
+    "mv -f",
+    "mv source",
+    "ln",
+    "ln -s",
+    "ln source",
   ]) {
     const analysis = analyzeShellCommand(command);
     assert.equal(analysis.kind, "reject", command);

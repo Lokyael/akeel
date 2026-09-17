@@ -306,7 +306,11 @@ export function analyzeCoreutilsProgram(name: string, args: readonly ShellWord[]
   if (contract === undefined) return undefined;
   const parsed = parseBoundedOptions(args, contract);
   if (parsed.kind === "reject") return rejectFrom(parsed);
-  if ((name === "rm" || name === "stat" || name === "file") && parsed.operands.length === 0) {
+  if ((name === "rm" || name === "stat" || name === "file" || name === "mkdir" || name === "touch") && parsed.operands.length === 0) {
+    const word = args[args.length - 1] ?? syntheticPath();
+    return Object.freeze({ kind: "reject" as const, code: "unsupported-syntax" as const, word });
+  }
+  if ((name === "cp" || name === "mv" || name === "ln") && parsed.operands.length < 2) {
     const word = args[args.length - 1] ?? syntheticPath();
     return Object.freeze({ kind: "reject" as const, code: "unsupported-syntax" as const, word });
   }
