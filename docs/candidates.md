@@ -102,7 +102,6 @@
   - **Redirection:** 旧版支持重定向且 `<>/2<>` 按 write 侧建模；当前保留 read-write redirection write-side contract，unsupported clobber fail-closed。候选问题：是否补全 README 的重定向支持矩阵。
 ### Program semantics 与命令族覆盖
 
-  - **Shell base inspection commands:** 当前基础集合覆盖 `cat/head/tail/grep/rg/find/ls/od/wc/cut/stat/diff/file/du/df` 等 inspect 命令并继承路径与递归边界；旧 read adapter 已全量处置（有界只读子集恢复、交互式分页器退役）。
   - **Shell base modification commands:** 当前基础集合保留 `mkdir/touch/cp/mv` 等 modify 命令；候选问题：逐项确认旧 filesystem adapter 中同类写入命令是否需要恢复。
   - **Shell deterministic/noop commands:** 当前保留 `true/false/echo/printf` 等确定性或无路径命令；旧版 noop 还包含 `:`，当前 `:` 落入 unknown。候选问题：对照旧 noop/date/read adapter，确认哪些 inspect-only 命令应恢复。
   - **Filesystem adapter family:** 旧版 filesystem adapter 覆盖 `rm/rmdir/touch/mkdir/cp/mv/ln/tee/dd/chmod/chown/install/mktemp/truncate/shred` 等文件系统操作；当前只保留较小基础子集，`tee`/`dd` 等未建模形态进入更保守的边界处理。候选问题：逐项判断缺失命令是否恢复或退役。
