@@ -1521,4 +1521,76 @@ test("bounded chmod admits workspace files under develop, prompts in guided, den
   });
 });
 
+test("Git inspect subcommands with safe filter options are allowed across develop, review, and guided presets", () => {
+  const developPolicy = freezeShellPolicySnapshot({
+    read: "allow",
+    write: "allow",
+    inspect: "allow",
+    modify: "allow",
+    execute: "allow",
+    opaque: "allow",
+    destroy: "allow",
+    unknown: "allow",
+    allowedRoots: ["/workspace/project"],
+    blockedRoots: [],
+    blockedPaths: ["/etc/passwd"],
+  });
+
+  const reviewPolicy = freezeShellPolicySnapshot({
+    read: "allow",
+    write: "deny",
+    inspect: "allow",
+    modify: "deny",
+    execute: "deny",
+    opaque: "deny",
+    destroy: "deny",
+    unknown: "deny",
+    allowedRoots: ["/workspace/project"],
+    blockedRoots: [],
+    blockedPaths: ["/etc/passwd"],
+  });
+
+  const guidedPolicy = freezeShellPolicySnapshot({
+    read: "allow",
+    write: "ask",
+    inspect: "allow",
+    modify: "ask",
+    execute: "ask",
+    opaque: "ask",
+    destroy: "deny",
+    unknown: "ask",
+    allowedRoots: ["/workspace/project"],
+    blockedRoots: [],
+    blockedPaths: ["/etc/passwd"],
+  });
+
+  // 1. git log -S under review, develop, and guided: all allow because inspect is allow, read is allow, not opaque!
+  assert.deepEqual(evaluateShellAdmission(admission("git log -S C-025 --oneline", false), reviewPolicy), {
+    kind: "allow",
+  });
+  assert.deepEqual(evaluateShellAdmission(admission("git log -S C-025 --oneline", false), developPolicy), {
+    kind: "allow",
+  });
+  assert.deepEqual(evaluateShellAdmission(admission("git log -S C-025 --oneline", false), guidedPolicy), {
+    kind: "allow",
+  });
+
+  // 2. Complex filters are allowed under review
+  assert.deepEqual(evaluateShellAdmission(admission("git log -G feat --grep=docs --author=alice -n 10", false), reviewPolicy), {
+    kind: "allow",
+  });
+
+  // 3. High-risk option (--ext-diff) is hard-boundary blocked even under develop with UI
+  assert.deepEqual(evaluateShellAdmission(admission("git log --ext-diff", true), developPolicy), {
+    kind: "deny",
+    code: "hard-boundary",
+  });
+
+  // 4. Missing value is hard-boundary blocked even under develop
+  assert.deepEqual(evaluateShellAdmission(admission("git log -S", true), developPolicy), {
+    kind: "deny",
+    code: "hard-boundary",
+  });
+});
+
 

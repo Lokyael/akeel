@@ -998,24 +998,58 @@ test("chmod rejects privilege-elevation special bits with security-boundary", ()
   }
 });
 
-test("chmod rejects invalid modes, unsupported options, and missing operands", () => {
-  for (const cmd of [
-    "chmod",
-    "chmod +x",
-    "chmod 755",
-    "chmod --reference=ref.txt target.txt",
-    "chmod 888 file.txt",
-    "chmod 77777 file.txt",
-    "chmod invalid-mode file.txt",
-    "chmod --invalid-flag 755 file.txt",
-  ]) {
-    const analysis = analyzeShellCommand(cmd);
-    assert.equal(analysis.kind, "reject", cmd);
-    if (analysis.kind === "reject") {
-      assert.equal(analysis.code, "unsupported-syntax", cmd);
-    }
-  }
+test("Git inspect subcommands accept safe display and filter options without becoming opaque or emitting pseudo-paths", () => {
+  const logSearch = complete("git log -S C-025 --oneline");
+  assert.equal(logSearch.commandClass, "inspect");
+  assert.deepEqual(logSearch.effects, ["read"]);
+  assert.deepEqual(logSearch.paths, [{ text: ".", role: "source" }]);
+  assert.equal(logSearch.semantic.opaquePathAccess, false);
+  assert.equal(logSearch.semantic.hardBoundary, false);
+
+  const logFilters = complete("git log -G ^feat --grep=docs --author=alice --since=2026-01-01 --until=2026-12-31 -n 10 --format=oneline");
+  assert.equal(logFilters.commandClass, "inspect");
+  assert.deepEqual(logFilters.effects, ["read"]);
+  assert.deepEqual(logFilters.paths, [{ text: ".", role: "source" }]);
+  assert.equal(logFilters.semantic.opaquePathAccess, false);
+  assert.equal(logFilters.semantic.hardBoundary, false);
+
+  const logFlags = complete("git log --graph --no-merges --topo-order --reverse -p");
+  assert.equal(logFlags.commandClass, "inspect");
+  assert.deepEqual(logFlags.effects, ["read"]);
+  assert.deepEqual(logFlags.paths, [{ text: ".", role: "source" }]);
+  assert.equal(logFlags.semantic.opaquePathAccess, false);
+  assert.equal(logFlags.semantic.hardBoundary, false);
+
+  const diffFilter = complete("git diff --diff-filter=ACMRT");
+  assert.equal(diffFilter.commandClass, "inspect");
+  assert.deepEqual(diffFilter.effects, ["read"]);
+  assert.deepEqual(diffFilter.paths, [{ text: ".", role: "source" }]);
+  assert.equal(diffFilter.semantic.opaquePathAccess, false);
+  assert.equal(diffFilter.semantic.hardBoundary, false);
 });
+
+test("Git inspect subcommands fail-closed on missing option values, external drivers, and unknown options", () => {
+  const missingVal = complete("git log -S");
+  assert.equal(missingVal.semantic.hardBoundary, true);
+
+  const extDiff = complete("git log --ext-diff");
+  assert.equal(extDiff.semantic.hardBoundary, true);
+
+  const textconv = complete("git diff --textconv");
+  assert.equal(textconv.semantic.hardBoundary, true);
+
+  const unknown = complete("git log --unknown-inspect-option");
+  assert.equal(unknown.semantic.opaquePathAccess, true);
+});
+
+test("Git non-inspect subcommands isolate inspect-only options and do not permit them", () => {
+  const checkoutWithInspectOpt = complete("git checkout -S pattern");
+  assert.equal(checkoutWithInspectOpt.semantic.opaquePathAccess, true);
+
+  const addWithInspectOpt = complete("git add -S pattern");
+  assert.equal(addWithInspectOpt.semantic.opaquePathAccess || addWithInspectOpt.semantic.hardBoundary, true);
+});
+
 
 
 

@@ -109,7 +109,7 @@
   - **Date adapter family:** 旧版 date adapter 区分 inspect 与 `--set` modify；当前未见等价专用家族。候选问题：是否明确退役或恢复 inspect-only 支持。
   - **Shell builtins adapter family:** 旧版 `source`/`.` 归为 execute；当前 compound/解释器边界更保守。候选问题：是否补充 shell builtin 分类矩阵。
   - **User command overrides:** 旧版 `commands/aliases/reclassify` 允许用户声明式扩展命令语义；当前无等价入口。候选问题：是否在新 Canonical 架构下重新设计用户扩展 seam，或明确不支持。
-  - **Git semantics:** 旧版 Git adapter 覆盖较广但重构任务记录了 path-boundary 风险；当前重点强化 `-C`、`--git-dir`、`--work-tree`、local `file://`、clone/fetch/pull/push/submodule 等 hard-boundary 回归。候选问题：是否只补可证明 Git 子集，而非追求旧 adapter parity。
+  - **Git semantics:** 旧版 Git adapter 覆盖较广但重构任务记录了 path-boundary 风险；当前 `log/diff/show/blame/grep` 已由 T-0124 / D-067 建立专有的 Inspect 选项契约（支持 `-S/-G/--grep/--author/--since/--format` 等过滤标量与 `--graph/-p` 等展示标志，成对消费参数值防伪路径溢出，外部驱动 `--ext-diff/--textconv` 维持 hard-boundary），且 `-C`、`--git-dir`、`--work-tree`、local `file://`、clone/fetch/pull/push/submodule 已完成 hard-boundary 强化，只读审查过滤诉求已定性闭环。候选问题：是否继续为其他 Git modify 子命令补充有界选项子集，而非追求旧 adapter parity。
   - **Package managers:** 旧版 npm/pnpm/yarn/npx adapter 更宽；当前分类常见 inspect/modify/execute，脚本、install、npx 等委托执行 opaque，在 path boundary 下 hard-deny。候选问题：是否按真实用例增加 bounded package-manager 子命令。
   - **uv:** 旧版已有 `uv run` execute 语义；当前保留 `uv run` execute/opaque、help/version inspect、未知 fail-closed。候选问题：是否扩展 uv 其他顶层子命令。
   - **Python tools:** 旧版覆盖 `ruff/mypy/black/isort/pylint/pytest/pyright` 等；当前保留同族核心分类，但 `pytest` 与委托执行 opaque，`ruff clean` destroy。候选问题：是否按工具逐项补 option/path matrix。

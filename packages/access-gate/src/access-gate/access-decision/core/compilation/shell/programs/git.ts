@@ -64,6 +64,22 @@ const GIT_VALUE_OPTIONS = new Set([
   "-m", "-F", "-b", "--message", "--file", "--output", "-o", "--output-directory",
 ]);
 
+const GIT_INSPECT_VALUE_OPTIONS = new Set([
+  ...GIT_VALUE_OPTIONS,
+  "-S", "-G", "--grep", "--author", "--committer",
+  "--since", "--after", "--until", "--before",
+  "--format", "--pretty", "-L", "--max-count", "--diff-filter",
+]);
+
+const GIT_INSPECT_SAFE_OPTIONS = new Set([
+  ...GIT_SAFE_OPTIONS,
+  ...GIT_INSPECT_VALUE_OPTIONS,
+  "--graph", "--follow", "--topo-order", "--date-order", "--author-date-order",
+  "--reverse", "--no-merges", "--merges", "--first-parent",
+  "-p", "--patch", "-s", "--no-patch", "--numstat", "--shortstat",
+  "--relative", "--abbrev-commit", "--no-abbrev-commit",
+]);
+
 function isFileTransportReference(value: string): boolean {
   return value.slice(0, "file://".length).toLowerCase() === "file://";
 }
@@ -136,9 +152,10 @@ function gitPathArguments(
   role: "source" | "target",
   afterSeparatorOnly = false,
   base: ProgramPathBase = "invocation-cwd",
+  valueOptions: ReadonlySet<string> = GIT_VALUE_OPTIONS,
 ): ProgramPath[] {
   const valueIndexes = new Set(
-    scanOptionWords(args, { valueOptions: GIT_VALUE_OPTIONS })
+    scanOptionWords(args, { valueOptions })
       .flatMap((occurrence) => occurrence.valueIndex === undefined ? [] : [occurrence.valueIndex]),
   );
   const paths: ProgramPath[] = [];
@@ -285,9 +302,19 @@ export function analyzeGitProgram(args: readonly ShellWord[]): ProgramSemantic {
   if (!subcommand) return result("unknown", [], globalPaths, { cwdChanges, opaque: true, hardBoundary: true });
   if (globalPaths.some((entry) => isFileTransportReference(entry.path.text))) hardBoundary = true;
   const rest = args.slice(index + 1);
-  const missingOptionValue = scanOptionWords(rest, { valueOptions: GIT_VALUE_OPTIONS })
-    .some((occurrence) => occurrence.missingValue);
-  if (rest.some((word) => isUnsupportedGitPathspec(word.text))) hardBoundary = true;
+  const isInspectSubcommand = GIT_INSPECT.has(subcommand);
+  const effectiveSafeOptions = isInspectSubcommand ? GIT_INSPECT_SAFE_OPTIONS : GIT_SAFE_OPTIONS;
+  const effectiveValueOptions = isInspectSubcommand ? GIT_INSPECT_VALUE_OPTIONS : GIT_VALUE_OPTIONS;
+  const optionOccurrences = scanOptionWords(rest, { valueOptions: effectiveValueOptions });
+  const missingOptionValue = optionOccurrences.some((occurrence) => occurrence.missingValue);
+  const optionWordIndices = new Set(
+    optionOccurrences.flatMap((occ) => [
+      occ.index,
+      ...(occ.valueIndex !== undefined && !occ.attached ? [occ.valueIndex] : []),
+    ]),
+  );
+  const positionalWords = rest.filter((_, idx) => !optionWordIndices.has(idx));
+  if (positionalWords.some((word) => isUnsupportedGitPathspec(word.text))) hardBoundary = true;
   if (rest.some((word) => word.text === "--pathspec-from-file" || word.text.startsWith("--pathspec-from-file=") ||
     word.text === "--pathspec-file-nul")) hardBoundary = true;
   if (rest.some((word) => isFileTransportReference(word.text) && localFileTransportPath(word.text) === undefined)) {
@@ -368,7 +395,7 @@ export function analyzeGitProgram(args: readonly ShellWord[]): ProgramSemantic {
       }
     } else {
       const requiresSeparator = ["diff", "show", "log", "grep", "blame"].includes(subcommand);
-      paths.push(...gitPathArguments(rest, "source", requiresSeparator, pathBase));
+      paths.push(...gitPathArguments(rest, "source", requiresSeparator, pathBase, effectiveValueOptions));
     }
     if (["diff", "show", "log", "blame"].includes(subcommand)) {
       paths.push(...gitOptionPaths(rest, new Set(["--output", "-o"]), "target", pathBase));
@@ -443,7 +470,7 @@ export function analyzeGitProgram(args: readonly ShellWord[]): ProgramSemantic {
   return result(commandClass, effects, paths, {
     cwdChanges,
     recursive: true,
-    opaque: unsafeGlobalOption || hasUncanonicalizedRepositoryLocation || hasUnknownOption(rest, GIT_SAFE_OPTIONS, GIT_VALUE_OPTIONS),
+    opaque: unsafeGlobalOption || hasUncanonicalizedRepositoryLocation || hasUnknownOption(rest, effectiveSafeOptions, effectiveValueOptions),
     hardBoundary: hardBoundary || missingOptionValue,
   });
 }
