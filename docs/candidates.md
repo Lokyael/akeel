@@ -81,7 +81,7 @@
 - **Review Contract:** 每个检查点分别核对 historical evidence、current evidence、外部合同与安全不变量，再由用户选择“确认当前行为 / 重新设计或恢复经证明的子集 / 文档同步 / 明确退役 / 发现实现与存活 Decision 不一致 / 迁移为独立 Task、Decision 或 Candidate”。清单覆盖保留不变、增强、收窄和删除项，按可独立判断的行为族组织，不按旧测试数量追求 parity；命令、选项、输入边界和测试细节归入对应功能族或横切检查项。当前实现、已有 Decision 和相关 Candidate 只构成证据或交叉引用；相关 Candidate 可以承载独立未来设计，但不能替代本记录的历史差异问题，未逐项裁决前也不得删除本地检查语义或预选结论。
 - **Current external dispositions pending this review:**
   - **Resolved cluster:** `Project root and session lifecycle` 与 `Home resolution authority` 当前由 [D-072](decisions.md#d-072-session-启动-cwd-作为访问根与-home-的受限-tilde-语义) 定义；这约束现行行为，但不证明 C-025 已核对旧 Git-root 前置、额外 host `home` 字段及其全部外部场景。正式复核不得无授权逆转 D-072，也不得把 Decision 的存在当作该检查已完成。
-  - **Migrated cluster:** `Bounded static iteration semantics` 已由 C-029 独立保存未来设计边界；C-025 仍保留“旧 reducer 与当前 unsupported `for` 的差异是否被正确处置”这一历史核对，不以迁移本身视为完成。
+  - **Migrated cluster:** `Bounded static iteration semantics` 已由 C-029 独立保存未来设计边界；`Pipeline and tee streaming write semantics` 已由 C-047 独立保存未来设计边界；C-025 仍保留“旧 reducer 与当前 unsupported `for` 的差异是否被正确处置”这一历史核对，不以迁移本身视为完成。
 
 ### Host、runtime 与 Direct tool 合同
 
@@ -99,7 +99,6 @@
   - **Shell grammar:** 旧版受限 Shell IR 覆盖更多形态；当前支持更小的 simple flow 与有界 `&&/||/;`，pipeline/background/compound/newline 多数 fail-closed。候选问题：是否恢复部分旧 Shell 形态，或保持 Greenfield 收窄。
   - **CWD / control-flow tracing:** 旧版 `control-flow.ts` 建模 `cd`、`cd -`、`pushd/popd`、`&&/||/;/newline` 下的 cwd 候选与 opaque 分支；当前 `core/compilation/shell/flow.ts` 追踪有界 reachable commands 与 `cd` 后 cwd states，但 newline 不作为 flow operator，`pushd/popd` 不再作为专门 cwd 变异族。候选问题：逐项确认旧 cwd 候选语义是否需要恢复、文档化退役，或仅保留当前 bounded flow seam。
   - **Wrapper handling:** 旧版建模 `env`、`timeout`、`command`、`nohup`、`exec` wrapper 链；当前仍有 wrapper 集合并测试底层语义保留。候选问题：是否补齐旧 wrapper 边角语料。
-  - **Redirection 与流式管道写入:** 旧版支持重定向且 `<>/2<>` 按 write 侧建模，并覆盖 `tee` 流式分支写入；当前标准文件描述符重定向（`0<`、`1>`、`1>>`、`2>`、`2>>`、`<>`、`2<>`）、`/dev/null` 丢弃流与 `2>&1` 合流修饰符已由 T-0125 定性闭环，unsupported clobber fail-closed，`tee` 随 pipeline fail-closed 保持未建模。候选问题：评估若开放有界管道时 `tee` 的目标文件写入准入与策略边界。
 ### Program semantics 与命令族覆盖
 
   - **Shell base modification commands:** 当前基础集合保留 `mkdir/touch/cp/mv` 等 modify 命令；候选问题：逐项确认旧 filesystem adapter 中同类写入命令是否需要恢复。
@@ -125,7 +124,6 @@
   - **Test strategy:** 不按数量追求 parity；只把旧测试中仍代表外部行为的部分转写到新 public seam。
 - **Supplementary cross-cutting checks:** 以下横切行为尚未在高层点中单独拆项，纳入本候选的待核对范围：
   - **Command prefix normalization:** 旧 `normalize.ts`、`prefix.ts`、`args.ts` 处理 `builtin`、`time`、`!`、env assignment、wrapper positional 和位置参数；当前 wrapper/命令分类是否保留同等边界需核对。
-  - **Redirection matrix:** 标准描述符 `0<`、`1>`、`1>>`、`2>`、`2>>`、`2>&1` 与 `/dev/null` 丢弃流已由 T-0125 闭环；其余 `&>`、`&>>`、fd close、heredoc、here-string、循环级重定向及管道继续保持 fail-closed。
   - **Host boundary and passthrough:** 旧 Gate 与当前 host adapter 对未知工具 passthrough、无效 host context、非法输入和受管 surface 的边界行为需逐项对照。
   - **Canonical trust boundary:** 旧 CompleteAccessPlan/verifier/coverage 与当前一次 Canonical 编译、sealed Admission、Display 分离、伪造对象拒绝之间的安全和可观察差异需单独记录。
   - **Approval evidence contract:** 路径证据聚合去重、literal command 展示、bounded reason、无 UI deny，以及 deny 路径/内容不回显等行为需与旧 approval/render contract 对照。
@@ -308,5 +306,19 @@
 - **Revisit condition:** `uv.ts`、`python-tools.ts` 或 `package-managers.ts` 出现选项与操作数混淆、参数值伪路径泄露或子命令选项污染的真实缺陷实证；或引入新的复杂子命令程序（如 `cargo`）需要统一架构支撑；或用户明确要求启动 Shell 语义分析层的架构一体化归并。
 - **Out of Scope:** 在本候选被明确采纳前，不重写现有各命令分析器，不引入通用动态 AST 引擎或动态 CLI 解释器，不改变现行 Canonical、Admission、Mandatory Boundary 或 Policy 决策语义。
 
-## C-047: 待创建
+## C-047: 有界静态管道流与流式写入准入（Pipeline & tee 语义评估）
+
+> 本条记录未来对有界静态管道流（如 `cmd1 | cmd2`）与流式写入（如 `tee`）准入的重新评估，不放宽通用无界并发管道，不弱化 Opaque 数据流隔离，也不构成实现承诺。
+
+- **Why Not Now:** T-0125 已解决标准文件描述符重定向（`0<`、`1>`、`2>`、`2>>`、`2>&1`、`2>/dev/null`）的核心痛点；当前管道（`|`）因并发子进程、状态码合成以及跨进程数据流不透明性（典型如 `curl | sh`），若无 OS 隔离或数据流追踪会导致数据外泄与命令逃逸风险。现行 `flow.ts` 状态机专为串行条件流（`&&/||/;`）设计，且尚未出现非管道不可解决的真实工作流阻塞。
+- **Exploration Direction:** 若未来重新评估，探索建立严格有界的静态管道模型（Bounded Static Pipeline）：
+  - 双端严格已知与安全分类：两端命令必须均为已建模的安全命令（如纯 inspect 或 `tee`），严禁任意一端出现 `opaque`、解释器内联代码、包管理器或网络外联工具；
+  - 并发子进程 CWD 隔离：管道内部两端命令严格继承外层 CWD，禁止管道内部变异（禁止 `cd`）；
+  - 写副作用精确汇合：管道下游包含 `tee <file>` 时，将目标文件提取为整体命令的 `target` 写入路径事实并计入 Admission，受现行路径策略与 Mandatory Boundary 审查；
+  - 有界拓扑与资源上限：深度严格限制为 2（单管道），禁止嵌套管道、后台流（`&`）或动态展开；超限或无法证明即 fail-closed。
+- **Revisit condition:** 真实工作流反复因缺少单级安全管道或 `tee` 流式写入受阻，且 Direct tools 无法合理替代；或宿主提供可验证的数据流隔离机制；或用户明确要求启动有界管道设计。
+- **Out of Scope:** 通用无界管道链、动态管道构建、后台并发执行、未隔离的数据流外联或实现 Task。
+- **Origin:** C-025
+
+## C-048: 待创建
 
