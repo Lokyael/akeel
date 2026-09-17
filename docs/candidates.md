@@ -80,7 +80,7 @@
 - **Why Not Now:** 当前实现已按 D-059/D-060 完成 Greenfield trust path 与生产切换，目标不是复刻旧 `command-semantics/gate/profile` 行为；旧实现和旧测试只提供历史线索，不能作为正确性 oracle。完整复核会同时触及安全、配置、UI、可用性、迁移和子代理边界，尚未成为已承诺调查。
 - **Review Contract:** 每个检查点分别核对 historical evidence、current evidence、外部合同与安全不变量，再由用户选择“确认当前行为 / 重新设计或恢复经证明的子集 / 文档同步 / 明确退役 / 发现实现与存活 Decision 不一致 / 迁移为独立 Task、Decision 或 Candidate”。清单覆盖保留不变、增强、收窄和删除项，按可独立判断的行为族组织，不按旧测试数量追求 parity；命令、选项、输入边界和测试细节归入对应功能族或横切检查项。当前实现、已有 Decision 和相关 Candidate 只构成证据或交叉引用；相关 Candidate 可以承载独立未来设计，但不能替代本记录的历史差异问题，未逐项裁决前也不得删除本地检查语义或预选结论。
 - **Current external dispositions pending this review:**
-  - **Resolved cluster:** `Project root and session lifecycle` 与 `Home resolution authority` 当前由 [D-072](decisions.md#d-072-session-启动-cwd-作为访问根与-home-的受限-tilde-语义) 定义；这约束现行行为，但不证明 C-025 已核对旧 Git-root 前置、额外 host `home` 字段及其全部外部场景。正式复核不得无授权逆转 D-072，也不得把 Decision 的存在当作该检查已完成。Shell 确定性与无副作用命令（`true`/`false`/`:`/`echo`/`printf` 及规范系统路径）已由 T-0126 定性闭环。Modify 命令操作数基数契约与内核无界修改硬边界已由 T-0127 定性闭环（语法层严格拒绝缺少路径操作数的 modify 命令，内核新增 isUnboundedModify 对偶硬边界熔断，通用编排层消除具体命令隐式路径硬编码）。
+  - **Resolved cluster:** `Project root and session lifecycle` 与 `Home resolution authority` 当前由 [D-072](decisions.md#d-072-session-启动-cwd-作为访问根与-home-的受限-tilde-语义) 定义；这约束现行行为，但不证明 C-025 已核对旧 Git-root 前置、额外 host `home` 字段及其全部外部场景。正式复核不得无授权逆转 D-072，也不得把 Decision 的存在当作该检查已完成。Shell 确定性与无副作用命令（`true`/`false`/`:`/`echo`/`printf` 及规范系统路径）已由 T-0126 定性闭环。
   - **Migrated cluster:** `Bounded static iteration semantics` 已由 C-029 独立保存未来设计边界；`Pipeline and tee streaming write semantics` 已由 C-047 独立保存未来设计边界；`Build adapter family 语义与委托执行边界` 已由 C-048 独立保存未来设计边界；C-025 仍保留“旧 reducer 与当前 unsupported `for` 的差异是否被正确处置”这一历史核对，不以迁移本身视为完成。
 
 ### Host、runtime 与 Direct tool 合同
