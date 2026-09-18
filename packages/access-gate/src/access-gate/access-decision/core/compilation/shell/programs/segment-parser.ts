@@ -12,7 +12,6 @@ export type OptionSpec<Key extends string = string> = Readonly<{
 
 export type SegmentContract<Key extends string = string> = Readonly<{
   readonly options: readonly OptionSpec<Key>[];
-  readonly allowCluster?: boolean;
   readonly matchExtraOption?: (token: ShellWord) => { readonly key: Key; readonly name: string } | undefined;
 }>;
 
@@ -250,16 +249,20 @@ export function parseSegment<Key extends string = string>(
       if (arity === "required") {
         let attachedRest = clusterText.slice(offset + 1);
         if (attachedRest.length > 0) {
-          if (attachedRest.startsWith("=")) {
+          const isEquals = attachedRest.startsWith("=");
+          if (isEquals) {
             attachedRest = attachedRest.slice(1);
             if (attachedRest.length === 0) {
               return Object.freeze({ kind: "malformed" as const, reason: "missing-value" as const, word: token });
             }
-          }
-          if (!forms.includes("attached") && !forms.includes("equals")) {
+            if (!forms.includes("equals")) {
+              return Object.freeze({ kind: "malformed" as const, reason: "unsupported-form" as const, word: token });
+            }
+          } else if (!forms.includes("attached")) {
             return Object.freeze({ kind: "malformed" as const, reason: "unsupported-form" as const, word: token });
           }
-          const valWord = createValuedWord(token, attachedRest, token.start + 1 + offset + 1);
+          const valStart = token.start + 1 + offset + 1 + (isEquals ? 1 : 0);
+          const valWord = createValuedWord(token, attachedRest, valStart);
           options.push(Object.freeze({ kind: "valued" as const, key: spec.key, name: shortName, token, value: valWord }));
           break;
         }
@@ -280,8 +283,10 @@ export function parseSegment<Key extends string = string>(
       if (arity === "optional-attached") {
         const attachedRest = clusterText.slice(offset + 1);
         if (attachedRest.length > 0) {
-          const actualRest = attachedRest.startsWith("=") ? attachedRest.slice(1) : attachedRest;
-          const valWord = createValuedWord(token, actualRest, token.start + 1 + offset + 1);
+          const isEquals = attachedRest.startsWith("=");
+          const actualRest = isEquals ? attachedRest.slice(1) : attachedRest;
+          const valStart = token.start + 1 + offset + 1 + (isEquals ? 1 : 0);
+          const valWord = createValuedWord(token, actualRest, valStart);
           options.push(Object.freeze({ kind: "valued" as const, key: spec.key, name: shortName, token, value: valWord }));
         } else {
           options.push(Object.freeze({ kind: "flag" as const, key: spec.key, name: shortName, token }));
