@@ -73,6 +73,7 @@
 
 ### Evidence
 
+- 用户已采纳最小约束集：D-060 的“一次解释”表示单一 Canonical 语义权威而非内部单 pass；D-067 的 fail-closed 表示保存未知 arity 造成的不确定余部，不把它静默升级为 bounded facts，具体结果仍由程序专属合同映射。
 - C-046 复审已确认 Git 多次扫描与集合同步压力真实存在，但原记录对 `uv.ts`、`package-managers.ts` 的本地循环描述不准确，并遗漏 Herdr。
 - C-046 创建后的程序层变更仍主要局限于 Git、option scanner 与 coreutils，尚未出现跨多个分层程序的同步迁移。
 - 官方 CLI 合同表明 `git -C`、uv `--directory`/`--project` 与 npm prefix/workspace 不共享单一 cwd 语义。
@@ -80,8 +81,10 @@
 
 ### Durable Updates Checklist
 
-- [ ] `docs/decisions.md` — 仅在用户采纳模块边界结论后更新 D-067 或记录吸收结论
-- [ ] `CONTEXT.md` — 仅在采用后同步当前架构描述
+- [x] `docs/decisions.md` — 澄清 D-060 单一权威而非单 pass，并澄清 D-067 unknown arity 的显式不确定性合同
+- [x] `CONTEXT.md` — 同步单一 Canonical 权威与有界内部遍历
+- [ ] `docs/decisions.md` — 仅在用户采纳最终模块边界后更新 D-067 的程序层结构结论
+- [ ] `CONTEXT.md` — 仅在最终模块边界落地后同步程序层当前架构
 - [ ] `docs/task.md` — 验证并完成 durable updates 后清档
 
 ## T-0136: 待创建
