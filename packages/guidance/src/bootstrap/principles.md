@@ -180,6 +180,10 @@ Before touching code, read the project's `CONTEXT.md` when present, even if the 
 
 ## Project Records
 
+### Host Symmetry Invariant
+
+AKeel itself and every user project are symmetric: both are Host Projects governed by the same Project Record rules, formats, and lifecycles. AKeel enjoys no private record dialects or internal exemptions. Any structural constraint enforced on a Host Project must be backed by deterministic first-party product capabilities (Extension tools and skills), not relegated to natural-language hope or private repository development scripts.
+
 ### Project Record Authority
 
 Authority levels:
