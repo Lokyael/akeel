@@ -423,6 +423,23 @@ test("Python, uv, Node and package runners use explicit family semantics", () =>
   assert.equal((analyzeShellCommand("npx vite") as { commandClass: string }).commandClass, "execute");
 });
 
+test("uv path options extract source paths while python and scalars do not become paths", () => {
+  assert.deepEqual(complete("uv --directory=/tmp help").paths, [{ text: "/tmp", role: "source" }]);
+  assert.deepEqual(complete("uv --python 3.12 --config-file=/tmp/uv.toml help").paths, [
+    { text: "/tmp/uv.toml", role: "source" },
+  ]);
+  assert.deepEqual(complete("uv --python 3.12 help").paths, []);
+});
+
+test("package managers extract filesystem paths but do not emit workspace or filter selectors as paths", () => {
+  assert.deepEqual(complete("npm --prefix /tmp/deps view react").paths, [
+    { text: "/tmp/deps", role: "source" },
+  ]);
+  assert.deepEqual(complete("npm --workspace=@scope/pkg run test").paths, []);
+  assert.deepEqual(complete("pnpm --filter my-app test").paths, []);
+  assert.deepEqual(complete("yarn -w @scope/pkg test").paths, []);
+});
+
 test("Git option values and revisions are not mistaken for file paths", () => {
   assert.deepEqual(analyzeShellCommand("git archive --output=/tmp/out.tar HEAD"), {
     kind: "complete",
