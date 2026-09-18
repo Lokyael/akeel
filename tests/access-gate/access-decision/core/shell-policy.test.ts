@@ -1597,6 +1597,28 @@ test("Git inspect subcommands with safe filter options are allowed across develo
     kind: "deny",
     code: "hard-boundary",
   });
+
+  // 5. git status -u variants are admitted across review, develop, and guided
+  for (const cmd of ["git status -u", "git status -uno", "git status --untracked-files=all"]) {
+    assert.deepEqual(evaluateShellAdmission(admission(cmd, false), reviewPolicy), { kind: "allow" }, cmd);
+    assert.deepEqual(evaluateShellAdmission(admission(cmd, false), developPolicy), { kind: "allow" }, cmd);
+    assert.deepEqual(evaluateShellAdmission(admission(cmd, false), guidedPolicy), { kind: "allow" }, cmd);
+  }
+
+  // 6. git stash list and show are admitted across review, develop, and guided
+  for (const cmd of ["git stash list", "git stash show", "git stash show 'stash@{0}'"]) {
+    assert.deepEqual(evaluateShellAdmission(admission(cmd, false), reviewPolicy), { kind: "allow" }, cmd);
+    assert.deepEqual(evaluateShellAdmission(admission(cmd, false), developPolicy), { kind: "allow" }, cmd);
+    assert.deepEqual(evaluateShellAdmission(admission(cmd, false), guidedPolicy), { kind: "allow" }, cmd);
+  }
+
+  // 7. Invalid status mode and mutating stash commands remain hard-boundary
+  for (const cmd of ["git status -uevil", "git stash pop", "git stash drop", "git stash clear"]) {
+    assert.deepEqual(evaluateShellAdmission(admission(cmd, true), developPolicy), {
+      kind: "deny",
+      code: "hard-boundary",
+    }, cmd);
+  }
 });
 
 test("descriptor redirections and discard streams respect policy and mandatory boundaries", () => {

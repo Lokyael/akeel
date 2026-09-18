@@ -105,6 +105,64 @@ test("Git helper-capable commands remain hard-boundary while inspect commands ar
   assert.equal(unknownGit.hardBoundary, true);
 });
 
+test("Git status supports -u and --untracked-files while rejecting invalid modes", () => {
+  for (const flag of ["-u", "-uno", "-uall", "-unormal", "--untracked-files", "--untracked-files=no", "--untracked-files=all", "--untracked-files=normal"]) {
+    const semantic = analyzeProgramCommand({ executable: "git", arguments: [word("status", 0), word(flag, 7)] });
+    assert.ok(semantic, flag);
+    assert.equal(semantic.commandClass, "inspect", flag);
+    assert.equal(semantic.hardBoundary, false, flag);
+    assert.deepEqual(semantic.effects, ["read"], flag);
+  }
+
+  for (const bad of ["-uevil", "--untracked-files=evil", "--untracked-files="]) {
+    const semantic = analyzeProgramCommand({ executable: "git", arguments: [word("status", 0), word(bad, 7)] });
+    assert.ok(semantic, bad);
+    assert.equal(semantic.hardBoundary, true, bad);
+  }
+});
+
+test("Git stash supports read-only list and show while rejecting mutating actions", () => {
+  // Read-only inspect variants
+  const list = analyzeProgramCommand({ executable: "git", arguments: [word("stash", 0), word("list", 6)] });
+  assert.ok(list);
+  assert.equal(list.commandClass, "inspect");
+  assert.equal(list.hardBoundary, false);
+  assert.deepEqual(list.effects, ["read"]);
+
+  const show = analyzeProgramCommand({ executable: "git", arguments: [word("stash", 0), word("show", 6)] });
+  assert.ok(show);
+  assert.equal(show.commandClass, "inspect");
+  assert.equal(show.hardBoundary, false);
+  assert.deepEqual(show.effects, ["read"]);
+
+  const showRev = analyzeProgramCommand({ executable: "git", arguments: [word("stash", 0), word("show", 6), word("stash@{0}", 11)] });
+  assert.ok(showRev);
+  assert.equal(showRev.commandClass, "inspect");
+  assert.equal(showRev.hardBoundary, false);
+
+  const showWithStat = analyzeProgramCommand({ executable: "git", arguments: [word("stash", 0), word("show", 6), word("--stat", 11)] });
+  assert.ok(showWithStat);
+  assert.equal(showWithStat.commandClass, "inspect");
+  assert.equal(showWithStat.hardBoundary, false);
+
+  // Mutating or invalid actions trigger hardBoundary
+  for (const args of [
+    [word("stash", 0)],
+    [word("stash", 0), word("pop", 6)],
+    [word("stash", 0), word("drop", 6)],
+    [word("stash", 0), word("clear", 6)],
+    [word("stash", 0), word("push", 6)],
+    [word("stash", 0), word("apply", 6)],
+    [word("stash", 0), word("list", 6), word("extra", 11)],
+    [word("stash", 0), word("show", 6), word("stash@{0}", 11), word("extra", 20)],
+  ]) {
+    const cmdStr = args.map((a) => a.text).join(" ");
+    const semantic = analyzeProgramCommand({ executable: "git", arguments: args });
+    assert.ok(semantic, cmdStr);
+    assert.equal(semantic.hardBoundary, true, cmdStr);
+  }
+});
+
 test("Git bounded add and commit commands are admitted as modify operations", () => {
   const add = analyzeProgramCommand({ executable: "git", arguments: [word("add", 0), word("src/app.ts", 4)] });
   assert.ok(add);

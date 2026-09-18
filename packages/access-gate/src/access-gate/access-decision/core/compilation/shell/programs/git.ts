@@ -47,7 +47,6 @@ const COMMON_VALUE_OPTIONS: readonly OptionSpec<GitSubcommandKey>[] = [
       "--shallow-exclude",
       "--origin",
       "--upload-pack",
-      "-u",
       "--config",
       "--server-option",
       "--jobs",
@@ -64,7 +63,7 @@ const COMMON_FLAG_OPTIONS: readonly OptionSpec<GitSubcommandKey>[] = [
   {
     key: "flag",
     names: [
-      "-A", "-a", "-n", "-q", "-v", "-u", "-U", "--stat", "--oneline", "--cached", "--staged",
+      "-A", "-a", "-n", "-q", "-v", "-U", "--stat", "--oneline", "--cached", "--staged",
       "--porcelain", "--short", "--branch", "--show-current", "--name-only", "--name-status", "--dry-run",
       "--hard", "-d", "-D", "-f", "--force", "--delete", "--global", "--local", "--system",
       "--list", "-l", "--get", "--unset", "--add",
@@ -100,6 +99,11 @@ const INSPECT_FLAG_OPTIONS: readonly OptionSpec<GitSubcommandKey>[] = [
       "--relative", "--abbrev-commit", "--no-abbrev-commit",
     ],
     arity: "flag",
+  },
+  {
+    key: "flag",
+    names: ["-u", "--untracked-files"],
+    arity: "optional-attached",
   },
 ];
 
@@ -281,8 +285,9 @@ export function analyzeGitProgram(args: readonly ShellWord[]): ProgramSemantic {
 
   const isInspectSubcommand = GIT_INSPECT.has(subcommand);
   const isRestoreSubcommand = subcommand === "restore";
+  const isStashInspect = subcommand === "stash" && ["list", "show"].includes(rest[0]?.text ?? "");
 
-  const contract = isInspectSubcommand
+  const contract = (isInspectSubcommand || isStashInspect)
     ? GIT_INSPECT_CONTRACT
     : isRestoreSubcommand
       ? GIT_RESTORE_CONTRACT
@@ -306,8 +311,14 @@ export function analyzeGitProgram(args: readonly ShellWord[]): ProgramSemantic {
   if (rest.some((word) => isFileTransportReference(word.text) && localFileTransportPath(word.text) === undefined)) {
     hardBoundary = true;
   }
+  const isUploadPackCommand = subcommand === "clone" || subcommand === "fetch" || subcommand === "pull";
+  if (isUploadPackCommand && rest.some((word) =>
+    word.text === "-u" || word.text.startsWith("-u=") || (word.text.startsWith("-u") && word.text.length > 2)
+  )) {
+    hardBoundary = true;
+  }
+
   if (rest.some((word) => word.text === "--upload-pack" || word.text.startsWith("--upload-pack=") ||
-    word.text === "-u" || word.text.startsWith("-u=") || (word.text.startsWith("-u") && word.text.length > 2) ||
     word.text === "--receive-pack" || word.text.startsWith("--receive-pack=") ||
     word.text === "--exec" || word.text.startsWith("--exec=") ||
     word.text === "--ext-diff" || word.text.startsWith("--ext-diff=") ||
@@ -320,8 +331,32 @@ export function analyzeGitProgram(args: readonly ShellWord[]): ProgramSemantic {
     return result("unknown", [], globalPaths, { cwdChanges, opaque: true, hardBoundary: true });
   }
 
-  if (GIT_HELPER_COMMANDS.has(subcommand) && subcommand !== "restore" && subcommand !== "checkout") {
+  if (GIT_HELPER_COMMANDS.has(subcommand) && subcommand !== "restore" && subcommand !== "checkout" && !isStashInspect) {
     hardBoundary = true;
+  }
+
+  // Subcommand-specific constraints
+  if (subcommand === "status") {
+    for (const opt of options) {
+      if ((opt.name === "-u" || opt.name === "--untracked-files") && opt.kind === "valued") {
+        if (!["no", "normal", "all"].includes(opt.value.text)) {
+          hardBoundary = true;
+        }
+      }
+    }
+  }
+
+  if (isStashInspect) {
+    if (hasUnknownSubcommandOption) hardBoundary = true;
+    const action = rawOperands[0]?.text;
+    if (action === "list") {
+      if (rawOperands.length > 1) hardBoundary = true;
+    } else if (action === "show") {
+      if (rawOperands.length > 2) hardBoundary = true;
+      if (rawOperands.length === 2 && isUnsupportedGitPathspec(rawOperands[1]!.text)) {
+        hardBoundary = true;
+      }
+    }
   }
 
   // Subcommand-specific constraints
