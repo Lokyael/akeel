@@ -580,6 +580,42 @@ test("bounded coreutils option values do not become path operands", () => {
   }
 });
 
+test("bounded tee extracts inspect with zero paths when operandless, and modify with target paths when given files", () => {
+  assert.deepEqual(analyzeShellCommand("tee"), {
+    kind: "complete",
+    executable: "tee",
+    wrappers: [],
+    commandClass: "inspect",
+    effects: ["read"],
+    paths: [],
+  });
+  assert.deepEqual(analyzeShellCommand("tee -a output.log"), {
+    kind: "complete",
+    executable: "tee",
+    wrappers: [],
+    commandClass: "modify",
+    effects: ["write"],
+    paths: [{ text: "output.log", role: "target" }],
+  });
+  assert.deepEqual(analyzeShellCommand("tee --append -i out1.txt out2.txt"), {
+    kind: "complete",
+    executable: "tee",
+    wrappers: [],
+    commandClass: "modify",
+    effects: ["write"],
+    paths: [
+      { text: "out1.txt", role: "target" },
+      { text: "out2.txt", role: "target" },
+    ],
+  });
+  assert.deepEqual(analyzeShellCommand("tee -p file.txt"), {
+    kind: "reject",
+    code: "unsupported-syntax",
+    anchor: { start: 4, end: 6 },
+    resourceClass: "syntax",
+  });
+});
+
 test("known coreutils reject options outside their bounded contract", () => {
   for (const command of [
     "head --unknown README.md",

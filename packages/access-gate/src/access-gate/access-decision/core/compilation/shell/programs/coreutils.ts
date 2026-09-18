@@ -225,6 +225,12 @@ const contracts: ReadonlyMap<string, BoundedOptionContract> = new Map([
       ),
     ],
   }],
+  ["tee", {
+    options: [
+      flag("-a", "--append", "-i", "--ignore-interrupts"),
+      unsupported("-p", "--output-error"),
+    ],
+  }],
 ]);
 
 function syntheticPath(): ShellWord {
@@ -252,9 +258,9 @@ function analyzeCoreutilsComplete(name: string, options: readonly ParsedBoundedO
     "cat", "head", "tail", "grep", "rg", "ls", "od", "wc", "cut", "stat",
     "diff", "file", "du", "df", "tr", "sort", "uniq",
   ]);
-  const modification = new Set(["mkdir", "touch", "cp", "mv", "ln"]);
+  const modification = new Set(["mkdir", "touch", "cp", "mv", "ln", "tee"]);
   const destruction = new Set(["rm"]);
-  const commandClass = inspection.has(name)
+  const commandClass = (name === "tee" && operands.length === 0) || inspection.has(name)
     ? "inspect"
     : modification.has(name)
       ? "modify"
@@ -284,6 +290,10 @@ function analyzeCoreutilsComplete(name: string, options: readonly ParsedBoundedO
     }
   } else if (name === "rm") {
     paths.push(...pathsFor(operands, "target"));
+  } else if (name === "tee") {
+    if (operands.length > 0) {
+      paths.push(...pathsFor(operands, "target"));
+    }
   } else if (name === "tr") {
     // tr takes character set operands, not file path operands
   } else {
@@ -295,7 +305,7 @@ function analyzeCoreutilsComplete(name: string, options: readonly ParsedBoundedO
     ? (name === "tr" ? [] : ["read"])
     : name === "rm"
       ? ["delete"]
-      : name === "mkdir" || name === "touch"
+      : name === "mkdir" || name === "touch" || name === "tee"
         ? ["write"]
         : ["read", "write"];
   return result(commandClass, effects, paths, { recursive });

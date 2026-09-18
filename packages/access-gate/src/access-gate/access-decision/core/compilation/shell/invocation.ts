@@ -47,7 +47,7 @@ const inspectionCommands = new Set([
   "cat", "head", "tail", "grep", "rg", "ls", "od", "wc", "cut", "stat",
   "diff", "file", "du", "df", "tr", "sort", "uniq",
 ]);
-const modificationCommands = new Set(["mkdir", "touch", "cp", "mv", "ln", "chmod"]);
+const modificationCommands = new Set(["mkdir", "touch", "cp", "mv", "ln", "chmod", "tee"]);
 const destructionCommands = new Set(["rm", "rmdir", "unlink", "truncate"]);
 const executionCommands = new Set([...INTERPRETERS]);
 const deterministicCommands = new Set(["true", "false", ":"]);

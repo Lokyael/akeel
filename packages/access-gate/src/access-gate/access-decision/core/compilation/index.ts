@@ -9,7 +9,8 @@ import {
 import { analyzeShellCommandWords, shellCommandOutcomes } from "./shell/invocation";
 import type { ShellCommandAnalysis, ShellCommandClass, ShellEffect } from "./shell/invocation";
 import { parseShellFlow } from "./shell/flow";
-import type { ShellFlow } from "./shell/flow";
+import type { ShellCommandStatus, ShellFlow } from "./shell/flow";
+import { isKnownProgram, resolveExecutableIdentity } from "./shell/programs/index";
 
 export { createLinuxPathEvidence } from "./path-evidence";
 
@@ -145,14 +146,14 @@ function reject(code: "invalid-request" | "resource-limit"): UnifiedCanonicalRej
 }
 
 function rejectShell(
-  code: "invalid-request" | "resource-limit",
+  code: "invalid-request" | "resource-limit" | "security-boundary" | "unsupported-syntax",
   end: number,
 ): UnifiedCanonicalReject {
   return Object.freeze({
     kind: "reject",
     code,
     anchor: Object.freeze({ start: 0, end }),
-    resourceClass: "input",
+    resourceClass: code === "security-boundary" ? "security" : code === "unsupported-syntax" ? "syntax" : "input",
   });
 }
 
@@ -261,6 +262,23 @@ export function compileManagedCall(
 type CompleteShellAnalysis = Extract<ShellCommandAnalysis, { readonly kind: "complete" }>;
 type CompleteShellFlow = Extract<ShellFlow, { readonly kind: "complete" }>;
 
+type CompiledSimpleCommand = Readonly<{
+  readonly kind: "simple";
+  readonly analysis: CompleteShellAnalysis;
+}>;
+
+type CompiledPipelineCommand = Readonly<{
+  readonly kind: "pipeline";
+  readonly upstreamAnalysis: CompleteShellAnalysis;
+  readonly downstreamAnalysis: CompleteShellAnalysis;
+}>;
+
+type CompiledCommand = CompiledSimpleCommand | CompiledPipelineCommand;
+
+const ALLOWED_PIPELINE_FILTERS = new Set([
+  "grep", "rg", "head", "tail", "wc", "cut", "sort", "uniq", "tr", "cat", "od",
+]);
+
 function compileShellCall(
   argumentsValue: Record<string, unknown>,
   environment: CompileEnvironmentFacts,
@@ -280,15 +298,76 @@ function compileShellCall(
   if (flow.kind === "reject") return flow;
   if (flow.commands.length > MAX_SHELL_COMMANDS) return rejectShell("resource-limit", command.length);
 
-  const analyses: CompleteShellAnalysis[] = [];
+  const compiledCommands: CompiledCommand[] = [];
   for (const flowCommand of flow.commands) {
-    const analysis = analyzeShellCommandWords(flowCommand.words);
-    if (analysis.kind === "reject") return analysis;
-    analyses.push(analysis);
+    if (flowCommand.kind === "simple") {
+      const analysis = analyzeShellCommandWords(flowCommand.words);
+      if (analysis.kind === "reject") return analysis;
+      compiledCommands.push(Object.freeze({ kind: "simple", analysis }));
+    } else {
+      const upstreamAnalysis = analyzeShellCommandWords(flowCommand.upstream.words);
+      if (upstreamAnalysis.kind === "reject") return upstreamAnalysis;
+      const downstreamAnalysis = analyzeShellCommandWords(flowCommand.downstream.words);
+      if (downstreamAnalysis.kind === "reject") return downstreamAnalysis;
+
+      const upstreamIdentity = resolveExecutableIdentity(upstreamAnalysis.executable, isKnownProgram);
+      const isUpstreamIdentitySafe = upstreamIdentity.kind === "bare" || upstreamIdentity.kind === "system";
+      if (
+        !isUpstreamIdentitySafe ||
+        upstreamAnalysis.commandClass !== "inspect" ||
+        upstreamAnalysis.effects.includes("write") ||
+        upstreamAnalysis.effects.includes("delete") ||
+        upstreamAnalysis.semantic.hardBoundary ||
+        upstreamAnalysis.semantic.opaquePathAccess
+      ) {
+        return rejectShell("security-boundary", flowCommand.pipe.end);
+      }
+
+      const downstreamIdentity = resolveExecutableIdentity(downstreamAnalysis.executable, isKnownProgram);
+      const isDownstreamIdentitySafe = downstreamIdentity.kind === "bare" || downstreamIdentity.kind === "system";
+      const downstreamName = (downstreamIdentity.kind === "bare" || downstreamIdentity.kind === "system")
+        ? downstreamIdentity.name
+        : "";
+      const isFilter = ALLOWED_PIPELINE_FILTERS.has(downstreamName);
+      const isTee = downstreamName === "tee";
+
+      if (
+        !isDownstreamIdentitySafe ||
+        (!isFilter && !isTee) ||
+        downstreamAnalysis.semantic.hardBoundary ||
+        downstreamAnalysis.semantic.opaquePathAccess
+      ) {
+        return rejectShell("security-boundary", flowCommand.pipe.end);
+      }
+
+      if (isFilter) {
+        if (
+          downstreamAnalysis.commandClass !== "inspect" ||
+          downstreamAnalysis.effects.includes("write") ||
+          downstreamAnalysis.effects.includes("delete")
+        ) {
+          return rejectShell("security-boundary", flowCommand.pipe.end);
+        }
+      }
+
+      compiledCommands.push(Object.freeze({
+        kind: "pipeline",
+        upstreamAnalysis,
+        downstreamAnalysis,
+      }));
+    }
   }
-  if (environment.home === undefined && flow.commands.some((entry) =>
-    entry.words.some((word) => word.pathKind === "home-relative"))) {
-    return rejectShell("invalid-request", command.length);
+
+  if (environment.home === undefined) {
+    const hasHomeRelative = flow.commands.some((entry) => {
+      const allWords = entry.kind === "pipeline"
+        ? [...entry.upstream.words, ...entry.downstream.words]
+        : entry.words;
+      return allWords.some((word) => word.pathKind === "home-relative");
+    });
+    if (hasHomeRelative) {
+      return rejectShell("invalid-request", command.length);
+    }
   }
 
   const operations: ShellCompilationOperation[] = [];
@@ -302,16 +381,34 @@ function compileShellCall(
     if (seen.size >= MAX_SHELL_CWD_STATES) return rejectShell("resource-limit", command.length);
     seen.add(key);
 
-    const analysis = analyses[state.commandIndex]!;
-    const operation = compileShellOperation(analysis, state.cwd, environment);
-    if (operation === undefined) return rejectShell("invalid-request", command.length);
-    operations.push(operation);
+    const compiled = compiledCommands[state.commandIndex]!;
+    let outcomes: readonly ShellCommandStatus[] = [];
+    let nextCwdCandidate: string | undefined = undefined;
 
-    for (const outcome of shellCommandOutcomes(analysis)) {
+    if (compiled.kind === "simple") {
+      const operation = compileShellOperation(compiled.analysis, state.cwd, environment);
+      if (operation === undefined) return rejectShell("invalid-request", command.length);
+      operations.push(operation);
+      outcomes = shellCommandOutcomes(compiled.analysis);
+      nextCwdCandidate = compiled.analysis.executable === "cd"
+        ? operation.paths[0]?.evidence.candidate ?? state.cwd
+        : state.cwd;
+    } else {
+      const op1 = compileShellOperation(compiled.upstreamAnalysis, state.cwd, environment);
+      if (op1 === undefined) return rejectShell("invalid-request", command.length);
+      const op2 = compileShellOperation(compiled.downstreamAnalysis, state.cwd, environment);
+      if (op2 === undefined) return rejectShell("invalid-request", command.length);
+      operations.push(op1);
+      operations.push(op2);
+      outcomes = shellCommandOutcomes(compiled.downstreamAnalysis);
+      nextCwdCandidate = state.cwd;
+    }
+
+    for (const outcome of outcomes) {
       const nextIndex = nextReachableCommand(flow, state.commandIndex, outcome);
       if (nextIndex === undefined) continue;
-      const nextCwd = outcome === "success" && analysis.executable === "cd"
-        ? operation.paths[0]?.evidence.candidate ?? state.cwd
+      const nextCwd = outcome === "success" && nextCwdCandidate !== undefined
+        ? nextCwdCandidate
         : state.cwd;
       const nextKey = `${nextIndex}\u0000${nextCwd}`;
       if (seen.has(nextKey) || queued.has(nextKey)) continue;

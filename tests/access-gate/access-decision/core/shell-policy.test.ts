@@ -605,7 +605,7 @@ test("interpreter scripts cannot bypass a blocked path", () => {
 test("unmodeled command paths follow the opaque policy axis", () => {
   const restricted = freezeShellPolicySnapshot({ ...policy, execute: "allow", unknown: "allow" });
 
-  for (const command of ["tee /etc/passwd", "dd if=/etc/passwd of=/tmp/out", "/usr/bin/tee /etc/passwd"]) {
+  for (const command of ["base64 /etc/passwd", "dd if=/etc/passwd of=/tmp/out", "/usr/bin/base64 /etc/passwd"]) {
     assert.deepEqual(evaluateShellAdmission(admission(command), restricted), {
       kind: "deny",
       code: "policy-denied",
@@ -1779,5 +1779,57 @@ test("Git bounded restore and checkout commands are admitted as modify operation
   for (const cmd of unsafeCommands) {
     assert.deepEqual(evaluateShellAdmission(admission(cmd), develop), { kind: "deny", code: "hard-boundary" }, cmd);
   }
+});
+
+test("bounded pipelines evaluate under policy presets with mandatory boundaries preserved", () => {
+  const develop = freezeShellPolicySnapshot({
+    ...policy,
+    allowedRoots: ["/workspace/project"],
+    blockedRoots: [],
+    blockedPaths: [],
+    write: "allow",
+    modify: "allow",
+    inspect: "allow",
+  });
+  const review = freezeShellPolicySnapshot({
+    ...policy,
+    allowedRoots: ["/workspace/project"],
+    blockedRoots: [],
+    blockedPaths: [],
+    write: "deny",
+    modify: "deny",
+    inspect: "allow",
+  });
+  const guided = freezeShellPolicySnapshot({
+    ...policy,
+    allowedRoots: ["/workspace/project"],
+    blockedRoots: [],
+    blockedPaths: [],
+    write: "ask",
+    modify: "ask",
+    inspect: "allow",
+  });
+
+  assert.deepEqual(evaluateShellAdmission(admission("cat README.md | head -n 5"), review), { kind: "allow" });
+  assert.deepEqual(evaluateShellAdmission(admission("git log -5 | grep fix"), review), { kind: "allow" });
+  assert.deepEqual(evaluateShellAdmission(admission("cat README.md | tee"), review), { kind: "allow" });
+
+  assert.deepEqual(evaluateShellAdmission(admission("cat README.md | tee out.txt"), develop), { kind: "allow" });
+  assert.deepEqual(evaluateShellAdmission(admission("cat README.md | tee out.txt"), review), { kind: "deny", code: "policy-denied" });
+  assert.deepEqual(evaluateShellAdmission(admission("cat README.md | tee out.txt", true), guided), { kind: "ask", executed: false });
+
+  assert.deepEqual(evaluateShellAdmission(admission("cat README.md | tee .git/hooks/pre-commit"), develop), {
+    kind: "deny",
+    code: "hard-boundary",
+  });
+  assert.deepEqual(evaluateShellAdmission(admission("cat README.md | tee .gitattributes"), develop), {
+    kind: "deny",
+    code: "hard-boundary",
+  });
+
+  assert.deepEqual(evaluateShellAdmission(admission("cat README.md | tee /etc/crontab"), develop), {
+    kind: "deny",
+    code: "hard-boundary",
+  });
 });
 

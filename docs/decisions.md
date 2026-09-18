@@ -56,7 +56,7 @@
 - Canonical path resolution 保留 lexical 与 symlink-target traversal prefixes；blocked components remain hard boundaries，recursive path operations reject blocked descendants。
 - 配置显式 path boundary 时，unknown 或其他 unbounded Shell path access 一律 hard-deny；无显式 boundary 时仍按 command class policy 决策。
 - 一个 tool call 的所有 ask intent 聚合为一次审批；无 UI 不执行 ask。
-- newline、pipeline、background、compound command、`for`、动态展开及其他不可证明形态继续在 Canonical 阶段拒绝，不引入猜测放行。
+- newline、background、compound command、`for`、动态展开及其他不可证明形态继续在 Canonical 阶段拒绝，不引入猜测放行；支持有界两阶段静态管道流（`cmd1 | cmd2`）：严格约束深度为 2，管道内部禁止 `cd` 且完全继承外层 CWD；上游必须为纯只读 `inspect` 命令且零写副作用（严禁包含 `>`/`>>` 文件写重定向）；下游严格限定为纯文本过滤器（`grep`、`rg`、`head`、`tail`、`wc`、`cut`、`sort`、`uniq`、`tr`、`cat`、`od`）或受管流式写入器（`tee`）；严禁任意一端出现解释器（`sh`/`bash`/`node`/`python`）、包管理器、网络外联工具（`curl`/`wget`）或未建模 `opaque` 命令；`tee` 携带的操作数映射为 target 写入路径事实并受三域路径模型管辖；多级管道、后台流（`&`）及其他不可证明形态继续 fail-closed。
 - `<>` 与 `2<>`（O_RDWR 读写打开）按 write 侧建模：write 决策覆盖读面（write⇒read 一致性）；不以只读建模掩盖写侧。Policy adapter 必须拒绝矛盾的 write/read 组合，避免由配置产生未定义授权语义。
 - Shell 重定向支持标准描述符形态：`0<` 与 `<` 按 source 读入建模，`>`、`>>`、`1>`、`1>>`、`2>`、`2>>`、`<>` 与 `2<>` 按 target 写入建模，字面 `2>&1` 按流复制修饰符处理且不发行多余路径事实。所有重定向目标为字面 `/dev/null` 时均作为无害丢弃流处理，不发行 target 路径事实、不污染写入 effect；作为命令常规操作数的 `/dev/null`、其它设备节点（如 `/dev/sda`、`/dev/zero`、`/dev/pts/*`）以及向外部非 `/dev/null` 路径的重定向继续受路径边界与安全策略硬拦截；非标准描述符（如 `3>`、`4>` 等）、多行输入（`<<`、`<<<`）与未建模流复制（如 `2>&2`、`<&`）继续 fail-closed。
 
