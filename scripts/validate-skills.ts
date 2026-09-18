@@ -2,13 +2,16 @@
  * validate-skills.ts — Skill quality gate checks.
  *
  * Checks:
- *   1. description follows trigger-sentence convention ("Use when..." for disciplines)
- *   2. Directory name matches frontmatter "name"
- *   3. description length ≤ 1024 chars
- *   4. SKILL.md line count ≤ 200 (warning only)
- *   5. /skill: body references must resolve and never invoke user-invoked skills (D-078)
+ *   1. Frontmatter YAML parsing and mapping structure
+ *   2. Description convention ("Use when..." for disciplines, "Use /skill:..." for manual workflows)
+ *   3. Directory name matches frontmatter "name"
+ *   4. Description length ≤ 1024 chars
+ *   5. SKILL.md line count observation
+ *   6. Prohibition of untrusted external CDN URLs in skills
+ *   7. /skill: body cross-references resolve and never imperatively invoke user-invoked skills (D-078)
+ *   8. principles.md anchor resolution across SKILL.md and companion markdown files (D-030)
  *
- * 规则行为测试迁出至 tests/validate-skills.test.ts（node:test）。
+ * 规则行为测试位于 tests/validate-skills.test.ts（node:test）。
  */
 
 import { readFileSync, readdirSync, existsSync, statSync } from "node:fs";
@@ -24,6 +27,11 @@ const TRIGGER_PREFIXES = ["Use when", "Use before", "Use after", "Use during"] a
 interface FrontmatterResult {
   values: Record<string, unknown>;
   error?: string;
+}
+
+export interface SkillCompanion {
+  readonly relPath: string;
+  readonly content: string;
 }
 
 export interface SkillMeta {
@@ -43,6 +51,8 @@ export interface SkillMeta {
   content: string;
   /** SKILL.md line count */
   lineCount: number;
+  /** Companion markdown files in the skill directory */
+  companions?: SkillCompanion[];
 }
 
 // ─── Frontmatter parser ───
@@ -79,7 +89,7 @@ function parseFrontmatter(content: string): FrontmatterResult {
   }
 }
 
-// ─── Collect all SKILL.md files ───
+// ─── Collect all SKILL.md and companion files ───
 
 function collectSkills(): SkillMeta[] {
   const skills: SkillMeta[] = [];
@@ -101,6 +111,19 @@ function collectSkills(): SkillMeta[] {
       const name = fm.values["name"];
       const description = fm.values["description"];
       const disableModelInvocation = fm.values["disable-model-invocation"] === true;
+
+      const companions: SkillCompanion[] = [];
+      for (const subEntry of readdirSync(entryPath)) {
+        if (subEntry === "SKILL.md" || !subEntry.endsWith(".md")) continue;
+        const compPath = join(entryPath, subEntry);
+        if (statSync(compPath).isFile()) {
+          companions.push({
+            relPath: subEntry,
+            content: readFileSync(compPath, "utf-8"),
+          });
+        }
+      }
+
       skills.push({
         dirName: entry,
         layer,
@@ -110,6 +133,7 @@ function collectSkills(): SkillMeta[] {
         disableModelInvocation,
         content,
         lineCount: content.split(/\r?\n/).length,
+        companions,
       });
     }
   }
@@ -297,8 +321,8 @@ export function loadPrinciplesAnchors(): PrinciplesAnchors {
     if (heading) {
       const level = heading[1]!.length;
       const text = heading[2]!;
-      // Quick Reference 与 Project Records 都是可引用锚点节（S4b 拆节后项目记录锚点独立成节）
-      if (level === 2) inAnchorSection = text === "Quick Reference" || text === "Project Records";
+      // 所有二级大节下的三级及以上标题（包括 Core Principles、Quick Reference、Project Records）均作为标题锚点
+      if (level === 2) inAnchorSection = true;
       if (inAnchorSection && level >= 3) anchors.anchorSections.add(text);
       const numbered = text.match(/^(\d+)[.．]\s+(.+)$/);
       if (numbered) anchors.sections.add(numbered[1]!);
@@ -329,7 +353,7 @@ function extractPrinciplesRefs(content: string): PrinciplesRef[] {
     refs.push({ kind: "sec", value: m[1]!, raw: m[0]! });
   }
   // 裸 §N 引用（无 principles.md 前缀）：技能内 § 只用于原则编号引用（如 "(§9 Centralize...)"）；
-  // 编号归位时这类引用同样必须存活——曾因裸 § 未被提取而静默悬空（S4a 回归）
+  // 编号归位时这类引用同样必须存活，防止裸 § 编号引用静默悬空
   const bareSec = /(?:^|[^\w])§\s*(\d+[a-z]?)/g;
   for (const m of content.matchAll(bareSec)) {
     refs.push({ kind: "sec", value: m[1]!, raw: m[0]! });
@@ -394,6 +418,25 @@ function main() {
 
     const skillErrors = checks.flatMap((c) => c.errors);
     const skillWarnings = checks.flatMap((c) => c.warnings);
+
+    for (const comp of skill.companions ?? []) {
+      const compMeta: SkillMeta = {
+        ...skill,
+        content: comp.content,
+        lineCount: comp.content.split(/\r?\n/).length,
+      };
+      const compChecks = [
+        checkExternalUrls(compMeta),
+        checkPrinciplesRefs(compMeta, principlesAnchors),
+        checkSkillReferences(compMeta, skillRegistry),
+      ];
+      for (const err of compChecks.flatMap((c) => c.errors)) {
+        skillErrors.push(`[companion: ${comp.relPath}] ${err}`);
+      }
+      for (const warn of compChecks.flatMap((c) => c.warnings)) {
+        skillWarnings.push(`[companion: ${comp.relPath}] ${warn}`);
+      }
+    }
 
     if (skillErrors.length === 0 && skillWarnings.length === 0) {
       console.log(`  ✅ ${label} — pass`);

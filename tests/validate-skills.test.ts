@@ -29,6 +29,7 @@ function skill(overrides: Partial<SkillMeta> = {}): SkillMeta {
     disableModelInvocation: false,
     content: "",
     lineCount: 1,
+    companions: [],
     ...overrides,
   };
 }
@@ -463,4 +464,13 @@ test("user-invoked reference rule blocks imperatives and passes benign mention f
     const fired = result.errors.length > 0;
     assert.equal(fired, violates, `content: "${bullet.content}"`);
   }
+});
+
+test("principles anchor loader admits non-numbered subsection headers such as Coherent Changes", () => {
+  const anchors = loadPrinciplesAnchors();
+  assert.ok(anchors.anchorSections.has("Coherent Changes"), "expected 'Coherent Changes' anchor section");
+
+  const valid = skill({ content: "Apply principles.md Coherent Changes when editing." });
+  const result = checkPrinciplesRefs(valid, anchors);
+  assert.equal(result.errors.length, 0, `unexpected error: ${result.errors.join("; ")}`);
 });
