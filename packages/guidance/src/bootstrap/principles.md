@@ -272,6 +272,12 @@ When active policy permits, use `/tmp/akeel/` to download and inspect external r
 
 `domain-modeling` updates this file when terminology or constraints change; it does not copy complete Decision Records into `CONTEXT.md`.
 
+**Content Triage Rules:**
+- **Glossary:** domain terms, canonical definitions, and precise meanings. Omit code identifiers, class or function names, and transient implementation details.
+- **Architecture:** standing system topology, subsystem boundaries, pipeline stages, and invariant execution models. Omit concrete CLI option lists, code identifiers, AST/parser details, numeric constants, and skill workflow steps. Keep bullets concise and structured; do not append changelog-style narrative paragraphs.
+- **Active Decisions:** IDs and titles linking to active entries in `docs/decisions.md`.
+- **Negative Space:** deliberate system exclusions, unmodeled surfaces, and residual risk boundaries. Architecture does not redundantly re-list negative exclusions.
+
 ---
 
 ## Skill Usage Rule

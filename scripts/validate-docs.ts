@@ -353,6 +353,123 @@ export function checkDecisionHygiene(content: string): CheckResult {
   return { ok: errors.length === 0, errors };
 }
 
+// ─── CONTEXT.md Hygiene 校验 ───
+
+export const CONTEXT_REQUIRED_SECTIONS = [
+  "Glossary",
+  "Architecture",
+  "Active Decisions",
+  "Negative Space",
+] as const;
+
+export const MAX_ARCHITECTURE_BULLET_CHARS = 1_000;
+
+const KNOWN_SKILL_NAMES = [
+  "module-design",
+  "assess-modularity",
+  "implementation-planning",
+  "instruction-editing",
+  "implement-work",
+  "change-preflight",
+  "code-review",
+  "code-cleanup",
+  "bug-reproduction",
+  "systematic-debugging",
+  "grill-docs",
+  "survey-context",
+  "doc-sync",
+  "test-driven-development",
+  "domain-modeling",
+  "security-review",
+  "fix-validation",
+  "herdr",
+];
+
+export function checkContextHygiene(content: string): CheckResult {
+  const errors: string[] = [];
+  const lines = content.split(/\r?\n/);
+
+  // 1. 校验四大标准一级标题的完备性与顺序
+  const h2Headings: Array<{ title: string; lineIndex: number }> = [];
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]!;
+    if (line.startsWith("## ")) {
+      h2Headings.push({ title: line.slice(3).trim(), lineIndex: i });
+    }
+  }
+
+  const titles = h2Headings.map((h) => h.title);
+  let lastIndex = -1;
+  for (const expected of CONTEXT_REQUIRED_SECTIONS) {
+    const idx = titles.indexOf(expected);
+    if (idx === -1) {
+      errors.push(`CONTEXT.md: missing required section '## ${expected}'`);
+    } else if (idx < lastIndex) {
+      errors.push(
+        `CONTEXT.md: section '## ${expected}' is out of order (expected canonical order: ${CONTEXT_REQUIRED_SECTIONS.join(" → ")})`,
+      );
+    } else {
+      lastIndex = idx;
+    }
+  }
+
+  // 2. 校验 Architecture 章节的段落负荷与反累加器规则
+  const archHeading = h2Headings.find((h) => h.title === "Architecture");
+  if (archHeading) {
+    const nextHeading = h2Headings.find((h) => h.lineIndex > archHeading.lineIndex);
+    const archEnd = nextHeading ? nextHeading.lineIndex : lines.length;
+    const archLines = lines.slice(archHeading.lineIndex + 1, archEnd);
+
+    const bullets: Array<{ text: string; startLine: number }> = [];
+    let currentBullet: { text: string; startLine: number } | null = null;
+
+    for (let i = 0; i < archLines.length; i++) {
+      const line = archLines[i]!;
+      const actualLineNum = archHeading.lineIndex + 2 + i;
+      if (line.trim().startsWith("- ") || line.trim().startsWith("* ")) {
+        if (currentBullet) bullets.push(currentBullet);
+        currentBullet = { text: line.trim().slice(2).trim(), startLine: actualLineNum };
+      } else if (currentBullet && line.startsWith("  ")) {
+        currentBullet.text += " " + line.trim();
+      } else if (line.trim().length > 0) {
+        if (currentBullet) {
+          bullets.push(currentBullet);
+          currentBullet = null;
+        }
+        bullets.push({ text: line.trim(), startLine: actualLineNum });
+      } else {
+        if (currentBullet) {
+          bullets.push(currentBullet);
+          currentBullet = null;
+        }
+      }
+    }
+    if (currentBullet) bullets.push(currentBullet);
+
+    for (const b of bullets) {
+      const charCount = Array.from(b.text).length;
+      if (charCount > MAX_ARCHITECTURE_BULLET_CHARS) {
+        const preview = b.text.slice(0, 60) + "...";
+        errors.push(
+          `CONTEXT.md: Architecture entry at line ${b.startLine} exceeds budget (${charCount} chars > ${MAX_ARCHITECTURE_BULLET_CHARS} max): "${preview}"`,
+        );
+      }
+
+      let matchedSkills = 0;
+      for (const skill of KNOWN_SKILL_NAMES) {
+        if (b.text.includes(skill)) matchedSkills++;
+      }
+      if (matchedSkills >= 4) {
+        errors.push(
+          `CONTEXT.md: Architecture entry at line ${b.startLine} enumerates skill workflow roster (${matchedSkills} skills). Skill workflows belong in SKILL.md per principles.md.`,
+        );
+      }
+    }
+  }
+
+  return { ok: errors.length === 0, errors };
+}
+
 // ─── main ───
 
 function main(): void {
@@ -375,6 +492,14 @@ function main(): void {
   } else {
     for (const error of hygieneResult.errors) console.log(`  ❌ ${error}`);
     totalErrors += hygieneResult.errors.length;
+  }
+  const contextContent = readFileSync(join(import.meta.dirname!, "..", "CONTEXT.md"), "utf-8");
+  const contextHygieneResult = checkContextHygiene(contextContent);
+  if (contextHygieneResult.ok) {
+    console.log("  ✅ CONTEXT.md — Context hygiene ok");
+  } else {
+    for (const error of contextHygieneResult.errors) console.log(`  ❌ ${error}`);
+    totalErrors += contextHygieneResult.errors.length;
   }
   const liveIds = collectLiveDecisionIds(decisionsContent);
   // 代码层（packages/、tests）与文档层（docs/、packages/guidance/skills/ + 根文档）全部纳入存活校验

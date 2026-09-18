@@ -29,7 +29,7 @@ Scan the repository for documentation files whose content may be affected by the
 For each identified doc, verify:
 
 1. **Counts**: verify numeric statements against actual source counts. Prefer references or ranges over hardcoded counts that rot.
-2. **Architecture**: diagrams and pipelines match actual code flow.
+2. **Architecture**: diagrams and pipelines match actual code flow. Maintain standing structural topology and pipeline invariants per principles.md Quick Reference — CONTEXT.md Structure; do not append concrete CLI option lists, code identifiers, or skill workflows. If recent changes expand capability, summarize them into the architectural model instead of appending narrative changelogs.
 3. **Commands**: all listed commands still exist and work as documented.
 4. **References**: cross-references to other docs/files resolve; record IDs (`C-xxx`/`T-xxx`/`D-xxx`) cited in code comments resolve to live entries (per principles.md Project Records — Record Lifecycle). Run `grep -rnE 'D-[0-9]{3}' src tests` and resolve each hit against the `docs/decisions.md` headings; skip this check when the project has no record containers.
 5. **Examples**: code examples work with current API; paths are portable — use relative paths or placeholders (`~`, `$HOME`) instead of machine-specific absolute paths.

@@ -43,7 +43,7 @@ When the user states how something works, check whether the code agrees. If you 
 
 ### Update CONTEXT.md Inline
 
-When a term or current constraint crystallises, add it to `CONTEXT.md` immediately. The canonical structure is in principles.md Quick Reference — CONTEXT.md Structure. Build sections lazily: Glossary → Architecture → Active Decisions → Negative Space.
+When a term or current constraint crystallises, add it to `CONTEXT.md` immediately. The canonical structure is in principles.md Quick Reference — CONTEXT.md Structure. Build sections lazily: Glossary → Architecture → Active Decisions → Negative Space. Follow its Content Triage Rules: keep Glossary focused on domain meanings, Architecture on standing structural invariants, and Negative Space on deliberate exclusions.
 
 ### Park Uncommitted Candidates
 

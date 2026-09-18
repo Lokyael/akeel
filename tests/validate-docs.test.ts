@@ -2,7 +2,7 @@
 
 import assert from "node:assert/strict";
 import test from "node:test";
-import { checkDecisionHygiene } from "../scripts/validate-docs";
+import { checkContextHygiene, checkDecisionHygiene } from "../scripts/validate-docs";
 
 const decisionId = "D-" + "123";
 const validDecision = `## ${decisionId}: Example
@@ -154,3 +154,83 @@ test("Decision hygiene rejects malformed Decision headings instead of skipping t
     assert.ok(result.errors.some((error) => error.includes("heading")), heading);
   }
 });
+
+// ─── CONTEXT.md Hygiene Tests ───
+
+const validContext = `# AKeel Context
+
+## Glossary
+
+- **Term**: Meaning.
+
+## Architecture
+
+- Subsystem A handles pipeline X.
+- Subsystem B handles pipeline Y.
+
+## Active Decisions
+
+- [D-001 Title](docs/decisions.md#d-001-title)
+
+## Negative Space
+
+- Deliberate exclusion.
+`;
+
+test("Context hygiene accepts valid minimal CONTEXT structure", () => {
+  const result = checkContextHygiene(validContext);
+  assert.deepEqual(result.errors, []);
+  assert.equal(result.ok, true);
+});
+
+test("Context hygiene rejects missing required sections", () => {
+  const missingArch = validContext.replace(
+    "## Architecture\n\n- Subsystem A handles pipeline X.\n- Subsystem B handles pipeline Y.\n\n",
+    "",
+  );
+  const result = checkContextHygiene(missingArch);
+  assert.equal(result.ok, false);
+  assert.ok(result.errors.some((e) => e.includes("missing required section '## Architecture'")));
+});
+
+test("Context hygiene rejects out of order sections", () => {
+  const outOfOrder = `# AKeel Context
+
+## Architecture
+
+- Subsystem A.
+
+## Glossary
+
+- Term: Meaning.
+
+## Active Decisions
+
+- [D-001](docs/decisions.md)
+
+## Negative Space
+
+- Exclusion.
+`;
+  const result = checkContextHygiene(outOfOrder);
+  assert.equal(result.ok, false);
+  assert.ok(result.errors.some((e) => e.includes("out of order")));
+});
+
+test("Context hygiene rejects Architecture bullet exceeding character budget", () => {
+  const longBullet = "- " + "A".repeat(1001);
+  const withLong = validContext.replace("- Subsystem A handles pipeline X.", longBullet);
+  const result = checkContextHygiene(withLong);
+  assert.equal(result.ok, false);
+  assert.ok(result.errors.some((e) => e.includes("exceeds budget")));
+});
+
+test("Context hygiene rejects Architecture enumerating skill roster", () => {
+  const skillDump =
+    "- Skills include module-design, assess-modularity, implementation-planning, and instruction-editing.";
+  const withDump = validContext.replace("- Subsystem A handles pipeline X.", skillDump);
+  const result = checkContextHygiene(withDump);
+  assert.equal(result.ok, false);
+  assert.ok(result.errors.some((e) => e.includes("enumerates skill workflow roster")));
+});
+
