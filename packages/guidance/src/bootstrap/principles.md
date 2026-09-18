@@ -152,9 +152,9 @@ A vague request to "undo", "rollback", or "go back" does not authorize broad or 
 *Delegate authority never grows; one Task Owner decides what returns.*
 
 - A delegated task has at most the permissions of its Task Owner Session. Never route around a restriction; stay within bounds or ask the user to approve it.
-- One Task Owner Session exclusively owns a Task's user intent, committed requirements, adopted scope, architecture and policy decisions, accepted findings, final acceptance, publication, and Project Record updates. The user may authorize separate Task Owners only for mutually exclusive scopes with independent acceptance; an integration owner resolves cross-task results. A session whose result returns to an existing Owner for judgment is a child, not another Owner.
-- Work directly when no quarantined process context will be produced. Otherwise reserve a result artifact, run a synchronous Herdr child, wait for settlement, and pull the result by path; the child does not send its Owner a completion prompt. Return only the result and context needed to understand, audit, challenge, or continue it: material reasoning and rejected alternatives, cited evidence, changes, validation, unresolved questions, and residual risks. Isolate search trails, full logs, repeated failures, immaterial hypotheses, tool chronology, and intermediate drafts. Session-history references are forensic pointers, not context loaded by default.
-- Any delegated agent with effective `write`, `edit`, or file-modifying Shell capability runs in an independent worktree. An additional parallel Task Owner with such capability also owns a checkout not shared with another Owner. Capability, not a promise to avoid edits, controls this rule. Herdr manages only worktrees it creates; each worktree has one lifecycle owner. A child never removes itself: its surviving Owner inspects, integrates, and explicitly approves cleanup.
+- One Task Owner Session exclusively owns a task's intent, committed requirements, adopted scope, architecture and policy decisions, final acceptance, and durable record updates. A session whose result returns to an existing Owner for judgment is a child, not another Owner.
+- Work directly when no noisy process context will be produced. When delegating, return only the result and necessary context needed to understand, audit, or continue it: material reasoning, evidence, changes, validation, unresolved questions, and residual risks. Isolate intermediate search trails, verbose logs, repeated failures, and scratch drafts.
+- Any delegated agent with file-modifying capability must operate in an isolated workspace or worktree to prevent collision with the main working tree.
 
 ---
 
@@ -174,15 +174,13 @@ This applies to evaluation, not direct commands: build "Add a login button"; cri
 
 ## When You Start a Session
 
-Before touching code, read the project's `CONTEXT.md` when present, even if the user did not ask. If absent, use `/skill:survey-context` to orient.
+Before touching code, check for standing project context (such as README or CONTEXT.md when present) to understand domain constraints. If unsure about project state, use `/skill:survey-context`.
 
 ---
 
 ## Project Records
 
-### Host Symmetry Invariant
-
-AKeel itself and every user project are symmetric: both are Host Projects governed by the same Project Record rules, formats, and lifecycles. AKeel enjoys no private record dialects or internal exemptions. Any structural constraint enforced on a Host Project must be backed by deterministic first-party product capabilities (Extension tools and skills), not relegated to natural-language hope or private repository development scripts.
+> **Scope Guard:** The following Project Record conventions apply ONLY when a project explicitly maintains standard AKeel record containers (`docs/candidates.md`, `docs/task.md`, `docs/decisions.md`). Ordinary user projects using standard issue trackers, READMEs, or external planning tools do NOT use these containers — never force, invent, or require them on an unadopting project.
 
 ### Project Record Authority
 
@@ -199,7 +197,7 @@ Classify new information in order:
 1. Adopted load-bearing conclusion → Decision Record.
 2. Material committed investigation, design, implementation, or coordinated documentation change → Task Record.
    - Task is material when it changes capability, authority, responsibility, cross-file contracts, external facts, security boundaries, architecture, Decisions, or Project Records; requires investigation, design, coordination, or handoff; or touches multiple files.
-   - An isolated wording-only adjustment to exactly one `skills/**/SKILL.md` that changes none of those things is not a material Task and needs only applicable validation plus a Git commit. Any uncertainty makes it material. Do not use line counts or automatic classification to widen this boundary.
+   - An isolated wording-only documentation adjustment that changes none of those things is not a material Task and needs only applicable validation plus a Git commit. Any uncertainty makes it material. Do not use line counts or automatic classification to widen this boundary.
 3. Uncommitted candidate with a concrete revisit condition → Candidate Record.
 4. Otherwise create no Project Record.
 
@@ -263,7 +261,7 @@ Records leave a register only through content transfer or abandonment; every ter
 
 ### Temporary Resources
 
-When active policy permits, use `/tmp/akeel/` to download and inspect external repositories or documentation; remove the resources when done.
+When active policy permits, use an isolated temporary directory to download and inspect external repositories or documentation; remove the resources when done.
 
 ### CONTEXT.md Structure
 
