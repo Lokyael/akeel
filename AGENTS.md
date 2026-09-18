@@ -44,6 +44,7 @@ CONTEXT.md              # 当前事实、术语、架构与 Active Decisions 索
 - **修改边界（工作区源 vs 安装副本）**：内容只在仓库源 checkout 中修改；已安装的全局副本（pi 分发到 agent 目录的技能与扩展）是分发产物，只读，拒绝直接修改——改动分发走正常安装/更新机制。
 - **路径可移植性**：文档、注释、示例与测试不写死本机具体路径（如 `/home/<user>/...` 绝对路径、本机工作区目录名）；用相对路径、角色化表述或占位符（`~`、`$HOME`）——本机路径随环境迁移或他人开发失效。
 - **文档边界**：长期决策写 `docs/decisions.md`，当前事实写 `CONTEXT.md`（安全承诺与残余风险在 decisions.md 安全条目与 CONTEXT Negative Space），第三方来源与许可证写 `docs/traceability.md`；AGENTS.md 不承接这些职责。
+- **维护主体与产品边界（维护 AKeel vs AKeel 维护的内容）**：`AGENTS.md` 只定义维护 AKeel 仓库自身的本地开发入口与构建/测试约定，不随 package 分发；`CONTEXT.md`、`docs/decisions.md` 等标准项目容器属于 AKeel 作为产品在所有宿主项目中管理并分发的核心知识资产。严禁在 `AGENTS.md` 中为 `CONTEXT.md` 等通用项目容器定义维护规则、分诊标准或格式要求；所有关于项目知识容器的维护规范、内容分诊与生命周期必须由随包分发的 `packages/guidance/src/bootstrap/principles.md` 与对应技能（`doc-sync`、`domain-modeling`）统一定义并承载（单一来源，见 D-009 与 D-030），`AGENTS.md` 坚决不越界承接。
 - **决策寄存器内容分诊**：`docs/decisions.md` 只保留决策级内容（当前结论、理由、必要替代方案、影响）；用户使用文档（如 config schema）进 README，实现细节进代码/测试，验证证据（测试计数、用例枚举、迁移过程）不保留，历史由 Git 承载；条目结构遵循 `packages/guidance/src/bootstrap/principles.md` Project Records — Decision Record Format。
 - **技能规则单一来源**：技能只引用 `packages/guidance/src/bootstrap/principles.md`，不在技能内重复定义规则（D-030）。
 - **技能单一职责**：每个 skill 只做一件事、调用时内容全量被使用；触发场景互斥的 skill 保持独立、不合并（D-030）。
