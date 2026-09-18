@@ -1074,6 +1074,27 @@ test("Git inspect subcommands accept safe display and filter options without bec
   assert.deepEqual(diffFilter.paths, [{ text: ".", role: "source" }]);
   assert.equal(diffFilter.semantic.opaquePathAccess, false);
   assert.equal(diffFilter.semantic.hardBoundary, false);
+
+  const logNumeric = complete("git log -5 --oneline");
+  assert.equal(logNumeric.commandClass, "inspect");
+  assert.deepEqual(logNumeric.effects, ["read"]);
+  assert.deepEqual(logNumeric.paths, [{ text: ".", role: "source" }]);
+  assert.equal(logNumeric.semantic.opaquePathAccess, false);
+  assert.equal(logNumeric.semantic.hardBoundary, false);
+
+  const revListNumeric = complete("git rev-list -3 HEAD");
+  assert.equal(revListNumeric.commandClass, "inspect");
+  assert.deepEqual(revListNumeric.effects, ["read"]);
+  assert.deepEqual(revListNumeric.paths, [{ text: ".", role: "source" }]);
+  assert.equal(revListNumeric.semantic.opaquePathAccess, false);
+  assert.equal(revListNumeric.semantic.hardBoundary, false);
+
+  const branchShowCurrent = complete("git branch --show-current");
+  assert.equal(branchShowCurrent.commandClass, "inspect");
+  assert.deepEqual(branchShowCurrent.effects, ["read"]);
+  assert.deepEqual(branchShowCurrent.paths, [{ text: ".", role: "source" }]);
+  assert.equal(branchShowCurrent.semantic.opaquePathAccess, false);
+  assert.equal(branchShowCurrent.semantic.hardBoundary, false);
 });
 
 test("Git inspect subcommands fail-closed on missing option values, external drivers, and unknown options", () => {
@@ -1096,6 +1117,12 @@ test("Git non-inspect subcommands isolate inspect-only options and do not permit
 
   const addWithInspectOpt = complete("git add -S pattern");
   assert.equal(addWithInspectOpt.semantic.opaquePathAccess || addWithInspectOpt.semantic.hardBoundary, true);
+
+  const commitWithNumeric = complete("git commit -m msg -5");
+  assert.equal(commitWithNumeric.semantic.opaquePathAccess || commitWithNumeric.semantic.hardBoundary, true);
+
+  const checkoutWithNumeric = complete("git checkout -5");
+  assert.equal(checkoutWithNumeric.semantic.opaquePathAccess || checkoutWithNumeric.semantic.hardBoundary, true);
 });
 
 test("standard descriptor redirections emit target path and write effect", () => {

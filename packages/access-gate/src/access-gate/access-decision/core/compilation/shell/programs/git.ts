@@ -54,7 +54,7 @@ const GIT_REMOTE_VALUE_OPTIONS = new Set(["--upload-pack", "-u", "--depth", "--s
 const GIT_SAFE_OPTIONS = new Set([
   ...GIT_CLONE_VALUE_OPTIONS,
   "--", "-A", "-a", "-n", "-q", "-v", "-u", "-U", "--stat", "--oneline", "--cached", "--staged",
-  "--porcelain", "--short", "--branch", "--name-only", "--name-status", "--dry-run", "--hard", "-m", "-F",
+  "--porcelain", "--short", "--branch", "--show-current", "--name-only", "--name-status", "--dry-run", "--hard", "-m", "-F",
   "--message", "--file", "-b", "-d", "-D", "-f", "--force", "--delete", "--dry-run", "--output", "-o",
   "--output-directory", "--global", "--local", "--system", "--list", "-l", "--get", "--unset", "--add",
 ]);
@@ -532,10 +532,12 @@ export function analyzeGitProgram(args: readonly ShellWord[]): ProgramSemantic {
   const effects: ProgramSemantic["effects"] = commandClass === "inspect"
     ? hasWritePath ? ["read", "write"] : ["read"]
     : commandClass === "destroy" ? ["delete"] : ["read", "write"];
+  const isGitNumericLimitOption = (name: string): boolean =>
+    (subcommand === "log" || subcommand === "rev-list") && /^-[1-9][0-9]*$/u.test(name);
   return result(commandClass, effects, paths, {
     cwdChanges,
     recursive: true,
-    opaque: unsafeGlobalOption || hasUncanonicalizedRepositoryLocation || hasUnknownOption(rest, effectiveSafeOptions, effectiveValueOptions),
+    opaque: unsafeGlobalOption || hasUncanonicalizedRepositoryLocation || hasUnknownOption(rest, effectiveSafeOptions, effectiveValueOptions, isGitNumericLimitOption),
     hardBoundary: hardBoundary || missingOptionValue,
   });
 }

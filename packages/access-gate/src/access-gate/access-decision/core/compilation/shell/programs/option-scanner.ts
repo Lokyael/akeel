@@ -112,6 +112,9 @@ export function hasUnknownOption(
   words: readonly ShellWord[],
   knownOptions: ReadonlySet<string>,
   valueOptions: ReadonlySet<string> = new Set(),
+  isKnownExtra?: (name: string) => boolean,
 ): boolean {
-  return scanOptionWords(words, { valueOptions }).some((occurrence) => occurrence.missingValue || !knownOptions.has(occurrence.name));
+  return scanOptionWords(words, { valueOptions }).some(
+    (occurrence) => occurrence.missingValue || (!knownOptions.has(occurrence.name) && !isKnownExtra?.(occurrence.name)),
+  );
 }

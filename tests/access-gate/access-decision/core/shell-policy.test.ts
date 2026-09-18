@@ -1579,6 +1579,12 @@ test("Git inspect subcommands with safe filter options are allowed across develo
   assert.deepEqual(evaluateShellAdmission(admission("git log -G feat --grep=docs --author=alice -n 10", false), reviewPolicy), {
     kind: "allow",
   });
+  assert.deepEqual(evaluateShellAdmission(admission("git log -5 --oneline", false), reviewPolicy), {
+    kind: "allow",
+  });
+  assert.deepEqual(evaluateShellAdmission(admission("git branch --show-current", false), reviewPolicy), {
+    kind: "allow",
+  });
 
   // 3. High-risk option (--ext-diff) is hard-boundary blocked even under develop with UI
   assert.deepEqual(evaluateShellAdmission(admission("git log --ext-diff", true), developPolicy), {
