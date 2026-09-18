@@ -947,5 +947,27 @@ Artifact tools 是独立自授权的 Pi custom tool surfaces，不改变 Access 
 
 **Out of Scope:** 工作区外普通业务文件的读写放宽、对未注册第三方文件的特例放行、Shell 任意动态或未建模命令对能力资产的执行，以及动态包扫描器的引入。
 
-## D-091: 待创建
+## D-091: 多语言构建工具族语义分类与防误删硬边界
+
+**Reversal surface:** engineering
+
+**Decision:** Access Gate Shell 程序分析器注册表（`programs/`）新增多语言构建工具族语义模型（`build-tools.ts`），覆盖 Rust（`cargo`）、Go（`go`）、通用 Make（`make`/`gmake`）、Java/JVM 构建工具（`mvn`/`mvnw`/`gradle`/`gradlew`）及 Java 运行时工具（`java`/`javac`）：
+1. **破坏性清理一票否决硬拦截**：`cargo clean`、`make clean/distclean/mrproper/clobber`、`go clean`（含 `-cache` 等）、`mvn clean`（含 `clean:clean`）、`gradle clean`（含 `cleanTest` 等前缀目标）统一裁决为 `commandClass: "destroy"`, `effects: ["delete"]`, `hardBoundary: true`。即使命令行混合常规构建目标（如 `mvn clean install` 或 `gradle clean build`），破坏性效果享有绝对最高优先级裁决权，坚决触发防误删硬拒绝。
+2. **元数据与只读检查精准识别**：纯版本与帮助标志（`--version`, `-v`, `--help`, `-h` 等）裁决为 `inspect`（0 effects）；专有只读查询（如 `cargo metadata/tree`、`go env/list/doc`、`make -p/-q/-n`、`mvn dependency:tree/help:*`、`gradle tasks/dependencies/--dry-run`、`java/javac -version`）裁决为 `commandClass: "inspect"`, `effects: ["read"]`。
+3. **关键工作区参数与 CWD 变更消费**：`-C`（Go, Make）提取为 `cwdChanges`；工作区构建与配置选项（`cargo --manifest-path`、`make -f`、`mvn -f/-s`、`gradle -p/-b/-c`、`java -jar`、`javac *.java`）提取为 `role: "source"` 路径；输出目标选项（`go -o`、`cargo --target-dir`、`javac -d`）提取为 `role: "target"` 路径。
+4. **有界委托构建执行**：常规构建、编译与测试目标统一保持 `commandClass: "execute"`, `effects: ["execute"]`, `opaque: true`，不伪造构建无副作用的假象，受策略预设与工作区路径管辖；本地 Wrapper（`./mvnw`, `./gradlew`）保持 path-form 契约：destroy 穿透硬拦截，非 destroy 降级为 opaque execute。
+
+**Why:** 现代工程项目重度依赖多语言构建工具链，此前因缺乏建模直接落入 `unknown`，导致 `clean` 破坏性删除逃脱 Mandatory Boundary 防误删防线（在 develop 下被误放行），同时无副作用查询被过度拦截，且丢失工作区路径事实。分层语义模型以极简、统一的选项契约封闭支持上述核心工具，在提供多语言开发流畅体验的同时筑牢系统防误删底线。
+
+**Impact:** 开发者在 Rust、Go、C/C++、Java/Kotlin 仓库中可原生使用常用构建、测试与诊断命令，且不会被误拦截；任何带有 `clean` 批处理删除的命令均被系统强制拦截，杜绝误抹除 target/build/cache 的事故。
+
+**Rejected:**
+
+- **对 Makefile、build.rs 或 Gradle 脚本进行深度 AST 语法分析：** 编译期构建行为图灵完备，AST 解释复杂度高且无法形成完备证明，统一如实声明为 `opaque: true`。
+- **允许混合命令（如 `mvn clean install`）降级为普通 execute：** 会让破坏性删除借构建之名穿透防线，必须执行一票否决。
+- **将 Java 本地 Wrapper 脚本视为系统级 inspect 命令：** 本地工作区脚本可能被篡改，执行脚本代码本身具有任意执行属性，必须在 path-form 下降级为 opaque execute。
+
+**Out of Scope:** 语言构建工具内部的网络依赖下载拦截（由网络策略独立管辖）、非标准或已废弃构建系统的特定方言。
+
+## D-092: 待创建
 

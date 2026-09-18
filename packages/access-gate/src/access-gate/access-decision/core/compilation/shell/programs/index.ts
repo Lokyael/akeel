@@ -1,4 +1,5 @@
 import type { ShellWord } from "../language";
+import { analyzeBuildToolProgram, BUILD_TOOLS } from "./build-tools";
 import { analyzeChmodProgram } from "./chmod";
 import { analyzeCoreutilsProgram, isCoreutilsProgram } from "./coreutils";
 import { analyzeFindProgram, analyzeFindProgramInvocation } from "./find";
@@ -39,6 +40,7 @@ export {
 } from "./segment-parser";
 
 export {
+  analyzeBuildToolProgram,
   analyzeChmodProgram,
   analyzeCoreutilsProgram,
   analyzeFindProgram,
@@ -61,6 +63,7 @@ const PROGRAM_ANALYZERS: ReadonlyMap<string, ProgramAnalyzer> = new Map([
   ...[...INTERPRETERS].map((name) => [name, (_name: string, args: readonly ShellWord[]) => analyzeInterpreterProgram(args)] as const),
   ...[...PYTHON_TOOLS].map((name) => [name, (_name: string, args: readonly ShellWord[]) => analyzePythonToolProgram(name, args)] as const),
   ...[...PACKAGE_MANAGERS].map((name) => [name, (_name: string, args: readonly ShellWord[]) => analyzePackageManagerProgram(name, args)] as const),
+  ...[...BUILD_TOOLS].map((name) => [name, (_name: string, args: readonly ShellWord[]) => analyzeBuildToolProgram(name, args)] as const),
 ]);
 
 const DETERMINISTIC_PROGRAMS = new Set(["true", "false", ":"]);

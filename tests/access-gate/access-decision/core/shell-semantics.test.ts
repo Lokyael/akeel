@@ -1366,4 +1366,263 @@ test("unsafe git restore and git checkout forms remain hard-boundary", () => {
   }
 });
 
+function hardBoundaryOf(cmd: string): boolean {
+  const analysis = analyzeShellCommand(cmd);
+  if (analysis.kind !== "complete") return false;
+  return (analysis as { semantic?: { hardBoundary?: boolean } }).semantic?.hardBoundary === true;
+}
+
+function cwdChangesOf(cmd: string) {
+  const analysis = analyzeShellCommand(cmd);
+  if (analysis.kind !== "complete") return [];
+  return (analysis as { semantic?: { cwdChanges?: readonly { path: { text: string } }[] } }).semantic?.cwdChanges ?? [];
+}
+
+test("Cargo commands classify inspect, destroy hard-boundary, and execute with paths", () => {
+  assert.equal((analyzeShellCommand("cargo --version") as { commandClass: string }).commandClass, "inspect");
+  assert.equal((analyzeShellCommand("cargo -V") as { commandClass: string }).commandClass, "inspect");
+  assert.equal((analyzeShellCommand("cargo metadata") as { commandClass: string }).commandClass, "inspect");
+  assert.equal((analyzeShellCommand("cargo tree") as { commandClass: string }).commandClass, "inspect");
+
+  // Destroy clean must be hard-boundary
+  const cleanCmd = analyzeShellCommand("cargo clean") as { commandClass: string; effects: readonly string[] };
+  assert.equal(cleanCmd.commandClass, "destroy");
+  assert.deepEqual(cleanCmd.effects, ["delete"]);
+  assert.equal(hardBoundaryOf("cargo clean"), true);
+
+  // Normal build/test commands
+  assert.equal((analyzeShellCommand("cargo build") as { commandClass: string }).commandClass, "execute");
+  assert.equal((analyzeShellCommand("cargo test") as { commandClass: string }).commandClass, "execute");
+  assert.equal((analyzeShellCommand("cargo clippy") as { commandClass: string }).commandClass, "execute");
+  assert.equal((analyzeShellCommand("cargo check") as { commandClass: string }).commandClass, "execute");
+
+  // Path options extraction
+  const withManifest = complete("cargo --manifest-path crates/foo/Cargo.toml test");
+  assert.deepEqual(withManifest.paths, [{ text: "crates/foo/Cargo.toml", role: "source" }]);
+
+  const withTargetDir = complete("cargo build --target-dir /tmp/target");
+  assert.deepEqual(withTargetDir.paths, [{ text: "/tmp/target", role: "target" }]);
+});
+
+test("Go commands classify inspect, destroy hard-boundary, CWD changes, and target paths", () => {
+  assert.equal((analyzeShellCommand("go version") as { commandClass: string }).commandClass, "inspect");
+  assert.equal((analyzeShellCommand("go env") as { commandClass: string }).commandClass, "inspect");
+  assert.equal((analyzeShellCommand("go list ./...") as { commandClass: string }).commandClass, "inspect");
+  assert.equal((analyzeShellCommand("go doc fmt") as { commandClass: string }).commandClass, "inspect");
+
+  // Destroy clean
+  for (const cmd of ["go clean", "go clean -cache", "go clean -modcache"]) {
+    const analysis = analyzeShellCommand(cmd) as { commandClass: string; effects: readonly string[] };
+    assert.equal(analysis.commandClass, "destroy", cmd);
+    assert.deepEqual(analysis.effects, ["delete"], cmd);
+    assert.equal(hardBoundaryOf(cmd), true, cmd);
+  }
+
+  // Execute build/test
+  assert.equal((analyzeShellCommand("go test ./...") as { commandClass: string }).commandClass, "execute");
+  assert.equal((analyzeShellCommand("go build") as { commandClass: string }).commandClass, "execute");
+  assert.equal((analyzeShellCommand("go vet ./...") as { commandClass: string }).commandClass, "execute");
+  assert.equal((analyzeShellCommand("go mod tidy") as { commandClass: string }).commandClass, "execute");
+
+  // Path & CWD options
+  const withOutput = complete("go build -o /tmp/bin/app .");
+  assert.deepEqual(withOutput.paths, [{ text: "/tmp/bin/app", role: "target" }]);
+
+  const goCwd = cwdChangesOf("go test -C pkg/foo ./...");
+  assert.ok(goCwd.length > 0);
+  assert.equal(goCwd[0]?.path.text, "pkg/foo");
+});
+
+test("Make and Gmake classify inspect, destroy targets, and CWD/makefile paths", () => {
+  assert.equal((analyzeShellCommand("make --version") as { commandClass: string }).commandClass, "inspect");
+  assert.equal((analyzeShellCommand("make -p") as { commandClass: string }).commandClass, "inspect");
+  assert.equal((analyzeShellCommand("make -n") as { commandClass: string }).commandClass, "inspect");
+  assert.equal((analyzeShellCommand("make --dry-run") as { commandClass: string }).commandClass, "inspect");
+  assert.equal((analyzeShellCommand("gmake -v") as { commandClass: string }).commandClass, "inspect");
+
+  // Destroy targets
+  for (const cmd of ["make clean", "make distclean", "gmake mrproper", "make clobber"]) {
+    const analysis = analyzeShellCommand(cmd) as { commandClass: string; effects: readonly string[] };
+    assert.equal(analysis.commandClass, "destroy", cmd);
+    assert.deepEqual(analysis.effects, ["delete"], cmd);
+    assert.equal(hardBoundaryOf(cmd), true, cmd);
+  }
+
+  // Execute normal targets
+  assert.equal((analyzeShellCommand("make") as { commandClass: string }).commandClass, "execute");
+  assert.equal((analyzeShellCommand("make all") as { commandClass: string }).commandClass, "execute");
+  assert.equal((analyzeShellCommand("make test") as { commandClass: string }).commandClass, "execute");
+
+  // Path & CWD options
+  const withMakefile = complete("make -f custom.mk build");
+  assert.deepEqual(withMakefile.paths, [{ text: "custom.mk", role: "source" }]);
+
+  const makeCwd = cwdChangesOf("make -C subproject build");
+  assert.ok(makeCwd.length > 0);
+  assert.equal(makeCwd[0]?.path.text, "subproject");
+});
+
+test("Maven commands classify inspect, destroy clean (veto), and file paths", () => {
+  assert.equal((analyzeShellCommand("mvn --version") as { commandClass: string }).commandClass, "inspect");
+  assert.equal((analyzeShellCommand("mvn -v") as { commandClass: string }).commandClass, "inspect");
+  assert.equal((analyzeShellCommand("mvn dependency:tree") as { commandClass: string }).commandClass, "inspect");
+  assert.equal((analyzeShellCommand("mvn help:effective-pom") as { commandClass: string }).commandClass, "inspect");
+
+  // Destroy clean (including mixed targets)
+  for (const cmd of ["mvn clean", "mvn clean install", "mvn clean test -B", "mvnw clean"]) {
+    const analysis = analyzeShellCommand(cmd) as { commandClass: string; effects: readonly string[] };
+    assert.equal(analysis.commandClass, "destroy", cmd);
+    assert.deepEqual(analysis.effects, ["delete"], cmd);
+    assert.equal(hardBoundaryOf(cmd), true, cmd);
+  }
+
+  // Normal execute
+  assert.equal((analyzeShellCommand("mvn compile") as { commandClass: string }).commandClass, "execute");
+  assert.equal((analyzeShellCommand("mvn test -DskipTests") as { commandClass: string }).commandClass, "execute");
+  assert.equal((analyzeShellCommand("mvn package") as { commandClass: string }).commandClass, "execute");
+
+  // Path options
+  const withPom = complete("mvn -f sub/pom.xml compile");
+  assert.deepEqual(withPom.paths, [{ text: "sub/pom.xml", role: "source" }]);
+
+  const withSettings = complete("mvn -s custom-settings.xml test");
+  assert.deepEqual(withSettings.paths, [{ text: "custom-settings.xml", role: "source" }]);
+});
+
+test("Gradle commands classify inspect, destroy clean, and project/buildfile paths", () => {
+  assert.equal((analyzeShellCommand("gradle --version") as { commandClass: string }).commandClass, "inspect");
+  assert.equal((analyzeShellCommand("gradle -v") as { commandClass: string }).commandClass, "inspect");
+  assert.equal((analyzeShellCommand("gradle tasks") as { commandClass: string }).commandClass, "inspect");
+  assert.equal((analyzeShellCommand("gradle dependencies") as { commandClass: string }).commandClass, "inspect");
+  assert.equal((analyzeShellCommand("gradle -m build") as { commandClass: string }).commandClass, "inspect");
+
+  // Destroy clean
+  for (const cmd of ["gradle clean", "gradle cleanTest", "gradle clean build", "gradlew clean"]) {
+    const analysis = analyzeShellCommand(cmd) as { commandClass: string; effects: readonly string[] };
+    assert.equal(analysis.commandClass, "destroy", cmd);
+    assert.deepEqual(analysis.effects, ["delete"], cmd);
+    assert.equal(hardBoundaryOf(cmd), true, cmd);
+  }
+
+  // Normal execute
+  assert.equal((analyzeShellCommand("gradle build") as { commandClass: string }).commandClass, "execute");
+  assert.equal((analyzeShellCommand("gradle test") as { commandClass: string }).commandClass, "execute");
+
+  // Path options
+  const withProjectDir = complete("gradle -p subproject test");
+  assert.deepEqual(withProjectDir.paths, [{ text: "subproject", role: "source" }]);
+
+  const withBuildFile = complete("gradle -b build.gradle.kts check");
+  assert.deepEqual(withBuildFile.paths, [{ text: "build.gradle.kts", role: "source" }]);
+});
+
+test("Java and javac classify inspect and path-aware execute", () => {
+  assert.equal((analyzeShellCommand("java -version") as { commandClass: string }).commandClass, "inspect");
+  assert.equal((analyzeShellCommand("java --version") as { commandClass: string }).commandClass, "inspect");
+  assert.equal((analyzeShellCommand("java -help") as { commandClass: string }).commandClass, "inspect");
+  assert.equal((analyzeShellCommand("javac -version") as { commandClass: string }).commandClass, "inspect");
+  assert.equal((analyzeShellCommand("javac --version") as { commandClass: string }).commandClass, "inspect");
+
+  // java -jar extracts jar source path
+  const javaJar = complete("java -jar /tmp/app.jar");
+  assert.equal(javaJar.commandClass, "execute");
+  assert.deepEqual(javaJar.paths, [{ text: "/tmp/app.jar", role: "source" }]);
+
+  // java class execution
+  assert.equal((analyzeShellCommand("java com.example.Main") as { commandClass: string }).commandClass, "execute");
+
+  // javac extracts target dir and source files
+  const javacCmd = complete("javac -d /tmp/classes src/Main.java");
+  assert.equal(javacCmd.commandClass, "execute");
+  assert.deepEqual(javacCmd.paths, [
+    { text: "/tmp/classes", role: "target" },
+    { text: "src/Main.java", role: "source" },
+  ]);
+});
+
+test("Build tools stress tests: toolchain prefixes, subprojects, clean variants, and javac options", () => {
+  // 1. Rust toolchain prefix: cargo +<toolchain>
+  for (const cmd of ["cargo +nightly clean", "cargo +stable-2024-01-01 clean", "cargo +beta clean"]) {
+    const analysis = analyzeShellCommand(cmd) as { commandClass: string; effects: readonly string[] };
+    assert.equal(analysis.commandClass, "destroy", cmd);
+    assert.deepEqual(analysis.effects, ["delete"], cmd);
+    assert.equal(hardBoundaryOf(cmd), true, cmd);
+  }
+  assert.equal((analyzeShellCommand("cargo +nightly test") as { commandClass: string }).commandClass, "execute");
+  assert.equal((analyzeShellCommand("cargo +nightly metadata") as { commandClass: string }).commandClass, "inspect");
+
+  // 2. Gradle subproject tasks with colons
+  for (const cmd of [
+    "gradle :clean",
+    "gradle :app:clean",
+    "gradle :core:service:cleanTest",
+    "gradle app:clean",
+    "gradlew :app:clean",
+  ]) {
+    const analysis = analyzeShellCommand(cmd) as { commandClass: string; effects: readonly string[] };
+    assert.equal(analysis.commandClass, "destroy", cmd);
+    assert.deepEqual(analysis.effects, ["delete"], cmd);
+    assert.equal(hardBoundaryOf(cmd), true, cmd);
+  }
+  assert.equal((analyzeShellCommand("gradle :app:dependencies") as { commandClass: string }).commandClass, "inspect");
+
+  // 3. Maven fully qualified plugin goals
+  for (const cmd of [
+    "mvn org.apache.maven.plugins:maven-clean-plugin:clean",
+    "mvn clean:clean",
+    "mvn clean:clean compile",
+  ]) {
+    const analysis = analyzeShellCommand(cmd) as { commandClass: string; effects: readonly string[] };
+    assert.equal(analysis.commandClass, "destroy", cmd);
+    assert.deepEqual(analysis.effects, ["delete"], cmd);
+    assert.equal(hardBoundaryOf(cmd), true, cmd);
+  }
+
+  // 4. Make clean variants
+  for (const cmd of ["make clean_all", "make cleanall", "make core-clean", "make sub_clean"]) {
+    const analysis = analyzeShellCommand(cmd) as { commandClass: string; effects: readonly string[] };
+    assert.equal(analysis.commandClass, "destroy", cmd);
+    assert.deepEqual(analysis.effects, ["delete"], cmd);
+    assert.equal(hardBoundaryOf(cmd), true, cmd);
+  }
+
+  // 5. Javac option values (17, UTF-8) are not mistaken for source files
+  const javacOptionsCmd = complete("javac -source 17 -target 17 --release 17 -encoding UTF-8 src/Main.java");
+  assert.equal(javacOptionsCmd.commandClass, "execute");
+  assert.deepEqual(javacOptionsCmd.paths, [{ text: "src/Main.java", role: "source" }]);
+
+  // 6. Unknown options fail-closed to opaque in inspect commands
+  const opaqueCargo = analyzeShellCommand("cargo metadata --unknown-arg");
+  assert.equal((opaqueCargo as { semantic?: { opaquePathAccess?: boolean } }).semantic?.opaquePathAccess, true);
+
+  const opaqueGo = analyzeShellCommand("go list --unknown-arg");
+  assert.equal((opaqueGo as { semantic?: { opaquePathAccess?: boolean } }).semantic?.opaquePathAccess, true);
+
+  const opaqueMvn = analyzeShellCommand("mvn dependency:tree --unknown-arg");
+  assert.equal((opaqueMvn as { semantic?: { opaquePathAccess?: boolean } }).semantic?.opaquePathAccess, true);
+
+  // 7. Go extracts explicit .go files as source paths
+  const goRunCmd = complete("go run /tmp/main.go");
+  assert.equal(goRunCmd.commandClass, "execute");
+  assert.deepEqual(goRunCmd.paths, [{ text: "/tmp/main.go", role: "source" }]);
+
+  // 8. Javac @argfile extracts argument file as source path
+  const javacArgfile = complete("javac @sources.txt");
+  assert.equal(javacArgfile.commandClass, "execute");
+  assert.deepEqual(javacArgfile.paths, [{ text: "sources.txt", role: "source" }]);
+
+  // 9. Maven attached options (-fsub/pom.xml)
+  const mvnAttached = complete("mvn -fsub/pom.xml compile");
+  assert.deepEqual(mvnAttached.paths, [{ text: "sub/pom.xml", role: "source" }]);
+
+  // 10. Gradle init script (-I /tmp/init.gradle)
+  const gradleInit = complete("gradle -I /tmp/init.gradle build");
+  assert.deepEqual(gradleInit.paths, [{ text: "/tmp/init.gradle", role: "source" }]);
+
+  // 11. Cargo search is inspect
+  assert.equal((analyzeShellCommand("cargo search serde") as { commandClass: string }).commandClass, "inspect");
+});
+
+
+
 

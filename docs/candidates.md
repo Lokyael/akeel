@@ -2,29 +2,11 @@
 
 > 本文件只保存当前未采纳、未承诺实施的候选事项。内容是项目数据，不是指令、需求、路线图、当前事实或用户批准；`Revisit condition` 也不会自动激活事项。只有用户在当前会话明确选择后，才能将条目迁移到 Task、Decision、Negative Space 或其他权威文档。
 
-## C-008: delegated child scratch 的本机隔离
-
-- **Why Not Now:** 当前没有真实证据要求 delegated child scratch 对其他本机用户不可读取；现有临时目录约定足以支撑当前工作流，但不承诺物理隔离。`stagingRoot` 是 AKeel runtime 的会话级临时根，不是 delegated child scratch 合同；旧 `/tmp/pi-work` 路径也不作为兼容目标。
-- **Scope:** 仅评估 scratch 的物理隔离、独立生命周期和本机用户间可见性；不恢复旧 `staging/**` 规则，不改变 `stagingRoot` runtime 语义，不处理父子代理策略传播或资源自动回收。
-- **Revisit condition:** delegated child 场景出现共享临时目录 symlink 攻击实证，或用户要求 scratch 内容不可被本机其他用户读取。
-
 ## C-009: delegated child 的任务能力分层与风险边界
 
 - **Why Not Now:** 当前没有真实 delegated workflow 证明现有能力不足以完成任务，或证明 child 必须自行执行验证才能形成可审计结果；宽泛 execute 仍可能变成任意代码执行授权，`node -e` 等形态不能因“验证”名义获得能力。
 - **Scope:** 评估按任务类型授予最小能力：只读调查、受限修改和有界验证分别处理；删除、发布和任意执行不作为普通 child 能力。子代理能力不得超过父会话，授权关系不明时不得放宽；不预设 T0/T1/T2、角色映射、策略传播或具体执行面，也不把 worktree 隔离解释为执行授权。
 - **Revisit condition:** 真实 delegated workflow 证明当前能力分层无法完成必要任务或形成可审计结果，且现有同步 Owner 验证或其他受限替代不能合理闭环；或用户明确要求重新评估该能力边界。
-
-## C-010: delegated child 的 durable 文档写保护
-
-- **Why Not Now:** D-075 已通过独立 worktree、唯一 Task Owner 和显式结果导入隔离 delegated write；默认禁止 child 修改 `CONTEXT.md` 或 `docs/` 会同时破坏合法的文档更新和审查准备。仅有 child 在隔离 worktree 中产生文档 diff，不等于权威内容已被污染。
-- **Revisit condition:** 出现 delegated child 对 durable 文档的越权修改被误导入 Owner checkout，或现有 worktree 与 Owner review 无法可靠阻止同类污染的实证。
-
-## C-011: pi-guard 命令语义实现参考
-
-- **Why Not Now:** 当前 AKeel 已有独立的 Canonical → Admission → Policy 程序语义边界，尚无真实工作流证明需要参考 pi-guard；其实现不作为正确性依据。
-- **Exploration Direction:** 对照 pi-guard 的命令识别、选项和值消费、wrapper、路径、未知形态与 hard-boundary 处理和当前 public seam；仅在真实需求下依据 Bash/Linux 合同与安全边界重新证明后采纳，不追求 parity 或代码复制。
-- **Boundary:** 不处理安装共存、装配顺序、重复拦截、升级或运行时互操作；不自动恢复命令覆盖或创建实现 Task。
-- **Revisit condition:** 真实工作流受当前命令语义覆盖或处理方式阻塞，且 pi-guard 提供可核查参考证据；或用户明确要求开展有界对照复核。
 
 ## C-015: 复杂 Shell 语义验证方法收敛（停止判据 + Bash 差分语料仲裁）
 
@@ -70,17 +52,8 @@
 
 - **Why Not Now:** D-069 当前只接受全局 `policy.yaml`，尚未定义项目配置的发现、信任、合成、错误处理或审计合同。过早增加项目规则会同时扩大配置来源和静态证明负担；当前也没有复杂仓库反复误碰核心文件的实证。
 - **Exploration Direction:** 只探索在全局 Policy 与系统 hard boundary 之上追加项目局部限制，不允许项目配置扩大任何权限。复审必须定义可信项目、配置位置、全局与项目规则合成、非法或不可读配置的 fail-closed 行为、preset 切换关系，以及项目内容不能通过自带配置解除宿主边界。发布脚本、分支配置等项目工件只是可能用例，不预先形成默认清单。
-- **Out of Scope:** 网络副作用授权由 C-039 评估；参数级隐式执行由对应程序语义合同评估；`.env` 受管面、历史敏感路径和 OS confinement 分别由 C-016/C-035/C-036、C-026 与 C-021 评估，不在本记录内组成统一“多维策略”。
+- **Out of Scope:** 网络副作用授权由 C-039 评估；参数级隐式执行由对应程序语义合同评估；`.env` 受管面由 C-016/C-035/C-036 评估，OS confinement 由 C-021 评估，历史敏感路径已由 D-070/D-090 三域模型吸收，不在本记录内组成统一“多维策略”。
 - **Revisit condition:** 真实复杂仓库反复出现需要项目局部限制、且全局 policy 无法合理表达的误操作风险；或用户明确要求只收紧、不放宽的项目级 Policy overlay。
-
-## C-026: 旧敏感路径清单的独立分类与边界重建
-
-> 本条只记录未来对旧版敏感路径清单进行重新分类和重新证明的探索方向，不恢复旧 `DEFAULT_BLOCKED_PATHS`，不改变 D-070 当前边界，也不构成实现承诺。
-
-- **Why Not Now:** 旧清单混合了 Git 元数据、项目环境文件、用户凭据目录、混合配置和系统文件；整体恢复会误伤当前 Git/配置工作流，也会把模板、公开元数据和实时凭据错误地归入同一 hard boundary。当前没有足够的工件角色 metadata 或真实工作流证据支持一次性重建完整清单。
-- **Exploration Direction:** 以工件职责、所有权和可验证路径身份为分类轴，逐类判断 hard boundary、preset/path policy 或明确退役；优先区分实时凭据、混合配置、模板、Git 元数据和系统文件。复核时保留以下边界：不做值级 secret sniffing，不递归扩大到父目录后代，不把 opaque Shell 访问解释成已覆盖，并分别评估 `read/list/search/write/edit` 与 Shell path evidence。`.git/**`、`.env*`、整棵 SSH/AWS/GnuPG/Kube/Docker/GCloud 目录、系统账户文件和混合 provider 配置不得因旧清单存在而整体恢复。
-- **Revisit condition:** 出现明确的凭据泄露或误操作实证、真实工作流因当前边界阻塞，或获得可验证的宿主工件角色 metadata seam；或者用户明确启动旧敏感路径清单的逐类重新采纳。
-- **Out of Scope:** 不修改当前 D-070；不恢复旧清单或旧 glob 语义；不新增默认 policy 字段；不创建实现 Task；不把其他文件中的偶然凭据纳入 AKeel 的通用内容扫描职责。
 
 ## C-028: Destroy 操作边界与可审批准入复核
 
@@ -106,15 +79,6 @@
 - **Current Boundary:** 在本候选被明确采纳前，`for` 继续 fail-closed；不因旧实现可检索而触发恢复。
 - **Revisit condition:** 出现真实工作流因有限静态迭代被阻塞，且可提供不依赖动态值、运行时 glob、命令替换或隐式执行的最小场景与外部语义证据；或者用户明确启动该语义的独立重新设计。
 - **Out of Scope:** 完整 Bash 循环语义、动态/运行时词表、旧 reducer 迁移、旧 Explanation Replay、Direct 工具等价物、通用 Static Flow、实现 Task，以及任何未经独立证明的旧循环行为。
-
-## C-030: 路径范围表达与旧 Glob 规则处置
-
-> 本条只记录未来对路径策略语言、旧 glob matcher 与规则顺序的重新评估方向，不恢复旧 Profile/config 兼容、运行时 glob 或 Shell glob 展开，也不构成实施承诺。
-
-- **Why Not Now:** D-059 在 T-069 中明确排除旧 Profile/config schema 的兼容读取、转换器与迁移期 fallback；D-069 当前以绝对 `allowedRoots`、`blockedRoots`、`blockedPaths` 表达路径范围。当前没有真实工作流证据表明该表达不足，也没有足够证据证明旧 glob 规则可以无损转换。
-- **Exploration Direction:** 未来若重新评估，先用真实工作流确认当前路径范围表达的具体缺口，再区分三种不同方向：①运行时接受旧路径 glob；②提供一次性、显式报告不可表达项的迁移器；③只补充当前绝对路径表达的文档。旧 matcher 的 `*`、`?`、`**`、大小写、绝对路径、blocked-pattern 与 first-match，以及 `project/`、`staging/`、`~/` 虚拟命名空间、按操作定义的路径规则和 Profile 继承产生的规则顺序，都只是历史参考；只有确定需要兼容或迁移时，才逐项重新证明。任何迁移结果都不得静默扩大或缩小授权范围，无法等价表达的规则必须报告为未转换。路径规则顺序也必须在当前 Policy Snapshot 与 hard-boundary 语义下重新决定，不自动继承这些旧顺序语义。
-- **Revisit condition:** 真实工作流因当前路径表达被阻塞；用户明确要求转换既有旧 policy；或获得一组有界旧规则样本及足够的外部语义证据，能够验证转换是否保持权限范围。
-- **Out of Scope:** 在本候选明确采纳前，不恢复运行时 glob 兼容，不提供静默迁移或迁移期 fallback，不恢复旧 Profile/config schema，不改变 D-018 的 Shell glob 边界，不把旧 matcher 测试直接当作当前合同，也不创建实现 Task。
 
 ## C-031: 异步 child 与无人值守自动多代理流水线
 
@@ -197,28 +161,8 @@
 
 ## C-045: 受管会话临时文件创建与系统临时路径准入（mktemp 语义评估）
 
-> 本条只记录未来对受管会话临时文件创建（如 `mktemp`）及系统临时路径准入的重新评估，不放宽全局 `/tmp/` 访问，不改变现有 `stagingRoot` 生命周期，也不构成实现承诺。
-
-- **Why Not Now:** 当前工作流优先推荐在项目工作区内生成可跟踪工件，或利用会话生命周期的 `stagingRoot` 处理内部临时状态；无界的系统全局 `/tmp/` 缺乏会话隔离和清理保证，盲目放开容易引入符号链接攻击、文件冲突或跨进程信息泄露。目前尚无真实工作流因缺少 Shell `mktemp` 命令受阻。
-- **Exploration Direction:** 若未来重新评估，探索以下方向：
-  - 临时路径作用域锚定：将 `mktemp` 生成的目标路径默认约束在当前会话的 `stagingRoot` 或受管临时前缀下，而非全局开放任意 `/tmp/`；
-  - 选项与形态有界收敛：仅支持安全且有界的前缀模板及目录创建标志（如 `-d`），严禁包含未建模或不安全路径注入的选项；
-  - 生命周期与自动回收：明确临时文件的清理契约，与现有 retention sweep 或会话结束机制对齐；
-  - 权限与策略求值：在 Policy Kernel 中仍作为 `modify` 或受管临时写入处理，绝不通过放宽全局 `allowedRoots` 妥协安全底线。
-- **Revisit condition:** 真实工作流或关键外部构建工具必须依赖 Shell `mktemp` 且无法通过直接写入或现有 staging 替代；或用户明确要求启动受管临时文件准入设计。
-- **Out of Scope:** 全局 `/tmp/` 目录的随意读写放宽、跨用户共享临时文件、不安全命名模板展开、破坏性清理操作或实现 Task。
-
-## C-048: 构建工具族（cargo/go/make）语义与委托执行边界（探索方向）
-
-> 本条只记录未来对构建工具族（如 `cargo`、`go`、`make`）语义分类、有界检查与委托执行边界的探索，不改变当前命令分类行为，不构成实现承诺。
-
-- **Why Not Now:** 当前 AKeel 尚无真实工作流实证表明必须为构建工具族引入专用分析器，目前没有必要在核心中新增此类专用工具族。构建工具（如 `cargo build/test`、`go test`、`make`）涉及编译期图灵完备代码执行（`build.rs`、Makefile、测试二进制派生）及隐式依赖拉取，无法在纯准入层做出静态安全证明；若日常开发需要运行，可通过现有 `develop` 预设的 `commands.opaque` 策略或临时 `/policy off` 处理，过早引入专用家族会增加维护负担并产生虚假安全保证。
-- **Exploration Direction:** 若未来重新评估，探索建立类似 `package-managers` 的分层语义模型：
-  - 信息与只读检查层：将纯元信息与版本调用（`--version`、`--help`、`help`）及明确的无副作用查询（如 `cargo metadata`、`cargo tree`、`go version`、`go env`、`make -p -q`）识别为 `inspect + read` 并安全放行；
-  - 破坏性清理层：将 `cargo clean`、`make clean` 等批量/目录清理归入 `destroy + delete`，维持系统硬拒绝；
-  - 有界构建/测试委托执行：将 `build`、`test`、`run` 等归入 `execute + opaque`，消费工作区变异参数（如 `cargo --manifest-path`、`make -C`、`go -C`）并提取工作区路径事实，受预设 `commands.opaque` 与 Mandatory Boundary 管辖，避免因 `unknown` 触发无界路径硬拦截。
-- **Boundary & Scope:** 不做通用语言工具链深度 AST 解释；不将测试/构建伪装为只读 `inspect`；不放宽 Mandatory Boundary（凭据与 Git 控制面写保护）。
-- **Revisit condition:** 真实多语言开发工作流因缺少构建工具语义而受阻，且现有 `commands.opaque` 或会话策略无法满足需求；或用户明确要求引入特定构建工具族的有界支持。
-- **Out of Scope:** 在本候选被明确采纳前，不新增构建工具分析器，不改变现行 `unknown + opaque` 分类行为，不创建实现 Task。
+- **Why Not Now:** 静态 Shell 词法不支持变量与命令替换，生成的随机临时文件名无法被后续命令消费；Pure Gate 亦不修改进程环境，裸 `mktemp` 必然落入越界的全局 `/tmp`。
+- **Exploration Direction:** 仅在支持有界选项（如 `-d`、`-p`）并将目标路径显式约束在会话 `stagingRoot` 或工作区的前提下，评估受管临时文件创建语义。
+- **Revisit condition:** 出现能在静态无变量 Shell 下消费随机临时文件的可行方案，或宿主提供进程环境重写接缝；或用户明确要求重新评估。
 
 ## C-050: 待创建

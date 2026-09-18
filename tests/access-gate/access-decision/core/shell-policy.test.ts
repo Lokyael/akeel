@@ -1855,3 +1855,69 @@ test("bounded pipelines evaluate under policy presets with mandatory boundaries 
   });
 });
 
+test("build tools respect policy presets and enforce anti-destroy hard-boundaries", () => {
+  const develop = freezeShellPolicySnapshot({
+    ...policy,
+    allowedRoots: ["/workspace/project"],
+    blockedRoots: [],
+    blockedPaths: [],
+    write: "allow",
+    modify: "allow",
+    execute: "allow",
+    opaque: "allow",
+    destroy: "allow",
+    inspect: "allow",
+  });
+  const review = freezeShellPolicySnapshot({
+    ...policy,
+    allowedRoots: ["/workspace/project"],
+    blockedRoots: [],
+    blockedPaths: [],
+    write: "deny",
+    modify: "deny",
+    execute: "deny",
+    opaque: "deny",
+    destroy: "deny",
+    inspect: "allow",
+  });
+
+  // 1. In review preset: inspect commands are allowed, execute commands are policy-denied
+  assert.deepEqual(evaluateShellAdmission(admission("cargo --version"), review), { kind: "allow" });
+  assert.deepEqual(evaluateShellAdmission(admission("go version"), review), { kind: "allow" });
+  assert.deepEqual(evaluateShellAdmission(admission("make --version"), review), { kind: "allow" });
+  assert.deepEqual(evaluateShellAdmission(admission("mvn dependency:tree"), review), { kind: "allow" });
+  assert.deepEqual(evaluateShellAdmission(admission("gradle tasks"), review), { kind: "allow" });
+  assert.deepEqual(evaluateShellAdmission(admission("java -version"), review), { kind: "allow" });
+
+  assert.deepEqual(evaluateShellAdmission(admission("cargo build"), review), { kind: "deny", code: "policy-denied" });
+  assert.deepEqual(evaluateShellAdmission(admission("go test ./..."), review), { kind: "deny", code: "policy-denied" });
+  assert.deepEqual(evaluateShellAdmission(admission("make all"), review), { kind: "deny", code: "policy-denied" });
+  assert.deepEqual(evaluateShellAdmission(admission("mvn compile"), review), { kind: "deny", code: "policy-denied" });
+  assert.deepEqual(evaluateShellAdmission(admission("gradle build"), review), { kind: "deny", code: "policy-denied" });
+
+  // 2. In develop preset: execute commands are allowed
+  assert.deepEqual(evaluateShellAdmission(admission("cargo build"), develop), { kind: "allow" });
+  assert.deepEqual(evaluateShellAdmission(admission("go test ./..."), develop), { kind: "allow" });
+  assert.deepEqual(evaluateShellAdmission(admission("make test"), develop), { kind: "allow" });
+
+  // 3. In develop preset (even with destroy: allow): ALL clean commands MUST be hard-denied!
+  for (const cmd of [
+    "cargo clean",
+    "cargo +nightly clean",
+    "go clean",
+    "go clean -cache",
+    "make clean",
+    "make distclean",
+    "gmake mrproper",
+    "mvn clean",
+    "mvn clean compile",
+    "mvn org.apache.maven.plugins:maven-clean-plugin:clean",
+    "gradle clean",
+    "gradle :app:clean",
+    "gradlew clean",
+  ]) {
+    assert.deepEqual(evaluateShellAdmission(admission(cmd), develop), { kind: "deny", code: "hard-boundary" }, cmd);
+  }
+});
+
+
