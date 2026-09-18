@@ -10,7 +10,7 @@ AKeel 是 [pi](https://pi.dev) 的插件包：以 **扩展（extensions）** 注
 
 | 类别 | 位置 | 是什么 | 分发方式 | 维护对象 |
 |------|------|--------|----------|----------|
-| **扩展（插件）** | `packages/guidance/src/bootstrap/`、`packages/access-gate/src/access-gate/`、`packages/context-pruner/src/context-pruner/` | Session 原则注入、`policy.yaml` 驱动的访问控制与测试输出上下文裁剪 | 各 package 的 `pi.extensions` | 运行时行为；改动需同步测试与文档 |
+| **扩展（插件）** | `packages/guidance/src/bootstrap/`、`packages/guidance/src/record-containers/`、`packages/access-gate/src/access-gate/`、`packages/context-pruner/src/context-pruner/` | Session 原则注入、Project Record 容器校验、`policy.yaml` 驱动的访问控制与测试输出上下文裁剪 | 各 package 的 `pi.extensions` | 运行时行为；改动需同步测试与文档 |
 | **Skills** | `packages/guidance/skills/disciplines/`、`packages/guidance/skills/workflows/` | 按需加载的技能，含 SKILL.md 与配套文件；两目录表达作者职责，不定义 Pi 加载机制（D-073） | `package.json` 的 `pi.skills` | 技能内容与流程；只引用权威文档，不重复定义规则 |
 | **开发内容（dev）** | `tests/`、`scripts/`、`types/`、`tsconfig.json`、`package.json` 脚本 | AKeel 自身的构建、测试、类型声明与技能校验 | 不进入用户项目分发 | 开发质量；改动随对应功能同步 |
 
@@ -18,6 +18,7 @@ AKeel 是 [pi](https://pi.dev) 的插件包：以 **扩展（extensions）** 注
 
 ```
 packages/guidance/src/bootstrap/          # 扩展：Session 注入原则（principles.md + index.ts）
+packages/guidance/src/record-containers/  # 扩展：Project Record 容器校验纯引擎与 Pi tool composition
 packages/guidance/src/artifact-exchange/  # 扩展：workflow run、capability artifact 与 Pi tool composition
 packages/guidance/src/handoff-store/      # Guidance runtime：source→successor handoff envelope
 packages/access-gate/src/access-gate/        # 扩展：policy.yaml adapter、Canonical access-decision 与 Pi runtime composition

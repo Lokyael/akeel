@@ -105,7 +105,7 @@ After every significant change, scan the project's actual documentation (`README
 
 *Boundaries prevent scope creep. Write them down.*
 
-When exclusions matter, every Task Record and load-bearing decision must list what is deliberately out of scope using:
+When exclusions matter, plans, task specifications, and decisions must list what is deliberately out of scope using:
 
 ```
 - **[What]**: [Why not now]. Revisit when [condition].
@@ -139,7 +139,7 @@ Before adding a function, module, rule, config, or decision, check for an existi
 
 Do not report one-offs or user-declared off-limits work; defer reports for urgent fixes until task close. Repository-wide signals belong to `/skill:assess-modularity`, not mid-task; use module-design for a known boundary.
 
-At task or session close, name and dispose of every open proposal: promote recurring structural friction to a Candidate Record, record deliberate exclusions in Negative Space, or drop it. Nothing dangles.
+At task or session close, name and dispose of every open proposal: record recurring friction or deliberate exclusions where the project tracks constraints (such as a Candidate Record, Negative Space, or project issue tracker), or drop it. Nothing dangles.
 
 ### 10. Destructive Actions Need Explicit Intent
 
