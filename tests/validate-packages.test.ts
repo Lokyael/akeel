@@ -54,7 +54,11 @@ test("three capability packages expose independent Pi manifests", () => {
 
 test("guidance owns bootstrap and skills without duplicating principles", () => {
   const manifest = readPackage("packages/guidance/package.json");
-  assert.deepEqual(manifest.pi?.extensions, ["./src/bootstrap/index.ts", "./src/artifact-exchange/pi-composition.ts"]);
+  assert.deepEqual(manifest.pi?.extensions, [
+    "./src/bootstrap/index.ts",
+    "./src/artifact-exchange/pi-composition.ts",
+    "./src/record-containers/pi-composition.ts",
+  ]);
   assert.deepEqual(manifest.pi?.skills, ["./skills/disciplines", "./skills/workflows"]);
   const principles = filesNamed(join(root, "packages/guidance"), "principles.md");
   assert.deepEqual(principles, [join(root, "packages/guidance/src/bootstrap/principles.md")]);
@@ -86,6 +90,7 @@ test("root akeel manifest loads each capability exactly once", () => {
   assert.deepEqual(manifest.pi?.extensions, [
     "./packages/guidance/src/bootstrap/index.ts",
     "./packages/guidance/src/artifact-exchange/pi-composition.ts",
+    "./packages/guidance/src/record-containers/pi-composition.ts",
     "./packages/access-gate/src/access-gate",
     "./packages/context-pruner/src/context-pruner",
   ]);

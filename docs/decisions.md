@@ -668,7 +668,7 @@ Tilde expansion 仅适用于受支持 Shell word 中位于开头、未引用、�
 
 **Out of Scope:**
 
-- **用户项目 Project Record 自动校验或 CI 接入：** 保持为 C-032，直到出现多个真实项目或明确的确定性复用需求。
+- **用户项目 Project Record CI 门禁接入：** 会话内已通过 akeel_validate_records 原生扩展工具提供确定性校验，独立 CI/npm 门禁接入待后续按需评估。
 - **完整 Decision 语义审查：** 由人工 code/doc review 完成，不把文本启发式当作语义证明。
 
 ## D-078: Workflows 触发模型（手动调用与即时介入）

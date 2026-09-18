@@ -23,14 +23,14 @@
 
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
+import {
+  checkContainerContent,
+  RECORD_SLOT_RE,
+  STANDARD_CONTAINERS,
+} from "../packages/guidance/src/record-containers/validator.js";
 
-const CONTAINERS: ReadonlyArray<{ file: string; prefix: "C" | "T" | "D" }> = [
-  { file: "docs/candidates.md", prefix: "C" },
-  { file: "docs/task.md", prefix: "T" },
-  { file: "docs/decisions.md", prefix: "D" },
-];
-
-const SLOT_RE = /^## ([CTD])-0\d{2,}: 待创建$/;
+const CONTAINERS = STANDARD_CONTAINERS;
+const SLOT_RE = RECORD_SLOT_RE;
 const DECISION_HEADING_RE = /^## (D-\d{3}): (.+)$/;
 const DECISION_REF_RE = /\bD-\d{3}\b/g;
 
@@ -40,29 +40,8 @@ export interface CheckResult {
 }
 
 function checkContainer(file: string, expectedPrefix: string, content: string): CheckResult {
-  const errors: string[] = [];
-  const nonEmpty = content
-    .split(/\r?\n/)
-    .map((line, index) => ({ line, index }))
-    .filter((x) => x.line.trim().length > 0);
-  const slots = nonEmpty.filter((x) => SLOT_RE.test(x.line));
-  const last = nonEmpty[nonEmpty.length - 1];
-
-  if (slots.length !== 1) {
-    errors.push(`${file}: expected exactly one slot heading (## X-0NN: 待创建), found ${slots.length}`);
-  } else {
-    const slot = slots[0]!;
-    const prefix = SLOT_RE.exec(slot.line)![1]!;
-    if (prefix !== expectedPrefix) {
-      errors.push(`${file}: slot prefix ${prefix} does not match container (expected ${expectedPrefix})`);
-    }
-    if (slot.index !== last.index) {
-      errors.push(
-        `${file}: slot heading is not the last non-empty line (line ${slot.index + 1}; last non-empty is line ${last.index + 1})`,
-      );
-    }
-  }
-  return { ok: errors.length === 0, errors };
+  const result = checkContainerContent(file, content, expectedPrefix);
+  return { ok: result.ok, errors: [...result.errors] };
 }
 
 // ─── 决策 ID 引用存活校验 ───

@@ -9,7 +9,11 @@
     "typebox": "*"
   },
   "pi": {
-    "extensions": ["./src/bootstrap/index.ts", "./src/artifact-exchange/pi-composition.ts"],
+    "extensions": [
+      "./src/bootstrap/index.ts",
+      "./src/artifact-exchange/pi-composition.ts",
+      "./src/record-containers/pi-composition.ts"
+    ],
     "skills": ["./skills/disciplines", "./skills/workflows"]
   }
 }

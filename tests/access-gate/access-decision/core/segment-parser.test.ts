@@ -16,7 +16,7 @@ const contract: SegmentContract<CommonKey> = Object.freeze({
   options: Object.freeze([
     { key: "config" as const, names: ["--config", "-c"], arity: "required" as const },
     { key: "output" as const, names: ["--output", "-o"], arity: "required" as const },
-    { key: "dir" as const, names: ["-C"], arity: "required" as const, forms: ["separate" as const, "attached" as const] },
+    { key: "dir" as const, names: ["-C"], arity: "required" as const, forms: ["separate" as const, "equals" as const, "attached" as const] },
     { key: "verbose" as const, names: ["--verbose", "-v"], arity: "flag" as const },
     { key: "force" as const, names: ["--force", "-f"], arity: "flag" as const },
     { key: "help" as const, names: ["--help", "-h"], arity: "flag" as const },
