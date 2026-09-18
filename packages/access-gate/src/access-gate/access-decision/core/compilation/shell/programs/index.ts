@@ -24,6 +24,20 @@ export type {
   ProgramSemantic,
 } from "./types";
 
+export type {
+  OptionArity,
+  OptionSpec,
+  OptionValueForm,
+  ParsedOption,
+  SegmentContract,
+  SegmentParseOptions,
+  SegmentResult,
+} from "./segment-parser";
+
+export {
+  parseSegment,
+} from "./segment-parser";
+
 export {
   analyzeChmodProgram,
   analyzeCoreutilsProgram,

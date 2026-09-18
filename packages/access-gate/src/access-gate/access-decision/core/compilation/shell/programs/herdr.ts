@@ -1,58 +1,66 @@
 import type { ShellWord } from "../language";
-import { optionPaths, result } from "./shared";
+import { parseSegment, type OptionSpec, type SegmentContract } from "./segment-parser";
+import { path, result } from "./shared";
 import type { ProgramPath, ProgramSemantic } from "./types";
 
-const HERDR_VALUE_OPTIONS = new Set([
-  "--cwd",
-  "--path",
-  "--session",
-  "--remote",
-  "--remote-keybindings",
-  "--pane",
-  "--kind",
-  "--timeout",
-  "--source",
-  "--lines",
-  "--format",
-  "--branch",
-  "--label",
-  "--workspace",
-  "--base",
-  "-C",
+const HERDR_OPTIONS: readonly OptionSpec<string>[] = Object.freeze([
+  // Info & global flags
+  { key: "help", names: ["--help", "-h"], arity: "flag" },
+  { key: "version", names: ["--version", "-V", "-v"], arity: "flag" },
+  { key: "handoff", names: ["--handoff"], arity: "flag" },
+  { key: "defaultConfig", names: ["--default-config"], arity: "flag" },
+  { key: "skill", names: ["--skill"], arity: "flag" },
+  { key: "noFocus", names: ["--no-focus"], arity: "flag" },
+  { key: "wait", names: ["--wait"], arity: "flag" },
+
+  // Global & route value options
+  { key: "session", names: ["--session"], arity: "required" },
+  { key: "machine", names: ["--machine"], arity: "required" },
+  { key: "remote", names: ["--remote"], arity: "required" },
+  { key: "remoteKeybindings", names: ["--remote-keybindings"], arity: "required" },
+  { key: "cwd", names: ["--cwd", "-C"], arity: "required", forms: ["separate", "equals", "attached"] },
+  { key: "path", names: ["--path"], arity: "required" },
+  { key: "pane", names: ["--pane"], arity: "required" },
+  { key: "kind", names: ["--kind"], arity: "required" },
+  { key: "timeout", names: ["--timeout"], arity: "required" },
+  { key: "source", names: ["--source"], arity: "required" },
+  { key: "lines", names: ["--lines"], arity: "required" },
+  { key: "format", names: ["--format"], arity: "required" },
+  { key: "branch", names: ["--branch"], arity: "required" },
+  { key: "label", names: ["--label"], arity: "required" },
+  { key: "workspace", names: ["--workspace"], arity: "required" },
+  { key: "base", names: ["--base"], arity: "required" },
 ]);
+
+const HERDR_CONTRACT: SegmentContract<string> = Object.freeze({
+  options: HERDR_OPTIONS,
+});
 
 const INSPECT_ACTIONS = new Set(["list", "get", "read", "explain", "wait", "report-metadata"]);
 const EXECUTE_ACTIONS = new Set(["start", "prompt", "send-keys", "attach"]);
 const MODIFY_ACTIONS = new Set(["create", "open", "close", "remove", "rename", "focus"]);
 
-function extractPositionals(args: readonly ShellWord[]): ShellWord[] {
-  const positionals: ShellWord[] = [];
-  for (let index = 0; index < args.length; index += 1) {
-    const word = args[index]!;
-    if (word.text === "--") {
-      for (let rest = index + 1; rest < args.length; rest += 1) {
-        positionals.push(args[rest]!);
-      }
-      break;
-    }
-    if (word.text.startsWith("-")) {
-      if (!word.text.includes("=") && HERDR_VALUE_OPTIONS.has(word.text) &&
-        index + 1 < args.length && !args[index + 1]!.text.startsWith("-")) {
-        index += 1;
-      }
-      continue;
-    }
-    positionals.push(word);
-  }
-  return positionals;
-}
-
 export function analyzeHerdrProgram(args: readonly ShellWord[]): ProgramSemantic {
-  if (args.length === 0 || args.some((word) => ["--help", "-h", "--version", "-V", "-v"].includes(word.text))) {
+  if (args.length === 0) {
     return result("inspect", ["read"]);
   }
 
-  const positionals = extractPositionals(args);
+  const parsed = parseSegment(args, HERDR_CONTRACT);
+
+  if (parsed.kind === "malformed") {
+    return result("unknown", [], [], { opaque: true, hardBoundary: true });
+  }
+
+  if (parsed.kind === "indeterminate") {
+    return result("unknown", [], [], { opaque: true });
+  }
+
+  // Check for top-level help or version flags
+  if (parsed.options.some((opt) => opt.key === "help" || opt.key === "version")) {
+    return result("inspect", ["read"]);
+  }
+
+  const positionals = parsed.operands;
   if (positionals.length === 0) {
     return result("inspect", ["read"]);
   }
@@ -65,16 +73,13 @@ export function analyzeHerdrProgram(args: readonly ShellWord[]): ProgramSemantic
   }
 
   if (subcommand === "agent") {
-    if (action === undefined) {
+    if (action === undefined || INSPECT_ACTIONS.has(action)) {
       return result("inspect", ["read"]);
     }
-    if (INSPECT_ACTIONS.has(action)) {
-      return result("inspect", ["read"]);
-    }
-    if (action !== undefined && EXECUTE_ACTIONS.has(action)) {
+    if (EXECUTE_ACTIONS.has(action)) {
       return result("execute", ["execute"], [], { opaque: true });
     }
-    if (action !== undefined && MODIFY_ACTIONS.has(action)) {
+    if (MODIFY_ACTIONS.has(action)) {
       return result("modify", ["read", "write"]);
     }
     return result("unknown", [], [], { opaque: true });
@@ -85,10 +90,16 @@ export function analyzeHerdrProgram(args: readonly ShellWord[]): ProgramSemantic
       return result("inspect", ["read"]);
     }
     if (action !== undefined && MODIFY_ACTIONS.has(action)) {
-      const paths: ProgramPath[] = [
-        ...optionPaths(args, new Set(["--cwd", "-C"]), "source"),
-        ...optionPaths(args, new Set(["--path"]), "target"),
-      ];
+      const paths: ProgramPath[] = [];
+      for (const opt of parsed.options) {
+        if (opt.kind === "valued") {
+          if (opt.key === "cwd") {
+            paths.push(path(opt.value, "source"));
+          } else if (opt.key === "path") {
+            paths.push(path(opt.value, "target"));
+          }
+        }
+      }
       return result("modify", ["read", "write"], paths);
     }
     return result("unknown", [], [], { opaque: true });

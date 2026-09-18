@@ -835,6 +835,20 @@ test("Herdr commands map to inspect, execute, and modify semantics with path ext
   }
 });
 
+test("Herdr commands with unknown options are opaque and fail-closed", () => {
+  for (const command of [
+    "herdr --unknown-flag status",
+    "herdr status --unknown-flag",
+    "herdr agent list --unknown-opt",
+  ]) {
+    const analysis = analyzeShellCommand(command);
+    assert.equal(analysis.kind, "complete", command);
+    if (analysis.kind === "complete") {
+      assert.equal(analysis.semantic.opaquePathAccess, true, `expected opaque for ${command}`);
+    }
+  }
+});
+
 test("fixed system path-form coreutils obtain system identity and reuse bare-name semantics", () => {
   for (const executable of ["/bin/cat", "/usr/bin/cat"]) {
     const semantic = analyzeProgramCommand({ executable, arguments: [word("README.md", 0)] });
