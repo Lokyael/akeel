@@ -58,6 +58,7 @@ CONTEXT.md              # 当前事实、术语、架构与 Active Decisions 索
 修改 `packages/guidance/src/bootstrap/principles.md`、`packages/guidance/skills/` 或 Access Gate Guidance 时应用 `instruction-editing`。语义完整是本仓合入门禁，行数不构成优化目标；以下规则只定义 AKeel 的本地 Prompt Surface overlay。
 
 - **适用面**：`principles.md` 承载恒定原则和 Project Record 参考，skills 承载按需方法与工作流，Access Gate Guidance 承载失败路径的静态行为。每项内容按其运行时读取面和责任维护。
+- **受众感知过滤（Audience Perception & Scope Filter）**：`principles.md` 作为全局注入面，其内容仅限对所有编码项目均成立的通用工程素养与不可逾越的安全底线（如思考先于编码、极简设计、外科手术修改、新鲜证据核验、防误删）。严禁将 AKeel 自仓内务特例（如自仓特定目录豁免）、专有路径硬编码、高级多代理拓扑细节（如 Herdr/Worktree 底层调用）或元哲学说教写入该文件。Project Records 容器规则属于可选工程流派，必须以显式 Scope Guard 声明其仅适用于已采用的项目，严禁强加给普通用户项目。
 - **引用目标**：`per principles.md Quick Reference — X` 与 `per principles.md Project Records — X` 指向真实锚点，引用目标完整承载被引用语义。
 - **引用取舍（D-054）**：共享规则在目标与消费者处于可达读取或注入面、目标短而显著且单源收益高于解析成本时使用引用。跨文件引用在消费时真实读取目标；长操作细节随执行方提供。审批否决、分类守卫、防误删和其他执行必需条件留在动作点。引用解析具备可测失败或情境兜底，每次触及引用时重新核对映射可靠性。
 - **安全动作点**：失败路径的支持工具枚举、禁止重试或绕过、用户纠正路径和审批边界属于可执行判据，并在对应 Guidance 中形成完整合同。
