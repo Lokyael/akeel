@@ -170,7 +170,7 @@ const validContext = `# AKeel Context
 
 ## Active Decisions
 
-- [D-001 Title](docs/decisions.md#d-001-title)
+- [D-002 Title](docs/decisions.md#d-002-title)
 
 ## Negative Space
 
@@ -206,7 +206,7 @@ test("Context hygiene rejects out of order sections", () => {
 
 ## Active Decisions
 
-- [D-001](docs/decisions.md)
+- [D-002](docs/decisions.md)
 
 ## Negative Space
 
