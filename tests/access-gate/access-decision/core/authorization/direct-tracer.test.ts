@@ -112,3 +112,77 @@ test("all Direct surfaces use their own policy axis without retaining tool conte
   }
   assert.deepEqual(resolved, ["out.txt", "file.ts", ".", "."]);
 });
+
+test("capability asset domain grants immutable read-only admission and denies writes with hard boundary", () => {
+  const exports = core as Record<string, Function>;
+  function mockEvidence(candidate: string) {
+    const parts = candidate.split("/").filter(Boolean);
+    const traversed = ["/"];
+    let cur = "";
+    for (const part of parts) {
+      cur += `/${part}`;
+      traversed.push(cur);
+    }
+    return Object.freeze({ candidate, traversed: Object.freeze(traversed) });
+  }
+  const environment = exports.createCompileEnvironment!({
+    cwd: "/workspace",
+    pathEvidence: Object.freeze({
+      resolve(_base: string, path: string) {
+        return mockEvidence(path.startsWith("/") ? path : `/workspace/${path}`);
+      },
+    }),
+  });
+  const policy = exports.freezeUnifiedPolicySnapshot!({
+    paths: {
+      read: "deny",
+      write: "allow",
+      edit: "allow",
+      list: "deny",
+      search: "deny",
+      allowedRoots: ["/workspace"],
+      blockedRoots: [],
+      blockedPaths: [],
+    },
+    commands: {
+      inspect: "allow",
+      modify: "allow",
+      execute: "allow",
+      destroy: "deny",
+      unknown: "deny",
+    },
+  });
+  const mandatory = exports.createMandatoryBoundaries!({
+    credentialRoots: ["/agent"],
+    capabilityRoots: ["/agent/skills", "/agent/git"],
+  });
+
+  // 1. Direct read in capability roots is allowed (even though policy read is deny and outside allowedRoots)
+  const readComp = exports.compileManagedCall!({ surface: "read", arguments: { path: "/agent/skills/foo/SKILL.md" } }, environment);
+  const readAdm = exports.projectUnifiedAdmission!(readComp);
+  assert.deepEqual(exports.authorizeAdmission!(readAdm, mandatory, policy), { kind: "allow" });
+
+  // 2. Direct list in capability roots is allowed
+  const listComp = exports.compileManagedCall!({ surface: "list", arguments: { path: "/agent/skills/foo" } }, environment);
+  const listAdm = exports.projectUnifiedAdmission!(listComp);
+  assert.deepEqual(exports.authorizeAdmission!(listAdm, mandatory, policy), { kind: "allow" });
+
+  // 3. Direct write in capability roots is hard-denied (anti-tamper invariant, even though policy write is allow)
+  const writeComp = exports.compileManagedCall!({ surface: "write", arguments: { path: "/agent/skills/foo/SKILL.md", content: "hacked" } }, environment);
+  const writeAdm = exports.projectUnifiedAdmission!(writeComp);
+  assert.deepEqual(exports.authorizeAdmission!(writeAdm, mandatory, policy), { kind: "deny", code: "hard-boundary" });
+
+  // 4. Direct edit in capability roots is hard-denied (anti-tamper invariant)
+  const editComp = exports.compileManagedCall!({ surface: "edit", arguments: { path: "/agent/skills/foo/SKILL.md", edits: [{ oldText: "a", newText: "b" }] } }, environment);
+  const editAdm = exports.projectUnifiedAdmission!(editComp);
+  assert.deepEqual(exports.authorizeAdmission!(editAdm, mandatory, policy), { kind: "deny", code: "hard-boundary" });
+
+  // 5. Credential dominance: auth.json under credential roots remains hard-denied even if overlapping with capability roots
+  const credMandatory = exports.createMandatoryBoundaries!({
+    credentialRoots: ["/agent"],
+    capabilityRoots: ["/agent", "/agent/skills"],
+  });
+  const credComp = exports.compileManagedCall!({ surface: "read", arguments: { path: "/agent/auth.json" } }, environment);
+  const credAdm = exports.projectUnifiedAdmission!(credComp);
+  assert.deepEqual(exports.authorizeAdmission!(credAdm, credMandatory, policy), { kind: "deny", code: "hard-boundary" });
+});

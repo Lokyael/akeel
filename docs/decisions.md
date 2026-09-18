@@ -913,5 +913,28 @@ Artifact tools 是独立自授权的 Pi custom tool surfaces，不改变 Access 
 
 **Out of Scope:** 自动 run/handoff/Herdr resource GC、accepted/abandoned 状态、跨 Owner 自动 adoption、异步 mailbox、binary/streaming/multipart artifact、多用户或恶意同 uid 隔离、OS sandbox、fd broker 和完整 filesystem TOCTOU 消除。
 
-## D-090: 待创建
+## D-090: 三域正交路径访问模型与能力资产防篡改硬边界
+
+**Reversal surface:** user-boundary
+
+**Decision:** Access Gate 路径准入采用三域正交模型（Three-Tier Path Domain Model）：
+1. **凭据域（Credential Domain，D-070）**：宿主拥有且保存实时凭据的工件（`auth.json` 及其衍生变体）与相交递归搜索，享有绝对最高优先级拦截权，任何其他域不可豁免，一律永久 hard-deny。
+2. **能力资产域（Capability Domain）**：覆盖 Pi 宿主会话装配的已注册扩展与技能分发子目录（`git`、`node_modules`、`skills`、`extensions`）。对该域下的 Direct `read` 与非递归 Direct `ls` 赋予隐式只读准入，不要求路径位于工作区 `allowedRoots` 内；对 Direct `write`、`edit` 以及 Shell 中带有写或删除副作用（`write`/`delete`）的变异操作，一律触发系统级防篡改硬拒绝（`hard-boundary`），任何 preset 不得放宽。严禁将 `agentDir` 根目录自身纳入能力资产根，防止凭据与会话隐私泛化。
+3. **工作区主域（Workspace Domain，D-072 / D-069）**：覆盖会话 `accessRoot (cwd)`、`stagingRoot` 与 `/tmp/akeel`，完整受内置与自定义 Preset（`review`、`guided`、`develop`）管辖。
+
+`createMandatoryBoundaries` 接收并密封冻结 `capabilityRoots`；`createGateSession` 校验并传递该集合，工作区 `defaultRoots` 保持纯净；`pi-composition` 在会话初始化时自动装配标准分发子目录，实现用户零配置（Zero-Config UX）。
+
+**Why:** 用户在独立业务项目中加载全局技能时，技能读取伴随资源会被工作区访问根（D-072）拦截，迫使用户手动配置 `policy.yaml` 或执行 `/policy off`，破坏开箱即用体验。若简单将全局分发目录加入 `allowedRoots`，在 `develop` 预设下模型将获得对全局分发代码的写权限，直接违背 AGENTS.md“全局副本只读，拒绝直接修改”铁律。三域正交模型将能力资产提升为系统级只读基础设施，在底层通过 Mandatory Boundary 硬件级阻断篡改，同时保证凭据域的绝对压制，兼顾了零配置体验与分发代码防篡改安全。
+
+**Impact:** 模型在任何工作区中可直接读取已注册技能与扩展的说明与配套资源，无需用户在 `policy.yaml` 配置白名单；任何对分发代码的修改（写、改、删）即使在 `develop` 下也被硬阻断；`agentDir/auth.json` 维持绝对不可读硬边界。
+
+**Rejected:**
+
+- **在工作区 `allowedRoots` 中手动配置分发目录：** 破坏 Zero-Config UX，且在 `develop` 下向模型暴露分发代码写权限，存在写穿透风险。
+- **将 `agentDir` 根目录直接作为能力资产根：** 会将 `auth.json`、`settings.json` 及会话日志置于能力域之下，扩大暴露面。
+- **允许对能力资产进行受审批的修改（`ask`）：** 分发安装副本在工作区会话中必须是严格只读的，修改必须在仓库源 checkout 中进行，不提供审批放宽通道。
+
+**Out of Scope:** 工作区外普通业务文件的读写放宽、对未注册第三方文件的特例放行、Shell 任意动态或未建模命令对能力资产的执行，以及动态包扫描器的引入。
+
+## D-091: 待创建
 

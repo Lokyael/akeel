@@ -64,6 +64,7 @@
 - 生产入口只读取 `$PI_CODING_AGENT_DIR/akeel/policy.yaml`（默认 `~/.pi/agent/akeel/policy.yaml`）。内置 `review`、`guided`、`develop` 不依赖外置文件；文件缺失、为空、格式/schema/legacy 不可用时整体忽略并使用内置 `review`，不部分采用、不读取旧 config/Profile schema，也不使用旧 fallback。
 - Policy Preset 当前由 D-069 规定为内置 `review`、`guided`、`develop` 和 `policy.yaml` 自定义 preset；每个 preset 可拥有独立 path scope，系统 hard boundary 始终优先。自定义 badge 由配置声明或自动消歧。内置 `guided` 与 `develop` 将 `commands.destroy` 设为 `ask`，`review` 为 `deny`；D-071 仅对已建立完备路径证明的单文件非递归裸 `rm` 解除硬边界短路并接入知情同意（`ask`，无 UI 时 fail-closed），递归删除、目录删除及未证明破坏操作继续永久 hard-deny。`/policy` 提供临时 preset 选择面板、显式切换和状态查询；策略 Badge 通过宿主 `ui.setStatus` 同步，会话结束时清除。Delegated child 按任务类型的能力分层与风险边界仍属 C-009 候选范围。
 - 宿主拥有且用于保存实时凭据的凭据工件由 D-070 归入系统 hard boundary：对 Canonical 阶段明确识别的受管路径操作 `read`、`write`、`edit`、`list`、`search` 一律拒绝，preset 不得放宽；模板类工件不属于该类别。分类依据是受信任 agent 目录下的路径身份契约，不读取内容；递归 search 若候选路径与 credential root 相交则硬拒绝，非递归的 agent 目录访问仍按既有路径策略处理，也不为无法发行具体路径的 opaque Shell access 增加凭据专用拒绝。
+- 路径准入遵循三域正交模型（Three-Tier Path Domain Model，D-090）：凭据域（D-070）拥有不可放宽的绝对最高压制权；能力资产域（Capability Domain）覆盖 Pi 宿主会话装配的已注册扩展与技能分发子目录（`git`、`node_modules`、`skills`、`extensions`），赋予 Direct `read`/`list` 隐式只读准入，同时对 Direct `write`/`edit` 及 Shell 写删副作用实施系统级防篡改硬拦截（`hard-boundary`，任何 preset 不可放宽），在运行时强制落实全局分发产物只读铁律；工作区主域（Workspace Domain）覆盖项目 `accessRoot (cwd)` 与 `stagingRoot`，受 Preset 策略管辖。严禁将 `agentDir` 根目录自身纳入能力资产根。
 - Access Gate 默认启用；D-066 允许用户在 `policy.yaml` 中以 `accessGate: off` 或在会话内通过 `/policy off` 进入关闭模式（仅保留 bootstrap/skills，tool-call 直通）；off 模式下可随时通过 `/policy <preset>` 动态启用 Access Gate。
 - Prompt Surface（D-030/D-053/D-023）：Policy Snapshot、policy.yaml 和活动 policy 状态不进入 context 消息、tool description 或 system prompt；模型可见的政策相关文本只有受 D-023 限定的静态失败 Guidance。
 - 旧决策实现、旧测试与 archive 不属于当前依赖边界，也不是 parity oracle。Static Flow、Explanation Replay 与 Runtime Content Flow 不属于 T-069。
@@ -109,6 +110,7 @@
 - [D-087 Access Gate 双语义车道与单一授权信任链](docs/decisions.md#d-087-access-gate-双语义车道与单一授权信任链)
 - [D-088 Session-owned Staging 生命周期与保留策略](docs/decisions.md#d-088-session-owned-staging-生命周期与保留策略)
 - [D-089 Capability Artifact Exchange 与临时资源分类](docs/decisions.md#d-089-capability-artifact-exchange-与临时资源分类)
+- [D-090 三域正交路径访问模型与能力资产防篡改硬边界](docs/decisions.md#d-090-三域正交路径访问模型与能力资产防篡改硬边界)
 
 ## Negative Space
 
@@ -131,6 +133,7 @@
 - 不分发独立 `grill-plan` 或响应自然语言 grill 触发词；grilling 只由用户手动调用 `grill-docs`。
 - 不把 Herdr 声明为 AKeel runtime dependency；`grill-docs` 使用 Herdr 固定执行面和 Artifact Exchange verified collect。当前不提供异步 child mailbox、自动续跑、结果聚合、run/handoff GC、accepted/abandoned 状态或 pane/workspace/worktree 的确定性自动回收；publication receipt 只证明 artifact 完整发布，不证明验收、commit 保留或资源可删除。长期独立工作使用用户授权、范围互斥的 Task Owner Session，child 与临时资源仍由存活 Owner 检查并在用户批准后精确清理。
 - `assess-modularity` 不提供覆盖数据所有权、运行时拓扑、部署、可靠性、安全和容量的广义 architecture review，也不实施或采纳其 findings。
+- 能力资产域（Capability Domain）仅针对宿主已注册扩展与技能分发子目录（`git`、`node_modules`、`skills`、`extensions`）赋予只读准入，不放宽工作区外普通业务文件的读写，不将 `agentDir` 根目录自身纳入能力域，不对 Shell 任意动态或未建模命令开放能力资产执行，也不放宽分发目录的任何写/改/删操作（防篡改硬拦截）。
 
 ## Project Documents
 

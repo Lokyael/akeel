@@ -24,10 +24,12 @@ type ProjectLifecycleOptions = Readonly<{
 export type PiCompositionOptions = ProjectLifecycleOptions & Readonly<{
   readonly policyConfig: unknown;
   readonly agentDir?: string;
+  readonly capabilityRoots?: readonly string[];
 }>;
 
 export type GlobalPiCompositionOptions = Readonly<{
   readonly agentDir?: string;
+  readonly capabilityRoots?: readonly string[];
 }>;
 
 type SessionProject = Readonly<{
@@ -109,11 +111,27 @@ function credentialRoots(agentDir: string): readonly string[] {
   return Object.freeze(resolved === undefined || resolved === agentDir ? [agentDir] : [agentDir, resolved]);
 }
 
+function defaultCapabilityRoots(agentDir: string): readonly string[] {
+  const subDirs = ["git", "node_modules", "skills", "extensions"];
+  const roots: string[] = [];
+  const evidence = createLinuxPathEvidence();
+  for (const sub of subDirs) {
+    const raw = `${agentDir}/${sub}`;
+    const resolved = evidence.resolve("/", raw)?.candidate;
+    roots.push(raw);
+    if (resolved !== undefined && resolved !== raw) {
+      roots.push(resolved);
+    }
+  }
+  return Object.freeze([...new Set(roots)]);
+}
+
 function installComposition(
   pi: ExtensionAPI,
   policyProvider: () => DecodedPolicyConfiguration | undefined,
   createSessionProject: (cwd: string) => SessionProject,
   agentDir: string,
+  configuredCapabilityRoots?: readonly string[],
 ): void {
   let session: GateSession | undefined;
   let project: ProjectLifecycle | undefined;
@@ -121,6 +139,9 @@ function installComposition(
   let currentConfiguration: DecodedPolicyConfiguration | undefined = policyProvider();
   const pathEvidence = createLinuxPathEvidence();
   const protectedRoots = credentialRoots(agentDir);
+  const activeCapabilityRoots = Object.freeze([
+    ...new Set([...defaultCapabilityRoots(agentDir), ...(configuredCapabilityRoots ?? [])]),
+  ]);
 
   function currentBadge(): string {
     if (currentConfiguration?.kind === "off") {
@@ -182,6 +203,7 @@ function installComposition(
         stagingRoot: project ? project.context.stagingRoot : context.cwd,
         home: sessionHome,
         credentialRoots: protectedRoots,
+        capabilityRoots: activeCapabilityRoots,
         configuration: newConfig,
         pathEvidence,
       });
@@ -285,6 +307,7 @@ function installComposition(
         stagingRoot: sessionProject.context.stagingRoot,
         home: sessionHome,
         credentialRoots: protectedRoots,
+        capabilityRoots: activeCapabilityRoots,
         configuration: currentConfiguration,
         pathEvidence,
       });
@@ -321,10 +344,10 @@ export function installPiAccessDecision(pi: ExtensionAPI, options: PiComposition
     return {
       context: createProjectContext({ cwd, projectRoot: cwd, stagingRoot: options.stagingRoot }),
     };
-  }, agentDir);
+  }, agentDir, options.capabilityRoots);
 }
 
 export function installGlobalPiAccessDecision(pi: ExtensionAPI, options: GlobalPiCompositionOptions): void {
   const agentDir = resolveAgentDir(options.agentDir);
-  installComposition(pi, () => loadDecodedPolicyFile(agentDir), createProjectLifecycle, agentDir);
+  installComposition(pi, () => loadDecodedPolicyFile(agentDir), createProjectLifecycle, agentDir, options.capabilityRoots);
 }

@@ -250,3 +250,69 @@ test("cross-surface policy evaluation verifies dual-axis tightening and path int
   });
 });
 
+test("Shell operations respect capabilityRoots with anti-tamper hard boundary for modifications", () => {
+  const exports = core as Record<string, Function>;
+  function mockEvidence(candidate: string) {
+    const parts = candidate.split("/").filter(Boolean);
+    const traversed = ["/"];
+    let cur = "";
+    for (const part of parts) {
+      cur += `/${part}`;
+      traversed.push(cur);
+    }
+    return Object.freeze({ candidate, traversed: Object.freeze(traversed) });
+  }
+  const environment = exports.createCompileEnvironment!({
+    cwd: "/workspace",
+    pathEvidence: Object.freeze({
+      resolve(_base: string, path: string) {
+        return mockEvidence(path.startsWith("/") ? path : `/workspace/${path}`);
+      },
+    }),
+  });
+
+  const mandatory = exports.createMandatoryBoundaries!({
+    credentialRoots: ["/agent"],
+    capabilityRoots: ["/agent/skills"],
+  });
+
+  const policy = exports.freezeUnifiedPolicySnapshot!({
+    paths: {
+      read: "allow",
+      write: "allow",
+      edit: "allow",
+      list: "allow",
+      search: "allow",
+      allowedRoots: ["/workspace"],
+      blockedRoots: [],
+      blockedPaths: [],
+    },
+    commands: {
+      inspect: "allow",
+      modify: "allow",
+      execute: "allow",
+      destroy: "deny",
+      unknown: "deny",
+    },
+  });
+
+  // 1. Inspecting file in capability roots is allowed (read effect)
+  const catCall = exports.compileManagedCall!({
+    surface: "bash",
+    arguments: { command: "cat /agent/skills/foo/SKILL.md" },
+  }, environment);
+  assert.deepEqual(exports.authorizeAdmission!(exports.projectUnifiedAdmission!(catCall), mandatory, policy), {
+    kind: "allow",
+  });
+
+  // 2. Modifying file in capability roots is hard-denied (anti-tamper)
+  const touchCall = exports.compileManagedCall!({
+    surface: "bash",
+    arguments: { command: "touch /agent/skills/foo/SKILL.md" },
+  }, environment);
+  assert.deepEqual(exports.authorizeAdmission!(exports.projectUnifiedAdmission!(touchCall), mandatory, policy), {
+    kind: "deny",
+    code: "hard-boundary",
+  });
+});
+

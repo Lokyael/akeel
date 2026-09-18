@@ -58,6 +58,7 @@ export function createGateSession(input: unknown): GateSession {
     input.accessRoot !== undefined && !isAbsolutePath(input.accessRoot) ||
     input.home !== undefined && !isAbsolutePath(input.home) || !Array.isArray(input.credentialRoots) ||
     input.credentialRoots.length === 0 || !input.credentialRoots.every(isAbsolutePath) ||
+    input.capabilityRoots !== undefined && (!Array.isArray(input.capabilityRoots) || !input.capabilityRoots.every(isAbsolutePath)) ||
     !isRecord(input.configuration) || input.configuration.kind !== "enabled" || !isRecord(input.pathEvidence)) {
     throw new TypeError("invalid gate session");
   }
@@ -67,7 +68,10 @@ export function createGateSession(input: unknown): GateSession {
     home: input.home,
     pathEvidence: input.pathEvidence,
   });
-  const mandatory = createMandatoryBoundaries({ credentialRoots: input.credentialRoots });
+  const mandatory = createMandatoryBoundaries({
+    credentialRoots: input.credentialRoots,
+    capabilityRoots: input.capabilityRoots as readonly string[] | undefined,
+  });
   const defaultRoots = Object.freeze([
     (input.accessRoot as string | undefined) ?? input.cwd,
     input.stagingRoot,

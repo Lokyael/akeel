@@ -449,3 +449,37 @@ test("Pi production composition clears the service at session shutdown", async (
     { block: true, reason: "Blocked because the decision service is not initialized." },
   );
 });
+
+test("Pi composition automatically equips capability asset roots with read-only admission and write hard-block", async () => {
+  const { handlers, pi } = fakePi();
+  const agentDir = "/tmp/test-agent-env";
+  installPiAccessDecision(pi, {
+    ...options,
+    agentDir,
+    policyConfig: {
+      presets: {
+        develop: {
+          paths: { read: "allow", write: "allow", edit: "allow" },
+          commands: { inspect: "allow", modify: "allow", execute: "allow" },
+        },
+      },
+      activePreset: "develop",
+    },
+  });
+  const hostContext = context("/workspace/project", false, async () => false);
+  await invoke(handlers, "session_start", {}, hostContext);
+
+  // 1. Reading a skill asset in agentDir/skills is allowed (even outside project cwd)
+  assert.equal(
+    await invoke(handlers, "tool_call", { toolName: "read", input: { path: `${agentDir}/skills/survey/SKILL.md` } }, hostContext),
+    undefined,
+  );
+
+  // 2. Writing to a skill asset is blocked with static reason (anti-tamper invariant under develop)
+  const writeBlock = await invoke(handlers, "tool_call", { toolName: "write", input: { path: `${agentDir}/skills/survey/SKILL.md`, content: "tamper" } }, hostContext);
+  assert.equal((writeBlock as any)?.block, true);
+
+  // 3. Credential artifact auth.json in agentDir remains blocked
+  const credBlock = await invoke(handlers, "tool_call", { toolName: "read", input: { path: `${agentDir}/auth.json` } }, hostContext);
+  assert.equal((credBlock as any)?.block, true);
+});

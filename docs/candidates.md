@@ -264,19 +264,4 @@
 - **Revisit condition:** 真实多语言开发工作流因缺少构建工具语义而受阻，且现有 `commands.opaque` 或会话策略无法满足需求；或用户明确要求引入特定构建工具族的有界支持。
 - **Out of Scope:** 在本候选被明确采纳前，不新增构建工具分析器，不改变现行 `unknown + opaque` 分类行为，不创建实现 Task。
 
-## C-049: 宿主已注册技能与扩展资产的清单级只读准入（Dynamic Asset Manifest）
-
-> 本条记录未来基于 Pi 宿主已注册清单对技能（Skills）与扩展（Extensions）分发资产实施精准只读准入（Dynamic Asset Manifest）的架构探索，不弱化凭据与工作区边界，不改变现行 Policy Kernel 决策语义，也不构成实现承诺。
-
-- **Why Not Now:** 当前可通过显式配置 `policy.yaml` 中的 `allowedRoots`（如将 `~/.pi/agent/git`、`~/.pi/agent/node_modules` 等分发子目录加入只读白名单）避免阻断；Access Gate 的 Greenfield 决策管线刚完成原子切换，若直接在运行时引入动态宿主资产扫描与清单索引会增加会话启动耦合，且目前缺少跨包管理器（git、npm、standalone skills 等）统一且无损的宿主 API 查询缝隙。过早引入全量动态资产索引可能引入启动开销与宿主版本契约脆弱性。
-- **Exploration Direction:** 若未来重新评估，探索基于已注册清单的精确最小权限准入模型（Dynamic Asset Manifest）：
-  - **清单级索引与会话绑定（Session-Bound Manifest Discovery）**：在 `session_start` 时，由 Pi 组合适配层提取当前会话实际生效的技能与扩展入口（如解析 `ExtensionContext`、`package.json` 中的 `pi.skills`/`pi.extensions` 声明），生成只读的不可变注册资产集合（`registeredAssetRoots` 或精确 `registeredAssetPaths`）；
-  - **语义意图与路径角色分类（Capability Asset Read vs. Workspace Read）**：在 Direct 工具（特别是 `read` 与非递归 `ls`）准入检查中，若目标路径命中注册资产清单，将其识别为合法的“宿主能力资产检查（Capability Inspection）”，静默赋予只读准入，不再要求该路径必须位于项目 `cwd`（`allowedRoots`）内；
-  - **绝对只读与不可变性保证（Immutable Read-Only Invariant）**：命中资产清单的路径严格仅允许只读操作（`read`），任何对分发资产的写（`write`）、修改（`edit`）、删除（`destroy`）或 Shell 写入均触发系统硬拒绝（`hard-boundary`），杜绝运行时篡改分发物；
-  - **不可动摇的凭据硬隔离（Credential Boundary Dominance）**：`auth.json` 及其衍生凭据文件继续由 Mandatory Boundary 的 `credentialArtifact`（D-070）永久拦截，即使被误放入包目录也绝不放行；递归搜索与凭据根相交继续 fail-closed；
-  - **用户零配置体验（Zero-Config UX）**：彻底消除用户手动配置 npm、git、nvm、全局模块等底层目录的摩擦，且在普通用户项目中杜绝因找不到全局技能而向本地未提交脏源码退化的错误降级。
-- **Boundary & Scope:** 不放宽工作区外普通业务文件的读写限制；不为未注册的任意第三方或环境文件开特例；不对动态/未知 Shell 命令放开工作区外执行；不弱化 D-018 的语义准入与 D-072 的工作区访问根原则。
-- **Revisit condition:** 真实用户在独立业务项目中因技能加载被 Access Gate 拦截而频繁遇到死锁；或 Pi 官方提供稳定的已注册技能与扩展查询 API / Seam；或用户明确要求启动基于已注册清单的技能准入设计 Task。
-- **Out of Scope:** 在本候选被明确采纳前，不修改 `packages/access-gate` 现行授权内核代码，不引入动态资产扫描器，不放宽默认 `allowedRoots`，不创建实现 Task。
-
 ## C-050: 待创建

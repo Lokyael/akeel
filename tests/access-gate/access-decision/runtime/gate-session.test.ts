@@ -248,3 +248,65 @@ test("default roots admit the session access root, staging root, and /tmp/akeel"
   });
 });
 
+test("GateSession enforces capabilityRoots with read-only admission and anti-tamper write denial under develop", () => {
+  const createGateSession = (runtime as Record<string, unknown>).createGateSession;
+  const configuration = decodePolicyConfiguration({
+    presets: {
+      develop: {
+        paths: { read: "allow", write: "allow", edit: "allow" },
+        commands: { inspect: "allow", modify: "allow", execute: "allow" },
+      },
+    },
+    activePreset: "develop",
+  });
+
+  function mockEvidence(candidate: string) {
+    const parts = candidate.split("/").filter(Boolean);
+    const traversed = ["/"];
+    let cur = "";
+    for (const part of parts) {
+      cur += `/${part}`;
+      traversed.push(cur);
+    }
+    return Object.freeze({ candidate, traversed: Object.freeze(traversed) });
+  }
+
+  const session = (createGateSession as Function)({
+    cwd: "/workspace",
+    home: "/home/user",
+    stagingRoot: "/tmp/akeel-stage",
+    credentialRoots: ["/agent"],
+    capabilityRoots: ["/agent/skills"],
+    configuration,
+    pathEvidence: Object.freeze({
+      resolve(base: string, path: string) {
+        return mockEvidence(path.startsWith("/") ? path : `${base}/${path}`);
+      },
+    }),
+  });
+
+  // 1. Direct read on capability asset outside workspace is allowed under develop
+  assert.deepEqual(session.evaluate({ surface: "read", arguments: { path: "/agent/skills/foo/SKILL.md" } }), {
+    kind: "allow",
+  });
+
+  // 2. Direct write on capability asset is hard-denied even under develop
+  assert.deepEqual(session.evaluate({ surface: "write", arguments: { path: "/agent/skills/foo/SKILL.md", content: "evil" } }), {
+    kind: "deny",
+    code: "hard-boundary",
+  });
+
+  // 3. Rejects invalid capabilityRoots
+  assert.throws(() => {
+    (createGateSession as Function)({
+      cwd: "/workspace",
+      home: "/home/user",
+      stagingRoot: "/tmp/akeel-stage",
+      credentialRoots: ["/agent"],
+      capabilityRoots: ["relative/path"],
+      configuration,
+      pathEvidence: Object.freeze({ resolve: () => undefined }),
+    });
+  }, TypeError);
+});
+
