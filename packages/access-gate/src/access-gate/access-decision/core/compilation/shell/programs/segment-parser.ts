@@ -13,6 +13,7 @@ export type OptionSpec<Key extends string = string> = Readonly<{
 export type SegmentContract<Key extends string = string> = Readonly<{
   readonly options: readonly OptionSpec<Key>[];
   readonly allowCluster?: boolean;
+  readonly matchExtraOption?: (token: ShellWord) => { readonly key: Key; readonly name: string } | undefined;
 }>;
 
 export type SegmentParseOptions = Readonly<{
@@ -132,6 +133,20 @@ export function parseSegment<Key extends string = string>(
       }
       index += 1;
       continue;
+    }
+
+    if (contract.matchExtraOption !== undefined) {
+      const extra = contract.matchExtraOption(token);
+      if (extra !== undefined) {
+        options.push(Object.freeze({
+          kind: "flag" as const,
+          key: extra.key,
+          name: extra.name,
+          token,
+        }));
+        index += 1;
+        continue;
+      }
     }
 
     // Long options (--foo or --foo=bar)

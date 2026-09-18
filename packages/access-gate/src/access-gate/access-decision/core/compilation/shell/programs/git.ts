@@ -1,90 +1,160 @@
 import type { ShellPath } from "../invocation";
 import type { ShellWord } from "../language";
-import { firstNonOptionWord, hasUnknownOption, scanOptionWords } from "./option-scanner";
+import { parseSegment, type OptionSpec, type SegmentContract } from "./segment-parser";
 import type { ProgramCwdChange, ProgramPath, ProgramPathBase, ProgramSemantic } from "./types";
 
-const GIT_CLONE_VALUE_OPTIONS = new Set([
-  "--template", "--reference", "--reference-if-able", "--separate-git-dir", "--depth", "--shallow-since",
-  "--shallow-exclude", "--origin", "-o", "--branch", "-b", "--upload-pack", "-u", "--config",
-  "--server-option", "--jobs", "-j", "--filter",
+// --- Global Options Contract ---
+
+type GitGlobalKey = "cwd" | "gitDir" | "workTree" | "config" | "flag";
+
+const GIT_GLOBAL_OPTIONS: readonly OptionSpec<GitGlobalKey>[] = Object.freeze([
+  { key: "cwd" as const, names: ["-C"], arity: "required" as const, forms: ["separate" as const, "attached" as const] },
+  { key: "config" as const, names: ["-c"], arity: "required" as const, forms: ["separate" as const, "attached" as const] },
+  { key: "gitDir" as const, names: ["--git-dir"], arity: "required" as const, forms: ["separate" as const, "equals" as const] },
+  { key: "workTree" as const, names: ["--work-tree"], arity: "required" as const, forms: ["separate" as const, "equals" as const] },
+  { key: "flag" as const, names: ["--no-pager", "--paginate", "--literal-pathspecs"], arity: "flag" as const },
 ]);
-const GIT_CLONE_PATH_OPTIONS = new Set(["--template", "--reference", "--reference-if-able"]);
-const GIT_CLONE_SAFE_OPTIONS = new Set([
-  ...GIT_CLONE_VALUE_OPTIONS,
-  "--local", "-l", "--no-hardlinks", "--shared", "--no-tags", "--tags", "--single-branch", "--no-single-branch",
-  "--recurse-submodules", "--recursive", "--shallow-submodules", "--no-shallow-submodules", "--dissociate",
-  "--no-checkout", "--bare", "--mirror", "--progress", "--no-progress", "--quiet", "-q", "--verbose", "-v",
-  "--ipv4", "--ipv6", "--also-filter-submodules",
+
+const GIT_GLOBAL_CONTRACT: SegmentContract<GitGlobalKey> = Object.freeze({
+  options: GIT_GLOBAL_OPTIONS,
+});
+
+// --- Subcommand Option Contracts ---
+
+type GitSubcommandKey =
+  | "flag"
+  | "scalar"
+  | "path"
+  | "output"
+  | "file"
+  | "message"
+  | "source"
+  | "branch"
+  | "remote"
+  | "numericLimit";
+
+// Common Value Options across git subcommands
+const COMMON_VALUE_OPTIONS: readonly OptionSpec<GitSubcommandKey>[] = [
+  { key: "message", names: ["-m", "-F", "--message", "--file"], arity: "required" },
+  { key: "branch", names: ["-b", "--branch"], arity: "required" },
+  { key: "output", names: ["--output", "-o", "--output-directory"], arity: "required" },
+  { key: "path", names: ["--template", "--reference", "--reference-if-able", "--separate-git-dir"], arity: "required" },
+  {
+    key: "scalar",
+    names: [
+      "--depth",
+      "--shallow-since",
+      "--shallow-exclude",
+      "--origin",
+      "--upload-pack",
+      "-u",
+      "--config",
+      "--server-option",
+      "--jobs",
+      "-j",
+      "--filter",
+      "--negotiation-tip",
+    ],
+    arity: "required",
+  },
+];
+
+// Common Flag Options
+const COMMON_FLAG_OPTIONS: readonly OptionSpec<GitSubcommandKey>[] = [
+  {
+    key: "flag",
+    names: [
+      "-A", "-a", "-n", "-q", "-v", "-u", "-U", "--stat", "--oneline", "--cached", "--staged",
+      "--porcelain", "--short", "--branch", "--show-current", "--name-only", "--name-status", "--dry-run",
+      "--hard", "-d", "-D", "-f", "--force", "--delete", "--global", "--local", "--system",
+      "--list", "-l", "--get", "--unset", "--add",
+      "--local", "--no-hardlinks", "--shared", "--no-tags", "--tags", "--single-branch", "--no-single-branch",
+      "--recurse-submodules", "--recursive", "--shallow-submodules", "--no-shallow-submodules", "--dissociate",
+      "--no-checkout", "--bare", "--mirror", "--progress", "--no-progress", "--quiet", "--verbose",
+      "--ipv4", "--ipv6", "--also-filter-submodules",
+    ],
+    arity: "flag",
+  },
+];
+
+// Inspect Option Additions (T-0124)
+const INSPECT_VALUE_OPTIONS: readonly OptionSpec<GitSubcommandKey>[] = [
+  {
+    key: "scalar",
+    names: [
+      "-S", "-G", "--grep", "--author", "--committer",
+      "--since", "--after", "--until", "--before",
+      "--format", "--pretty", "-L", "--max-count", "--diff-filter",
+    ],
+    arity: "required",
+  },
+];
+
+const INSPECT_FLAG_OPTIONS: readonly OptionSpec<GitSubcommandKey>[] = [
+  {
+    key: "flag",
+    names: [
+      "--graph", "--follow", "--topo-order", "--date-order", "--author-date-order",
+      "--reverse", "--no-merges", "--merges", "--first-parent",
+      "-p", "--patch", "-s", "--no-patch", "--numstat", "--shortstat",
+      "--relative", "--abbrev-commit", "--no-abbrev-commit",
+    ],
+    arity: "flag",
+  },
+];
+
+const GIT_INSPECT_CONTRACT: SegmentContract<GitSubcommandKey> = Object.freeze({
+  options: Object.freeze([
+    ...COMMON_VALUE_OPTIONS,
+    ...COMMON_FLAG_OPTIONS,
+    ...INSPECT_VALUE_OPTIONS,
+    ...INSPECT_FLAG_OPTIONS,
+  ]),
+  matchExtraOption: (token: ShellWord) => {
+    if (/^-[1-9][0-9]*$/u.test(token.text)) {
+      return { key: "numericLimit" as const, name: token.text };
+    }
+    return undefined;
+  },
+});
+
+const GIT_RESTORE_OPTIONS: readonly OptionSpec<GitSubcommandKey>[] = Object.freeze([
+  { key: "source" as const, names: ["--source", "-s"], arity: "required" as const },
+  {
+    key: "flag" as const,
+    names: ["--worktree", "-W", "--staged", "-S", "-q", "--quiet", "--progress", "--no-progress", "--ignore-unmerged", "--ignore-skip-worktree-bits"],
+    arity: "flag" as const,
+  },
 ]);
+
+const GIT_RESTORE_CONTRACT: SegmentContract<GitSubcommandKey> = Object.freeze({
+  options: GIT_RESTORE_OPTIONS,
+});
+
+const GIT_COMMON_CONTRACT: SegmentContract<GitSubcommandKey> = Object.freeze({
+  options: Object.freeze([
+    ...COMMON_VALUE_OPTIONS,
+    ...COMMON_FLAG_OPTIONS,
+  ]),
+});
+
+// --- Constants ---
+
 const GIT_INSPECT = new Set([
   "status", "diff", "log", "rev-list", "show", "grep", "blame", "ls-files", "ls-tree", "ls-remote",
   "fsck", "describe", "check-attr", "check-ignore", "help",
 ]);
+
 const GIT_MODIFY = new Set([
   "add", "rm", "commit", "push", "checkout", "switch", "restore", "merge", "rebase", "tag", "reset",
   "fetch", "pull", "clone", "init", "remote", "mv", "cherry-pick", "revert", "apply", "gc", "submodule",
   "stash", "format-patch", "archive", "config",
 ]);
+
 const GIT_HELPER_COMMANDS = new Set([
-  "push",
-  "fetch",
-  "pull",
-  "clone",
-  "init",
-  "checkout",
-  "switch",
-  "restore",
-  "merge",
-  "rebase",
-  "tag",
-  "reset",
-  "cherry-pick",
-  "revert",
-  "stash",
-  "submodule",
-  "config",
-  "help",
-  "grep",
-  "blame",
-  "gc",
-  "apply",
-]);
-const GIT_GLOBAL_VALUE_OPTIONS = new Set(["-C", "-c", "--git-dir", "--work-tree"]);
-const GIT_REMOTE_VALUE_OPTIONS = new Set(["--upload-pack", "-u", "--depth", "--shallow-since", "--shallow-exclude", "--negotiation-tip", "--server-option", "--filter"]);
-const GIT_SAFE_OPTIONS = new Set([
-  ...GIT_CLONE_VALUE_OPTIONS,
-  "--", "-A", "-a", "-n", "-q", "-v", "-u", "-U", "--stat", "--oneline", "--cached", "--staged",
-  "--porcelain", "--short", "--branch", "--show-current", "--name-only", "--name-status", "--dry-run", "--hard", "-m", "-F",
-  "--message", "--file", "-b", "-d", "-D", "-f", "--force", "--delete", "--dry-run", "--output", "-o",
-  "--output-directory", "--global", "--local", "--system", "--list", "-l", "--get", "--unset", "--add",
-]);
-const GIT_VALUE_OPTIONS = new Set([
-  ...GIT_CLONE_VALUE_OPTIONS,
-  ...GIT_REMOTE_VALUE_OPTIONS,
-  "-m", "-F", "-b", "--message", "--file", "--output", "-o", "--output-directory",
-]);
-
-const GIT_INSPECT_VALUE_OPTIONS = new Set([
-  ...GIT_VALUE_OPTIONS,
-  "-S", "-G", "--grep", "--author", "--committer",
-  "--since", "--after", "--until", "--before",
-  "--format", "--pretty", "-L", "--max-count", "--diff-filter",
-]);
-
-const GIT_INSPECT_SAFE_OPTIONS = new Set([
-  ...GIT_SAFE_OPTIONS,
-  ...GIT_INSPECT_VALUE_OPTIONS,
-  "--graph", "--follow", "--topo-order", "--date-order", "--author-date-order",
-  "--reverse", "--no-merges", "--merges", "--first-parent",
-  "-p", "--patch", "-s", "--no-patch", "--numstat", "--shortstat",
-  "--relative", "--abbrev-commit", "--no-abbrev-commit",
-]);
-
-const GIT_RESTORE_VALUE_OPTIONS = new Set(["--source", "-s"]);
-const GIT_RESTORE_SAFE_OPTIONS = new Set([
-  ...GIT_RESTORE_VALUE_OPTIONS,
-  "--worktree", "-W", "--staged", "-S", "-q", "--quiet", "--progress", "--no-progress",
-  "--ignore-unmerged", "--ignore-skip-worktree-bits", "--",
+  "push", "fetch", "pull", "clone", "init", "checkout", "switch", "restore", "merge", "rebase",
+  "tag", "reset", "cherry-pick", "revert", "stash", "submodule", "config", "help", "grep",
+  "blame", "gc", "apply",
 ]);
 
 function isFileTransportReference(value: string): boolean {
@@ -143,53 +213,6 @@ function result(
   });
 }
 
-function optionPaths(
-  words: readonly ShellWord[],
-  options: ReadonlySet<string>,
-  role: "source" | "target",
-  base: ProgramPathBase = "invocation-cwd",
-): ProgramPath[] {
-  return scanOptionWords(words, { valueOptions: options })
-    .filter((occurrence) => options.has(occurrence.name) && occurrence.value !== undefined)
-    .map((occurrence) => path(occurrence.value!, role, occurrence.value!.start, base));
-}
-
-function gitPathArguments(
-  args: readonly ShellWord[],
-  role: "source" | "target",
-  afterSeparatorOnly = false,
-  base: ProgramPathBase = "invocation-cwd",
-  valueOptions: ReadonlySet<string> = GIT_VALUE_OPTIONS,
-): ProgramPath[] {
-  const valueIndexes = new Set(
-    scanOptionWords(args, { valueOptions })
-      .flatMap((occurrence) => occurrence.valueIndex === undefined ? [] : [occurrence.valueIndex]),
-  );
-  const paths: ProgramPath[] = [];
-  let afterSeparator = false;
-  for (let index = 0; index < args.length; index += 1) {
-    const word = args[index]!;
-    if (valueIndexes.has(index)) continue;
-    if (word.text === "--") {
-      afterSeparator = true;
-      continue;
-    }
-    if (!afterSeparator && word.text.startsWith("-")) continue;
-    if (afterSeparatorOnly && !afterSeparator) continue;
-    paths.push(path(word, role, word.start, base));
-  }
-  return paths;
-}
-
-function gitOptionPaths(
-  args: readonly ShellWord[],
-  options: ReadonlySet<string>,
-  role: "source" | "target",
-  base: ProgramPathBase = "invocation-cwd",
-): ProgramPath[] {
-  return optionPaths(args, options, role, base);
-}
-
 function isRemoteGitReference(value: string): boolean {
   if (isFileTransportReference(value)) return false;
   return /^[A-Za-z][A-Za-z0-9+.-]*:\/\//u.test(value) || /^(?:[^/@:]+@)?[^/:]+:/u.test(value);
@@ -203,161 +226,111 @@ function isUnsupportedGitPathspec(value: string): boolean {
   return value.startsWith(":") || value.startsWith("!") || value.startsWith("^") || /[*?\[]/u.test(value);
 }
 
-function firstGitPositionalWord(args: readonly ShellWord[]): ShellWord | undefined {
-  return firstNonOptionWord(args, GIT_REMOTE_VALUE_OPTIONS);
-}
-
-function firstGitPositionalArgument(args: readonly ShellWord[]): string | undefined {
-  return firstGitPositionalWord(args)?.text;
-}
-
-type GitClonePathAnalysis = Readonly<{
-  readonly paths: readonly ProgramPath[];
-  readonly positionalCount: number;
-  readonly source?: ShellWord;
-}>;
-
-function gitClonePaths(
-  args: readonly ShellWord[],
-  base: ProgramPathBase = "invocation-cwd",
-): GitClonePathAnalysis {
-  const occurrences = new Map(scanOptionWords(args, { valueOptions: GIT_CLONE_VALUE_OPTIONS }).map((entry) => [entry.index, entry]));
-  const valueIndexes = new Set(
-    [...occurrences.values()]
-      .flatMap((entry) => entry.valueIndex === undefined || entry.valueIndex === entry.index ? [] : [entry.valueIndex]),
-  );
-  const positional: ShellWord[] = [];
-  const paths: ProgramPath[] = [];
-  let afterSeparator = false;
-  for (let index = 0; index < args.length; index += 1) {
-    const word = args[index]!;
-    if (word.text === "--") {
-      afterSeparator = true;
-      continue;
-    }
-    if (!afterSeparator && word.text.startsWith("-")) {
-      const occurrence = occurrences.get(index);
-      if (occurrence !== undefined && GIT_CLONE_PATH_OPTIONS.has(occurrence.name) && occurrence.value !== undefined) {
-        paths.push(path(occurrence.value, "source", occurrence.value.start, base));
-      }
-      continue;
-    }
-    if (valueIndexes.has(index)) continue;
-    positional.push(word);
-  }
-  const source = positional[0];
-  if (positional.length === 2) {
-    if (!isRemoteGitReference(source!.text)) paths.push(path(source!, "source", source!.start, base));
-    paths.push(path(positional[1]!, "target", positional[1]!.start, base));
-  } else if (positional.length < 2) {
-    if (source !== undefined && !isRemoteGitReference(source.text)) paths.push(path(source, "source", source.start, base));
-    paths.push(path({ text: ".", start: 0, end: 0, quote: "bare" }, "target", 0, base));
-  }
-  return { paths: Object.freeze(paths), positionalCount: positional.length, source };
-}
-
 export function analyzeGitProgram(args: readonly ShellWord[]): ProgramSemantic {
-  let index = 0;
+  // 1. Stage 1: Parse Global Prefix Options
   const globalPaths: ProgramPath[] = [];
-  let unsafeGlobalOption = false;
   const cwdChanges: ProgramCwdChange[] = [];
   let hasCommandCwd = false;
   let hasUncanonicalizedRepositoryLocation = false;
   let hardBoundary = false;
-  const globalOptions = new Map(
-    scanOptionWords(args, {
-      valueOptions: GIT_GLOBAL_VALUE_OPTIONS,
-      attachedOptions: new Set(["-C", "-c"]),
-    }).map((entry) => [entry.index, entry]),
-  );
-  while (index < args.length && args[index]!.text.startsWith("-")) {
-    const option = args[index]!;
-    if (option.text === "--") break;
-    const occurrence = globalOptions.get(index);
-    const optionName = occurrence?.name ?? option.text;
-    if (occurrence === undefined || !GIT_GLOBAL_VALUE_OPTIONS.has(optionName) &&
-      !["--no-pager", "--paginate", "--literal-pathspecs"].includes(optionName)) {
-      unsafeGlobalOption = true;
-      hardBoundary = true;
-      index += 1;
-      continue;
-    }
-    if (GIT_GLOBAL_VALUE_OPTIONS.has(optionName)) {
-      const value = occurrence.value;
-      if (!value) return result("unknown", [], [], { opaque: true, hardBoundary: true });
-      if (optionName === "-c") hardBoundary = true;
-      else if (optionName === "-C") {
+  let unsafeGlobalOption = false;
+
+  let globalParsed = parseSegment(args, GIT_GLOBAL_CONTRACT, { stopAtFirstOperand: true });
+
+  if (globalParsed.kind === "malformed") {
+    return result("unknown", [], [], { opaque: true, hardBoundary: true });
+  }
+
+  if (globalParsed.kind === "indeterminate") {
+    unsafeGlobalOption = true;
+    hardBoundary = true;
+  }
+
+  const globalOptions = globalParsed.options;
+  for (const opt of globalOptions) {
+    if (opt.kind === "valued") {
+      const val = opt.value;
+      if (opt.key === "config") {
+        hardBoundary = true;
+      } else if (opt.key === "cwd") {
         const base: ProgramPathBase = hasCommandCwd ? "command-cwd" : "invocation-cwd";
-        globalPaths.push(path(value, "source", option.start, base));
-        cwdChanges.push(Object.freeze({ path: pathFromWord(value, "source"), start: option.start, base }));
+        globalPaths.push(path(val, "source", opt.token.start, base));
+        cwdChanges.push(Object.freeze({ path: pathFromWord(val, "source"), start: opt.token.start, base }));
         hasCommandCwd = true;
-      } else if (optionName === "--git-dir" || optionName === "--work-tree") {
-        globalPaths.push(path(value, "source", option.start, "command-cwd"));
+      } else if (opt.key === "gitDir" || opt.key === "workTree") {
+        globalPaths.push(path(val, "source", opt.token.start, "command-cwd"));
       } else {
-        globalPaths.push(path(value, "source", option.start, "command-cwd"));
+        globalPaths.push(path(val, "source", opt.token.start, "command-cwd"));
         hasUncanonicalizedRepositoryLocation = true;
         hardBoundary = true;
       }
-      index = occurrence.valueIndex === undefined || occurrence.valueIndex === occurrence.index
-        ? occurrence.index + 1
-        : occurrence.valueIndex + 1;
-      continue;
     }
-    index += 1;
   }
-  const subcommand = args[index]?.text;
-  if (!subcommand) return result("unknown", [], globalPaths, { cwdChanges, opaque: true, hardBoundary: true });
-  if (globalPaths.some((entry) => isFileTransportReference(entry.path.text))) hardBoundary = true;
-  const rest = args.slice(index + 1);
+
+  const subcommand = globalParsed.operands[0]?.text;
+  if (!subcommand) {
+    return result("unknown", [], globalPaths, { cwdChanges, opaque: true, hardBoundary: true });
+  }
+
+  if (globalPaths.some((entry) => isFileTransportReference(entry.path.text))) {
+    hardBoundary = true;
+  }
+
+  const rest = globalParsed.remainder;
   const pathBase: ProgramPathBase = hasCommandCwd ? "command-cwd" : "invocation-cwd";
+
   const isInspectSubcommand = GIT_INSPECT.has(subcommand);
   const isRestoreSubcommand = subcommand === "restore";
-  const effectiveSafeOptions = isInspectSubcommand
-    ? GIT_INSPECT_SAFE_OPTIONS
+
+  const contract = isInspectSubcommand
+    ? GIT_INSPECT_CONTRACT
     : isRestoreSubcommand
-      ? GIT_RESTORE_SAFE_OPTIONS
-      : GIT_SAFE_OPTIONS;
-  const effectiveValueOptions = isInspectSubcommand
-    ? GIT_INSPECT_VALUE_OPTIONS
-    : isRestoreSubcommand
-      ? GIT_RESTORE_VALUE_OPTIONS
-      : GIT_VALUE_OPTIONS;
-  const optionOccurrences = scanOptionWords(rest, { valueOptions: effectiveValueOptions });
-  const missingOptionValue = optionOccurrences.some((occurrence) => occurrence.missingValue);
-  const optionWordIndices = new Set(
-    optionOccurrences.flatMap((occ) => [
-      occ.index,
-      ...(occ.valueIndex !== undefined && !occ.attached ? [occ.valueIndex] : []),
-    ]),
-  );
-  const positionalWords = rest.filter((_, idx) => !optionWordIndices.has(idx));
-  if (positionalWords.some((word) => isUnsupportedGitPathspec(word.text))) hardBoundary = true;
+      ? GIT_RESTORE_CONTRACT
+      : GIT_COMMON_CONTRACT;
+
+  // 2. Stage 2: Parse Subcommand Scoped Options & Operands
+  const parsedRest = parseSegment(rest, contract);
+  const missingOptionValue = parsedRest.kind === "malformed";
+  const hasUnknownSubcommandOption = parsedRest.kind === "indeterminate";
+
+  const options = parsedRest.kind === "complete" || parsedRest.kind === "indeterminate" ? parsedRest.options : [];
+  const rawOperands = parsedRest.kind === "complete" || parsedRest.kind === "indeterminate" ? parsedRest.operands : [];
+  const pathspecOperands = parsedRest.kind === "complete" ? parsedRest.pathspecOperands : [];
+
+  // Security checks across raw tokens
+  if (rawOperands.some((word) => isUnsupportedGitPathspec(word.text))) hardBoundary = true;
+  if (pathspecOperands.some((word) => isUnsupportedGitPathspec(word.text))) hardBoundary = true;
+
   if (rest.some((word) => word.text === "--pathspec-from-file" || word.text.startsWith("--pathspec-from-file=") ||
     word.text === "--pathspec-file-nul")) hardBoundary = true;
   if (rest.some((word) => isFileTransportReference(word.text) && localFileTransportPath(word.text) === undefined)) {
     hardBoundary = true;
   }
   if (rest.some((word) => word.text === "--upload-pack" || word.text.startsWith("--upload-pack=") ||
-    word.text === "-u" || word.text.startsWith("-u=") || word.text.startsWith("-u") && word.text.length > 2 ||
+    word.text === "-u" || word.text.startsWith("-u=") || (word.text.startsWith("-u") && word.text.length > 2) ||
     word.text === "--receive-pack" || word.text.startsWith("--receive-pack=") ||
     word.text === "--exec" || word.text.startsWith("--exec=") ||
     word.text === "--ext-diff" || word.text.startsWith("--ext-diff=") ||
     word.text === "--textconv" || word.text.startsWith("--textconv="))) {
     hardBoundary = true;
   }
+
   const known = GIT_INSPECT.has(subcommand) || GIT_MODIFY.has(subcommand) || subcommand === "clean" || subcommand === "branch";
-  if (!known) return result("unknown", [], globalPaths, { cwdChanges, opaque: true, hardBoundary: true });
+  if (!known) {
+    return result("unknown", [], globalPaths, { cwdChanges, opaque: true, hardBoundary: true });
+  }
+
   if (GIT_HELPER_COMMANDS.has(subcommand) && subcommand !== "restore" && subcommand !== "checkout") {
     hardBoundary = true;
   }
 
+  // Subcommand-specific constraints
   if (subcommand === "commit") {
-    const commitOptions = scanOptionWords(rest, { valueOptions: GIT_VALUE_OPTIONS });
-    const hasMessage = commitOptions.some(
+    const hasMessage = options.some(
       (opt) => (opt.name === "-m" || opt.name === "--message" || opt.name === "-F" || opt.name === "--file") &&
-        opt.value !== undefined && opt.value.text.length > 0,
+        opt.kind === "valued" && opt.value.text.length > 0,
     );
-    if (!hasMessage || hasUnknownOption(rest, GIT_SAFE_OPTIONS, GIT_VALUE_OPTIONS)) hardBoundary = true;
+    if (!hasMessage || hasUnknownSubcommandOption) hardBoundary = true;
     if (rest.some((word) =>
       word.text === "-e" || word.text === "--edit" ||
       word.text === "-i" || word.text === "--interactive" ||
@@ -367,8 +340,9 @@ export function analyzeGitProgram(args: readonly ShellWord[]): ProgramSemantic {
       hardBoundary = true;
     }
   }
+
   if (subcommand === "add") {
-    if (hasUnknownOption(rest, GIT_SAFE_OPTIONS, GIT_VALUE_OPTIONS) || rest.some((word) =>
+    if (hasUnknownSubcommandOption || rest.some((word) =>
       word.text === "-i" || word.text === "--interactive" ||
       word.text === "-p" || word.text === "--patch" ||
       word.text === "-e" || word.text === "--edit",
@@ -376,24 +350,23 @@ export function analyzeGitProgram(args: readonly ShellWord[]): ProgramSemantic {
       hardBoundary = true;
     }
   }
+
   if (subcommand === "restore") {
-    const restoreOptions = scanOptionWords(rest, { valueOptions: GIT_RESTORE_VALUE_OPTIONS });
-    if (hasUnknownOption(rest, GIT_RESTORE_SAFE_OPTIONS, GIT_RESTORE_VALUE_OPTIONS)) {
-      hardBoundary = true;
-    }
-    for (const opt of restoreOptions) {
-      if (opt.name === "--source" || opt.name === "-s") {
-        const text = opt.value?.text;
+    if (hasUnknownSubcommandOption) hardBoundary = true;
+    for (const opt of options) {
+      if (opt.key === "source" && opt.kind === "valued") {
+        const text = opt.value.text;
         if (!text || !/^HEAD(?:~\d+|\^\d*)?$/u.test(text)) {
           hardBoundary = true;
         }
       }
     }
-    const pathArgs = gitPathArguments(rest, "target", false, pathBase, GIT_RESTORE_VALUE_OPTIONS);
-    if (pathArgs.length !== 1 || pathArgs[0]!.path.text === "." || isUnsupportedGitPathspec(pathArgs[0]!.path.text)) {
+    const allOperands = [...rawOperands, ...pathspecOperands];
+    if (allOperands.length !== 1 || allOperands[0]!.text === "." || isUnsupportedGitPathspec(allOperands[0]!.text)) {
       hardBoundary = true;
     }
   }
+
   if (subcommand === "checkout") {
     const separatorIndex = rest.findIndex((word) => word.text === "--");
     if (separatorIndex === -1) {
@@ -401,103 +374,152 @@ export function analyzeGitProgram(args: readonly ShellWord[]): ProgramSemantic {
     } else {
       const beforeSeparator = rest.slice(0, separatorIndex);
       const afterSeparator = rest.slice(separatorIndex + 1);
-      const hasUnknown = hasUnknownOption(
-        beforeSeparator,
-        new Set(["-q", "--quiet", "--progress", "--no-progress"]),
-        new Set(),
-      );
-      if (hasUnknown) {
+      const beforeParsed = parseSegment(beforeSeparator, {
+        options: [{ key: "flag", names: ["-q", "--quiet", "--progress", "--no-progress"], arity: "flag" }],
+      });
+      if (beforeParsed.kind !== "complete") {
         hardBoundary = true;
       }
-      const nonOptionBefore = beforeSeparator.filter((w) => !w.text.startsWith("-"));
+      const nonOptionBefore = beforeParsed.kind === "complete" ? beforeParsed.operands : [];
       if (nonOptionBefore.length > 1) {
         hardBoundary = true;
       } else if (nonOptionBefore.length === 1 && !/^HEAD(?:~\d+|\^\d*)?$/u.test(nonOptionBefore[0]!.text)) {
         hardBoundary = true;
       }
-      const pathArgs = gitPathArguments(afterSeparator, "target", false, pathBase);
-      if (pathArgs.length !== 1 || pathArgs[0]!.path.text === "." || isUnsupportedGitPathspec(pathArgs[0]!.path.text)) {
+      const afterOperands = afterSeparator.filter((w) => !w.text.startsWith("-"));
+      if (afterOperands.length !== 1 || afterOperands[0]!.text === "." || isUnsupportedGitPathspec(afterOperands[0]!.text)) {
         hardBoundary = true;
       }
     }
   }
 
+  // Determine command class
   let commandClass: ProgramSemantic["commandClass"] = GIT_INSPECT.has(subcommand) ? "inspect" : "modify";
-  if (subcommand === "branch" && !rest.some((word) => ["-d", "-D", "--delete", "-f", "--force", "-m", "-M", "--move", "--rename", "-c", "-C", "--copy"].includes(word.text))) {
-    commandClass = rest.some((word) => !word.text.startsWith("-")) ? "modify" : "inspect";
+  if (subcommand === "branch" && !options.some((o) => ["-d", "-D", "--delete", "-f", "--force", "-m", "-M", "--move", "--rename", "-c", "-C", "--copy"].includes(o.name))) {
+    commandClass = rawOperands.length > 0 ? "modify" : "inspect";
   }
-  if (subcommand === "clean") commandClass = rest.some((word) => ["-n", "--dry-run"].includes(word.text)) ? "inspect" : "destroy";
+  if (subcommand === "clean") {
+    commandClass = options.some((o) => o.name === "-n" || o.name === "--dry-run") ? "inspect" : "destroy";
+  }
   if (subcommand === "rm") commandClass = "destroy";
-  if (subcommand === "stash" && ["list", "show"].includes(rest.find((word) => !word.text.startsWith("-"))?.text ?? "")) commandClass = "inspect";
-  if (subcommand === "config" && rest.some((word) => ["--list", "-l", "--get", "--get-all", "--get-regexp"].includes(word.text))) commandClass = "inspect";
-  if (subcommand === "config" && rest.some((word) => ["--global", "--system"].includes(word.text))) hardBoundary = true;
-  if (subcommand === "reset" && rest.some((word) => word.text === "--hard")) commandClass = "destroy";
-  if (subcommand === "push" && rest.some((word) => word.text === "-f" || word.text.startsWith("--force"))) commandClass = "destroy";
-  if (subcommand === "branch" && rest.some((word) => ["-d", "-D", "--delete"].includes(word.text))) commandClass = "destroy";
-  if (subcommand === "stash" && rest.some((word) => word.text === "clear")) commandClass = "destroy";
-  if (subcommand === "remote") hardBoundary = true;
-  if (subcommand === "archive" && rest.some((word) => word.text === "--remote" || word.text.startsWith("--remote="))) {
+  if (subcommand === "stash" && ["list", "show"].includes(rawOperands[0]?.text ?? "")) commandClass = "inspect";
+  if (subcommand === "config" && options.some((o) => ["--list", "-l", "--get", "--get-all", "--get-regexp"].includes(o.name))) {
+    commandClass = "inspect";
+  }
+  if (subcommand === "config" && options.some((o) => o.name === "--global" || o.name === "--system")) {
     hardBoundary = true;
   }
+  if (subcommand === "reset" && options.some((o) => o.name === "--hard")) commandClass = "destroy";
+  if (subcommand === "push" && options.some((o) => o.name === "-f" || o.name === "--force")) commandClass = "destroy";
+  if (subcommand === "branch" && options.some((o) => o.name === "-d" || o.name === "-D" || o.name === "--delete")) commandClass = "destroy";
+  if (subcommand === "stash" && rawOperands[0]?.text === "clear") commandClass = "destroy";
+  if (subcommand === "remote") hardBoundary = true;
+  if (subcommand === "archive" && rest.some((word) => word.text === "--remote" || word.text.startsWith("--remote="))) hardBoundary = true;
+
   if (subcommand === "ls-remote") {
-    const remote = firstGitPositionalArgument(rest);
+    const remote = rawOperands[0]?.text;
     if (remote === undefined || (!isRemoteGitReference(remote) && !isGitPathReference(remote))) hardBoundary = true;
     if (remote !== undefined && isRemoteGitReference(remote)) hardBoundary = true;
   }
 
+  // 3. Stage 3: Collect Paths
   const paths = [...globalPaths];
   if (subcommand !== "clone") {
     const repositoryRole = commandClass === "destroy" || subcommand === "init" ? "target" : "source";
     paths.push(path({ text: ".", start: 0, end: 0, quote: "bare" }, repositoryRole, 0, pathBase));
   }
+
   if (["diff", "show", "log", "grep", "blame", "ls-files", "ls-remote", "check-attr", "check-ignore"].includes(subcommand)) {
     if (subcommand === "ls-remote") {
-      const remote = firstGitPositionalWord(rest);
+      const remote = rawOperands[0];
       if (remote !== undefined && isGitPathReference(remote.text)) {
         paths.push(path(remote, "source", remote.start, pathBase));
       }
     } else {
       const requiresSeparator = ["diff", "show", "log", "grep", "blame"].includes(subcommand);
-      paths.push(...gitPathArguments(rest, "source", requiresSeparator, pathBase, effectiveValueOptions));
+      if (requiresSeparator) {
+        for (const op of pathspecOperands) {
+          paths.push(path(op, "source", op.start, pathBase));
+        }
+      } else {
+        for (const op of [...rawOperands, ...pathspecOperands]) {
+          paths.push(path(op, "source", op.start, pathBase));
+        }
+      }
     }
     if (["diff", "show", "log", "blame"].includes(subcommand)) {
-      paths.push(...gitOptionPaths(rest, new Set(["--output", "-o"]), "target", pathBase));
+      for (const opt of options) {
+        if (opt.key === "output" && opt.kind === "valued") {
+          paths.push(path(opt.value, "target", opt.value.start, pathBase));
+        }
+      }
     }
   } else if (["add", "rm", "mv"].includes(subcommand)) {
-    paths.push(...gitPathArguments(rest, subcommand === "add" ? "source" : "target", false, pathBase));
+    const role = subcommand === "add" ? "source" : "target";
+    for (const op of [...rawOperands, ...pathspecOperands]) {
+      paths.push(path(op, role, op.start, pathBase));
+    }
   } else if (subcommand === "restore") {
-    paths.push(...gitPathArguments(rest, "target", false, pathBase, GIT_RESTORE_VALUE_OPTIONS));
+    for (const op of [...rawOperands, ...pathspecOperands]) {
+      paths.push(path(op, "target", op.start, pathBase));
+    }
   } else if (["checkout", "switch"].includes(subcommand)) {
-    paths.push(...gitPathArguments(rest, "target", true, pathBase));
+    for (const op of pathspecOperands) {
+      paths.push(path(op, "target", op.start, pathBase));
+    }
   } else if (subcommand === "archive" || subcommand === "format-patch") {
-    const outputIndex = rest.findIndex((word) => ["-o", "--output", "--output-directory"].includes(word.text) || word.text.startsWith("--output=") || word.text.startsWith("--output-directory="));
-    const outputToken = outputIndex >= 0 ? rest[outputIndex]! : undefined;
-    const output = outputToken?.text.includes("=")
-      ? Object.freeze({ ...outputToken, text: outputToken.text.slice(outputToken.text.indexOf("=") + 1) })
-      : outputToken !== undefined
-        ? rest[outputIndex + 1]
-        : undefined;
-    if (output) paths.push(path(output, "target", output.start, pathBase));
+    for (const opt of options) {
+      if (opt.key === "output" && opt.kind === "valued") {
+        paths.push(path(opt.value, "target", opt.value.start, pathBase));
+      }
+    }
   } else if (subcommand === "init") {
-    paths.push(...gitOptionPaths(rest, new Set(["--template"]), "source", pathBase));
-    paths.push(...gitOptionPaths(rest, new Set(["--separate-git-dir"]), "target", pathBase));
-    paths.push(...gitPathArguments(rest, "target", false, pathBase));
+    for (const opt of options) {
+      if (opt.name === "--template" && opt.kind === "valued") {
+        paths.push(path(opt.value, "source", opt.value.start, pathBase));
+      } else if (opt.name === "--separate-git-dir" && opt.kind === "valued") {
+        paths.push(path(opt.value, "target", opt.value.start, pathBase));
+      }
+    }
+    for (const op of [...rawOperands, ...pathspecOperands]) {
+      paths.push(path(op, "target", op.start, pathBase));
+    }
   } else if (subcommand === "commit") {
-    paths.push(...gitOptionPaths(rest, new Set(["-F", "--file"]), "source", pathBase));
+    for (const opt of options) {
+      if ((opt.name === "-F" || opt.name === "--file") && opt.kind === "valued") {
+        paths.push(path(opt.value, "source", opt.value.start, pathBase));
+      }
+    }
   } else if (subcommand === "clone") {
-    const clone = gitClonePaths(rest, pathBase);
-    const cloneOptions = scanOptionWords(rest, { valueOptions: GIT_CLONE_VALUE_OPTIONS });
-    paths.push(...clone.paths);
-    if (clone.source !== undefined && isRemoteGitReference(clone.source.text)) hardBoundary = true;
-    if (clone.positionalCount > 2 || hasUnknownOption(rest, GIT_CLONE_SAFE_OPTIONS) ||
-      cloneOptions.some((option) => option.name === "--recurse-submodules" || option.name === "--recursive") ||
+    for (const opt of options) {
+      if (["--template", "--reference", "--reference-if-able"].includes(opt.name) && opt.kind === "valued") {
+        paths.push(path(opt.value, "source", opt.value.start, pathBase));
+      }
+    }
+    const sourceWord = rawOperands[0];
+    if (sourceWord !== undefined && isRemoteGitReference(sourceWord.text)) {
+      hardBoundary = true;
+    }
+    if (rawOperands.length === 2) {
+      if (sourceWord !== undefined && !isRemoteGitReference(sourceWord.text)) {
+        paths.push(path(sourceWord, "source", sourceWord.start, pathBase));
+      }
+      paths.push(path(rawOperands[1]!, "target", rawOperands[1]!.start, pathBase));
+    } else if (rawOperands.length < 2) {
+      if (sourceWord !== undefined && !isRemoteGitReference(sourceWord.text)) {
+        paths.push(path(sourceWord, "source", sourceWord.start, pathBase));
+      }
+      paths.push(path({ text: ".", start: 0, end: 0, quote: "bare" }, "target", 0, pathBase));
+    }
+    if (rawOperands.length > 2 || hasUnknownSubcommandOption ||
+      options.some((o) => o.name === "--recurse-submodules" || o.name === "--recursive") ||
       rest.some((word) => word.text === "--separate-git-dir" || word.text.startsWith("--separate-git-dir=") ||
-        word.text === "--upload-pack" || word.text.startsWith("--upload-pack=") || word.text === "-u" || word.text.startsWith("-u=") || word.text.startsWith("-u") && word.text.length > 2 ||
+        word.text === "--upload-pack" || word.text.startsWith("--upload-pack=") || word.text === "-u" || word.text.startsWith("-u=") || (word.text.startsWith("-u") && word.text.length > 2) ||
         word.text === "--config" || word.text.startsWith("--config="))) {
       hardBoundary = true;
     }
   } else if (["fetch", "pull", "push"].includes(subcommand)) {
-    const remote = firstGitPositionalWord(rest);
+    const remote = rawOperands[0];
     if (remote === undefined || (!isRemoteGitReference(remote.text) && !isGitPathReference(remote.text))) {
       hardBoundary = true;
     } else if (isRemoteGitReference(remote.text)) {
@@ -506,25 +528,32 @@ export function analyzeGitProgram(args: readonly ShellWord[]): ProgramSemantic {
       paths.push(path(remote, subcommand === "push" ? "target" : "source", remote.start, pathBase));
     }
   } else if (subcommand === "submodule") {
-    const action = firstGitPositionalArgument(rest);
-    const positionalPaths = gitPathArguments(rest, "source", false, pathBase);
+    const action = rawOperands[0]?.text;
+    const positionalPaths = rawOperands.map((op) => path(op, "source", op.start, pathBase));
     paths.push(...positionalPaths);
     if (action === "add") {
-      const source = positionalPaths[1]?.path.text;
+      const source = rawOperands[1]?.text;
       if (source === undefined || isRemoteGitReference(source) || !isGitPathReference(source)) hardBoundary = true;
-      paths.push(...gitOptionPaths(rest, new Set(["--reference", "--reference-if-able"]), "source", pathBase));
+      for (const opt of options) {
+        if (["--reference", "--reference-if-able"].includes(opt.name) && opt.kind === "valued") {
+          paths.push(path(opt.value, "source", opt.value.start, pathBase));
+        }
+      }
     }
     if (action === "foreach" || action === "update" || action === "init" || action === "sync") hardBoundary = true;
   } else if (subcommand === "config") {
-    paths.push(...gitOptionPaths(rest, new Set(["--file", "-f"]), commandClass === "inspect" ? "source" : "target", pathBase));
-    if (rest.some((word, index) =>
-      ["--file", "-f"].includes(word.text) && rest[index + 1] === undefined && !word.text.includes("="))) {
+    for (const opt of options) {
+      if ((opt.name === "--file" || opt.name === "-f") && opt.kind === "valued") {
+        paths.push(path(opt.value, commandClass === "inspect" ? "source" : "target", opt.value.start, pathBase));
+      }
+    }
+    if (rest.some((word, idx) =>
+      ["--file", "-f"].includes(word.text) && rest[idx + 1] === undefined && !word.text.includes("="))) {
       hardBoundary = true;
     }
   }
 
-  if (rest.some((word) => word.text === "--output" || word.text.startsWith("--output=") || word.text === "--output-directory" || word.text.startsWith("--output-directory=")) &&
-    !["diff", "show", "log", "blame", "archive", "format-patch"].includes(subcommand)) {
+  if (options.some((o) => o.key === "output") && !["diff", "show", "log", "blame", "archive", "format-patch"].includes(subcommand)) {
     hardBoundary = true;
   }
 
@@ -532,13 +561,11 @@ export function analyzeGitProgram(args: readonly ShellWord[]): ProgramSemantic {
   const effects: ProgramSemantic["effects"] = commandClass === "inspect"
     ? hasWritePath ? ["read", "write"] : ["read"]
     : commandClass === "destroy" ? ["delete"] : ["read", "write"];
-  const isGitNumericLimitOption = (name: string): boolean =>
-    (subcommand === "log" || subcommand === "rev-list") && /^-[1-9][0-9]*$/u.test(name);
+
   return result(commandClass, effects, paths, {
     cwdChanges,
     recursive: true,
-    opaque: unsafeGlobalOption || hasUncanonicalizedRepositoryLocation || hasUnknownOption(rest, effectiveSafeOptions, effectiveValueOptions, isGitNumericLimitOption),
+    opaque: unsafeGlobalOption || hasUncanonicalizedRepositoryLocation || hasUnknownSubcommandOption,
     hardBoundary: hardBoundary || missingOptionValue,
   });
 }
-

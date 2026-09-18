@@ -143,3 +143,25 @@ test("segment parser supports stopAtFirstOperand for subcommand routing", () => 
     assert.deepEqual(result.remainder.map((w) => w.text), ["create", "--help"]);
   }
 });
+
+test("segment parser supports matchExtraOption for custom patterns like numeric flags", () => {
+  const numericContract: SegmentContract<CommonKey | "numericLimit"> = {
+    options: contract.options,
+    matchExtraOption: (token) => {
+      if (/^-[1-9][0-9]*$/u.test(token.text)) {
+        return { key: "numericLimit", name: token.text };
+      }
+      return undefined;
+    },
+  };
+
+  const words = [word("-5", 0), word("--verbose", 3), word("src/file.ts", 13)];
+  const result = parseSegment(words, numericContract);
+  assert.equal(result.kind, "complete");
+  if (result.kind === "complete") {
+    assert.equal(result.options[0]?.key, "numericLimit");
+    assert.equal(result.options[0]?.name, "-5");
+    assert.equal(result.options[1]?.key, "verbose");
+    assert.deepEqual(result.operands.map((w) => w.text), ["src/file.ts"]);
+  }
+});

@@ -1,6 +1,5 @@
 import type { ShellPath } from "../invocation";
 import type { ShellWord } from "../language";
-import { firstNonOptionWord, scanOptionWords } from "./option-scanner";
 import type { ProgramPath, ProgramPathBase, ProgramSemantic } from "./types";
 
 export const INFO_FLAGS = new Set(["--help", "-h", "--version", "-V", "-v"]);
@@ -48,19 +47,4 @@ export function result(
     opaque: options.opaque ?? false,
     hardBoundary: options.hardBoundary ?? false,
   });
-}
-
-export function firstCommand(words: readonly ShellWord[], valueOptions: ReadonlySet<string>): string {
-  return firstNonOptionWord(words, valueOptions)?.text ?? "";
-}
-
-export function optionPaths(
-  words: readonly ShellWord[],
-  options: ReadonlySet<string>,
-  role: "source" | "target",
-  base: ProgramPathBase = "invocation-cwd",
-): ProgramPath[] {
-  return scanOptionWords(words, { valueOptions: options })
-    .filter((occurrence) => options.has(occurrence.name) && occurrence.value !== undefined)
-    .map((occurrence) => path(occurrence.value!, role, occurrence.value!.start, base));
 }
