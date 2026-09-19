@@ -623,6 +623,12 @@ test("bounded coreutils option values do not become path operands", () => {
     ["touch -d -5 file", ["file"]],
     ["grep --color pattern README.md", ["README.md"]],
     ["grep --include '*.ts' pattern README.md", ["README.md"]],
+    ["grep -E pattern README.md", ["README.md"]],
+    ["grep --extended-regexp pattern README.md", ["README.md"]],
+    ["grep -F pattern README.md", ["README.md"]],
+    ["grep --fixed-strings pattern README.md", ["README.md"]],
+    ["grep -Ein pattern README.md", ["README.md"]],
+    ["grep -Fn pattern README.md", ["README.md"]],
     ["ls -la README.md", ["README.md"]],
     ["head -- -file", ["-file"]],
     ["wc -l README.md", ["README.md"]],
@@ -1199,6 +1205,27 @@ test("Git inspect subcommands accept safe display and filter options without bec
   assert.deepEqual(diffFilter.paths, [{ text: ".", role: "source" }]);
   assert.equal(diffFilter.semantic.opaquePathAccess, false);
   assert.equal(diffFilter.semantic.hardBoundary, false);
+
+  const diffSummary = complete("git diff --summary");
+  assert.equal(diffSummary.commandClass, "inspect");
+  assert.deepEqual(diffSummary.effects, ["read"]);
+  assert.deepEqual(diffSummary.paths, [{ text: ".", role: "source" }]);
+  assert.equal(diffSummary.semantic.opaquePathAccess, false);
+  assert.equal(diffSummary.semantic.hardBoundary, false);
+
+  const diffRevisionSummary = complete("git diff origin/main..main --summary");
+  assert.equal(diffRevisionSummary.commandClass, "inspect");
+  assert.deepEqual(diffRevisionSummary.effects, ["read"]);
+  assert.deepEqual(diffRevisionSummary.paths, [{ text: ".", role: "source" }]);
+  assert.equal(diffRevisionSummary.semantic.opaquePathAccess, false);
+  assert.equal(diffRevisionSummary.semantic.hardBoundary, false);
+
+  const logSummary = complete("git log --summary");
+  assert.equal(logSummary.commandClass, "inspect");
+  assert.deepEqual(logSummary.effects, ["read"]);
+  assert.deepEqual(logSummary.paths, [{ text: ".", role: "source" }]);
+  assert.equal(logSummary.semantic.opaquePathAccess, false);
+  assert.equal(logSummary.semantic.hardBoundary, false);
 
   const logNumeric = complete("git log -5 --oneline");
   assert.equal(logNumeric.commandClass, "inspect");

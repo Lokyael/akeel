@@ -21,7 +21,9 @@
 - **Workflow Run**：同一 Task Owner 拥有的一次 bounded 临时 workflow attempt，位于 `/tmp/akeel/runs/run-*/`；它不是 Task Record，可包含 packet、child artifacts、control receipts、quarantine 与 transport diagnostics。
 - **Artifact Capability**：Artifact Exchange 为一个 child result slot 发行的 opaque、单次、有时限有界文本发布权。
 - **Formal Artifact Handoff**：child publication 经 binding、receipt、长度与 digest 核验后由原 Task Owner collect 的结果交接；Herdr settled state 与 terminal read 不构成该结果。
-- **Session Handoff**：source session 通过 Handoff Store 发布、由 successor session 按 receipt 核验的 authority-context 转交；其 consumer 与 owner 会转移，不属于普通 Workflow Run。
+- **Semantic Unit**：Session 连续性中一个已捕获、可独立追踪的 requirement、constraint、assumption、finding、risk、decision candidate、evidence、external effect、work state 或 next action；操作完成状态不决定其 `live` / `closed` / `superseded` 语义生命周期。
+- **Continuation Capsule**：由显式 roots 的 live 依赖闭包、durable authority 引用、workspace checkpoint、唯一 next action 与 closure tombstones 构成的结构化 Session Handoff 载荷；规范化 JSON 是语义载荷，Markdown 是确定性投影。
+- **Session Handoff**：source session 把 captured semantics 唯一映射到 durable reference、Continuation Capsule、evidence reference 或有依据的 closure tombstone，完全内嵌于 Pi 会话条目中，经原生 replacement 绑定 successor，再由后继核对 workspace 并覆盖每个 live semantic ID 的 authority-context 转交；零外部孤儿目录，随会话清理一并销毁。
 - **Guidance**：从决策代码到静态 bounded host-facing 文案的封闭映射，不携带可执行 Shell。
 - **Project Record**：项目文档中的受控记录总称，分为 Candidate、Task 和 Decision。
 - **Candidate Record**：未采纳、未承诺实施的 `C-xxx` 停车记录，不构成指令或路线图。
@@ -62,7 +64,7 @@
 - **Shell 分析器注册表与有界执行流（Shell Analyzers & Execution Flows，D-067, D-087, D-091）**：封闭分析器注册表（`programs/`）为已知程序族（Git、bounded coreutils、解释器、Python、uv、herdr、包管理器、多语言构建工具族与 Java 运行工具）提供专有选项与路径事实提取；分层多命令程序采用共享确定性分段语法与程序私有 Invocation Plan / 语义投影的两阶段解耦架构，平坦命令保留专用有界分析器（D-067）；规范系统路径（`/bin/`、`/usr/bin/`）命中已知程序时复用裸名语义，自定义与非规范路径作为 source 路径事实纳入 Mandatory Boundary 并按 opaque execute 处理；支持字面 `/dev/null` 重定向流丢弃特例、确定性无副作用 inspect 命令（`true`/`false`/`:`），以及深度为 2 的有界静态管道流（上游纯只读 inspect 且零写副作用，下游限定为受支持文本过滤器或受管 `tee` 流式写入器）；多语言构建工具族（`cargo`、`go`、`make/gmake`、`mvn/mvnw`、`gradle/gradlew`）全面实现破坏性清理（`clean`）一票否决硬拦截与工作区变异参数消费（D-091）；未建模语法、无界修改与外部/网络 transport 严格 fail-closed。
 - **编译期三层正交预算守卫（Static Resource & Analysis Budget Guard）**：Canonical 编译期实行三层硬预算防御，超限在语法解析层直接拒绝（`resource-limit`）且不进入后续授权内核：POSIX 路径边界管辖 Direct 路径、CWD 与搜索模式（`MAX_PATH_BYTES`）；对称数据载荷信封统筹 Direct `write` 与 `edit` 的内容与全部替换块总量（`MAX_DIRECT_PAYLOAD_BYTES`）；算法复杂度守卫维持命令行长度（`MAX_SHELL_COMMAND_BYTES`）、命令总数、条件流 CWD 状态分支数及 edit 替换块数的紧凑防线。
 - **策略预设与会话暂存区生命周期（Policy Presets & Session Lifecycle，D-066, D-069, D-088）**：生产入口仅读取全局 `policy.yaml`，内置 `review`、`guided`、`develop` 并支持自定义 preset；每个 preset 声明独立 path scope，系统硬边界始终优先。`/policy` 提供临时选择面板、动态切换与状态查询；支持显式关闭 Access Gate（`off` 模式，D-066）。每个会话在受管临时资源目录下拥有专属的 `Session Resource Envelope`（含元数据、锁与唯一 `stagingRoot`），正常退出自动清理，异常残留遵循 retention 配额并由新会话异步回收（D-088）。
-- **任务权威上下文与委托协作模型（Context Admission & Delegation Runtime，D-075, D-089）**：Task Owner Session 持有用户意图、需求、架构决策与最终验收的唯一 Authority Context；需要隔离过程探索的工作通过 Herdr 同步子代理执行，有效写能力的委托代理强制进入独立 worktree（D-075）；结果交接由 `Capability Artifact Exchange` 持有：Task Owner 预留 run 并发行单次有时限的 opaque capability，child 发布后由 Owner 在核验 binding、receipt、长度与摘要后原子 collect 导入（D-089）。
+- **任务权威上下文、Session 接力与委托协作模型（Context Admission & Delegation Runtime，D-075, D-089, D-092）**：Task Owner Session 持有用户意图、需求、架构决策与最终验收的唯一 Authority Context；同一 Owner 的 session 接力通过 Pi custom-entry semantic ledger、no-silent-drop Continuation Capsule、会话内嵌收据状态机、显式 `/akeel-handoff [optional-notes]` 原生 replacement 与 successor reconciliation 转移 captured live semantics，零外部文件残留，source 原始 session 保留为冷归档但不整体注入后继 context（D-092）。需要隔离过程探索的工作通过 Herdr 同步子代理执行，有效写能力的委托代理强制进入独立 worktree（D-075）；结果返回原 Owner 时由 `Capability Artifact Exchange` 预留 run、发行单次有时限的 opaque capability，并在核验 binding、receipt、长度与摘要后原子 collect（D-089）。
 
 ## Active Decisions
 
@@ -107,6 +109,7 @@
 - [D-089 Capability Artifact Exchange 与临时资源分类](docs/decisions.md#d-089-capability-artifact-exchange-与临时资源分类)
 - [D-090 三域正交路径访问模型与能力资产防篡改硬边界](docs/decisions.md#d-090-三域正交路径访问模型与能力资产防篡改硬边界)
 - [D-091 多语言构建工具族语义分类与防误删硬边界](docs/decisions.md#d-091-多语言构建工具族语义分类与防误删硬边界)
+- [D-092 必要语义保活、会话内嵌 Handoff 与单入口原生 Session 接力](docs/decisions.md#d-092-必要语义保活会话内嵌-handoff-与单入口原生-session-接力)
 
 ## Negative Space
 
@@ -121,13 +124,14 @@
 - 旧 `config.yaml`、Profile、命令覆盖、继承和子代理字段不属于新 Policy Snapshot 输入；当前只读取全局 `policy.yaml` 的静态策略字段、preset 绑定或显式 `accessGate` 禁用标志。
 - Shell 只支持显式定义、可静态证明且资源有界的子集；管道仅支持深度为 2 的有界静态管道（上游纯只读 inspect 且零写副作用，下游受限过滤器或 tee 流式写入），不提供任意多级管道链、后台并发管道（`&`）、管道内目录切换或向未知程序/解释器的数据流管道。设备文件只在 Shell 重定向目标为字面 `/dev/null` 时作为无害丢弃流豁免 target 路径与写入副作用，不向操作系统开放其它设备节点（如 `/dev/sda`、`/dev/zero`、`/dev/pts/*`），作为命令常规操作数的 `/dev/null` 以及向外部非 `/dev/null` 路径的重定向继续受路径边界硬拦截。`core/compilation/shell/programs/` 中的已知程序仍需提供 bounded path 事实；解释器脚本、uv run、npm/pnpm/yarn 执行、npx、pytest 和未知子命令等委托执行继续保持 opaque；内置 `review`/`guided`/`develop` 分别 deny/ask/allow。未建立完备证明的破坏操作（包括递归删除、目录删除、未知选项、未建模破坏命令与路径形式破坏可执行文件）永久 hard-deny；仅显式非递归且通过 Mandatory Boundary 核验的裸 `rm` 命令受管进入 Policy Kernel 评估（在内置 `guided`/`develop` 下为需知情同意的 `ask`，无 UI 时 fail-closed）。`commands.destroy: allow` 仅可作为自定义 preset 的合法配置值，不放宽未证明操作。Git local transport 仅接受可解析的项目内 `file://` path；HTTPS/SSH 等外部 transport、host、alias、间接 config、ext transport 和其他未建模形态继续 hard-boundary。`commands.opaque: allow` 不提供运行期 sandbox、路径强制或网络隔离；未建模的命令副作用不单独建模。
 - 不把短期 Task Record、实施过程或审查报告作为永久当前知识；Task checkpoint 留在 Git 历史，正文落地后从当前树清除。
+- Continuation Capsule 的固定 wrapper 与 delimiter 拒绝只保护文档结构和 authority 标记，不构成对其中自然语言的提示词注入隔离；reconciliation 证明 captured semantic ID 覆盖而不证明模型理解或遵从。来自外部不可信内容的 provenance/enforcement 仍属 C-038，不能因 Session Handoff 获得可信指令权。
 - 不在 T-069 实现 Static Flow Graph、Explanation Replay 或 Runtime Audit Event，也不提供通用 Runtime Content Flow；D-084 仅覆盖模型 `bash` 工具结果行内的人类专用模型视图，不覆盖用户 `!`/`!!` 的 `bashExecution`。
 - 不把旧实现结果当作正确性 oracle；旧代码、旧测试和 archive 只提供待重新证明的历史线索。
 - Access Root 固定为会话启动时的 `cwd`；不自动向下选择子 Git 仓库，不因 cwd 位于 Git 子目录而向上扩大到 Git root，也不在会话内因 Shell `cd` 改变访问根。用户显式项目选择器、多个 Access Root 和动态切换仍不提供。
 - Shell tilde expansion 只把受支持 Shell word 开头的未引用、未转义裸 `~` 或 `~/` 映射到会话初始化时的 `$HOME`；普通文件名、引用/转义形式、`~user`、动态或未建模形式不映射为 home。Direct path 不继承该 Shell 语义。
 - 不自动识别或写入用户项目的自有文档体系；非标准体系由用户显式声明。
 - 不分发独立 `grill-plan` 或响应自然语言 grill 触发词；grilling 只由用户手动调用 `grill-docs`。
-- 不把 Herdr 声明为 AKeel runtime dependency；`grill-docs` 使用 Herdr 固定执行面和 Artifact Exchange verified collect。当前不提供异步 child mailbox、自动续跑、结果聚合、run/handoff GC、accepted/abandoned 状态或 pane/workspace/worktree 的确定性自动回收；publication receipt 只证明 artifact 完整发布，不证明验收、commit 保留或资源可删除。长期独立工作使用用户授权、范围互斥的 Task Owner Session，child 与临时资源仍由存活 Owner 检查并在用户批准后精确清理。
+- 不把 Herdr 声明为 AKeel runtime dependency；`grill-docs` 使用 Herdr 固定执行面和 Artifact Exchange verified collect。当前不提供异步 child mailbox、无人值守续跑、结果聚合、run/handoff GC、Task accepted/abandoned 状态或 pane/workspace/worktree 的确定性自动回收；artifact publication receipt 只证明结果完整发布，Session Handoff reconciliation receipt 只证明 captured live semantic ID 覆盖与 workspace 核对，均不证明模型理解、Task 验收、commit 保留或资源可删除。长期独立工作使用用户授权、范围互斥的 Task Owner Session，child 与临时资源仍由存活 Owner 检查并在用户批准后精确清理。
 - `assess-modularity` 不提供覆盖数据所有权、运行时拓扑、部署、可靠性、安全和容量的广义 architecture review，也不实施或采纳其 findings。
 - 能力资产域（Capability Domain）仅针对宿主已注册扩展与技能分发子目录（`git`、`node_modules`、`skills`、`extensions`）赋予只读准入，不放宽工作区外普通业务文件的读写，不将 `agentDir` 根目录自身纳入能力域，不对 Shell 任意动态或未建模命令开放能力资产执行，也不放宽分发目录的任何写/改/删操作（防篡改硬拦截）。
 

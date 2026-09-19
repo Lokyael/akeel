@@ -3,6 +3,8 @@ declare module "@earendil-works/pi-coding-agent" {
     getSessionId(): string;
     getCwd(): string;
     getSessionName(): string | undefined;
+    getSessionFile(): string | undefined;
+    getBranch(): readonly unknown[];
     getEntries(): readonly unknown[];
     buildContextEntries(): readonly unknown[];
   }
@@ -29,6 +31,18 @@ declare module "@earendil-works/pi-coding-agent" {
     sessionManager?: SessionManager;
     model?: ModelInfo;
     getContextUsage?(): { percent: number | null; contextWindow: number } | undefined;
+  }
+
+  export interface ReplacedSessionContext extends ExtensionCommandContext {
+    sendUserMessage(content: string | readonly unknown[], options?: { deliverAs?: "steer" | "followUp" }): Promise<void>;
+  }
+
+  export interface ExtensionCommandContext extends ExtensionContext {
+    isIdle(): boolean;
+    newSession(options?: {
+      parentSession?: string;
+      withSession?: (context: ReplacedSessionContext) => unknown | Promise<unknown>;
+    }): Promise<{ cancelled: boolean }>;
   }
 
   export interface SessionStartEvent {
@@ -80,10 +94,11 @@ declare module "@earendil-works/pi-coding-agent" {
       name: string,
       options: {
         description: string;
-        handler: (args: string, ctx: ExtensionContext) => unknown | Promise<unknown>;
+        handler: (args: string, ctx: ExtensionCommandContext) => unknown | Promise<unknown>;
       },
     ): void;
     registerFlag(name: string, options: { description: string; type: "boolean" | "string" | "number"; default?: unknown }): void;
+    appendEntry(customType: string, data?: unknown): void;
     getFlag(name: string): unknown;
     registerTool(definition: ExtensionToolDefinition): void;
     getActiveTools(): string[];

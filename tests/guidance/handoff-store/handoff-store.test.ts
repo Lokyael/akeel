@@ -1,65 +1,139 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { chmodSync, mkdtempSync, rmSync, statSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { tmpdir } from "node:os";
 import { createHandoffStore } from "../../../packages/guidance/src/handoff-store/index";
+import type { SessionEntry } from "../../../packages/guidance/src/handoff-store/index";
+import { createContinuationCapsule } from "../../../packages/guidance/src/handoff-document/index";
 
-function harness() {
-  const root = mkdtempSync(join(tmpdir(), "akeel-handoff-store-"));
-  chmodSync(root, 0o700);
-  return { root, store: createHandoffStore({ root }), cleanup: () => rmSync(root, { recursive: true, force: true }) };
+function sampleCapsule() {
+  return createContinuationCapsule({
+    taskRef: "docs/task.md#t-0145",
+    authorityRefs: ["docs/decisions.md#d-092"],
+    roots: ["next"],
+    units: [{
+      id: "next",
+      kind: "next-action",
+      statement: "Advance in-session handoff.",
+      authority: "user-approved",
+      status: "live",
+      sourceRef: "docs/task.md#t-0145",
+    }],
+    checkpoint: {
+      state: "incomplete",
+      currentSlice: "Session-embedded handoff store",
+      actualState: "In-session persistence under test.",
+      nextActionId: "next",
+    },
+    workspace: { cwd: "/workspace/project", files: ["src/a.ts"] },
+  });
 }
 
-test("source session atomically publishes a successor-verifiable handoff", () => {
-  const h = harness();
-  try {
-    const result = h.store.publish({ sessionId: "source-session", cwd: "/workspace/project" }, "# Handoff\n\nContinue T-0116.\n");
-    assert.match(result.path, /handoff-[a-f0-9]{32}[/\\]handoff\.md$/);
-    assert.equal(statSync(dirname(result.path)).mode & 0o777, 0o700);
-    assert.equal(statSync(result.path).mode & 0o777, 0o600);
+test("prepares and retrieves an in-session capsule with zero filesystem writes", () => {
+  const store = createHandoffStore();
+  const capsule = sampleCapsule();
+  const prepared = store.prepareCapsule(capsule);
 
-    const verified = h.store.verify(result.path);
-    assert.equal(verified.content, "# Handoff\n\nContinue T-0116.\n");
-    assert.equal(verified.digest, result.digest);
-    assert.equal(verified.sourceSessionId, "source-session");
-  } finally {
-    h.cleanup();
-  }
+  assert.equal(prepared.entry.type, "custom");
+  assert.equal(prepared.entry.customType, "akeel:prepared-capsule");
+  assert.match(prepared.digest, /^sha256:[a-f0-9]{64}$/);
+  assert.match(prepared.content, /Advance in-session handoff/);
+
+  const entries: SessionEntry[] = [prepared.entry];
+  assert.equal(store.status(entries).state, "prepared");
+
+  const active = store.getActiveCapsule(entries);
+  assert.ok(active);
+  assert.equal(active.digest, prepared.digest);
+  assert.deepEqual(active.capsule, capsule);
 });
 
-test("handoff verification rejects paths outside the store and tampering", () => {
-  const h = harness();
-  const outside = join(tmpdir(), "akeel-handoff-outside.md");
-  try {
-    writeFileSync(outside, "outside", "utf8");
-    assert.throws(() => h.store.verify(outside), /handoff-store-denied/);
+test("in-session handoff advances through append-only switch, transfer, and reconciliation entries", () => {
+  const store = createHandoffStore();
+  const capsule = sampleCapsule();
+  const sourceEntries: SessionEntry[] = [store.prepareCapsule(capsule).entry];
 
-    const result = h.store.publish({ sessionId: "source-session", cwd: "/workspace/project" }, "original");
-    writeFileSync(result.path, "tampered", "utf8");
-    assert.throws(() => h.store.verify(result.path), /handoff-store-denied/);
+  assert.equal(store.status(sourceEntries).state, "prepared");
 
-    const manifestResult = h.store.publish({ sessionId: "source-session", cwd: "/workspace/project" }, "manifest-bound");
-    writeFileSync(join(dirname(manifestResult.path), "handoff.json"), JSON.stringify({ schemaVersion: 1, handoffId: "wrong" }), "utf8");
-    assert.throws(() => h.store.verify(manifestResult.path), /handoff-store-denied/);
-  } finally {
-    h.cleanup();
-    rmSync(outside, { force: true });
-  }
+  const switchIntent = store.beginSwitch(sourceEntries, "source-session");
+  sourceEntries.push(switchIntent);
+  assert.equal(store.status(sourceEntries).state, "switch-started");
+
+  const transferred = store.transfer(sourceEntries, "source-session", "successor-session");
+  sourceEntries.push(transferred.sourceEntry);
+  assert.equal(store.status(sourceEntries).state, "transferred");
+
+  // Successor session receives the transfer entry in its entries
+  const successorEntries: SessionEntry[] = [transferred.successorEntry];
+  assert.equal(store.status(successorEntries).state, "transferred");
+
+  const reconciliation = store.reconcile(successorEntries, "successor-session", {
+    importedSemanticIds: ["next"],
+    conflicts: [],
+    unresolvedSemanticIds: [],
+    workspaceVerified: true,
+  });
+  successorEntries.push(reconciliation.entry);
+  assert.equal(store.status(successorEntries).state, "reconciled");
+  assert.deepEqual(reconciliation.coveredSemanticIds, ["next"]);
 });
 
-test("handoff content and source identity are bounded", () => {
-  const h = harness();
-  try {
-    assert.throws(
-      () => h.store.publish({ sessionId: "", cwd: "/workspace/project" }, "content"),
-      /handoff-store-invalid/,
-    );
-    assert.throws(
-      () => h.store.publish({ sessionId: "source-session", cwd: "/workspace/project" }, "x".repeat(1_048_577)),
-      /handoff-store-invalid/,
-    );
-  } finally {
-    h.cleanup();
-  }
+test("cancelled and unresolved handoffs fail closed within session entries", () => {
+  const store = createHandoffStore();
+  const capsule = sampleCapsule();
+  const sourceEntries: SessionEntry[] = [store.prepareCapsule(capsule).entry];
+
+  sourceEntries.push(store.beginSwitch(sourceEntries, "source-session"));
+  sourceEntries.push(store.cancelSwitch(sourceEntries, "source-session"));
+  assert.equal(store.status(sourceEntries).state, "cancelled");
+
+  assert.throws(
+    () => store.transfer(sourceEntries, "source-session", "successor-session"),
+    /handoff-store-denied/,
+  );
+
+  // Attempting reconciliation with unresolved item produces a blocked state record without crashing
+  const freshEntries: SessionEntry[] = [store.prepareCapsule(capsule).entry];
+  const transferred = store.transfer(freshEntries, "source-session", "successor-session");
+  const successorEntries: SessionEntry[] = [transferred.successorEntry];
+
+  const blocked = store.reconcile(successorEntries, "successor-session", {
+    importedSemanticIds: [],
+    conflicts: [],
+    unresolvedSemanticIds: ["next"],
+    workspaceVerified: true,
+  });
+  assert.equal(blocked.state, "blocked");
+  successorEntries.push(blocked.entry);
+  assert.equal(store.status(successorEntries).state, "blocked");
 });
+
+test("reconciled session can prepare a fresh outbound capsule and advance multi-hop handoffs", () => {
+  const store = createHandoffStore();
+  const capsule = sampleCapsule();
+  const transferred = store.transfer([store.prepareCapsule(capsule).entry], "s1", "s2");
+  const s2Entries: SessionEntry[] = [transferred.successorEntry];
+
+  const reconciled = store.reconcile(s2Entries, "s2", {
+    importedSemanticIds: ["next"],
+    conflicts: [],
+    unresolvedSemanticIds: [],
+    workspaceVerified: true,
+  });
+  s2Entries.push(reconciled.entry);
+  assert.equal(store.status(s2Entries).state, "reconciled");
+
+  // S2 prepares a new outbound capsule for S3
+  const s2Outbound = store.prepareCapsule(capsule);
+  s2Entries.push(s2Outbound.entry);
+  assert.equal(store.status(s2Entries).state, "prepared");
+
+  const active = store.getActiveCapsule(s2Entries);
+  assert.ok(active);
+  assert.equal(active.origin, "outbound");
+  assert.equal(active.digest, s2Outbound.digest);
+
+  // S2 begins switch to S3
+  const s2Switch = store.beginSwitch(s2Entries, "s2");
+  s2Entries.push(s2Switch);
+  assert.equal(store.status(s2Entries).state, "switch-started");
+});
+

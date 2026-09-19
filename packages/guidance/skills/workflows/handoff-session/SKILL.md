@@ -1,31 +1,79 @@
 ---
 name: handoff-session
-description: Use /skill:handoff-session to publish a verified handoff document so a successor session can continue the work. Reference artifacts by path; redact sensitive information.
+description: Use /skill:handoff-session to audit live semantics and prepare a verified in-session continuation capsule for native replacement via /akeel-handoff. Reference artifacts by path; redact sensitive information.
 disable-model-invocation: true
 ---
 
-Publish a handoff document summarising the current conversation so a successor session can continue using only that document and repository content. Resolve information gaps first. A handoff transfers context to a successor; it is not a delegated run result and does not grant acceptance or publication authority.
+Prepare a continuation capsule so one successor Pi session can continue the current Task without silently dropping any captured live semantic unit. A handoff transfers Task Owner authority only after the user runs `/akeel-handoff` and the native replacement binds the successor; preparation alone leaves authority with the source session.
 
-## Content
+## 1. Resolve authority and reality first
 
-Include:
-- **Goal**: What we're trying to accomplish
-- **Current state**: Where we are in the process
-- **Decisions**: references only — link `D-xxx` entries and active Task sections with repo-relative paths (`docs/decisions.md#...`, `docs/task.md#...`). Reference authoritative records instead of copying them (per principles.md Project Records — Project Record Authority). Record an adopted but missing decision through domain-modeling before handing off.
-- **Files involved**: Use repo-relative paths for repo files and exact `/tmp/akeel/...` paths for retained temporary artifacts. Reference skills by name rather than installed path.
-- **Next steps**: What to do next
-- **Suggested skills**: Skill names only
+Read the active Task, referenced Decisions, `CONTEXT.md`, involved files, and current verification evidence. Resolve material gaps before preparing the capsule. A handoff does not turn an inference into user approval and does not make stale evidence fresh.
 
-## Excluded Content
+Move durable meaning to its authoritative destination before handoff, per principles.md Project Records — Project Record Authority:
 
-- Content already captured in `CONTEXT.md`, `docs/decisions.md`, an active Task Record, or commits; reference it by path.
-- Sensitive information: API keys, passwords, tokens, capability values, personally identifiable information.
-- Full terminal output, search trails, repeated failures, and intermediate drafts.
+- adopted Requirements and active scope → Task Record;
+- adopted load-bearing conclusions → Decision Record;
+- standing terminology and architecture → `CONTEXT.md`;
+- behavior and executable proof → code and tests;
+- bounded supporting results → referenced artifacts.
 
-## Publish and verify
+Do not copy authoritative content into the capsule when a repo-relative reference is sufficient.
 
-If the user passed arguments, treat them as the successor's focus and tailor the handoff accordingly.
+## 2. Audit captured semantics
 
-Call `akeel_handoff` action `publish` with the complete Markdown document. The Handoff Store creates one owner-controlled `/tmp/akeel/handoffs/handoff-<random>/` envelope and atomically publishes `handoff.json`, `handoff.md`, and `receipt.json` with private permissions. Destination paths and envelope structure are managed exclusively by the store.
+Call `akeel_handoff` action `status`. Review every existing Semantic Unit and inventory any expressed meaning that can still change the successor's valid next action, authority, safety boundary, current-state interpretation, or verification obligation.
 
-Return the exact published `handoff.md` path and a brief summary. The successor calls `akeel_handoff` action `verify` with that exact path before relying on its content. Missing or mismatched manifest, content, or receipt is a failed handoff; do not reconstruct it from terminal output. Handoff Store does not delete the envelope, so the successor reports the exact retained path for explicit user-managed cleanup after successful takeover.
+Call action `record` once for each missing live unit. Use one stable ID and one role from:
+
+`requirement | constraint | assumption | finding | risk | decision-candidate | evidence | external-effect | work-state | next-action`
+
+Record its statement, authority (`user-approved | project-record | observed | inferred`), source reference, `status: live`, and dependencies when another live unit carries part of its meaning. Unknown or unclassified meaning remains live. Never store secrets, full logs, repeated failures, search trails, or intermediate drafts.
+
+A unit being operationally complete does not make its meaning dead. Keep completed conclusions, performed external effects, safety findings, and rejected approaches live while they can still affect continuation or prevent repetition.
+
+## 3. Close only proven-dead semantics
+
+Call action `close` only when removal can no longer change a valid future action and no live unit depends on the old meaning. Supply:
+
+- `status`: `closed` or `superseded`;
+- `closure.disposition`: `materialized | superseded | invalidated | irrelevant`;
+- `closure.basisRef`: the evidence supporting closure;
+- `closure.destinationRef`: the current authority, replacement, or proof.
+
+Do not close a unit merely because its operation ended. When closure is uncertain, keep it live.
+
+## 4. Prepare the Continuation Capsule
+
+Call action `status` again and build the `prepare` payload:
+
+- `taskRef` and `authorityRefs`;
+- `roots`: live IDs whose dependency closure covers every live unit;
+- `checkpoint.state`: `complete | incomplete | blocked`;
+- `checkpoint.currentSlice` and factual `actualState`;
+- exactly one live `next-action` ID as `checkpoint.nextActionId`;
+- current absolute `workspace.cwd` and involved repo-relative files.
+
+Call `akeel_handoff` action `prepare`. Preparation fails closed on duplicate IDs, dangling dependencies, unreachable live units, dependencies on closed units, closure without evidence, missing next action, cwd mismatch, or an oversized capsule. Preparation records the canonical Continuation Capsule directly as an in-session custom entry with zero external directory footprint, immune to system reboots and cleaned up together with the session.
+
+Return the digest, summarize the checkpoint state, and tell the user to run `/akeel-handoff` (or `/akeel-handoff <next-action>`) when ready to transfer authority. Users may also run `/akeel-handoff` directly at any time to synthesize and switch in a single step without invoking this skill. Do not claim that preparation switched sessions.
+
+## 5. Native replacement and successor reconciliation
+
+`/akeel-handoff` is the explicit authority gate. It requires an idle source, verifies that the prepared capsule still matches the current session ledger and cwd, writes switch intent, and calls Pi's native `newSession` with parent lineage. Replacement code uses only the fresh `withSession` context, binds one successor, and sends a provenance-marked kickoff that cannot grant new user approval.
+
+The successor verifies the capsule, reads its authority references, inspects the current workspace, and rechecks evidence as needed. It then calls `akeel_handoff` action `reconcile` with every live semantic ID classified exactly once as:
+
+- imported;
+- conflict, with observed reality; or
+- unresolved.
+
+Reconciliation succeeds only when the workspace is verified and every live ID is imported without conflicts or unresolved items. Otherwise stop and ask the user to resolve the discrepancy. Receipt integrity and ID coverage do not prove model understanding or recover unexpressed, uncaptured intent.
+
+## Failure and privacy boundaries
+
+- If native replacement is cancelled, the handoff becomes cancelled and the source remains Owner; prepare a new capsule for another attempt.
+- A crash after switch intent but before successor transfer is ambiguous; do not infer ownership or retry automatically. Reopening a source whose latest handoff is switch-started, transferred, or reconciled disables its model tools until the user resolves ownership.
+- Never auto-commit, stash, revert, merge, publish, clean resources, scan other session JSONL files, or replace Pi compaction.
+- Reference sensitive or large material by approved path when possible. Do not place credentials, tokens, `.env` values, personal data, or full terminal output in semantic entries or capsules.
+- The source Pi session remains the cold forensic archive; the successor does not load it wholesale into context.

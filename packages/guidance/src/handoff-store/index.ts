@@ -1,36 +1,98 @@
+import { createHash } from "node:crypto";
 import {
-  closeSync,
-  fsyncSync,
-  linkSync,
-  lstatSync,
-  mkdirSync,
-  openSync,
-  readFileSync,
-  unlinkSync,
-  writeFileSync,
-} from "node:fs";
-import { createHash, randomBytes } from "node:crypto";
-import { basename, dirname, join, resolve } from "node:path";
+  reconcileContinuationCapsule,
+  renderContinuationCapsule,
+} from "../handoff-document/index";
+import type {
+  ContinuationCapsule,
+  ReconciliationReport,
+} from "../handoff-document/index";
 
-const MAX_HANDOFF_BYTES = 1_048_576;
+export type SessionEntry = Readonly<{
+  readonly type: "custom";
+  readonly customType: string;
+  readonly data: unknown;
+}>;
 
-type Source = Readonly<{ readonly sessionId: string; readonly cwd: string }>;
-type Receipt = Readonly<{
-  readonly schemaVersion: 1;
-  readonly handoffId: string;
+export type HandoffState =
+  | "none"
+  | "prepared"
+  | "switch-started"
+  | "cancelled"
+  | "transferred"
+  | "reconciled"
+  | "blocked";
+
+export type HandoffStatus = Readonly<{
+  readonly state: HandoffState;
+  readonly digest?: string;
+  readonly sourceSessionId?: string;
+  readonly successorSessionId?: string;
+}>;
+
+export type PreparedCapsuleData = Readonly<{
+  readonly capsule: ContinuationCapsule;
   readonly digest: string;
-  readonly bytes: number;
+  readonly content: string;
+}>;
+
+export type SwitchIntentData = Readonly<{
+  readonly digest: string;
   readonly sourceSessionId: string;
 }>;
 
-export type HandoffStore = Readonly<{
-  readonly publish: (source: Source, content: string) => Readonly<{ readonly path: string; readonly digest: string; readonly bytes: number }>;
-  readonly verify: (path: string) => Readonly<{ readonly content: string; readonly digest: string; readonly bytes: number; readonly sourceSessionId: string }>;
+export type HandoffSwitchedData = Readonly<{
+  readonly digest: string;
+  readonly sourceSessionId: string;
+  readonly successorSessionId: string;
 }>;
 
-export type HandoffStoreOptions = Readonly<{
-  readonly root: string;
-  readonly random?: (bytes: number) => Buffer;
+export type ContinuationCapsuleData = Readonly<{
+  readonly capsule: ContinuationCapsule;
+  readonly digest: string;
+  readonly content: string;
+  readonly sourceSessionId: string;
+  readonly successorSessionId: string;
+}>;
+
+export type ReconciliationData = Readonly<{
+  readonly digest: string;
+  readonly successorSessionId: string;
+  readonly coveredSemanticIds: readonly string[];
+}>;
+
+export type HandoffStore = Readonly<{
+  readonly prepareCapsule: (capsule: ContinuationCapsule) => Readonly<{
+    readonly digest: string;
+    readonly content: string;
+    readonly entry: SessionEntry;
+  }>;
+  readonly getActiveCapsule: (entries: readonly unknown[]) => Readonly<{
+    readonly capsule: ContinuationCapsule;
+    readonly digest: string;
+    readonly content: string;
+    readonly origin?: "inbound" | "outbound";
+  }> | undefined;
+  readonly status: (entries: readonly unknown[]) => HandoffStatus;
+  readonly beginSwitch: (entries: readonly unknown[], sourceSessionId: string) => SessionEntry;
+  readonly cancelSwitch: (entries: readonly unknown[], sourceSessionId: string) => SessionEntry;
+  readonly transfer: (
+    entries: readonly unknown[],
+    sourceSessionId: string,
+    successorSessionId: string,
+  ) => Readonly<{
+    readonly sourceEntry: SessionEntry;
+    readonly successorEntry: SessionEntry;
+  }>;
+  readonly reconcile: (
+    entries: readonly unknown[],
+    successorSessionId: string,
+    report: ReconciliationReport,
+  ) => Readonly<{
+    readonly state: "reconciled" | "blocked";
+    readonly entry: SessionEntry;
+    readonly coveredSemanticIds: readonly string[];
+  }>;
 }>;
 
 function invalid(): never {
@@ -45,103 +107,181 @@ function digest(content: string): string {
   return `sha256:${createHash("sha256").update(content).digest("hex")}`;
 }
 
-function ensureDirectory(path: string, create = false): void {
-  if (create) mkdirSync(path, { recursive: true, mode: 0o700 });
-  const stats = lstatSync(path);
-  if (!stats.isDirectory() || stats.isSymbolicLink() || (stats.mode & 0o022) !== 0) denied();
-  if (typeof process.getuid === "function" && stats.uid !== process.getuid()) denied();
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
 }
 
-function atomicNoClobber(path: string, content: string, random: (bytes: number) => Buffer): void {
-  const temporary = join(dirname(path), `.tmp-${random(12).toString("hex")}`);
-  let fd: number | undefined;
-  try {
-    fd = openSync(temporary, "wx", 0o600);
-    writeFileSync(fd, content, "utf8");
-    fsyncSync(fd);
-    closeSync(fd);
-    fd = undefined;
-    linkSync(temporary, path);
-  } finally {
-    if (fd !== undefined) closeSync(fd);
-    try { unlinkSync(temporary); } catch { /* exact temporary cleanup is best-effort */ }
-  }
-}
-
-export function createHandoffStore(options: HandoffStoreOptions): HandoffStore {
-  if (typeof options?.root !== "string" || !options.root.startsWith("/")) invalid();
-  const root = resolve(options.root);
-  const random = options.random ?? randomBytes;
-  ensureDirectory(root, true);
-
-  function parsePath(path: string): Readonly<{ handoffId: string; handoffRoot: string }> {
-    if (typeof path !== "string" || basename(path) !== "handoff.md") denied();
-    const handoffRoot = dirname(resolve(path));
-    const handoffId = basename(handoffRoot);
-    if (!/^handoff-[a-f0-9]{32}$/.test(handoffId) || dirname(handoffRoot) !== root) denied();
-    ensureDirectory(handoffRoot);
-    return { handoffId, handoffRoot };
-  }
-
+function customEntry(customType: string, data: unknown): SessionEntry {
   return Object.freeze({
-    publish(source, content) {
-      if (typeof source?.sessionId !== "string" || source.sessionId.length === 0 || source.sessionId.length > 128 ||
-        typeof source.cwd !== "string" || !source.cwd.startsWith("/") || typeof content !== "string" || content.includes("\u0000")) invalid();
-      const bytes = Buffer.byteLength(content, "utf8");
-      if (bytes > MAX_HANDOFF_BYTES) invalid();
+    type: "custom" as const,
+    customType,
+    data: Object.freeze(data as object),
+  });
+}
 
-      let handoffId = "";
-      let handoffRoot = "";
-      for (let attempt = 0; attempt < 8; attempt += 1) {
-        handoffId = `handoff-${random(16).toString("hex")}`;
-        handoffRoot = join(root, handoffId);
-        try {
-          mkdirSync(handoffRoot, { mode: 0o700 });
-          break;
-        } catch (error) {
-          if (attempt === 7 || typeof error !== "object" || error === null || !("code" in error) || error.code !== "EEXIST") throw error;
-        }
-      }
-      const contentDigest = digest(content);
-      atomicNoClobber(join(handoffRoot, "handoff.json"), JSON.stringify({
-        schemaVersion: 1,
-        handoffId,
-        source,
-      }), random);
-      const path = join(handoffRoot, "handoff.md");
-      atomicNoClobber(path, content, random);
-      const receipt: Receipt = Object.freeze({
-        schemaVersion: 1,
-        handoffId,
-        digest: contentDigest,
-        bytes,
-        sourceSessionId: source.sessionId,
+function findEntryData<T>(entries: readonly unknown[], customType: string): T | undefined {
+  for (let index = entries.length - 1; index >= 0; index -= 1) {
+    const raw = entries[index];
+    if (!isRecord(raw) || raw.type !== "custom" || raw.customType !== customType || !raw.data) continue;
+    return raw.data as T;
+  }
+  return undefined;
+}
+
+export function createHandoffStore(): HandoffStore {
+  return Object.freeze({
+    prepareCapsule(capsule: ContinuationCapsule) {
+      if (!capsule || typeof capsule !== "object") invalid();
+      const content = renderContinuationCapsule(capsule);
+      const capsuleDigest = digest(JSON.stringify(capsule));
+      const entryData: PreparedCapsuleData = Object.freeze({
+        capsule,
+        digest: capsuleDigest,
+        content,
       });
-      atomicNoClobber(join(handoffRoot, "receipt.json"), JSON.stringify(receipt), random);
-      return Object.freeze({ path, digest: contentDigest, bytes });
+      return Object.freeze({
+        digest: capsuleDigest,
+        content,
+        entry: customEntry("akeel:prepared-capsule", entryData),
+      });
     },
 
-    verify(path) {
-      const { handoffId, handoffRoot } = parsePath(path);
-      try {
-        const manifest: unknown = JSON.parse(readFileSync(join(handoffRoot, "handoff.json"), "utf8"));
-        const receipt: unknown = JSON.parse(readFileSync(join(handoffRoot, "receipt.json"), "utf8"));
-        if (typeof manifest !== "object" || manifest === null ||
-          (manifest as { schemaVersion?: unknown }).schemaVersion !== 1 ||
-          (manifest as { handoffId?: unknown }).handoffId !== handoffId ||
-          typeof (manifest as { source?: unknown }).source !== "object" || (manifest as { source?: unknown }).source === null ||
-          typeof receipt !== "object" || receipt === null || (receipt as Receipt).schemaVersion !== 1 ||
-          (receipt as Receipt).handoffId !== handoffId || typeof (receipt as Receipt).digest !== "string" ||
-          typeof (receipt as Receipt).bytes !== "number" || typeof (receipt as Receipt).sourceSessionId !== "string" ||
-          (manifest as { source: { sessionId?: unknown } }).source.sessionId !== (receipt as Receipt).sourceSessionId) denied();
-        const content = readFileSync(join(handoffRoot, "handoff.md"), "utf8");
-        const typed = receipt as Receipt;
-        if (Buffer.byteLength(content, "utf8") !== typed.bytes || digest(content) !== typed.digest) denied();
-        return Object.freeze({ content, digest: typed.digest, bytes: typed.bytes, sourceSessionId: typed.sourceSessionId });
-      } catch (error) {
-        if (error instanceof Error && error.message === "handoff-store-denied") throw error;
-        denied();
+    getActiveCapsule(entries: readonly unknown[]) {
+      for (let index = entries.length - 1; index >= 0; index -= 1) {
+        const raw = entries[index];
+        if (!isRecord(raw) || raw.type !== "custom" || typeof raw.customType !== "string") continue;
+        if (raw.customType === "akeel:prepared-capsule") {
+          const prepared = raw.data as PreparedCapsuleData;
+          return Object.freeze({
+            capsule: prepared.capsule,
+            digest: prepared.digest,
+            content: prepared.content,
+            origin: "outbound" as const,
+          });
+        }
+        if (raw.customType === "akeel:continuation-capsule") {
+          const continuation = raw.data as ContinuationCapsuleData;
+          return Object.freeze({
+            capsule: continuation.capsule,
+            digest: continuation.digest,
+            content: continuation.content,
+            origin: "inbound" as const,
+          });
+        }
       }
+      return undefined;
+    },
+
+    status(entries: readonly unknown[]) {
+      for (let index = entries.length - 1; index >= 0; index -= 1) {
+        const raw = entries[index];
+        if (!isRecord(raw) || raw.type !== "custom" || typeof raw.customType !== "string") continue;
+        if (raw.customType === "akeel:reconciliation") {
+          const data = raw.data as ReconciliationData;
+          return Object.freeze({ state: "reconciled", digest: data?.digest, successorSessionId: data?.successorSessionId });
+        }
+        if (raw.customType === "akeel:reconciliation-blocked") {
+          const data = raw.data as ReconciliationData;
+          return Object.freeze({ state: "blocked", digest: data?.digest, successorSessionId: data?.successorSessionId });
+        }
+        if (raw.customType === "akeel:handoff-switched") {
+          const data = raw.data as HandoffSwitchedData;
+          return Object.freeze({ state: "transferred", digest: data?.digest, sourceSessionId: data?.sourceSessionId, successorSessionId: data?.successorSessionId });
+        }
+        if (raw.customType === "akeel:switch-cancelled") {
+          const data = raw.data as SwitchIntentData;
+          return Object.freeze({ state: "cancelled", digest: data?.digest, sourceSessionId: data?.sourceSessionId });
+        }
+        if (raw.customType === "akeel:switch-intent") {
+          const data = raw.data as SwitchIntentData;
+          return Object.freeze({ state: "switch-started", digest: data?.digest, sourceSessionId: data?.sourceSessionId });
+        }
+        if (raw.customType === "akeel:continuation-capsule") {
+          const data = raw.data as ContinuationCapsuleData;
+          return Object.freeze({ state: "transferred", digest: data?.digest, sourceSessionId: data?.sourceSessionId, successorSessionId: data?.successorSessionId });
+        }
+        if (raw.customType === "akeel:prepared-capsule") {
+          const data = raw.data as PreparedCapsuleData;
+          return Object.freeze({ state: "prepared", digest: data?.digest });
+        }
+      }
+      return Object.freeze({ state: "none" });
+    },
+
+    beginSwitch(entries: readonly unknown[], sourceSessionId: string) {
+      const currentStatus = this.status(entries);
+      if (currentStatus.state !== "prepared" || !currentStatus.digest || !sourceSessionId) denied();
+      return customEntry("akeel:switch-intent", Object.freeze({
+        digest: currentStatus.digest,
+        sourceSessionId,
+      } satisfies SwitchIntentData));
+    },
+
+    cancelSwitch(entries: readonly unknown[], sourceSessionId: string) {
+      const currentStatus = this.status(entries);
+      if (currentStatus.state !== "switch-started" || !currentStatus.digest || currentStatus.sourceSessionId !== sourceSessionId) denied();
+      return customEntry("akeel:switch-cancelled", Object.freeze({
+        digest: currentStatus.digest,
+        sourceSessionId,
+      } satisfies SwitchIntentData));
+    },
+
+    transfer(entries: readonly unknown[], sourceSessionId: string, successorSessionId: string) {
+      const currentStatus = this.status(entries);
+      if ((currentStatus.state !== "switch-started" && currentStatus.state !== "prepared") ||
+        !currentStatus.digest || !sourceSessionId || !successorSessionId || sourceSessionId === successorSessionId) denied();
+      const active = this.getActiveCapsule(entries);
+      if (!active || active.digest !== currentStatus.digest) denied();
+
+      const sourceEntry = customEntry("akeel:handoff-switched", Object.freeze({
+        digest: currentStatus.digest,
+        sourceSessionId,
+        successorSessionId,
+      } satisfies HandoffSwitchedData));
+
+      const successorEntry = customEntry("akeel:continuation-capsule", Object.freeze({
+        capsule: active.capsule,
+        digest: active.digest,
+        content: active.content,
+        sourceSessionId,
+        successorSessionId,
+      } satisfies ContinuationCapsuleData));
+
+      return Object.freeze({ sourceEntry, successorEntry });
+    },
+
+    reconcile(entries: readonly unknown[], successorSessionId: string, report: ReconciliationReport) {
+      const currentStatus = this.status(entries);
+      if ((currentStatus.state !== "transferred" && currentStatus.state !== "blocked") || !currentStatus.digest) denied();
+      const continuation = findEntryData<ContinuationCapsuleData>(entries, "akeel:continuation-capsule");
+      if (!continuation || continuation.successorSessionId !== successorSessionId || continuation.digest !== currentStatus.digest) denied();
+
+      const result = reconcileContinuationCapsule(continuation.capsule, report);
+      if (result.status === "ready") {
+        const entry = customEntry("akeel:reconciliation", Object.freeze({
+          digest: currentStatus.digest,
+          successorSessionId,
+          coveredSemanticIds: result.coveredSemanticIds,
+        } satisfies ReconciliationData));
+
+        return Object.freeze({
+          state: "reconciled" as const,
+          entry,
+          coveredSemanticIds: result.coveredSemanticIds,
+        });
+      }
+
+      const entry = customEntry("akeel:reconciliation-blocked", Object.freeze({
+        digest: currentStatus.digest,
+        successorSessionId,
+        coveredSemanticIds: result.coveredSemanticIds,
+      } satisfies ReconciliationData));
+
+      return Object.freeze({
+        state: "blocked" as const,
+        entry,
+        coveredSemanticIds: result.coveredSemanticIds,
+      });
     },
   });
 }

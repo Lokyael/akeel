@@ -162,9 +162,11 @@ test("handoff and preflight use their distinct temporary-resource lifecycles", (
     "utf8",
   );
 
-  assert.match(handoff, /akeel_handoff[^.]*publish/i);
-  assert.match(handoff, /successor[^.]*verify/i);
-  assert.match(handoff, /handoffs\/handoff-<random>/i);
+  assert.match(handoff, /akeel_handoff[^.]*prepare/i);
+  assert.match(handoff, /successor reconciliation/i);
+  assert.match(handoff, /action `reconcile`/i);
+  assert.match(handoff, /\/akeel-handoff[^.]*explicit authority gate/i);
+  assert.match(handoff, /in-session custom entry/i);
   assert.doesNotMatch(handoff, /handoff-<timestamp>\.md/i);
   assert.match(preflight, /runs\/<run-id>\/quarantine/);
   assert.doesNotMatch(preflight, /\/tmp\/akeel\/preflight\//);

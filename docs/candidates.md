@@ -21,13 +21,6 @@
 - **Safety Boundary:** 只有“原始值不离开可信进程”时才可声称掩码；受管面不得 debug-log 原始内容，拒绝路径在读取文件前完成。按名掩码不覆盖名称未分类但值中含 secret、IP 或 URL 的变量；不提供按内容兜底保证。磁盘本体、其他 extension 的 Node fs、用户编辑器、被放行的 Shell、host 侧工具调用记录和进程输出仍在 AKeel 保证之外。
 - **Revisit condition:** 用户需要 agent 检查项目 `.env` 的非敏感配置且普通整读因泄露风险不可接受，或出现可验证的按名掩码受管读取需求。
 
-## C-019: 当前会话 Context watermark 的 human-only 预警
-
-- **Why Not Now:** Pi 已通过 Extension `ctx.getContextUsage()` 提供当前模型的 context usage，并自带自动 compaction；常规任务通常在窗口耗尽前结束，当前没有重复证据证明 AKeel 还需增加独立预警。固定 token 数也不能跨模型表达同一风险。
-- **Exploration Direction:** 只探索当前会话的 human-only 水位提示：从公开 `ctx.getContextUsage()` 获取使用量并结合当前模型 context window 计算比例，在不注入 LLM context、不扫描 session JSONL、不改变 compaction 和 Task 生命周期的前提下提醒用户。阈值必须可解释且有实际长会话测量依据；预警不声称 Git、测试或当前 Slice 已达到安全交接点，也不自动终止会话。
-- **Out of Scope:** 跨 Agent/session 文件扫描、Herdr pane 总览、自动生成交接、自动切换会话和主动停机；安全收敛与交接由 C-037 独立评估。
-- **Revisit condition:** 多个大型任务反复出现可测的 context 膨胀、推理退化或成本异常，且 Pi 自动 compaction 与现有人工状态显示不能满足预警需求；或用户明确要求 human-only 水位提醒。
-
 ## C-020: Content Flow checkpoint governance（仅探索方向）
 
 > 本条只记录 Content Flow checkpoint 的未来探索；不改变现有 Access Gate 行为。
@@ -118,13 +111,6 @@
 - **Exploration Direction:** 按外部 Shell/程序合同分别核对按名单值读取、全量 dump、赋值、导出与 child 可见性；protected 名的读取/导出应 fail-closed，allow/neutral 的可见性和写入需显式定义。若输出需要掩码，原值必须在可信进程内替换后才可进入 tool result；不能用 Shell 管道事后打码。rc 文件、环境加载器和 delegated child 的父子策略是独立边界，不因 `.env` 名称契约存在而自动解决。
 - **Revisit condition:** 出现进程环境或 rc 文件中的敏感值经受管命令泄露、按内容掩码漏判的实证，或真实工作流需要 agent 安全检查或设置特定环境变量。
 
-## C-037: Context watermark 后的自动安全收敛与交接
-
-- **Why Not Now:** AKeel 已有用户手动调用的 `handoff-session`，Pi 也提供 context usage、idle、compaction、shutdown 与 session replacement API；但 token 水位和 `idle` 都不能证明当前 Slice 完成、测试通过、Git 状态可接管或 durable records 已同步。自动停机若误判会留下破碎工作区，当前没有高频证据值得引入这组语义状态机。
-- **Exploration Direction:** 当 C-019 的水位信号达到经验证的软阈值后，只进入“不启动新工作”的收敛模式，并等待最近一个可证明的交接点。交接点至少核对当前修改完整、语法/测试状态、Task 证据、Git 保存点和未决风险；无法证明时必须继续当前闭环或请求用户，不得强制截断。交接内容复用 `handoff-session` 的 Goal、Current state、权威记录引用、文件、下一动作与 skill 合同，写入 `/tmp/akeel/handoffs/` 后才可通知或请求 graceful shutdown/session replacement。
-- **Out of Scope:** 不从 token 数推导完成状态，不跨 Agent 扫描 session JSONL，不自动接受、提交、合并或发布工作，也不替代 Pi compaction。
-- **Revisit condition:** 大型多阶段任务反复因上下文耗尽而在未闭环状态中断，且人工调用 `handoff-session` 与 Pi compaction 无法可靠缓解；或用户明确要求自动收敛与交接。
-
 ## C-038: 不可信内容的 provenance 与指令边界
 
 - **Why Not Now:** 网络抓取、PR/Issue 和第三方仓库内容可能携带间接提示词注入，但当前没有统一的 producer provenance、host message label 或可测试的 consuming-agent enforcement seam。把自然语言警告称为隔离会制造超出能力的安全承诺；D-030/D-053 的 Policy 零注入也不等同于一般不可信内容治理。
@@ -165,4 +151,13 @@
 - **Exploration Direction:** 仅在支持有界选项（如 `-d`、`-p`）并将目标路径显式约束在会话 `stagingRoot` 或工作区的前提下，评估受管临时文件创建语义。
 - **Revisit condition:** 出现能在静态无变量 Shell 下消费随机临时文件的可行方案，或宿主提供进程环境重写接缝；或用户明确要求重新评估。
 
-## C-050: 待创建
+## C-050: 无人值守 Session 自动换页与长周期自主接力
+
+> 本条记录未来将 Session 接力从单命令触发进一步推进为无人值守自动换页的探索；不改变当前需要显式触发的会话生命周期。
+
+- **Why Not Now:** 当前 Pi 宿主的 `ctx.newSession()` 在架构上仅对人类交互的 `ExtensionCommandContext` 开放，在事件回调或后台中直接调用存在宿主死锁风险；此外，无人值守换页需要系统具备完全自动化的静止点（Quiescence）判定、会话高频震荡（Churning）防御与自愈熔断机制。目前用户意图仍需长期安全约束，过早开放完全无人的自动换页会引入失控风险与不可控的 API 消耗。
+- **Exploration Direction:** 若未来宿主提供安全的非阻塞/后台会话替换接缝，探索基于上下文预算或 Slice 静止点的自主换页：系统自动侦测安全断点，就地合成胶囊并自动轮转至新会话接力，无需人类实时执行命令；用户仅保留异步或周期性的长期审计（Long-term Inspection & Audit），不参与日常微观审批。需设计换页频率预算门禁、工作区冲突自动熔断与异步告警通道。
+- **Safety Boundary:** 无人值守换页不得绕过 Access Gate 路径策略与 Mandatory Boundaries；出现工作区冲突、reconciliation 失败或测试严重异常时必须立即挂起并等待人类介入，严禁无限循环自动重启；父子会话冷归档与回退能力（Rollback）必须持续保持。
+- **Revisit condition:** Pi 官方发布支持后台/事件安全调用的会话替换接缝；或真实大型无人值守流水线证明单命令交互无法满足长期运行吞吐，且可提供完备的熔断防御方案；或用户明确启动无人值守会话换页的工程实施。
+
+## C-051: 待创建

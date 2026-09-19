@@ -31,7 +31,7 @@
 - mattpocock 上游实际文件是 `skills/productivity/handoff/SKILL.md`（该名自 2026-07-02 起存在，`handoff-session` 从未存在），初始记录的路径是本地改名误转写。
 - obra/superpowers 在核查时 HEAD `b36e0829` 全树与提交历史中均无 handoff 技能；初始记录归因给它的 redact sensitive information 等内容在 mattpocock 文件中已原生存在，20% 归属无对账文件，故从 superpowers 行的当前映射移除 “handoff”。
 
-当前 handoff-session 的触发方式遵循 D-078；其在 mattpocock 基线之上的交付规则与场景无关（通过 AKeel Handoff Store 发布 `/tmp/akeel/handoffs/handoff-*/` envelope；successor receipt 核验；交接自足判据；Decisions 只引用防双源），逐行差异由 Git 历史承载。
+当前 handoff-session 的触发方式遵循 D-078；其在 mattpocock 基线之上的交付规则与场景无关（D-092 会话内嵌存储与单命令 `/akeel-handoff` 接力；successor reconciliation 核验；交接自足判据；Decisions 只引用防双源），逐行差异由 Git 历史承载。
 
 ## Access Gate 来源
 
@@ -51,7 +51,7 @@
 
 | 来源 | 固定版本/修订 | 采用方式 | 采用范围与当前映射 | 许可证与证据 |
 |----------|----------|----------|----------|----------|
-| [Pi coding-agent extension guide](https://github.com/badlogic/pi-mono/blob/dd6bea41/packages/coding-agent/docs/extensions.md) 与 [extension types](https://github.com/badlogic/pi-mono/blob/dd6bea41/packages/coding-agent/src/core/extensions/types.ts) | pi-mono commit `dd6bea41` | conceptual reference | `tool_call` 拦截、`toolName`/`input` 请求边界、`ctx.hasUI`、`ctx.ui.confirm`、block 结果，以及 Guidance Artifact Exchange 使用的 custom tool/flag/session lifecycle 合同；映射到 Access Gate adapters 与 `packages/guidance/src/artifact-exchange/`，不复制 Pi 内部实现 | pi-mono 仓库许可证以该 revision 为准；本仓库未复制其代码 |
+| [Pi coding-agent extension guide](https://github.com/badlogic/pi-mono/blob/dd6bea41/packages/coding-agent/docs/extensions.md) 与 [extension types](https://github.com/badlogic/pi-mono/blob/dd6bea41/packages/coding-agent/src/core/extensions/types.ts) | pi-mono commit `dd6bea41` | conceptual reference | `tool_call` 拦截、`toolName`/`input` 请求边界、`ctx.hasUI`、`ctx.ui.confirm`、block 结果，以及 Guidance 使用的 custom tool/flag、custom session entry、command-only `ctx.newSession`、`parentSession`、fresh `withSession` replacement context 与 `sendUserMessage` 合同；映射到 Access Gate adapters、`types/pi-coding-agent.d.ts` 与 `packages/guidance/src/artifact-exchange/`，不复制 Pi 内部实现 | pi-mono 仓库许可证以该 revision 为准；本仓库未复制其代码 |
 | [Pi coding-agent README](https://github.com/earendil-works/pi/tree/v0.85.0/packages/coding-agent)、[quickstart](https://github.com/earendil-works/pi/tree/v0.85.0/packages/coding-agent/docs/quickstart.md) 与 [SDK](https://github.com/earendil-works/pi/tree/v0.85.0/packages/coding-agent/docs/sdk.md) | release `0.85.0` | conceptual reference | Pi 的 session `cwd` 工作目录、cwd-bound 工具/资源发现和非 Git cwd 行为；为 D-072 的 AKeel Access Root 语义提供外部依据，不复制 Pi 实现 | Pi 仓库许可证以该 release 为准；本仓库未复制其代码 |
 | [GNU Bash Reference Manual](https://www.gnu.org/software/bash/manual/bash.html) | Bash 5.3，Manual Edition 5.3，2025-05-18；实现基线 tag `bash-5.3` | conceptual reference + independently observed | 仅采用 T-069 支持子集的控制操作、and-or 求值顺序、引用/转义、tilde/参数展开、重定向和 builtin CWD 观察；`core/compilation/shell/language.ts`、`flow.ts`、`invocation.ts` 与 compilation facade 只实现已冻结的简单命令词义、wrapper、重定向和 fail-closed 动态/控制语法；不承诺完整 Bash | GNU Free Documentation License 1.3；本仓库只记录语义来源，不复制正文 |
 | [Arch Linux `bash(1)`](https://man.archlinux.org/man/bash.1.en) | Arch man-pages snapshot 标注 Bash 5.3；核查日 2026-09-02 | independently observed | 作为 Linux-only 运行环境的 Bash 命令行/版本交叉核对；不把发行版选项差异扩大为 AKeel 支持面 | Arch manual page 的上游许可证和版本信息以其页面为准；未复制文本 |

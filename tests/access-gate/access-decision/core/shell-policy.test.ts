@@ -1834,6 +1834,8 @@ test("bounded pipelines evaluate under policy presets with mandatory boundaries 
 
   assert.deepEqual(evaluateShellAdmission(admission("cat README.md | head -n 5"), review), { kind: "allow" });
   assert.deepEqual(evaluateShellAdmission(admission("git log -5 | grep fix"), review), { kind: "allow" });
+  assert.deepEqual(evaluateShellAdmission(admission("git diff origin/main..main | grep -E pattern"), review), { kind: "allow" });
+  assert.deepEqual(evaluateShellAdmission(admission("git diff origin/main..main --summary"), review), { kind: "allow" });
   assert.deepEqual(evaluateShellAdmission(admission("cat README.md | tee"), review), { kind: "allow" });
 
   assert.deepEqual(evaluateShellAdmission(admission("cat README.md | tee out.txt"), develop), { kind: "allow" });

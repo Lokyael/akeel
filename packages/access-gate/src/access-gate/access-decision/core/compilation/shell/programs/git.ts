@@ -95,7 +95,7 @@ const INSPECT_FLAG_OPTIONS: readonly OptionSpec<GitSubcommandKey>[] = [
     names: [
       "--graph", "--follow", "--topo-order", "--date-order", "--author-date-order",
       "--reverse", "--no-merges", "--merges", "--first-parent",
-      "-p", "--patch", "-s", "--no-patch", "--numstat", "--shortstat",
+      "-p", "--patch", "-s", "--no-patch", "--numstat", "--shortstat", "--summary",
       "--relative", "--abbrev-commit", "--no-abbrev-commit",
     ],
     arity: "flag",

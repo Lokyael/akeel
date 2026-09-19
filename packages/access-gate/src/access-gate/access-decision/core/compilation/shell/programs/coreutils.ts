@@ -38,7 +38,7 @@ const contracts: ReadonlyMap<string, BoundedOptionContract> = new Map([
   }],
   ["grep", {
     options: [
-      flag("-a", "--text", "-b", "--byte-offset", "-h", "--no-filename", "-H", "--with-filename", "-i", "--ignore-case", "-I", "-l", "--files-with-matches", "-L", "--files-without-match", "-n", "--line-number", "-o", "--only-matching", "-q", "--quiet", "-r", "--recursive", "-s", "--no-messages", "-v", "--invert-match", "-w", "--word-regexp", "-x", "--line-regexp", "-z", "--null-data"),
+      flag("-a", "--text", "-b", "--byte-offset", "-E", "--extended-regexp", "-F", "--fixed-strings", "-h", "--no-filename", "-H", "--with-filename", "-i", "--ignore-case", "-I", "-l", "--files-with-matches", "-L", "--files-without-match", "-n", "--line-number", "-o", "--only-matching", "-q", "--quiet", "-r", "--recursive", "-s", "--no-messages", "-v", "--invert-match", "-w", "--word-regexp", "-x", "--line-regexp", "-z", "--null-data"),
       scalar("-A", "--after-context", "-B", "--before-context", "-C", "--context", "-d", "--directories", "-m", "--max-count", "--binary-files", "--devices", "--label"),
       pattern("--include", "--exclude", "--exclude-dir"),
       flag("--color", "--colour"),

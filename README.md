@@ -116,16 +116,17 @@ AKeel trims output from model-invoked `bash` tool results for standalone `npm te
 
 Guidance supplies a formal text-artifact channel for synchronous Herdr children. The Task Owner reserves a run and packet, binds one result slot to the exact Herdr workspace/pane/Agent, and starts Pi with that slot's opaque capability. The child publishes its single bounded artifact through `akeel_publish_artifact`, with destination, limits, and binding determined by the capability. The Owner accepts a result only after `akeel_run_artifact` verifies its receipt, length, digest, and binding. Herdr `idle`/`done` and terminal output are diagnostic state, not artifact delivery.
 
-AKeel-owned temporary resources are classified by lifecycle:
+Session continuity is entirely session-embedded: `/akeel-handoff [optional-notes]` is the single user entry point. Live Semantic Units and Continuation Capsules are stored directly in Pi's native JSONL session files (`~/.pi/agent/sessions/`), with zero external filesystem footprint. They survive system reboots, eliminate orphan directories, and are automatically cleaned up when the session file is removed. `/akeel-handoff view` inspects the active capsule in the terminal without disk writes. When replacing sessions, the command verifies ledger state, invokes Pi's native parent-linked session replacement, and kicks off successor reconciliation. Successor sessions verify the workspace and classify every live semantic ID before a reconciliation entry is issued.
+
+AKeel-owned temporary resources under `/tmp/akeel/` are classified by lifecycle:
 
 ```text
 /tmp/akeel/
   sessions/session-<random>/staging/  # Access Gate session; crash retention applies
   runs/run-<random>/                  # Owner workflow packet/artifacts/control/quarantine
-  handoffs/handoff-<random>/          # source-to-successor session handoff
 ```
 
-New controlled directories use private permissions. Session residue is reclaimed under the documented retention policy; workflow runs and handoffs are retained for explicit user cleanup. Unrecognized filesystem entries are not claimed or removed.
+New controlled directories use private permissions. Session residue is reclaimed under the documented retention policy; workflow runs are retained for explicit user cleanup. Session handoff creates no external filesystem directories. Unrecognized filesystem entries are not claimed or removed.
 
 ## Companion tools
 
