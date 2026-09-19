@@ -156,8 +156,16 @@ export function synthesizeContinuationCapsule(options: SynthesizeCapsuleOptions)
         }
       }
     } else {
+      let defaultId = "continue-work";
+      if (units.some((u) => u.id === defaultId)) {
+        let suffix = 2;
+        while (units.some((u) => u.id === `${defaultId}-${suffix}`)) {
+          suffix += 1;
+        }
+        defaultId = `${defaultId}-${suffix}`;
+      }
       const defaultNext: SemanticUnit = Object.freeze({
-        id: "continue-work",
+        id: defaultId,
         kind: "next-action" as const,
         statement: "Continue active work in the fresh session.",
         authority: "inferred" as const,
@@ -165,7 +173,7 @@ export function synthesizeContinuationCapsule(options: SynthesizeCapsuleOptions)
         sourceRef: options.taskRef,
       });
       units.push(defaultNext);
-      nextActionId = "continue-work";
+      nextActionId = defaultId;
     }
   }
 

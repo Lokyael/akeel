@@ -577,3 +577,39 @@ test("synthesizeContinuationCapsule without args supersedes older next actions a
   assert.equal(supersededStep1.destinationRef, "step-2");
 });
 
+test("synthesizeContinuationCapsule suffixes default continue-work next action to prevent collision", () => {
+  const synthesized = synthesizeContinuationCapsule({
+    taskRef: "docs/task.md#t-0145",
+    cwd: "/workspace/project",
+    units: [
+      {
+        id: "continue-work",
+        kind: "next-action",
+        statement: "Prior default action.",
+        authority: "inferred",
+        status: "closed",
+        sourceRef: "docs/task.md#t-0145",
+        closure: {
+          disposition: "materialized",
+          basisRef: "commit:1",
+          destinationRef: "commit:1",
+        },
+      },
+      {
+        id: "live-risk",
+        kind: "risk",
+        statement: "Ongoing risk.",
+        authority: "observed",
+        status: "live",
+        sourceRef: "test:1",
+      },
+    ],
+  });
+
+  assert.equal(synthesized.schemaVersion, 1);
+  assert.equal(synthesized.checkpoint.nextActionId, "continue-work-2");
+  const next = synthesized.liveSemantics.find((u) => u.id === "continue-work-2");
+  assert.ok(next);
+  assert.equal(next!.statement, "Continue active work in the fresh session.");
+});
+

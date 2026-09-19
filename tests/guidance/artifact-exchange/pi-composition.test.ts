@@ -457,6 +457,332 @@ test("/akeel-handoff view logs capsule to console when hasUI is false", async ()
   }
 });
 
+test("/akeel-handoff view notifies gracefully without throwing when no capsule is active", async () => {
+  const root = mkdtempSync(join(tmpdir(), "akeel-artifact-pi-"));
+  chmodSync(root, 0o700);
+  try {
+    const ownerPi = fakePi();
+    installArtifactExchange(ownerPi.pi, { root });
+    await start(ownerPi, "source-session");
+    const sourceContext = context("source-session", ownerPi.entries);
+
+    let warningNotified: string | undefined;
+    const uiContext = {
+      ...sourceContext,
+      hasUI: true,
+      ui: {
+        notify: (msg: string, level?: string) => {
+          if (level === "warning") warningNotified = msg;
+        },
+      },
+      isIdle: () => true,
+    };
+
+    const command = ownerPi.commands.get("akeel-handoff")!;
+    assert.ok(command);
+    await command.handler("view", uiContext);
+    assert.equal(warningNotified, "No active continuation capsule found.");
+
+    const logged: string[] = [];
+    const origLog = console.log;
+    console.log = (msg: string) => { logged.push(msg); };
+    try {
+      const nonUiContext = {
+        ...sourceContext,
+        hasUI: false,
+        isIdle: () => true,
+      };
+      await command.handler("view", nonUiContext);
+      assert.equal(logged.length, 1);
+      assert.equal(logged[0]!, "No active continuation capsule found.");
+    } finally {
+      console.log = origLog;
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("/akeel-handoff recovers cleanly after a cancelled replacement and succeeds on retry", async () => {
+  const root = mkdtempSync(join(tmpdir(), "akeel-artifact-pi-"));
+  chmodSync(root, 0o700);
+  try {
+    const ownerPi = fakePi();
+    installArtifactExchange(ownerPi.pi, { root });
+    await start(ownerPi, "source-session");
+    const sourceContext = context("source-session", ownerPi.entries);
+
+    const handoffTool = ownerPi.tools.get("akeel_handoff")!;
+    await execute(handoffTool, { action: "record", payload: {
+      id: "retry-task",
+      kind: "requirement",
+      statement: "Verify cancellation and retry loop.",
+      authority: "user-approved",
+      status: "live",
+      sourceRef: "docs/task.md#t-0145",
+    } }, sourceContext);
+
+    const command = ownerPi.commands.get("akeel-handoff")!;
+    assert.ok(command);
+
+    // 1. First attempt: user cancels replacement
+    const cancelledContext = {
+      ...sourceContext,
+      isIdle: () => true,
+      newSession: async () => ({ cancelled: true }),
+    };
+    await command.handler("", cancelledContext);
+
+    // Session has recorded the cancellation entry
+    assert.equal(ownerPi.entries.some((entry) => entry.customType === "akeel:switch-cancelled"), true);
+
+    // 2. Second attempt: user retries without arguments and confirms replacement
+    const sentMessages: string[] = [];
+    let successorSessionFile: string | undefined;
+    const successorEntries: CustomEntry[] = [];
+    const successorCtx = {
+      ...context("retry-successor", successorEntries),
+      sendUserMessage: async (msg: string) => { sentMessages.push(msg); },
+    };
+    const confirmedContext = {
+      ...sourceContext,
+      isIdle: () => true,
+      newSession: async (options: any) => {
+        successorSessionFile = options.parentSession;
+        await options.withSession(successorCtx);
+        return { cancelled: false };
+      },
+    };
+
+    // Retry must succeed without hitting the 'cancelled' state deadlock
+    await command.handler("", confirmedContext);
+
+    assert.equal(successorSessionFile, "/sessions/source-session.jsonl");
+    assert.equal(sentMessages.length, 1);
+    assert.match(sentMessages[0]!, /<akeel-session-handoff>/);
+    assert.match(sentMessages[0]!, /Verify cancellation and retry loop/);
+
+    // Successor can hydrate and reconcile
+    await start(ownerPi, "retry-successor");
+    const successorHandoff = ownerPi.tools.get("akeel_handoff")!;
+    const status = await execute(successorHandoff, { action: "status" }, context("retry-successor", ownerPi.entries));
+    const liveIds = status.details.result.units.filter((u: any) => u.status === "live").map((u: any) => u.id);
+    assert.equal(liveIds.includes("retry-task"), true);
+
+    const reconciled = await execute(successorHandoff, { action: "reconcile", payload: {
+      importedSemanticIds: liveIds,
+      conflicts: [],
+      unresolvedSemanticIds: [],
+      workspaceVerified: true,
+    } }, context("retry-successor", ownerPi.entries));
+    assert.equal(reconciled.details.result.state, "reconciled");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("semanticUnits isolates historical entries and preserves continuation capsule snapshot closures", async () => {
+  const root = mkdtempSync(join(tmpdir(), "akeel-artifact-pi-"));
+  chmodSync(root, 0o700);
+  try {
+    const ownerPi = fakePi();
+    installArtifactExchange(ownerPi.pi, { root });
+    await start(ownerPi, "isolated-session");
+
+    // Manually construct a branch with historical record, a continuation capsule, and a fresh record
+    const syntheticBranch: CustomEntry[] = [
+      {
+        type: "custom",
+        customType: "akeel:semantic-ledger",
+        data: {
+          action: "record",
+          unit: {
+            id: "historical-unit",
+            kind: "assumption",
+            statement: "Original live statement before snapshot.",
+            authority: "inferred",
+            status: "live",
+            sourceRef: "session:entry-0",
+          },
+        },
+      },
+      {
+        type: "custom",
+        customType: "akeel:continuation-capsule",
+        data: {
+          digest: "sha256:1111222233334444",
+          content: "Rendered continuation capsule.",
+          sourceSessionId: "parent-session",
+          successorSessionId: "isolated-session",
+          capsule: {
+            schemaVersion: 1,
+            taskRef: "docs/task.md#t-0145",
+            authorityRefs: [],
+            roots: ["next-step"],
+            checkpoint: {
+              state: "incomplete",
+              currentSlice: "Snapshot isolation",
+              actualState: "Capsule loaded.",
+              nextActionId: "next-step",
+            },
+            workspace: { cwd: "/workspace/project", files: [] },
+            units: [
+              {
+                id: "historical-unit",
+                kind: "assumption",
+                statement: "Original live statement before snapshot.",
+                authority: "inferred",
+                status: "superseded",
+                sourceRef: "session:entry-0",
+                closure: {
+                  disposition: "superseded",
+                  basisRef: "auto-synthesis",
+                  destinationRef: "next-step",
+                },
+              },
+              {
+                id: "next-step",
+                kind: "next-action",
+                statement: "Continue in successor.",
+                authority: "user-approved",
+                status: "live",
+                sourceRef: "docs/task.md#t-0145",
+              },
+            ],
+            liveSemantics: [
+              {
+                id: "next-step",
+                kind: "next-action",
+                statement: "Continue in successor.",
+                authority: "user-approved",
+                status: "live",
+                sourceRef: "docs/task.md#t-0145",
+              },
+            ],
+            closures: [
+              {
+                semanticId: "historical-unit",
+                disposition: "superseded",
+                basisRef: "auto-synthesis",
+                destinationRef: "next-step",
+              },
+            ],
+          },
+        },
+      },
+      {
+        type: "custom",
+        customType: "akeel:semantic-ledger",
+        data: {
+          action: "record",
+          unit: {
+            id: "fresh-unit",
+            kind: "finding",
+            statement: "New finding recorded in current session.",
+            authority: "observed",
+            status: "live",
+            sourceRef: "session:entry-3",
+          },
+        },
+      },
+    ];
+
+    const ctx = context("isolated-session", syntheticBranch);
+    const handoffTool = ownerPi.tools.get("akeel_handoff")!;
+    const status = await execute(handoffTool, { action: "status" }, ctx);
+    const units: any[] = status.details.result.units;
+
+    const historical = units.find((u) => u.id === "historical-unit");
+    assert.ok(historical);
+    // Crucial: historical-unit MUST remain superseded as recorded in the capsule snapshot
+    assert.equal(historical.status, "superseded");
+    assert.equal(historical.closure?.destinationRef, "next-step");
+
+    const fresh = units.find((u) => u.id === "fresh-unit");
+    assert.ok(fresh);
+    assert.equal(fresh.status, "live");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("prepare action fails closed on workspace cwd mismatch and canReuseActive respects cwd change", async () => {
+  const root = mkdtempSync(join(tmpdir(), "akeel-artifact-pi-"));
+  chmodSync(root, 0o700);
+  try {
+    const ownerPi = fakePi();
+    installArtifactExchange(ownerPi.pi, { root });
+    await start(ownerPi, "cwd-session");
+    const handoff = ownerPi.tools.get("akeel_handoff")!;
+    const ownerCtx = context("cwd-session", ownerPi.entries);
+
+    await execute(handoff, { action: "record", payload: {
+      id: "next",
+      kind: "next-action",
+      statement: "Continue.",
+      authority: "user-approved",
+      status: "live",
+      sourceRef: "docs/task.md#t-0145",
+    } }, ownerCtx);
+
+    // 1. Prepare with mismatched cwd must throw staticFailure
+    await assert.rejects(() => execute(handoff, { action: "prepare", payload: {
+      taskRef: "docs/task.md#t-0145",
+      authorityRefs: [],
+      roots: ["next"],
+      checkpoint: {
+        state: "incomplete",
+        currentSlice: "CWD check",
+        actualState: "Testing cwd mismatch.",
+        nextActionId: "next",
+      },
+      workspace: { cwd: "/other/workspace/project", files: [] },
+    } }, ownerCtx), /Handoff operation failed/);
+
+    // 2. Prepare with valid cwd succeeds
+    await execute(handoff, { action: "prepare", payload: {
+      taskRef: "docs/task.md#t-0145",
+      authorityRefs: [],
+      roots: ["next"],
+      checkpoint: {
+        state: "incomplete",
+        currentSlice: "CWD check",
+        actualState: "Testing valid cwd.",
+        nextActionId: "next",
+      },
+      workspace: { cwd: "/workspace/project", files: [] },
+    } }, ownerCtx);
+
+    // 3. Changing context cwd forces canReuseActive to false and re-synthesizes capsule with new cwd
+    const changedCwdContext = {
+      ...ownerCtx,
+      cwd: "/new/workspace/project",
+      isIdle: () => true,
+      newSession: async (options: any) => {
+        const successorEntries: CustomEntry[] = [];
+        const successorCtx = {
+          ...context("cwd-successor", successorEntries),
+          cwd: "/new/workspace/project",
+          sendUserMessage: async () => {},
+        };
+        await options.withSession(successorCtx);
+        return { cancelled: false };
+      },
+    };
+
+    const command = ownerPi.commands.get("akeel-handoff")!;
+    assert.ok(command);
+    await command.handler("", changedCwdContext);
+
+    // The prepared capsule appended for the switch must contain the new cwd
+    const lastPrepared = [...ownerPi.entries].reverse().find((e) => e.customType === "akeel:prepared-capsule");
+    assert.ok(lastPrepared);
+    assert.equal((lastPrepared!.data as any).capsule.workspace.cwd, "/new/workspace/project");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("publisher fails with static errors when Herdr topology is unavailable", async () => {
   const root = mkdtempSync(join(tmpdir(), "akeel-artifact-pi-"));
   chmodSync(root, 0o700);

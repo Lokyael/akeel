@@ -78,6 +78,7 @@ function semanticUnits(context: ExtensionContext): readonly SemanticUnit[] {
   const units = new Map<string, SemanticUnit>();
   const branch = context.sessionManager?.getBranch() ?? [];
 
+  let startIndex = 0;
   for (let i = branch.length - 1; i >= 0; i -= 1) {
     const raw = branch[i];
     if (isRecord(raw) && raw.type === "custom" && raw.customType === "akeel:continuation-capsule" && raw.data) {
@@ -87,11 +88,13 @@ function semanticUnits(context: ExtensionContext): readonly SemanticUnit[] {
           units.set(unit.id, validateSemanticUnit(unit));
         }
       }
+      startIndex = i + 1;
       break;
     }
   }
 
-  for (const rawEntry of branch) {
+  for (let i = startIndex; i < branch.length; i += 1) {
+    const rawEntry = branch[i];
     if (!rawEntry || typeof rawEntry !== "object") continue;
     const entry = rawEntry as CustomEntry;
     if (entry.type !== "custom" || entry.customType !== SEMANTIC_ENTRY || !entry.data || typeof entry.data !== "object") continue;
@@ -256,6 +259,9 @@ export function installArtifactExchange(pi: ExtensionAPI, options: ArtifactExcha
           let capsule;
           if (params.payload && typeof params.payload === "object") {
             const input = { ...(params.payload as Omit<ContinuationCapsuleInput, "units">), units };
+            if (!input.workspace || typeof input.workspace.cwd !== "string" || input.workspace.cwd !== source.cwd) {
+              return staticFailure("Handoff operation failed.");
+            }
             capsule = createContinuationCapsule(input);
           } else {
             capsule = synthesizeContinuationCapsule({
@@ -304,7 +310,12 @@ export function installArtifactExchange(pi: ExtensionAPI, options: ArtifactExcha
 
         if (args === "view") {
           const active = handoffs.getActiveCapsule(branch);
-          if (!active) return staticFailure("No active continuation capsule found.");
+          if (!active) {
+            const message = "No active continuation capsule found.";
+            if (context.hasUI) context.ui.notify(message, "warning");
+            else console.log(message);
+            return;
+          }
           if (context.hasUI) {
             context.ui.notify(`Continuation Capsule:\n\n${active.content}`, "info");
           } else {
@@ -322,11 +333,15 @@ export function installArtifactExchange(pi: ExtensionAPI, options: ArtifactExcha
 
         const currentUnits = semanticUnits(context);
         let active = handoffs.getActiveCapsule(branch);
+        const currentStatus = handoffs.status(branch);
         const userProvidedArgs = args.length > 0;
-        const canReuseActive = active?.origin === "outbound" && !userProvidedArgs &&
+        const canReuseActive = currentStatus.state === "prepared" &&
+          active?.origin === "outbound" && !userProvidedArgs &&
+          active.capsule.workspace.cwd === source.cwd &&
           active.capsule.units.length === currentUnits.length &&
           active.capsule.units.every((u, i) => u.id === currentUnits[i]?.id && u.status === currentUnits[i]?.status);
 
+        let sourceBranch = [...(context.sessionManager?.getBranch() ?? [])];
         if (!canReuseActive) {
           const capsule = synthesizeContinuationCapsule({
             taskRef: resolveTaskRef(currentUnits),
@@ -336,13 +351,13 @@ export function installArtifactExchange(pi: ExtensionAPI, options: ArtifactExcha
           });
           const prepared = handoffs.prepareCapsule(capsule);
           pi.appendEntry(prepared.entry.customType, prepared.entry.data);
+          sourceBranch.push(prepared.entry);
           active = { capsule, digest: prepared.digest, content: prepared.content, origin: "outbound" };
         }
 
         if (!active) return staticFailure("Handoff session replacement failed.");
         const currentActive = active;
 
-        const sourceBranch = [...(context.sessionManager?.getBranch() ?? [])];
         const switchIntent = handoffs.beginSwitch(sourceBranch, source.sessionId);
         pi.appendEntry(switchIntent.customType, switchIntent.data);
         sourceBranch.push(switchIntent);
@@ -368,8 +383,9 @@ export function installArtifactExchange(pi: ExtensionAPI, options: ArtifactExcha
           const cancel = handoffs.cancelSwitch(context.sessionManager?.getBranch() ?? [], source.sessionId);
           pi.appendEntry(cancel.customType, cancel.data);
         }
-      } catch {
-        return staticFailure("Handoff session replacement failed.");
+      } catch (error) {
+        const message = error instanceof Error && error.message ? error.message : "Handoff session replacement failed.";
+        return staticFailure(message);
       }
     },
   });
@@ -417,7 +433,7 @@ export function installArtifactExchange(pi: ExtensionAPI, options: ArtifactExcha
 
     if (status.state === "switch-started") {
       pi.setActiveTools([]);
-      if (context.hasUI) context.ui.notify("AKeel session switch is in progress or ambiguous; model tools are disabled.", "warning");
+      if (context.hasUI) context.ui.notify("AKeel session switch was initiated; model tools are disabled in this retired or ambiguous session.", "warning");
       return;
     }
 
