@@ -33,12 +33,16 @@ type GitSubcommandKey =
   | "remote"
   | "numericLimit";
 
-// Common Value Options across git subcommands
-const COMMON_VALUE_OPTIONS: readonly OptionSpec<GitSubcommandKey>[] = [
+// Mutating / Creation Value Options
+const MUTATING_VALUE_OPTIONS: readonly OptionSpec<GitSubcommandKey>[] = [
   { key: "message", names: ["-m", "-F", "--message", "--file"], arity: "required" },
   { key: "branch", names: ["-b", "--branch"], arity: "required" },
-  { key: "output", names: ["--output", "-o", "--output-directory"], arity: "required" },
   { key: "path", names: ["--template", "--reference", "--reference-if-able", "--separate-git-dir"], arity: "required" },
+];
+
+// Shared Value Options across inspect and common subcommands
+const SHARED_VALUE_OPTIONS: readonly OptionSpec<GitSubcommandKey>[] = [
+  { key: "output", names: ["--output", "-o", "--output-directory"], arity: "required" },
   {
     key: "scalar",
     names: [
@@ -93,6 +97,7 @@ const INSPECT_FLAG_OPTIONS: readonly OptionSpec<GitSubcommandKey>[] = [
   {
     key: "flag",
     names: [
+      "-b",
       "--graph", "--follow", "--topo-order", "--date-order", "--author-date-order",
       "--reverse", "--no-merges", "--merges", "--first-parent",
       "-p", "--patch", "-s", "--no-patch", "--numstat", "--shortstat", "--summary",
@@ -107,9 +112,41 @@ const INSPECT_FLAG_OPTIONS: readonly OptionSpec<GitSubcommandKey>[] = [
   },
 ];
 
+const GIT_STATUS_OPTIONS: readonly OptionSpec<GitSubcommandKey>[] = Object.freeze([
+  {
+    key: "flag",
+    names: [
+      "-s", "--short",
+      "-b", "--branch",
+      "-v", "--verbose",
+      "-z",
+      "--show-stash",
+      "--ahead-behind", "--no-ahead-behind",
+      "--renames", "--no-renames",
+      "--long",
+    ],
+    arity: "flag",
+  },
+  {
+    key: "flag",
+    names: ["-u", "--untracked-files", "--ignored", "--porcelain", "--find-renames"],
+    arity: "optional-attached",
+  },
+  {
+    key: "scalar",
+    names: ["--ignore-submodules"],
+    arity: "optional-attached",
+  },
+  ...COMMON_FLAG_OPTIONS,
+]);
+
+const GIT_STATUS_CONTRACT: SegmentContract<GitSubcommandKey> = Object.freeze({
+  options: GIT_STATUS_OPTIONS,
+});
+
 const GIT_INSPECT_CONTRACT: SegmentContract<GitSubcommandKey> = Object.freeze({
   options: Object.freeze([
-    ...COMMON_VALUE_OPTIONS,
+    ...SHARED_VALUE_OPTIONS,
     ...COMMON_FLAG_OPTIONS,
     ...INSPECT_VALUE_OPTIONS,
     ...INSPECT_FLAG_OPTIONS,
@@ -137,7 +174,8 @@ const GIT_RESTORE_CONTRACT: SegmentContract<GitSubcommandKey> = Object.freeze({
 
 const GIT_COMMON_CONTRACT: SegmentContract<GitSubcommandKey> = Object.freeze({
   options: Object.freeze([
-    ...COMMON_VALUE_OPTIONS,
+    ...MUTATING_VALUE_OPTIONS,
+    ...SHARED_VALUE_OPTIONS,
     ...COMMON_FLAG_OPTIONS,
   ]),
 });
@@ -283,15 +321,18 @@ export function analyzeGitProgram(args: readonly ShellWord[]): ProgramSemantic {
   const rest = globalParsed.remainder;
   const pathBase: ProgramPathBase = hasCommandCwd ? "command-cwd" : "invocation-cwd";
 
+  const isStatusSubcommand = subcommand === "status";
   const isInspectSubcommand = GIT_INSPECT.has(subcommand);
   const isRestoreSubcommand = subcommand === "restore";
   const isStashInspect = subcommand === "stash" && ["list", "show"].includes(rest[0]?.text ?? "");
 
-  const contract = (isInspectSubcommand || isStashInspect)
-    ? GIT_INSPECT_CONTRACT
-    : isRestoreSubcommand
-      ? GIT_RESTORE_CONTRACT
-      : GIT_COMMON_CONTRACT;
+  const contract = isStatusSubcommand
+    ? GIT_STATUS_CONTRACT
+    : (isInspectSubcommand || isStashInspect)
+      ? GIT_INSPECT_CONTRACT
+      : isRestoreSubcommand
+        ? GIT_RESTORE_CONTRACT
+        : GIT_COMMON_CONTRACT;
 
   // 2. Stage 2: Parse Subcommand Scoped Options & Operands
   const parsedRest = parseSegment(rest, contract);
@@ -340,6 +381,16 @@ export function analyzeGitProgram(args: readonly ShellWord[]): ProgramSemantic {
     for (const opt of options) {
       if ((opt.name === "-u" || opt.name === "--untracked-files") && opt.kind === "valued") {
         if (!["no", "normal", "all"].includes(opt.value.text)) {
+          hardBoundary = true;
+        }
+      }
+      if (opt.name === "--ignored" && opt.kind === "valued") {
+        if (!["traditional", "no", "matching"].includes(opt.value.text)) {
+          hardBoundary = true;
+        }
+      }
+      if (opt.name === "--porcelain" && opt.kind === "valued") {
+        if (!["v1", "v2", "1", "2"].includes(opt.value.text)) {
           hardBoundary = true;
         }
       }

@@ -408,6 +408,38 @@ test("Git inspect commands are bounded repository reads", () => {
     effects: ["read"],
     paths: [{ text: ".", role: "source" }],
   });
+  assert.deepEqual(analyzeShellCommand("git status -sb"), {
+    kind: "complete",
+    executable: "git",
+    wrappers: [],
+    commandClass: "inspect",
+    effects: ["read"],
+    paths: [{ text: ".", role: "source" }],
+  });
+  assert.deepEqual(analyzeShellCommand("git status -s -b"), {
+    kind: "complete",
+    executable: "git",
+    wrappers: [],
+    commandClass: "inspect",
+    effects: ["read"],
+    paths: [{ text: ".", role: "source" }],
+  });
+  assert.deepEqual(analyzeShellCommand("git status --porcelain -b"), {
+    kind: "complete",
+    executable: "git",
+    wrappers: [],
+    commandClass: "inspect",
+    effects: ["read"],
+    paths: [{ text: ".", role: "source" }],
+  });
+  assert.deepEqual(analyzeShellCommand("git diff -b"), {
+    kind: "complete",
+    executable: "git",
+    wrappers: [],
+    commandClass: "inspect",
+    effects: ["read"],
+    paths: [{ text: ".", role: "source" }],
+  });
   assert.deepEqual(analyzeShellCommand("git diff -- src/app.ts"), {
     kind: "complete",
     executable: "git",

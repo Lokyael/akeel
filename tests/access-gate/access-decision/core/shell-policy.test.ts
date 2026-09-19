@@ -1598,8 +1598,16 @@ test("Git inspect subcommands with safe filter options are allowed across develo
     code: "hard-boundary",
   });
 
-  // 5. git status -u variants are admitted across review, develop, and guided
-  for (const cmd of ["git status -u", "git status -uno", "git status --untracked-files=all"]) {
+  // 5. git status -u variants and clustered short flags (-sb) are admitted across review, develop, and guided
+  for (const cmd of [
+    "git status -u",
+    "git status -uno",
+    "git status --untracked-files=all",
+    "git status -sb",
+    "git status -s -b",
+    "git status --porcelain -b",
+    "git status && git log -n 5 --oneline && git status -sb",
+  ]) {
     assert.deepEqual(evaluateShellAdmission(admission(cmd, false), reviewPolicy), { kind: "allow" }, cmd);
     assert.deepEqual(evaluateShellAdmission(admission(cmd, false), developPolicy), { kind: "allow" }, cmd);
     assert.deepEqual(evaluateShellAdmission(admission(cmd, false), guidedPolicy), { kind: "allow" }, cmd);
