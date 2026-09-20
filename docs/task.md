@@ -2,67 +2,49 @@
 
 > 活跃任务。验证完成后，提炼长期信息到 `docs/decisions.md` 或 `CONTEXT.md`，然后清空对应 Task Record 章节。
 
-## T-0149: 实施独立子代理审查提出的 7 项工程打磨修复 (ENG-01 ~ ENG-07)
+## T-0149: 为 which 建立有界 Shell inspect 语义
 
-- **Kind:** refactor
+- **Kind:** feature
 - **Status:** in-progress
 - **Reversal surface:** engineering
 
 ### Background & Goal
 
-在对本次 Pi 0.86 原生现代化改造（T-0148）执行独立子代理多轴审查（`code-review`）后，需求审查轴全票通过（100% 满足），工程审查轴精准指出了 7 项工程打磨点（ENG-01 至 ENG-07）：
-1. `SEMANTIC_UNIT_SCHEMA` 中 `statement` 可选导致与底层 `validateSemanticUnit` 必填冲突，且包含不应在 record 阶段出现的 `closure` 和非 live 状态（ENG-01）；
-2. `PREPARE_PAYLOAD_SCHEMA` 内部全字段可选与底层 `createContinuationCapsule` 必填参数冲突（ENG-02）；
-3. `accessGate` 默认导出丢弃了注销函数返回值（ENG-03）；
-4. `akeel_principles` 直接对 `sections` 属性赋值，在对象被冻结时存在潜在 `TypeError` 风险（ENG-04）；
-5. `RECONCILE_PAYLOAD_SCHEMA` 中 `workspaceVerified` 写死 `Type.Literal(true)` 导致无法合法上报 `false`（blocked）状态（ENG-05）；
-6. Handoff Schema 测试缺乏针对 TypeBox `Value.Check` 的正反例深度断言（ENG-06）；
-7. `BuildSystemPromptOptions.sections` 在声明中非可选，但运行时防御性按可选处理（ENG-07）。
-
-本任务旨在全面实施上述 7 项工程打磨，消除 Schema 与底层运行时的全部摩擦，补齐深度测试网。
+`which <command>` 是常见的可执行文件路径查询，但当前 `which` 未进入封闭 Shell analyzer registry，因此被分类为 `unknown [opaque]` 并触发审批。为减少无风险路径查询的交互摩擦，在不扩大执行能力的前提下，为严格受限的单目标 `which` 建立 inspect/read 语义。
 
 ### Out of Scope
 
-- 不变更 `HandoffStore` 与 `ContinuationCapsule` 底层算法逻辑；
-- 不变更 Access Gate 准入内核逻辑。
+- 不支持 `which` 的别名、函数、多个目标、选项或 Shell 扩展行为；
+- 不改变未知命令的 fail-closed 语义；
+- 不放宽自定义路径形式、包装器、管道或重定向的准入。
 
 ### Requirements
 
-- **REQ-1 (Handoff Schema 修复与收敛 - ENG-01, ENG-02, ENG-05):**
-  - 为 `action: "record"` 提供专用的 `RECORD_PAYLOAD_SCHEMA`，将 `statement` 设为必填，限定 `status: "live"`，移除 `closure`；
-  - 在 `PREPARE_PAYLOAD_SCHEMA` 内部，将 `taskRef`、`authorityRefs`、`roots`、`checkpoint`、`workspace` 标注为必填；
-  - 将 `RECONCILE_PAYLOAD_SCHEMA` 中的 `workspaceVerified` 改为 `Type.Boolean()`。
-- **REQ-2 (入口注销对齐与防御赋值 - ENG-03, ENG-04):**
-  - `packages/access-gate/src/access-gate/index.ts` 导出函数返回 `installGlobalPiAccessDecision(pi, {});`；
-  - `packages/guidance/src/bootstrap/index.ts` 使用浅拷贝解构重新赋值 `sections`。
-- **REQ-3 (类型声明修正 - ENG-07):**
-  - `types/pi-coding-agent.d.ts` 中将 `sections` 标记为可选 `sections?: Record<string, string | null>`。
-- **REQ-4 (深度 Schema 测试网 - ENG-06):**
-  - 在 `tests/guidance/artifact-exchange/pi-composition.test.ts` 中引入 TypeBox `Value.Check`，对 `record`、`close`、`prepare`、`reconcile` 增加深度正向通过与反向拦截断言。
+- **REQ-1:** `which <bare-command-name>` 分类为 `inspect`，效果为 `read`，不产生文件路径事实且不标记 opaque。
+- **REQ-2:** 选项、多个目标、空目标及动态/路径形式保持 fail-closed，不获得 `which` 的系统身份复用。
+- **REQ-3:** 在 shell 语义与 policy seam 补充正反例测试，并保持全量验证通过。
 
 ### Plan
 
-#### Slice 1: 修复 Schema 契约、类型声明与入口导出
-- 修改 `types/pi-coding-agent.d.ts`（ENG-07）；
-- 修改 `packages/access-gate/src/access-gate/index.ts`（ENG-03）；
-- 修改 `packages/guidance/src/bootstrap/index.ts`（ENG-04）；
-- 修改 `packages/guidance/src/artifact-exchange/pi-composition.ts`（ENG-01, ENG-02, ENG-05）。
+#### Slice 1: Shell analyzer contract
+- 先在 `tests/access-gate/access-decision/core/shell-semantics.test.ts` 增加 `which` 正反例；
+- 在 coreutils registry 中加入有界 `which` 合同与单目标校验；
+- 增加 policy seam 允许 inspect 查询的断言。
 
-#### Slice 2: 补充深度测试并全量验证
-- 更新 `tests/guidance/artifact-exchange/pi-composition.test.ts`（ENG-06）；
-- 运行 `npm test` 与 `akeel_validate_records`，完成全量校验与清档。
+#### Slice 2: Verification and records
+- 运行相关测试、全量 `npm test` 与 `akeel_validate_records`；
+- 同步当前架构事实并清理本 Task。
 
 ### Verification Evidence
 
-- 待执行验证并记录证据。
+- 待执行。
 
 ### Durable Updates Checklist
 
-- [ ] `types/pi-coding-agent.d.ts`
-- [ ] `packages/access-gate/src/access-gate/index.ts`
-- [ ] `packages/guidance/src/bootstrap/index.ts`
-- [ ] `packages/guidance/src/artifact-exchange/pi-composition.ts`
-- [ ] `tests/guidance/artifact-exchange/pi-composition.test.ts`
+- [ ] `packages/access-gate/src/access-gate/access-decision/core/compilation/shell/programs/coreutils.ts`
+- [ ] `tests/access-gate/access-decision/core/shell-semantics.test.ts`
+- [ ] `tests/access-gate/access-decision/core/shell-policy.test.ts`
+- [ ] `CONTEXT.md`
 - [ ] `docs/task.md`
 
 ## T-0150: 待创建
