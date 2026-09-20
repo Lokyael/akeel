@@ -50,4 +50,4 @@ Each finding: **`File:Line` — Severity — Category**
 
 ## Verify
 
-The security review is complete only when its findings and evidence are recorded in the active Task Record, or when that Task Record is marked `verified` and its durable updates are complete.
+The security review is complete only when its findings and evidence are recorded in the active Task Record and blocking findings are resolved; final completion carries that evidence into the frozen review packet and clears the Task with its durable updates.

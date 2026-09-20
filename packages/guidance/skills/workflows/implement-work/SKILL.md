@@ -35,4 +35,4 @@ The Task Owner disposes every finding. Any accepted fix returns to step 1 and re
 2. After the Task Owner disposes all findings from the unchanged READY surface, confirm the checkpoint remains reachable and freeze the accepted Requirements in the review packet.
 3. Apply durable updates and include the Task clear operation in the final landing surface (per principles.md Next-ID slots).
 4. Repeat steps 1–5 against that surface using the frozen Requirements; closure does not recreate the Task.
-5. When the surface remains unchanged and all blocking findings are resolved, set the Task to `verified` and commit the final landing change; it clears the Task before another Task starts. Never squash or rewrite away the only checkpoint.
+5. When the surface remains unchanged and all blocking findings are resolved, commit the final landing change with durable updates and the Task clear operation. Never persist a `verified` Task status, and never squash or rewrite away the only checkpoint.

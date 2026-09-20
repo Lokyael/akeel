@@ -215,7 +215,7 @@ Do not create subdirectories, dated copies, or split task files.
 
 ```
 Candidate: parked → promoted (→ T-xxx / D-xxx / other authority) | dismissed (no durable content)
-Task:      draft → in-progress → verified → cleared
+Task:      draft → in-progress → cleared
 Decision:  present (= active) → superseded (→ absorbing D-xxx) | retired (→ Negative Space / boundary D-xxx) → pruned
 Context:   current truth, no status transition
 ```

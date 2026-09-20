@@ -272,9 +272,12 @@ test("task lifecycle keeps checkpoints sparse and context current-tree only", ()
   assert.match(implementation, /\*\*Lifecycle:\*\*[\s\S]*\*\*Checkpoint:\*\*[\s\S]*\*\*Completion:\*\*/);
   assert.match(implementation, /Do not commit Task Record changes for individual slices, tests, or steps/);
   assert.doesNotMatch(principles, /minimum lifecycle is two commits|minimum two commits/);
+  assert.match(principles, /Task:\s+draft → in-progress → cleared/);
+  assert.doesNotMatch(implementation, /set the Task to `verified`/);
+  assert.doesNotMatch(survey, /Task Record is `verified`/);
   assert.doesNotMatch(implementation, /minimum two commits|first of the minimum two commits/);
   assert.doesNotMatch(survey, /minimum lifecycle is two commits|minimum two commits/);
-  assert.match(implementation, /commit the final landing change; it clears the Task before another Task starts/);
+  assert.match(implementation, /commit the final landing change with durable updates and the Task clear operation/);
   assert.match(survey, /Routine survey reads the current tree only/);
   assert.match(survey, /does not load cleared Task Records from Git history/);
 });

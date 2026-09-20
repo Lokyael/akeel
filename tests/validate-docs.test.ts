@@ -255,7 +255,7 @@ test("Context hygiene rejects Architecture enumerating skill roster", () => {
 // ─── Task Hygiene Tests ───
 
 test("Task hygiene accepts valid minimal Task Record", () => {
-  const validTask = `# Tasks\n\n## T-001: Sample Task\n\n- **Kind:** refactor\n- **Status:** verified\n- **Reversal surface:** user-boundary\n\n### Plan\n\n## T-002: 待创建\n`;
+  const validTask = `# Tasks\n\n## T-001: Sample Task\n\n- **Kind:** refactor\n- **Status:** in-progress\n- **Reversal surface:** user-boundary\n\n### Plan\n\n## T-002: 待创建\n`;
   const result = checkTaskHygiene(validTask);
   assert.deepEqual(result.errors, []);
   assert.equal(result.ok, true);

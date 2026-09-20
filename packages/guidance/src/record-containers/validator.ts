@@ -39,7 +39,6 @@ export const TASK_KINDS = Object.freeze(new Set([
 export const TASK_STATUSES = Object.freeze(new Set([
   "draft",
   "in-progress",
-  "verified",
 ]));
 
 export const TASK_REVERSAL_SURFACES = Object.freeze(new Set([

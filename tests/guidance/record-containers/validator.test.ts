@@ -99,8 +99,8 @@ test("validateRecordContainers: returns empty checked list when no containers ex
   assert.deepEqual(res.errors, []);
 });
 
-test("checkTaskHygiene: accepts valid active Task record with draft, in-progress, and verified statuses", () => {
-  for (const status of ["draft", "in-progress", "verified"]) {
+test("checkTaskHygiene: accepts valid active Task record with draft and in-progress statuses", () => {
+  for (const status of ["draft", "in-progress"]) {
     const content = `# Tasks\n\n## T-001: Sample Feature\n\n- **Kind:** feature\n- **Status:** ${status}\n- **Reversal surface:** engineering\n\n### Background & Goal\n\nGoal.\n\n## T-002: 待创建\n`;
     const res = checkTaskHygiene(content);
     assert.equal(res.ok, true, `expected status '${status}' to be valid`);

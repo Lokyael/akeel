@@ -5,7 +5,7 @@
 ## T-0156: 简化 Task 生命周期状态
 
 - Kind: refactor
-- Status: draft
+- Status: in-progress
 - Reversal surface: engineering
 
 ### Background & Goal
