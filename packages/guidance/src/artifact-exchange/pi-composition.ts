@@ -37,7 +37,7 @@ const OWNER_PARAMETERS = Type.Object({
 }, { additionalProperties: false });
 
 const PUBLISH_PARAMETERS = Type.Object({ content: Type.String() }, { additionalProperties: false });
-const SEMANTIC_UNIT_SCHEMA = Type.Object({
+const RECORD_PAYLOAD_SCHEMA = Type.Object({
   id: Type.String({ description: "Unique semantic unit identifier" }),
   kind: Type.Union([
     Type.Literal("requirement"),
@@ -51,30 +51,16 @@ const SEMANTIC_UNIT_SCHEMA = Type.Object({
     Type.Literal("work-state"),
     Type.Literal("next-action"),
   ]),
-  statement: Type.Optional(Type.String({ description: "Statement of the semantic unit" })),
+  statement: Type.String({ description: "Statement of the semantic unit" }),
   authority: Type.Union([
     Type.Literal("user-approved"),
     Type.Literal("project-record"),
     Type.Literal("observed"),
     Type.Literal("inferred"),
   ]),
-  status: Type.Union([
-    Type.Literal("live"),
-    Type.Literal("superseded"),
-    Type.Literal("closed"),
-  ]),
+  status: Type.Literal("live", { description: "Semantic status for recording" }),
   sourceRef: Type.String({ description: "Source reference" }),
   dependsOn: Type.Optional(Type.Array(Type.String())),
-  closure: Type.Optional(Type.Object({
-    disposition: Type.Union([
-      Type.Literal("materialized"),
-      Type.Literal("superseded"),
-      Type.Literal("invalidated"),
-      Type.Literal("irrelevant"),
-    ]),
-    basisRef: Type.String(),
-    destinationRef: Type.String(),
-  }, { additionalProperties: false })),
 }, { additionalProperties: false });
 
 const CLOSE_PAYLOAD_SCHEMA = Type.Object({
@@ -99,27 +85,27 @@ const RECONCILE_PAYLOAD_SCHEMA = Type.Object({
     observedReality: Type.String(),
   }, { additionalProperties: false }), { description: "Semantic IDs conflicting with observed reality" }),
   unresolvedSemanticIds: Type.Array(Type.String(), { description: "Semantic IDs that could not be resolved" }),
-  workspaceVerified: Type.Literal(true, { description: "Must be true to confirm workspace verification" }),
+  workspaceVerified: Type.Boolean({ description: "True if workspace matches ledger reality; false if unverified" }),
 }, { additionalProperties: false });
 
 const PREPARE_PAYLOAD_SCHEMA = Type.Object({
-  taskRef: Type.Optional(Type.String()),
-  authorityRefs: Type.Optional(Type.Array(Type.String())),
-  roots: Type.Optional(Type.Array(Type.String())),
-  checkpoint: Type.Optional(Type.Object({
+  taskRef: Type.String({ description: "Task record reference" }),
+  authorityRefs: Type.Array(Type.String(), { description: "Authority references" }),
+  roots: Type.Array(Type.String(), { description: "Root semantic unit IDs" }),
+  checkpoint: Type.Object({
     state: Type.Union([Type.Literal("complete"), Type.Literal("incomplete"), Type.Literal("blocked")]),
     currentSlice: Type.String(),
     actualState: Type.String(),
     nextActionId: Type.String(),
-  }, { additionalProperties: false })),
-  workspace: Type.Optional(Type.Object({
+  }, { additionalProperties: false }),
+  workspace: Type.Object({
     cwd: Type.String(),
     files: Type.Optional(Type.Array(Type.String())),
-  }, { additionalProperties: false })),
+  }, { additionalProperties: false }),
 }, { additionalProperties: false });
 
 const HANDOFF_PAYLOAD_SCHEMA = Type.Union([
-  SEMANTIC_UNIT_SCHEMA,
+  RECORD_PAYLOAD_SCHEMA,
   CLOSE_PAYLOAD_SCHEMA,
   RECONCILE_PAYLOAD_SCHEMA,
   PREPARE_PAYLOAD_SCHEMA,

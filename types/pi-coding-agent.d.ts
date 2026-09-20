@@ -44,7 +44,7 @@ declare module "@earendil-works/pi-coding-agent" {
     toolSnippets?: Record<string, string>;
     toolGuidelines?: Record<string, string[]>;
     promptGuidelines?: string[];
-    sections: Record<string, string | null>;
+    sections?: Record<string, string | null>;
     appendSystemPrompt?: string;
     cwd?: string;
     contextFiles?: unknown[];

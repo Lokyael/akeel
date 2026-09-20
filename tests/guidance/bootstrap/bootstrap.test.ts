@@ -36,7 +36,7 @@ test("akeelBootstrap registers before_agent_start and injects akeel_principles s
 
   handler(event, {} as ExtensionContext);
 
-  assert.ok(event.systemPromptOptions.sections.akeel_principles);
+  assert.ok(event.systemPromptOptions.sections?.akeel_principles);
   assert.ok(event.systemPromptOptions.sections.akeel_principles.includes("## Core Behavioral Principles"));
   assert.ok(event.systemPromptOptions.sections.akeel_principles.includes("### 1. Think Before Coding"));
   assert.ok(!event.systemPromptOptions.sections.akeel_principles.includes("<AKEEL_PRINCIPLES>"));

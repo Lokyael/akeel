@@ -3,6 +3,7 @@ import test from "node:test";
 import { chmodSync, mkdtempSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
+import { Value } from "typebox/value";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { installArtifactExchange } from "../../../packages/guidance/src/artifact-exchange/pi-composition";
 
@@ -832,7 +833,7 @@ test("publisher fails with static errors when Herdr topology is unavailable", as
   }
 });
 
-test("akeel_handoff registers strongly-typed payload parameter schema", () => {
+test("akeel_handoff registers strongly-typed payload parameter schema and validates payloads", () => {
   const root = mkdtempSync(join(tmpdir(), "akeel-artifact-pi-"));
   chmodSync(root, 0o700);
   try {
@@ -842,7 +843,68 @@ test("akeel_handoff registers strongly-typed payload parameter schema", () => {
     assert.ok(handoffTool);
     assert.equal(handoffTool.parameters.additionalProperties, false);
     assert.ok(handoffTool.parameters.properties.payload);
-    assert.ok(handoffTool.parameters.properties.payload.anyOf);
+    assert.equal(handoffTool.parameters.properties.payload.anyOf.length, 4);
+
+    const validRecord = {
+      action: "record",
+      payload: {
+        id: "rec-1",
+        kind: "finding",
+        statement: "Valid finding statement.",
+        authority: "observed",
+        status: "live",
+        sourceRef: "docs/task.md",
+      },
+    };
+    assert.equal(Value.Check(handoffTool.parameters, validRecord), true);
+
+    const invalidRecordMissingStatement = {
+      action: "record",
+      payload: {
+        id: "rec-1",
+        kind: "finding",
+        authority: "observed",
+        status: "live",
+        sourceRef: "docs/task.md",
+      },
+    };
+    assert.equal(Value.Check(handoffTool.parameters, invalidRecordMissingStatement), false);
+
+    const validClose = {
+      action: "close",
+      payload: {
+        id: "rec-1",
+        status: "closed",
+        closure: {
+          disposition: "materialized",
+          basisRef: "commit-123",
+          destinationRef: "docs/task.md",
+        },
+      },
+    };
+    assert.equal(Value.Check(handoffTool.parameters, validClose), true);
+
+    const validReconcile = {
+      action: "reconcile",
+      payload: {
+        importedSemanticIds: ["rec-1"],
+        conflicts: [],
+        unresolvedSemanticIds: [],
+        workspaceVerified: true,
+      },
+    };
+    assert.equal(Value.Check(handoffTool.parameters, validReconcile), true);
+
+    const validReconcileBlocked = {
+      action: "reconcile",
+      payload: {
+        importedSemanticIds: ["rec-1"],
+        conflicts: [{ semanticId: "rec-1", observedReality: "drifted" }],
+        unresolvedSemanticIds: [],
+        workspaceVerified: false,
+      },
+    };
+    assert.equal(Value.Check(handoffTool.parameters, validReconcileBlocked), true);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

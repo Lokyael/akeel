@@ -18,10 +18,13 @@ const CORE_PRINCIPLES = readFileSync(resolve(EXTENSION_DIR, "principles.md"), "u
 export default function akeelBootstrap(pi: ExtensionAPI): () => void {
   return pi.on("before_agent_start", (event) => {
     if (event.systemPromptOptions && typeof event.systemPromptOptions === "object") {
-      if (!event.systemPromptOptions.sections || typeof event.systemPromptOptions.sections !== "object") {
-        event.systemPromptOptions.sections = {};
-      }
-      event.systemPromptOptions.sections.akeel_principles = CORE_PRINCIPLES;
+      const existing = typeof event.systemPromptOptions.sections === "object" && event.systemPromptOptions.sections !== null
+        ? event.systemPromptOptions.sections
+        : {};
+      event.systemPromptOptions.sections = {
+        ...existing,
+        akeel_principles: CORE_PRINCIPLES,
+      };
     }
   });
 }
