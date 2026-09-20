@@ -115,6 +115,20 @@ test("checkTaskHygiene: accepts empty / cleared task container", () => {
   assert.deepEqual(res.errors, []);
 });
 
+test("checkTaskHygiene: accepts plain metadata without Markdown emphasis", () => {
+  const content = `# Tasks\n\n## T-001: Task\n\n- Kind: refactor\n- Status: in-progress\n- Reversal surface: engineering\n\n### Plan\n\n## T-002: 待创建\n`;
+  const res = checkTaskHygiene(content);
+  assert.equal(res.ok, true);
+  assert.deepEqual(res.errors, []);
+});
+
+test("checkTaskHygiene: rejects malformed metadata with a format hint", () => {
+  const content = `# Tasks\n\n## T-001: Task\n\nKind: refactor\nStatus: in-progress\nReversal surface: engineering\n\n### Plan\n\n## T-002: 待创建\n`;
+  const res = checkTaskHygiene(content);
+  assert.equal(res.ok, false);
+  assert.ok(res.errors.some((e) => e.includes("expected Task metadata format")));
+});
+
 test("checkTaskHygiene: rejects Origin metadata", () => {
   const content = `# Tasks\n\n## T-001: Task\n\n- **Kind:** refactor\n- **Status:** in-progress\n- **Reversal surface:** user-boundary\n- **Origin:** C-012\n\n### Plan\n\n## T-002: 待创建\n`;
   const res = checkTaskHygiene(content);
@@ -176,6 +190,27 @@ test("validateRecordContainers: enforces Task hygiene on docs/task.md", () => {
 });
 
 // ─── Candidate Hygiene Tests ───
+
+test("checkCandidateHygiene: accepts plain candidate fields without Markdown emphasis", () => {
+  const content = `# Candidates\n\n## C-001: Sample Idea\n\n- Why Not Now: Not needed yet.\n- Revisit condition: Upstream API is released.\n\n## C-002: 待创建\n`;
+  const res = checkCandidateHygiene(content);
+  assert.equal(res.ok, true);
+  assert.deepEqual(res.errors, []);
+});
+
+test("checkCandidateHygiene: rejects missing required fields", () => {
+  const content = `# Candidates\n\n## C-001: Sample Idea\n\n- Why Not Now: Not needed yet.\n\n## C-002: 待创建\n`;
+  const res = checkCandidateHygiene(content);
+  assert.equal(res.ok, false);
+  assert.ok(res.errors.some((e) => e.includes("missing required Candidate field: Revisit condition")));
+});
+
+test("checkCandidateHygiene: rejects malformed fields with a format hint", () => {
+  const content = `# Candidates\n\n## C-001: Sample Idea\n\nWhy Not Now: Not needed yet.\nRevisit condition: Upstream API is released.\n\n## C-002: 待创建\n`;
+  const res = checkCandidateHygiene(content);
+  assert.equal(res.ok, false);
+  assert.ok(res.errors.some((e) => e.includes("expected Candidate field format")));
+});
 
 test("checkCandidateHygiene: accepts valid candidate records without status metadata", () => {
   const content = `# Candidates\n\n## C-001: Sample Idea\n\n- **Why Not Now:** Not needed yet.\n- **Revisit condition:** Upstream API is released.\n\n## C-002: 待创建\n`;

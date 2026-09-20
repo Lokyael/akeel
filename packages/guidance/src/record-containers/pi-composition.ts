@@ -3,8 +3,9 @@
  *
  * Registers `akeel_validate_records` tool:
  * A pure, deterministic Direct tool allowing the agent to verify Project Record
- * containers (docs/candidates.md, docs/task.md, docs/decisions.md) without Shell
- * overhead or Access Gate interpreter delegation boundaries.
+ * containers (docs/candidates.md, docs/task.md, docs/decisions.md), including
+ * slot placement and Candidate/Task field hygiene, without Shell overhead or
+ * Access Gate interpreter delegation boundaries.
  */
 
 import { resolve } from "node:path";
@@ -24,7 +25,7 @@ export function installRecordContainerValidator(pi: ExtensionAPI): void {
   pi.registerTool({
     name: VALIDATE_RECORDS_TOOL,
     label: "AKeel Validate Records",
-    description: "Validate Project Record containers (docs/candidates.md, docs/task.md, docs/decisions.md) for correct slot placement, unique slot invariant, and prefix matching.",
+    description: "Validate Project Record containers (docs/candidates.md, docs/task.md, docs/decisions.md) for slot placement, unique slot invariant, prefix matching, and Candidate/Task field hygiene.",
     parameters: VALIDATE_PARAMETERS,
     executionMode: "sequential",
     async execute(_toolCallId, rawParams, _signal, _onUpdate, context: ExtensionContext) {

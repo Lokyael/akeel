@@ -80,7 +80,10 @@ function structuralLines(content: string): string[] {
 }
 
 const TASK_HEADING_RE = /^## (T-\d{2,}): (.+)$/;
-const METADATA_BULLET_RE = /^-\s+\*\*([^*]+):\*\*\s*(.*)$/;
+const METADATA_BULLET_RE = /^-\s+(?:\*\*)?([^*\n:]+?)(?::\*\*|:)\s*(.*)$/;
+const LEGACY_METADATA_BULLET_RE = /^-\s+\*\*([^*\n:]+):\*\*\s*(.*)$/;
+const TASK_FIELD_LINE_RE = /^(?:\*\*)?(Kind|Status|Reversal surface)(?::\*\*|:)\s*(.*)$/;
+const CANDIDATE_FIELD_LINE_RE = /^(?:\*\*)?(Why Not Now|Revisit condition|Status)(?::\*\*|:)\s*(.*)$/;
 
 /**
  * Validates the metadata structure and canonical terms of active Task records.
@@ -108,6 +111,14 @@ export function checkTaskHygiene(content: string, file = "docs/task.md"): Contai
     seenFields.clear();
   }
 
+  function checkMetadataCompleteness(): void {
+    for (const required of ["Kind", "Status", "Reversal surface"] as const) {
+      if (!seenFields.has(required)) {
+        errors.push(`${file}: ${currentTaskId}: missing required Task field: ${required}`);
+      }
+    }
+  }
+
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i]!;
 
@@ -132,24 +143,30 @@ export function checkTaskHygiene(content: string, file = "docs/task.md"): Contai
 
     if (/^### /.test(line)) {
       if (inMetadata) {
-        for (const required of ["Kind", "Status", "Reversal surface"] as const) {
-          if (!seenFields.has(required)) {
-            errors.push(`${file}: ${currentTaskId}: missing required Task field: ${required}`);
-          }
-        }
+        checkMetadataCompleteness();
         inMetadata = false;
       }
       continue;
     }
 
     if (inMetadata) {
-      const bulletMatch = METADATA_BULLET_RE.exec(line.trim());
+      const trimmed = line.trim();
+      const bulletMatch = METADATA_BULLET_RE.exec(trimmed);
       if (bulletMatch) {
         const field = bulletMatch[1]!.trim();
         const value = bulletMatch[2]!.trim();
+        const isLegacyMetadata = LEGACY_METADATA_BULLET_RE.test(trimmed);
 
         if (seenFields.has(field)) {
           errors.push(`${file}:${i + 1}: duplicate Task field: ${field}`);
+          continue;
+        }
+        if (field !== "Kind" && field !== "Status" && field !== "Reversal surface") {
+          if (isLegacyMetadata) {
+            errors.push(`${file}:${i + 1}: unrecognized Task metadata field: ${field}`);
+          } else {
+            inMetadata = false;
+          }
           continue;
         }
         seenFields.add(field);
@@ -182,6 +199,18 @@ export function checkTaskHygiene(content: string, file = "docs/task.md"): Contai
         }
 
         errors.push(`${file}:${i + 1}: unrecognized Task metadata field: ${field}`);
+        continue;
+      }
+
+      const malformed = TASK_FIELD_LINE_RE.exec(trimmed);
+      if (malformed) {
+        const field = malformed[1]!;
+        seenFields.add(field);
+        errors.push(
+          `${file}:${i + 1}: expected Task metadata format '- ${field}: <value>' (Markdown emphasis is optional)`,
+        );
+      } else if (trimmed.length > 0) {
+        inMetadata = false;
       }
     }
   }
@@ -207,39 +236,82 @@ export function checkCandidateHygiene(content: string, file = "docs/candidates.m
 
   let inCandidate = false;
   let currentCandidateId = "";
+  const seenFields = new Set<string>();
+
+  function finishCurrentCandidate(): void {
+    if (!inCandidate) return;
+    for (const required of ["Why Not Now", "Revisit condition"] as const) {
+      if (!seenFields.has(required)) {
+        errors.push(`${file}: ${currentCandidateId}: missing required Candidate field: ${required}`);
+      }
+    }
+    inCandidate = false;
+    currentCandidateId = "";
+    seenFields.clear();
+  }
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i]!;
 
     if (/^## /.test(line)) {
       if (RECORD_SLOT_RE.test(line)) {
-        inCandidate = false;
-        currentCandidateId = "";
+        finishCurrentCandidate();
         continue;
       }
       const match = CANDIDATE_HEADING_RE.exec(line);
       if (match) {
+        finishCurrentCandidate();
         inCandidate = true;
         currentCandidateId = match[1]!;
         continue;
       }
-      inCandidate = false;
-      currentCandidateId = "";
+      finishCurrentCandidate();
       continue;
     }
 
     if (!inCandidate) continue;
 
-    const bulletMatch = METADATA_BULLET_RE.exec(line.trim());
+    const trimmed = line.trim();
+    const bulletMatch = METADATA_BULLET_RE.exec(trimmed);
     if (bulletMatch) {
       const field = bulletMatch[1]!.trim();
+      const value = bulletMatch[2]!.trim();
       if (field.toLowerCase() === "status") {
         errors.push(
           `${file}:${i + 1}: ${currentCandidateId}: Candidate records must not contain Status metadata (candidates are parked while present; promoted or dismissed candidates must be removed in the same change per principles.md and D-028)`,
         );
+        continue;
+      }
+      if (field === "Why Not Now" || field === "Revisit condition") {
+        if (seenFields.has(field)) {
+          errors.push(`${file}:${i + 1}: duplicate Candidate field: ${field}`);
+        } else {
+          seenFields.add(field);
+        }
+        if (value.length === 0) {
+          errors.push(`${file}:${i + 1}: Candidate field must not be empty: ${field}`);
+        }
+      }
+      continue;
+    }
+
+    const malformed = CANDIDATE_FIELD_LINE_RE.exec(trimmed);
+    if (malformed) {
+      const field = malformed[1]!;
+      seenFields.add(field);
+      if (field === "Status") {
+        errors.push(
+          `${file}:${i + 1}: ${currentCandidateId}: Candidate records must not contain Status metadata`,
+        );
+      } else {
+        errors.push(
+          `${file}:${i + 1}: expected Candidate field format '- ${field}: <value>' (Markdown emphasis is optional)`,
+        );
       }
     }
   }
+
+  finishCurrentCandidate();
 
   return Object.freeze({
     ok: errors.length === 0,

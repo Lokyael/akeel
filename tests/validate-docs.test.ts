@@ -36,6 +36,13 @@ test("Decision hygiene accepts the minimal metadata and open specification secti
   assert.equal(result.ok, true);
 });
 
+test("Decision hygiene accepts plain labels without Markdown emphasis", () => {
+  const plain = validDecision.replaceAll("**Reversal surface:**", "Reversal surface:").replaceAll("**Decision:**", "Decision:").replaceAll("**Why:**", "Why:").replaceAll("**Impact:**", "Impact:").replaceAll("**Rejected:**", "Rejected:").replaceAll("**Out of Scope:**", "Out of Scope:");
+  const result = checkDecisionHygiene(plain);
+  assert.deepEqual(result.errors, []);
+  assert.equal(result.ok, true);
+});
+
 test("Decision hygiene requires one explicit valid reversal surface", () => {
   const missing = checkDecisionHygiene(validDecision.replace("**Reversal surface:** engineering\n\n", ""));
   assert.equal(missing.ok, false);

@@ -1298,6 +1298,22 @@ test("Git inspect subcommands accept safe display and filter options without bec
   assert.equal(branchShowCurrent.semantic.hardBoundary, false);
 });
 
+test("Git local read-only display options remain bounded and non-opaque", () => {
+  for (const command of [
+    "git log --oneline -8 --decorate",
+    "git diff --check",
+    "git rev-parse --show-toplevel",
+    "git rev-parse --abbrev-ref --symbolic-full-name '@{upstream}'",
+  ]) {
+    const analysis = complete(command);
+    assert.equal(analysis.commandClass, "inspect", command);
+    assert.deepEqual(analysis.effects, ["read"], command);
+    assert.deepEqual(analysis.paths, [{ text: ".", role: "source" }], command);
+    assert.equal(analysis.semantic.opaquePathAccess, false, command);
+    assert.equal(analysis.semantic.hardBoundary, false, command);
+  }
+});
+
 test("Git inspect subcommands fail-closed on missing option values, external drivers, and unknown options", () => {
   const missingVal = complete("git log -S");
   assert.equal(missingVal.semantic.hardBoundary, true);
@@ -1310,6 +1326,14 @@ test("Git inspect subcommands fail-closed on missing option values, external dri
 
   const unknown = complete("git log --unknown-inspect-option");
   assert.equal(unknown.semantic.opaquePathAccess, true);
+
+  const unknownDisplayOption = complete("git log --decorate-refs=refs/heads/main");
+  assert.equal(unknownDisplayOption.semantic.opaquePathAccess, true);
+
+  for (const command of ["git show --decorate", "git log --check", "git diff --show-toplevel"]) {
+    const analysis = complete(command);
+    assert.equal(analysis.semantic.opaquePathAccess, true, command);
+  }
 });
 
 test("Git non-inspect subcommands isolate inspect-only options and do not permit them", () => {

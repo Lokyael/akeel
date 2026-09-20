@@ -13,7 +13,7 @@
  *   Git 保留历史是溯源手段，不是保留悬空引用的理由；剪除时应在同一变更内
  *   把引用更新到吸收条目。
  *
- * 三、Decision hygiene：存活 Decision 的顶层字段顺序、Reversal surface 值和明显过程历史标记。
+ * 三、Decision hygiene：存活 Decision 的顶层字段顺序、Reversal surface 值和明显过程历史标记；字段展示强调符号可选。
  * 该检查只覆盖可确定的结构，不替代人工的语义零损失审计。
  *
  * 只做结构性校验，不做编号 vs Git 历史的比对——编号可被合法重编号（如连续任务压缩），
@@ -151,8 +151,8 @@ function selfCheck(): void {
 
 // ─── Decision hygiene ───
 
-const TOP_LEVEL_FIELD_RE = /^\*\*([^*\n]+):\*\*(?:\s.*)?$/;
-const REVERSAL_RE = /^\*\*Reversal surface:\*\* (?:user-boundary|engineering)$/;
+const TOP_LEVEL_FIELD_RE = /^(?:\*\*)?([^*\n:]+?)(?::\*\*|:)(?:\s.*)?$/;
+const REVERSAL_RE = /^(?:\*\*)?Reversal surface(?::\*\*|:) (?:user-boundary|engineering)$/;
 const TASK_REF_RE = /\bT-\d{3}\b/;
 const PROCESS_WORD_RE = /\bdismiss(?:ed|al)?\s*(?:\(|（)?C-\d{3}\b|\b(?:migrated|promoted|moved)\s+from\s+[CT]-\d{3}\b|(?:从|由)\s*[CT]-\d{3}\s*(?:迁移|提升|移入|转入)/i;
 const PROCESS_FIELDS = new Set([

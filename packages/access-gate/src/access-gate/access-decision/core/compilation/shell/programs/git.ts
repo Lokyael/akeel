@@ -112,6 +112,22 @@ const INSPECT_FLAG_OPTIONS: readonly OptionSpec<GitSubcommandKey>[] = [
   },
 ];
 
+const GIT_LOG_INSPECT_OPTIONS: readonly OptionSpec<GitSubcommandKey>[] = [
+  { key: "flag", names: ["--decorate"], arity: "flag" },
+];
+
+const GIT_DIFF_INSPECT_OPTIONS: readonly OptionSpec<GitSubcommandKey>[] = [
+  { key: "flag", names: ["--check"], arity: "flag" },
+];
+
+const GIT_REV_PARSE_INSPECT_OPTIONS: readonly OptionSpec<GitSubcommandKey>[] = [
+  {
+    key: "flag",
+    names: ["--show-toplevel", "--abbrev-ref", "--symbolic-full-name"],
+    arity: "flag",
+  },
+];
+
 const GIT_STATUS_OPTIONS: readonly OptionSpec<GitSubcommandKey>[] = Object.freeze([
   {
     key: "flag",
@@ -159,6 +175,17 @@ const GIT_INSPECT_CONTRACT: SegmentContract<GitSubcommandKey> = Object.freeze({
   },
 });
 
+function gitInspectContract(extraOptions: readonly OptionSpec<GitSubcommandKey>[]): SegmentContract<GitSubcommandKey> {
+  return Object.freeze({
+    ...GIT_INSPECT_CONTRACT,
+    options: Object.freeze([...GIT_INSPECT_CONTRACT.options, ...extraOptions]),
+  });
+}
+
+const GIT_LOG_CONTRACT = gitInspectContract(GIT_LOG_INSPECT_OPTIONS);
+const GIT_DIFF_CONTRACT = gitInspectContract(GIT_DIFF_INSPECT_OPTIONS);
+const GIT_REV_PARSE_CONTRACT = gitInspectContract(GIT_REV_PARSE_INSPECT_OPTIONS);
+
 const GIT_RESTORE_OPTIONS: readonly OptionSpec<GitSubcommandKey>[] = Object.freeze([
   { key: "source" as const, names: ["--source", "-s"], arity: "required" as const },
   {
@@ -183,7 +210,7 @@ const GIT_COMMON_CONTRACT: SegmentContract<GitSubcommandKey> = Object.freeze({
 // --- Constants ---
 
 const GIT_INSPECT = new Set([
-  "status", "diff", "log", "rev-list", "show", "grep", "blame", "ls-files", "ls-tree", "ls-remote",
+  "status", "diff", "log", "rev-list", "rev-parse", "show", "grep", "blame", "ls-files", "ls-tree", "ls-remote",
   "fsck", "describe", "check-attr", "check-ignore", "help",
 ]);
 
@@ -328,9 +355,15 @@ export function analyzeGitProgram(args: readonly ShellWord[]): ProgramSemantic {
 
   const contract = isStatusSubcommand
     ? GIT_STATUS_CONTRACT
-    : (isInspectSubcommand || isStashInspect)
-      ? GIT_INSPECT_CONTRACT
-      : isRestoreSubcommand
+    : subcommand === "log"
+      ? GIT_LOG_CONTRACT
+      : subcommand === "diff"
+        ? GIT_DIFF_CONTRACT
+        : subcommand === "rev-parse"
+          ? GIT_REV_PARSE_CONTRACT
+          : (isInspectSubcommand || isStashInspect)
+            ? GIT_INSPECT_CONTRACT
+            : isRestoreSubcommand
         ? GIT_RESTORE_CONTRACT
         : GIT_COMMON_CONTRACT;
 

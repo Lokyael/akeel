@@ -710,7 +710,16 @@ test("Git inspect commands are admitted under develop and review while helper co
     blockedRoots: [],
   });
 
-  for (const command of ["git status", "git diff -- src/app.ts", "git log", "git show"]) {
+  for (const command of [
+    "git status",
+    "git diff -- src/app.ts",
+    "git log",
+    "git show",
+    "git log --oneline -8 --decorate",
+    "git diff --check",
+    "git rev-parse --show-toplevel",
+    "git rev-parse --abbrev-ref --symbolic-full-name '@{upstream}'",
+  ]) {
     assert.deepEqual(evaluateShellAdmission(admission(command), develop), {
       kind: "allow",
     }, command);
@@ -1038,6 +1047,7 @@ test("Git file and repository targets cannot escape the allowed project", () => 
     "git clone FILE:///etc/repo /workspace/project/clone",
     "git ls-remote file:///etc/repo",
     "git ls-remote origin",
+    "git remote -v",
     "git remote show origin",
     "git remote update",
     "git fetch file:///etc/repo",

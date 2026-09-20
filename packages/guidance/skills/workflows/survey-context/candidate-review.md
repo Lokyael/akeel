@@ -9,10 +9,10 @@ A Candidate Record is a strictly non-binding, parked uncommitted choice. It must
 ```markdown
 ## C-0NN: <Short, precise problem or capability boundary>
 
-- **Why Not Now:** <Concrete, factual obstacle, missing prerequisite, or lack of workload evidence>
-- **Revisit condition:** <Observable external fact that directly negates Why Not Now>
-[- **Scope / Exploration Direction:** <Optional: high-level exploration direction; NO implementation design>]
-[- **Boundary / Out of Scope:** <Optional: explicit exclusions that remain out of scope even if reopened>]
+- Why Not Now: <Concrete, factual obstacle, missing prerequisite, or lack of workload evidence>
+- Revisit condition: <Observable external fact that directly negates Why Not Now>
+[- Scope / Exploration Direction: <Optional: high-level exploration direction; NO implementation design>]
+[- Boundary / Out of Scope: <Optional: explicit exclusions that remain out of scope even if reopened>]
 ```
 
 Follow this 4-step authoring pipeline:

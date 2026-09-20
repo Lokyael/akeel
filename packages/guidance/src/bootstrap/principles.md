@@ -224,7 +224,7 @@ Every Decision declares a **Reversal surface**: `user-boundary` for security inv
 
 A Candidate enters the Task lifecycle only through an explicit user choice; its `Revisit condition` supplies objective evidence for an explicitly requested review.
 
-Task `Kind` is `feature | bug | refactor | investigation | maintenance`. Keep `Out of Scope`, Requirements, Design, Plan, Evidence, and a durable-update checklist in one Task file. Before implementation or clearing, every T-ID must have a complete Task Record in reachable Git history containing approved Requirements and necessary Design/Plan; slot advancement or a commit-message mention does not count. Update the Task Record only for cross-session continuity, handoff, or material authority changes; never step logs.
+Task `Kind` is `feature | bug | refactor | investigation | maintenance`. Candidate records must contain `Why Not Now` and `Revisit condition` and must not contain `Status`. Keep `Out of Scope`, Requirements, Design, Plan, Evidence, and a durable-update checklist in one Task file. Project Record fields use plain standalone labels: compact Candidate/Task metadata uses `- Field: value`, while Decision fields use `Field: value`; Markdown emphasis is presentation only and is not required for parsing. Validators may read the legacy `**Field:** value` spelling during migration, but new records must use the plain form. Before implementation or clearing, every T-ID must have a complete Task Record in reachable Git history containing approved Requirements and necessary Design/Plan; slot advancement or a commit-message mention does not count. Update the Task Record only for cross-session continuity, handoff, or material authority changes; never step logs.
 
 After verification, confirm the checkpoint remains reachable, apply needed updates to `CONTEXT.md` and `docs/decisions.md`, and clear the Task in the completion commit before starting another Task. Git or an adopted external tracker retains process history; do not create a default archive. Update one record through an iterative design arc and clear it only when the work lands, rather than allocating an ID per iteration.
 
@@ -234,7 +234,7 @@ After verification, confirm the checkpoint remains reachable, apply needed updat
 
 A Decision's presence means `active`; do not add `Status`, `Origin`, task references, process dates, or other process metadata.
 
-Use this order: `## D-xxx: <title>` → required unique `Reversal surface` → required unique `Decision` → optional specification sections → required unique `Why` → optional `Impact` → optional `Rejected` → optional `Out of Scope`. Specification sections occur only between `Decision` and `Why`; omit empty optional sections.
+Use this order: `## D-xxx: <title>` → required unique `Reversal surface: ...` → required unique `Decision: ...` → optional specification sections → required unique `Why: ...` → optional `Impact: ...` → optional `Rejected: ...` → optional `Out of Scope: ...`. Specification sections occur only between `Decision` and `Why`; omit empty optional sections. Each field label must occupy a standalone top-level line; Markdown emphasis around the label is legacy-only compatibility, not part of the format.
 
 ### Migration Protocol
 

@@ -57,7 +57,7 @@ test("akeel_validate_records executes against workspace cwd and reports valid st
   mkdirSync(join(tempDir, "docs"), { recursive: true });
   writeFileSync(
     join(tempDir, "docs", "task.md"),
-    "# Tasks\n\n## T-001: First\n\n- **Kind:** feature\n- **Status:** in-progress\n- **Reversal surface:** engineering\n\n## T-002: 待创建\n",
+    "# Tasks\n\n## T-001: First\n\n- Kind: feature\n- Status: in-progress\n- Reversal surface: engineering\n\n## T-002: 待创建\n",
   );
 
   try {
