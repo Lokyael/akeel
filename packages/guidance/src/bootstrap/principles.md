@@ -1,6 +1,3 @@
-<AKEEL_PRINCIPLES>
-akeel:core-principles
-
 ## Core Behavioral Principles
 
 These principles are your DNA. They apply to EVERY interaction — before any skill check, tool call, or response.
@@ -285,4 +282,3 @@ When active policy permits, use an isolated temporary directory to download and 
 ## Skill Usage Rule
 
 Use every matching skill. Read its listed `SKILL.md` with the `read` tool and follow its process. Available skills appear in `<available_skills>`; when unsure, try `/skill:survey-context` first.
-</AKEEL_PRINCIPLES>

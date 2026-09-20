@@ -107,7 +107,11 @@ test("Pi host composition keeps hard boundaries on generic guidance", async () =
     { cwd: "/workspace/project", hasUI: true, ui: {} },
   );
 
-  assert.deepEqual(result, { block: true, reason: "Blocked by a security boundary. Do not attempt bypasses or script wrappers; halt and report to the user." });
+  assert.deepEqual(result, {
+    block: true,
+    reason: "Blocked by a security boundary. Do not attempt bypasses or script wrappers; halt and report to the user.",
+    terminate: true,
+  });
 });
 
 test("Pi host composition executes only after explicit approval", async () => {
@@ -234,7 +238,11 @@ test("Pi host composition blocks Shell path-policy bypasses at the public seam",
       { toolName: "bash", input: { command } },
       { cwd: "/workspace/project", hasUI: false, ui: {} },
     );
-    assert.deepEqual(result, { block: true, reason: "Blocked by a security boundary. Do not attempt bypasses or script wrappers; halt and report to the user." }, command);
+    assert.deepEqual(result, {
+      block: true,
+      reason: "Blocked by a security boundary. Do not attempt bypasses or script wrappers; halt and report to the user.",
+      terminate: true,
+    }, command);
   }
   for (const command of ["dd if=/etc/passwd of=/tmp/out"]) {
     const result = await handleGateSessionToolCall(

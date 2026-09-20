@@ -831,3 +831,19 @@ test("publisher fails with static errors when Herdr topology is unavailable", as
     rmSync(root, { recursive: true, force: true });
   }
 });
+
+test("akeel_handoff registers strongly-typed payload parameter schema", () => {
+  const root = mkdtempSync(join(tmpdir(), "akeel-artifact-pi-"));
+  chmodSync(root, 0o700);
+  try {
+    const ownerPi = fakePi();
+    installArtifactExchange(ownerPi.pi, { root });
+    const handoffTool = ownerPi.tools.get("akeel_handoff") as any;
+    assert.ok(handoffTool);
+    assert.equal(handoffTool.parameters.additionalProperties, false);
+    assert.ok(handoffTool.parameters.properties.payload);
+    assert.ok(handoffTool.parameters.properties.payload.anyOf);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});

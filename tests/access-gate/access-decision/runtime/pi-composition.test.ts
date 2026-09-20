@@ -16,8 +16,11 @@ function fakePi(): { readonly handlers: Map<string, Handler>; readonly commands:
   const handlers = new Map<string, Handler>();
   const commands = new Map<string, (args: string, context: ExtensionContext) => unknown | Promise<unknown>>();
   const pi = {
-    on(event: string, handler: Handler): void {
+    on(event: string, handler: Handler): () => void {
       handlers.set(event, handler);
+      return () => {
+        handlers.delete(event);
+      };
     },
     registerCommand(name: string, options: { handler: (args: string, context: ExtensionContext) => unknown | Promise<unknown> }): void {
       commands.set(name, options.handler);
@@ -131,7 +134,11 @@ test("Pi composition hard-denies an agent credential variant under an allowing p
 
     assert.deepEqual(
       await invoke(handlers, "tool_call", { toolName: "read", input: { path: join(agentDir, "auth.json.bak") } }, hostContext),
-      { block: true, reason: "Blocked by a security boundary. Do not attempt bypasses or script wrappers; halt and report to the user." },
+      {
+        block: true,
+        reason: "Blocked by a security boundary. Do not attempt bypasses or script wrappers; halt and report to the user.",
+        terminate: true,
+      },
     );
   } finally {
     rmSync(agentDir, { recursive: true, force: true });
@@ -482,4 +489,12 @@ test("Pi composition automatically equips capability asset roots with read-only 
   // 3. Credential artifact auth.json in agentDir remains blocked
   const credBlock = await invoke(handlers, "tool_call", { toolName: "read", input: { path: `${agentDir}/auth.json` } }, hostContext);
   assert.equal((credBlock as any)?.block, true);
+});
+
+test("Pi composition disposal cleans up active session and unregisters handlers", async () => {
+  const { handlers, pi } = fakePi();
+  const dispose = installPiAccessDecision(pi, options);
+  assert.equal(handlers.size, 3);
+  dispose();
+  assert.equal(handlers.size, 0);
 });

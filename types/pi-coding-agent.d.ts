@@ -37,8 +37,45 @@ declare module "@earendil-works/pi-coding-agent" {
     sendUserMessage(content: string | readonly unknown[], options?: { deliverAs?: "steer" | "followUp" }): Promise<void>;
   }
 
+  export interface BuildSystemPromptOptions {
+    customPrompt?: string;
+    forceSystemPrompt?: string;
+    selectedTools?: string[];
+    toolSnippets?: Record<string, string>;
+    toolGuidelines?: Record<string, string[]>;
+    promptGuidelines?: string[];
+    sections: Record<string, string | null>;
+    appendSystemPrompt?: string;
+    cwd?: string;
+    contextFiles?: unknown[];
+    skills?: unknown[];
+  }
+
+  export interface BeforeAgentStartEvent {
+    prompt: string;
+    images?: unknown[];
+    systemPrompt: string;
+    systemPromptOptions: BuildSystemPromptOptions;
+  }
+
+  export interface BeforeAgentStartResult {
+    message?: {
+      customType?: string;
+      content: string | readonly unknown[];
+      display?: boolean;
+    };
+    systemPrompt?: string;
+  }
+
+  export interface UIPromptStartEvent {
+    reason: "ui_prompt";
+    kind: "select" | "confirm" | "input" | "editor" | "custom";
+    title?: string;
+  }
+
   export interface ExtensionCommandContext extends ExtensionContext {
     isIdle(): boolean;
+    waitForIdle?(): Promise<void>;
     newSession(options?: {
       parentSession?: string;
       withSession?: (context: ReplacedSessionContext) => unknown | Promise<unknown>;
@@ -59,12 +96,25 @@ declare module "@earendil-works/pi-coding-agent" {
     input: unknown;
   }
 
+  export interface ToolCallResult {
+    block?: boolean;
+    reason?: string;
+    terminate?: boolean;
+  }
+
   interface ExtensionEventMap {
     session_start: SessionStartEvent;
     session_compact: unknown;
     session_shutdown: unknown;
     context: ContextEvent;
     tool_call: ToolCallEvent;
+    before_agent_start: BeforeAgentStartEvent;
+    agent_start: unknown;
+    agent_end: { messages: unknown[] };
+    agent_settled: unknown;
+    ui_prompt_start: UIPromptStartEvent;
+    ui_prompt_end: unknown;
+    cache_warming_decision: unknown;
   }
 
   export interface ExtensionToolDefinition {
@@ -89,7 +139,7 @@ declare module "@earendil-works/pi-coding-agent" {
         event: ExtensionEventMap[K],
         ctx: ExtensionContext,
       ) => unknown | Promise<unknown>,
-    ): void;
+    ): () => void;
     registerCommand(
       name: string,
       options: {

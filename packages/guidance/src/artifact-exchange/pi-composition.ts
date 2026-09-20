@@ -37,6 +37,94 @@ const OWNER_PARAMETERS = Type.Object({
 }, { additionalProperties: false });
 
 const PUBLISH_PARAMETERS = Type.Object({ content: Type.String() }, { additionalProperties: false });
+const SEMANTIC_UNIT_SCHEMA = Type.Object({
+  id: Type.String({ description: "Unique semantic unit identifier" }),
+  kind: Type.Union([
+    Type.Literal("requirement"),
+    Type.Literal("constraint"),
+    Type.Literal("assumption"),
+    Type.Literal("finding"),
+    Type.Literal("risk"),
+    Type.Literal("decision-candidate"),
+    Type.Literal("evidence"),
+    Type.Literal("external-effect"),
+    Type.Literal("work-state"),
+    Type.Literal("next-action"),
+  ]),
+  statement: Type.Optional(Type.String({ description: "Statement of the semantic unit" })),
+  authority: Type.Union([
+    Type.Literal("user-approved"),
+    Type.Literal("project-record"),
+    Type.Literal("observed"),
+    Type.Literal("inferred"),
+  ]),
+  status: Type.Union([
+    Type.Literal("live"),
+    Type.Literal("superseded"),
+    Type.Literal("closed"),
+  ]),
+  sourceRef: Type.String({ description: "Source reference" }),
+  dependsOn: Type.Optional(Type.Array(Type.String())),
+  closure: Type.Optional(Type.Object({
+    disposition: Type.Union([
+      Type.Literal("materialized"),
+      Type.Literal("superseded"),
+      Type.Literal("invalidated"),
+      Type.Literal("irrelevant"),
+    ]),
+    basisRef: Type.String(),
+    destinationRef: Type.String(),
+  }, { additionalProperties: false })),
+}, { additionalProperties: false });
+
+const CLOSE_PAYLOAD_SCHEMA = Type.Object({
+  id: Type.String({ description: "Semantic ID to close" }),
+  status: Type.Union([Type.Literal("closed"), Type.Literal("superseded")]),
+  closure: Type.Object({
+    disposition: Type.Union([
+      Type.Literal("materialized"),
+      Type.Literal("superseded"),
+      Type.Literal("invalidated"),
+      Type.Literal("irrelevant"),
+    ]),
+    basisRef: Type.String({ description: "Evidence or basis reference" }),
+    destinationRef: Type.String({ description: "Destination record or tombstone reference" }),
+  }, { additionalProperties: false }),
+}, { additionalProperties: false });
+
+const RECONCILE_PAYLOAD_SCHEMA = Type.Object({
+  importedSemanticIds: Type.Array(Type.String(), { description: "Semantic IDs successfully imported" }),
+  conflicts: Type.Array(Type.Object({
+    semanticId: Type.String(),
+    observedReality: Type.String(),
+  }, { additionalProperties: false }), { description: "Semantic IDs conflicting with observed reality" }),
+  unresolvedSemanticIds: Type.Array(Type.String(), { description: "Semantic IDs that could not be resolved" }),
+  workspaceVerified: Type.Literal(true, { description: "Must be true to confirm workspace verification" }),
+}, { additionalProperties: false });
+
+const PREPARE_PAYLOAD_SCHEMA = Type.Object({
+  taskRef: Type.Optional(Type.String()),
+  authorityRefs: Type.Optional(Type.Array(Type.String())),
+  roots: Type.Optional(Type.Array(Type.String())),
+  checkpoint: Type.Optional(Type.Object({
+    state: Type.Union([Type.Literal("complete"), Type.Literal("incomplete"), Type.Literal("blocked")]),
+    currentSlice: Type.String(),
+    actualState: Type.String(),
+    nextActionId: Type.String(),
+  }, { additionalProperties: false })),
+  workspace: Type.Optional(Type.Object({
+    cwd: Type.String(),
+    files: Type.Optional(Type.Array(Type.String())),
+  }, { additionalProperties: false })),
+}, { additionalProperties: false });
+
+const HANDOFF_PAYLOAD_SCHEMA = Type.Union([
+  SEMANTIC_UNIT_SCHEMA,
+  CLOSE_PAYLOAD_SCHEMA,
+  RECONCILE_PAYLOAD_SCHEMA,
+  PREPARE_PAYLOAD_SCHEMA,
+]);
+
 const HANDOFF_PARAMETERS = Type.Object({
   action: Type.Union([
     Type.Literal("record"),
@@ -46,7 +134,7 @@ const HANDOFF_PARAMETERS = Type.Object({
     Type.Literal("reconcile"),
     Type.Literal("view"),
   ]),
-  payload: Type.Optional(Type.Any()),
+  payload: Type.Optional(HANDOFF_PAYLOAD_SCHEMA),
 }, { additionalProperties: false });
 
 const SEMANTIC_ENTRY = "akeel:semantic-ledger";

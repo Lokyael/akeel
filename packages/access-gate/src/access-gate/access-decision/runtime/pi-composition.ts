@@ -132,7 +132,7 @@ function installComposition(
   createSessionProject: (cwd: string) => SessionProject,
   agentDir: string,
   configuredCapabilityRoots?: readonly string[],
-): void {
+): () => void {
   let session: GateSession | undefined;
   let project: ProjectLifecycle | undefined;
   let sessionHome: string | undefined;
@@ -283,7 +283,9 @@ function installComposition(
     },
   });
 
-  pi.on("session_start", (_event, context) => {
+  const unsubs: Array<() => void> = [];
+
+  unsubs.push(pi.on("session_start", (_event, context) => {
     session?.close();
     project?.dispose();
     context.ui?.setStatus?.(POLICY_STATUS_ID, undefined);
@@ -317,29 +319,40 @@ function installComposition(
       project?.dispose();
       project = undefined;
     }
-  });
+  }));
 
-  pi.on("session_shutdown", (_event, context) => {
+  unsubs.push(pi.on("session_shutdown", (_event, context) => {
     session?.close();
     project?.dispose();
     context.ui?.setStatus?.(POLICY_STATUS_ID, undefined);
     session = undefined;
     project = undefined;
     sessionHome = undefined;
-  });
+  }));
 
-  pi.on("tool_call", async (event, context) => {
+  unsubs.push(pi.on("tool_call", async (event, context) => {
     if (currentConfiguration?.kind === "off") return undefined;
     if (!session) {
       return adaptPiGateToolCall(event, context).kind === "passthrough" ? undefined : initializationFailure();
     }
     return handleGateSessionToolCall(session, event, context);
-  });
+  }));
+
+  return () => {
+    session?.close();
+    project?.dispose();
+    session = undefined;
+    project = undefined;
+    sessionHome = undefined;
+    for (const unsub of unsubs) {
+      try { unsub?.(); } catch { /* ignore */ }
+    }
+  };
 }
 
-export function installPiAccessDecision(pi: ExtensionAPI, options: PiCompositionOptions): void {
+export function installPiAccessDecision(pi: ExtensionAPI, options: PiCompositionOptions): () => void {
   const agentDir = resolveAgentDir(options.agentDir);
-  installComposition(pi, () => decodedPolicy(options.policyConfig), (cwd) => {
+  return installComposition(pi, () => decodedPolicy(options.policyConfig), (cwd) => {
     if (options.projectRoot !== cwd) throw new TypeError("project root must match session cwd");
     return {
       context: createProjectContext({ cwd, projectRoot: cwd, stagingRoot: options.stagingRoot }),
@@ -347,7 +360,7 @@ export function installPiAccessDecision(pi: ExtensionAPI, options: PiComposition
   }, agentDir, options.capabilityRoots);
 }
 
-export function installGlobalPiAccessDecision(pi: ExtensionAPI, options: GlobalPiCompositionOptions): void {
+export function installGlobalPiAccessDecision(pi: ExtensionAPI, options: GlobalPiCompositionOptions): () => void {
   const agentDir = resolveAgentDir(options.agentDir);
-  installComposition(pi, () => loadDecodedPolicyFile(agentDir), createProjectLifecycle, agentDir, options.capabilityRoots);
+  return installComposition(pi, () => loadDecodedPolicyFile(agentDir), createProjectLifecycle, agentDir, options.capabilityRoots);
 }

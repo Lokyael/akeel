@@ -6,7 +6,13 @@ import type { GateSession, GateSessionResult } from "./gate-session";
 export type PiToolCallHandlerResult = Readonly<{
   readonly block: true;
   readonly reason: string;
+  readonly terminate?: boolean;
 }> | undefined;
+
+const TERMINATING_BLOCK_CODES = new Set<string>([
+  "hard-boundary",
+  "security-boundary",
+]);
 
 type ApprovalHostContext = Readonly<{
   readonly hasUI: true;
@@ -58,7 +64,14 @@ function renderGateSessionResult(
 }
 
 async function hostHandlerResult(result: HostFacingDecision, context: unknown): Promise<PiToolCallHandlerResult> {
-  if (result.kind === "block") return Object.freeze({ block: true, reason: result.reason });
+  if (result.kind === "block") {
+    const terminate = TERMINATING_BLOCK_CODES.has(result.code);
+    return Object.freeze({
+      block: true,
+      reason: result.reason,
+      ...(terminate ? { terminate: true } : {}),
+    });
+  }
   if (result.kind !== "confirm") return undefined;
   if (!hasApprovalUI(context)) return Object.freeze({ block: true, reason: "Blocked because approval UI is unavailable." });
 
