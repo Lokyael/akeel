@@ -19,7 +19,9 @@ function fakePi(flag?: string) {
   const tools = new Map<string, Tool>();
   const commands = new Map<string, Command>();
   const entries: CustomEntry[] = [];
+  let sessionEntries = entries;
   let active = ["read", "write"];
+  let alive = true;
   const pi = {
     on(name: string, handler: Handler): void { handlers.set(name, handler); },
     registerFlag(): void {},
@@ -28,12 +30,24 @@ function fakePi(flag?: string) {
     registerTool(tool: Tool & { name: string }): void { tools.set(tool.name, tool); },
     getActiveTools(): string[] { return [...active]; },
     setActiveTools(names: string[]): void { active = [...names]; },
-    appendEntry(customType: string, data: unknown): void { entries.push({ type: "custom", customType, data }); },
+    appendEntry(customType: string, data: unknown): void {
+      if (!alive) throw new Error("stale-extension-context");
+      sessionEntries.push({ type: "custom", customType, data });
+    },
   } as unknown as ExtensionAPI;
-  return { pi, handlers, tools, commands, entries, active: () => active };
+  return {
+    pi,
+    handlers,
+    tools,
+    commands,
+    entries,
+    active: () => active,
+    invalidate: () => { alive = false; },
+    useEntries: (nextEntries: CustomEntry[]) => { sessionEntries = nextEntries; },
+  };
 }
 
-function context(sessionId: string, entries: readonly CustomEntry[] = []): ExtensionContext {
+function context(sessionId: string, entries: CustomEntry[] = []): ExtensionContext {
   return {
     cwd: "/workspace/project",
     hasUI: false,
@@ -45,14 +59,23 @@ function context(sessionId: string, entries: readonly CustomEntry[] = []): Exten
       getSessionFile: () => `/sessions/${sessionId}.jsonl`,
       getBranch: () => entries,
       getEntries: () => entries,
+      appendCustomEntry: (customType: string, data: unknown) => {
+        entries.push({ type: "custom", customType, data });
+        return `entry-${entries.length}`;
+      },
     },
   } as unknown as ExtensionContext;
 }
 
-async function start(target: ReturnType<typeof fakePi>, sessionId: string): Promise<void> {
+async function start(
+  target: ReturnType<typeof fakePi>,
+  sessionId: string,
+  entries: CustomEntry[] = target.entries,
+): Promise<void> {
+  target.useEntries(entries);
   const handler = target.handlers.get("session_start");
   assert.ok(handler);
-  await handler!({}, context(sessionId, target.entries));
+  await handler!({}, context(sessionId, entries));
 }
 
 async function execute(tool: Tool, params: unknown, ctx: ExtensionContext): Promise<any> {
@@ -272,6 +295,7 @@ test("single /handoff command synthesizes capsule and replaces session in one st
       isIdle: () => true,
       newSession: async (options: any) => {
         parentSession = options.parentSession;
+        await options.setup(successorContext.sessionManager);
         await options.withSession(successorContext);
         return { cancelled: false };
       },
@@ -290,19 +314,21 @@ test("single /handoff command synthesizes capsule and replaces session in one st
     assert.match(sent[0]!, /importedSemanticIds/);
     assert.match(sent[0]!, /workspaceVerified/);
 
-    // Old session has switched entry and tools frozen on restart
-    assert.equal(ownerPi.entries.some((entry) => entry.customType === "akeel:handoff-switched"), true);
+    // Old session keeps its switch intent and tools freeze on restart.
+    assert.equal(ownerPi.entries.some((entry) => entry.customType === "akeel:switch-intent"), true);
+    assert.equal(ownerPi.entries.some((entry) => entry.customType === "akeel:handoff-switched"), false);
+    assert.equal(successorEntries.some((entry) => entry.customType === "akeel:continuation-capsule"), true);
     await start(ownerPi, "source-session");
     assert.deepEqual(ownerPi.active(), []);
 
     // Successor session start activates handoff and inspection tools without owner artifact delegation
-    await start(ownerPi, "successor-session");
+    await start(ownerPi, "successor-session", successorEntries);
     assert.equal(ownerPi.active().includes("akeel_handoff"), true);
     assert.equal(ownerPi.active().includes("akeel_run_artifact"), false);
 
     // Successor hydrates captured semantics from the continuation capsule
     const successorHandoff = ownerPi.tools.get("akeel_handoff")!;
-    const hydratedStatus = await execute(successorHandoff, { action: "status" }, context("successor-session", ownerPi.entries));
+    const hydratedStatus = await execute(successorHandoff, { action: "status" }, context("successor-session", successorEntries));
     const hydratedIds = hydratedStatus.details.result.units.map((u: any) => u.id);
     assert.equal(hydratedIds.includes("active-assumption"), true);
     assert.equal(hydratedIds.includes("user-next-action"), true);
@@ -313,12 +339,12 @@ test("single /handoff command synthesizes capsule and replaces session in one st
       conflicts: [],
       unresolvedSemanticIds: [],
       workspaceVerified: true,
-    } }, context("successor-session", ownerPi.entries));
+    } }, context("successor-session", successorEntries));
     assert.equal(reconciled.details.result.state, "reconciled");
     assert.equal(ownerPi.active().includes("akeel_run_artifact"), true);
 
     // Successor survives session restart/reboot with full owner tools intact
-    await start(ownerPi, "successor-session");
+    await start(ownerPi, "successor-session", successorEntries);
     assert.equal(ownerPi.active().includes("akeel_run_artifact"), true);
     assert.equal(ownerPi.active().includes("akeel_handoff"), true);
 
@@ -329,10 +355,11 @@ test("single /handoff command synthesizes capsule and replaces session in one st
       sendUserMessage: async (msg: string) => { sent.push(msg); },
     };
     const s2CommandContext = {
-      ...context("successor-session", ownerPi.entries),
+      ...context("successor-session", successorEntries),
       isIdle: () => true,
       newSession: async (options: any) => {
         parentSession = options.parentSession;
+        await options.setup(s3Context.sessionManager);
         await options.withSession(s3Context);
         return { cancelled: false };
       },
@@ -343,9 +370,9 @@ test("single /handoff command synthesizes capsule and replaces session in one st
     assert.match(sent[1]!, /\[user-next-action-2\] Implement slice in S3/);
 
     // S2 is now retired and frozen on start, while S3 can start
-    await start(ownerPi, "successor-session");
+    await start(ownerPi, "successor-session", successorEntries);
     assert.deepEqual(ownerPi.active(), []);
-    await start(ownerPi, "session-3");
+    await start(ownerPi, "session-3", s3Entries);
     assert.equal(ownerPi.active().includes("akeel_handoff"), true);
 
     // Isolated source session with switch-intent entry safely freezes tools on restart
@@ -362,6 +389,50 @@ test("single /handoff command synthesizes capsule and replaces session in one st
     assert.ok(isolatedHandler);
     await isolatedHandler!({}, context("isolated-source", isolatedSourceEntries));
     assert.deepEqual(isolatedPi.active(), []);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("/handoff writes the successor receipt through setup before using the fresh context", async () => {
+  const root = mkdtempSync(join(tmpdir(), "akeel-artifact-pi-"));
+  chmodSync(root, 0o700);
+  try {
+    const ownerPi = fakePi();
+    installArtifactExchange(ownerPi.pi, { root });
+    await start(ownerPi, "source-session");
+    const sourceContext = context("source-session", ownerPi.entries);
+    const successorEntries: CustomEntry[] = [];
+    const sent: string[] = [];
+    const successorManager = {
+      getSessionId: () => "successor-session",
+      appendCustomEntry(customType: string, data: unknown): string {
+        successorEntries.push({ type: "custom", customType, data });
+        return `entry-${successorEntries.length}`;
+      },
+    };
+    const successorContext = {
+      ...context("successor-session", successorEntries),
+      sendUserMessage: async (message: string) => { sent.push(message); },
+    };
+    const commandContext = {
+      ...sourceContext,
+      isIdle: () => true,
+      newSession: async (options: any) => {
+        ownerPi.invalidate();
+        assert.equal(typeof options.setup, "function");
+        await options.setup(successorManager);
+        await options.withSession(successorContext);
+        return { cancelled: false };
+      },
+    };
+
+    const command = ownerPi.commands.get("handoff")!;
+    await command.handler("Continue in the successor", commandContext);
+
+    assert.equal(sent.length, 1);
+    assert.equal(successorEntries.some((entry) => entry.customType === "akeel:continuation-capsule"), true);
+    assert.equal(ownerPi.entries.some((entry) => entry.customType === "akeel:handoff-switched"), false);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
@@ -552,6 +623,7 @@ test("/handoff recovers cleanly after a cancelled replacement and succeeds on re
       isIdle: () => true,
       newSession: async (options: any) => {
         successorSessionFile = options.parentSession;
+        await options.setup(successorCtx.sessionManager);
         await options.withSession(successorCtx);
         return { cancelled: false };
       },
@@ -566,9 +638,9 @@ test("/handoff recovers cleanly after a cancelled replacement and succeeds on re
     assert.match(sentMessages[0]!, /Verify cancellation and retry loop/);
 
     // Successor can hydrate and reconcile
-    await start(ownerPi, "retry-successor");
+    await start(ownerPi, "retry-successor", successorEntries);
     const successorHandoff = ownerPi.tools.get("akeel_handoff")!;
-    const status = await execute(successorHandoff, { action: "status" }, context("retry-successor", ownerPi.entries));
+    const status = await execute(successorHandoff, { action: "status" }, context("retry-successor", successorEntries));
     const liveIds = status.details.result.units.filter((u: any) => u.status === "live").map((u: any) => u.id);
     assert.equal(liveIds.includes("retry-task"), true);
 
@@ -577,7 +649,7 @@ test("/handoff recovers cleanly after a cancelled replacement and succeeds on re
       conflicts: [],
       unresolvedSemanticIds: [],
       workspaceVerified: true,
-    } }, context("retry-successor", ownerPi.entries));
+    } }, context("retry-successor", successorEntries));
     assert.equal(reconciled.details.result.state, "reconciled");
   } finally {
     rmSync(root, { recursive: true, force: true });
@@ -768,6 +840,7 @@ test("prepare action fails closed on workspace cwd mismatch and canReuseActive r
           cwd: "/new/workspace/project",
           sendUserMessage: async () => {},
         };
+        await options.setup(successorCtx.sessionManager);
         await options.withSession(successorCtx);
         return { cancelled: false };
       },

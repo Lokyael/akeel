@@ -6,6 +6,7 @@ declare module "@earendil-works/pi-coding-agent" {
     getSessionFile(): string | undefined;
     getBranch(): readonly unknown[];
     getEntries(): readonly unknown[];
+    appendCustomEntry(customType: string, data?: unknown): string;
     buildContextEntries(): readonly unknown[];
   }
 
@@ -78,6 +79,7 @@ declare module "@earendil-works/pi-coding-agent" {
     waitForIdle?(): Promise<void>;
     newSession(options?: {
       parentSession?: string;
+      setup?: (sessionManager: SessionManager) => unknown | Promise<unknown>;
       withSession?: (context: ReplacedSessionContext) => unknown | Promise<unknown>;
     }): Promise<{ cancelled: boolean }>;
   }

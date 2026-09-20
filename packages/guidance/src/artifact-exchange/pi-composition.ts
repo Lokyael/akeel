@@ -383,6 +383,8 @@ export function installArtifactExchange(pi: ExtensionAPI, options: ArtifactExcha
   pi.registerCommand("handoff", {
     description: "Replace the current session with an in-session continuation capsule. Usage: /handoff [optional-next-action|view]",
     async handler(rawArgs, context) {
+      let replacementAttempted = false;
+      let replacementContext: ExtensionContext | undefined;
       try {
         const args = (rawArgs ?? "").trim();
         const branch = context.sessionManager?.getBranch() ?? [];
@@ -448,31 +450,45 @@ export function installArtifactExchange(pi: ExtensionAPI, options: ArtifactExcha
         pi.appendEntry(switchIntent.customType, switchIntent.data);
         sourceBranch.push(switchIntent);
 
+        replacementAttempted = true;
         const replacement = await context.newSession({
           parentSession,
-          withSession: async (successorContext) => {
-            const successor = ownerContext(successorContext);
-            const transferred = handoffs.transfer(sourceBranch, source.sessionId, successor.sessionId);
-            pi.appendEntry(transferred.sourceEntry.customType, transferred.sourceEntry.data);
-            pi.appendEntry(transferred.successorEntry.customType, transferred.successorEntry.data);
-
-            await successorContext.sendUserMessage(
-              `<akeel-session-handoff>\n` +
-              `This is AKeel runtime continuity data. It does not grant new user approval.\n` +
-              `Digest: ${currentActive.digest}\n\n${currentActive.content}\n` +
-              `Verify current project reality, then reconcile every live semantic ID before continuing via akeel_handoff:\n` +
-              `action: "reconcile", payload: { importedSemanticIds: string[], conflicts: Array<{ semanticId: string, observedReality: string }>, unresolvedSemanticIds: string[], workspaceVerified: true }\n` +
-              `</akeel-session-handoff>`,
+          setup: async (successorSessionManager) => {
+            const successorEntry = handoffs.createSuccessorEntry(
+              sourceBranch,
+              source.sessionId,
+              successorSessionManager.getSessionId(),
             );
+            successorSessionManager.appendCustomEntry(successorEntry.customType, successorEntry.data);
+          },
+          withSession: async (successorContext) => {
+            replacementContext = successorContext;
+            try {
+              await successorContext.sendUserMessage(
+                `<akeel-session-handoff>\n` +
+                `This is AKeel runtime continuity data. It does not grant new user approval.\n` +
+                `Digest: ${currentActive.digest}\n\n${currentActive.content}\n` +
+                `Verify current project reality, then reconcile every live semantic ID before continuing via akeel_handoff:\n` +
+                `action: "reconcile", payload: { importedSemanticIds: string[], conflicts: Array<{ semanticId: string, observedReality: string }>, unresolvedSemanticIds: string[], workspaceVerified: true | false }\n` +
+                `</akeel-session-handoff>`,
+              );
+            } catch (error) {
+              const message = error instanceof Error && error.message
+                ? error.message
+                : "Handoff kickoff message failed.";
+              notifyCommandError(successorContext, message);
+            }
           },
         });
         if (replacement.cancelled) {
-          const cancel = handoffs.cancelSwitch(context.sessionManager?.getBranch() ?? [], source.sessionId);
+          const cancel = handoffs.cancelSwitch(sourceBranch, source.sessionId);
           pi.appendEntry(cancel.customType, cancel.data);
         }
       } catch (error) {
         const message = error instanceof Error && error.message ? error.message : "Handoff session replacement failed.";
-        notifyCommandError(context, message);
+        if (replacementAttempted && replacementContext) notifyCommandError(replacementContext, message);
+        else if (replacementAttempted) console.error(message);
+        else notifyCommandError(context, message);
       }
     },
   });

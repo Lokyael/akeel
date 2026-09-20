@@ -1185,6 +1185,9 @@ test("herdr commands follow policy classification and path boundaries", () => {
   assert.deepEqual(evaluateShellAdmission(admission("herdr worktree create --cwd ."), develop), {
     kind: "allow",
   });
+  assert.deepEqual(evaluateShellAdmission(admission("herdr workspace close w1"), develop), {
+    kind: "allow",
+  });
   assert.deepEqual(evaluateShellAdmission(admission("herdr worktree create --cwd /etc"), develop), {
     kind: "deny",
     code: "hard-boundary",
@@ -1203,6 +1206,10 @@ test("herdr commands follow policy classification and path boundaries", () => {
 
   assert.deepEqual(evaluateShellAdmission(admission("herdr agent get child1"), review), {
     kind: "allow",
+  });
+  assert.deepEqual(evaluateShellAdmission(admission("herdr workspace close w1"), review), {
+    kind: "deny",
+    code: "policy-denied",
   });
   assert.deepEqual(evaluateShellAdmission(admission("herdr agent prompt child1 'review'"), review), {
     kind: "deny",

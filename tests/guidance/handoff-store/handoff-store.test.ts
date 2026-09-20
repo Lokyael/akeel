@@ -46,7 +46,7 @@ test("prepares and retrieves an in-session capsule with zero filesystem writes",
   assert.deepEqual(active.capsule, capsule);
 });
 
-test("in-session handoff advances through append-only switch, transfer, and reconciliation entries", () => {
+test("in-session handoff advances through append-only switch, successor receipt, and reconciliation entries", () => {
   const store = createHandoffStore();
   const capsule = sampleCapsule();
   const sourceEntries: SessionEntry[] = [store.prepareCapsule(capsule).entry];
@@ -57,12 +57,11 @@ test("in-session handoff advances through append-only switch, transfer, and reco
   sourceEntries.push(switchIntent);
   assert.equal(store.status(sourceEntries).state, "switch-started");
 
-  const transferred = store.transfer(sourceEntries, "source-session", "successor-session");
-  sourceEntries.push(transferred.sourceEntry);
-  assert.equal(store.status(sourceEntries).state, "transferred");
+  const successorEntry = store.createSuccessorEntry(sourceEntries, "source-session", "successor-session");
+  assert.equal(store.status(sourceEntries).state, "switch-started");
 
   // Successor session receives the transfer entry in its entries
-  const successorEntries: SessionEntry[] = [transferred.successorEntry];
+  const successorEntries: SessionEntry[] = [successorEntry];
   assert.equal(store.status(successorEntries).state, "transferred");
 
   const reconciliation = store.reconcile(successorEntries, "successor-session", {
@@ -86,14 +85,14 @@ test("cancelled and unresolved handoffs fail closed within session entries", () 
   assert.equal(store.status(sourceEntries).state, "cancelled");
 
   assert.throws(
-    () => store.transfer(sourceEntries, "source-session", "successor-session"),
+    () => store.createSuccessorEntry(sourceEntries, "source-session", "successor-session"),
     /handoff-store-denied/,
   );
 
   // Attempting reconciliation with unresolved item produces a blocked state record without crashing
   const freshEntries: SessionEntry[] = [store.prepareCapsule(capsule).entry];
-  const transferred = store.transfer(freshEntries, "source-session", "successor-session");
-  const successorEntries: SessionEntry[] = [transferred.successorEntry];
+  const successorEntry = store.createSuccessorEntry(freshEntries, "source-session", "successor-session");
+  const successorEntries: SessionEntry[] = [successorEntry];
 
   const blocked = store.reconcile(successorEntries, "successor-session", {
     importedSemanticIds: [],
@@ -109,8 +108,8 @@ test("cancelled and unresolved handoffs fail closed within session entries", () 
 test("reconciled session can prepare a fresh outbound capsule and advance multi-hop handoffs", () => {
   const store = createHandoffStore();
   const capsule = sampleCapsule();
-  const transferred = store.transfer([store.prepareCapsule(capsule).entry], "s1", "s2");
-  const s2Entries: SessionEntry[] = [transferred.successorEntry];
+  const successorEntry = store.createSuccessorEntry([store.prepareCapsule(capsule).entry], "s1", "s2");
+  const s2Entries: SessionEntry[] = [successorEntry];
 
   const reconciled = store.reconcile(s2Entries, "s2", {
     importedSemanticIds: ["next"],

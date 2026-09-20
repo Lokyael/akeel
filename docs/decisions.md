@@ -985,5 +985,19 @@ Handoff 彻底消除外部 `/tmp/akeel/handoffs/` 孤儿目录，将胶囊数据
 
 **Out of Scope:** 未表达或未捕获语义的绝对完备性、跨未加载 AKeel 的进程实施全局 Owner 锁、无人值守异步 orchestration、跨 Agent session 文件扫描、自动 Git/发布副作用、handoff GC、OS sandbox，以及替换 Pi compaction。Source 冷归档与 unknown-live fallback 提供恢复面，但不消除自然语言理解的理论边界。
 
-## D-093: 待创建
+## D-093: Session Handoff 采用 source intent 与 successor receipt 的单向两阶段交接
+
+**Reversal surface:** engineering
+
+**Decision:** Pi 原生 Session Handoff 采用单向两阶段协议：source session 在 replacement 前追加 `akeel:prepared-capsule` 与 `akeel:switch-intent`，以 source intent 进入冻结状态；successor session 通过 `newSession({ setup })` 的 successor `SessionManager` 追加唯一 `akeel:continuation-capsule`，再通过 `withSession` 的 fresh context 发送 kickoff。replacement 成功后不再使用旧 `pi`、旧 command context、旧 `SessionManager` 或旧 UI，也不向 source 追加 transfer entry。新流程不发行 `akeel:handoff-switched`，读取逻辑继续兼容历史 entry；取消仅在 `newSession()` 明确返回 `cancelled: true` 且未发生 replacement 时追加 `akeel:switch-cancelled`。
+
+**Why:** Pi 在成功 session replacement 后使旧 extension instance 与 session-bound handles 失效；source 在 replacement 后无法安全完成第二次提交。将 source intent 作为切换前的冻结承诺、successor continuation 作为切换后的交接收据，可以避免 entry 写错 session、保留 fail-closed 的 source 状态，并使 `setup` 在 successor 启动前完成持久化初始化。`withSession` 只承担 fresh context 上的消息投递，不承担跨 session 状态写入。
+
+**Impact:** HandoffStore 的新发行接口只生成 successor receipt，历史 `handoff-switched` 仍可读取；Pi 类型声明补齐 `newSession.setup` 与 successor `SessionManager.appendCustomEntry`；composition 测试使用隔离的 source/successor session seam，并验证旧 handle 在 replacement 后不可用。
+
+**Rejected:** replacement 后继续使用捕获的 `pi` 或 command context；在 `withSession` 中追加 successor entry；把 source transfer entry 写入 successor；直接操作 JSONL session 文件；删除切换前 `switch-intent` 以规避取消清理。
+
+**Out of Scope:** Pi runtime 本身的 replacement/cancellation 实现、跨 Owner handoff、异步 mailbox、外部 handoff 文件和 source session 在 replacement 成功后的二次写入机制。
+
+## D-094: 待创建
 

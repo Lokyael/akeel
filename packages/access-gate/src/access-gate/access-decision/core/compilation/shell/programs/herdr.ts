@@ -100,7 +100,7 @@ export function analyzeHerdrProgram(args: readonly ShellWord[]): ProgramSemantic
           }
         }
       }
-      return result("modify", ["read", "write"], paths);
+      return result("modify", ["read", "write"], paths, { opaque: paths.length === 0 });
     }
     return result("unknown", [], [], { opaque: true });
   }

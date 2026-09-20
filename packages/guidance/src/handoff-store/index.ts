@@ -76,14 +76,11 @@ export type HandoffStore = Readonly<{
   readonly status: (entries: readonly unknown[]) => HandoffStatus;
   readonly beginSwitch: (entries: readonly unknown[], sourceSessionId: string) => SessionEntry;
   readonly cancelSwitch: (entries: readonly unknown[], sourceSessionId: string) => SessionEntry;
-  readonly transfer: (
+  readonly createSuccessorEntry: (
     entries: readonly unknown[],
     sourceSessionId: string,
     successorSessionId: string,
-  ) => Readonly<{
-    readonly sourceEntry: SessionEntry;
-    readonly successorEntry: SessionEntry;
-  }>;
+  ) => SessionEntry;
   readonly reconcile: (
     entries: readonly unknown[],
     successorSessionId: string,
@@ -226,28 +223,20 @@ export function createHandoffStore(): HandoffStore {
       } satisfies SwitchIntentData));
     },
 
-    transfer(entries: readonly unknown[], sourceSessionId: string, successorSessionId: string) {
+    createSuccessorEntry(entries: readonly unknown[], sourceSessionId: string, successorSessionId: string) {
       const currentStatus = this.status(entries);
       if ((currentStatus.state !== "switch-started" && currentStatus.state !== "prepared") ||
         !currentStatus.digest || !sourceSessionId || !successorSessionId || sourceSessionId === successorSessionId) denied();
       const active = this.getActiveCapsule(entries);
       if (!active || active.digest !== currentStatus.digest) denied();
 
-      const sourceEntry = customEntry("akeel:handoff-switched", Object.freeze({
-        digest: currentStatus.digest,
-        sourceSessionId,
-        successorSessionId,
-      } satisfies HandoffSwitchedData));
-
-      const successorEntry = customEntry("akeel:continuation-capsule", Object.freeze({
+      return customEntry("akeel:continuation-capsule", Object.freeze({
         capsule: active.capsule,
         digest: active.digest,
         content: active.content,
         sourceSessionId,
         successorSessionId,
       } satisfies ContinuationCapsuleData));
-
-      return Object.freeze({ sourceEntry, successorEntry });
     },
 
     reconcile(entries: readonly unknown[], successorSessionId: string, report: ReconciliationReport) {
