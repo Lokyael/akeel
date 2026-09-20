@@ -67,19 +67,6 @@ Apply the general **Coherent Changes** principle in `principles.md` while reshap
 
 Remove content that only narrates the source or proposes a solution: implementation-ready interfaces, modules, schemas, configuration or transport choices, algorithms, procedures, process chronology, rejected design detail, and alternatives that no longer affect the unresolved choice. Committed investigation, design, and implementation belong in a Task. Retain a detail only when removing it would hide a non-obvious safety boundary, a direction-changing alternative, a scope distinction, or a failure condition; state it briefly as a constraint or representative counterexample, not as a design. Zero-loss preserves Candidate-defining meaning, not every source detail or solution form. Temporary `verified-candidate` artifacts may still carry result-necessary design and evidence for Task Owner review.
 
-## Authoring and Maintaining Revisit Conditions
-
-The `Revisit condition` is the single load-bearing filter that eliminates review fatigue during explicit surveys. It determines whether a parked record deserves reconsidering during an explicit review turn without re-debating the original idea.
-
-A well-formed `Revisit condition` must satisfy three non-negotiable rules:
-
-1. **Direct Inversion of Why Not Now (反向击穿暂不实施理由)**:
-   The condition must state the exact observable fact that invalidates the premise of `Why Not Now`. If `Why Not Now` is "Upstream lacks execution hooks", the condition is "Upstream publishes a testable execution hook API". If `Why Not Now` is "No measured real-world bottleneck justifies caching", the condition is "Observed cache-miss latency exceeds 200ms on hot paths".
-2. **Strict Prohibition of Tautological Escape Hatches (禁止套套逻辑逃逸舱)**:
-   Never write "or when the user requests it", "when needed", "用户有需要时", "用户明确要求重新评估", or "用户启动该探索时" as part of the condition. Explicit user request is the universal prerequisite for entering Candidate review at all (per principles.md); embedding it inside the condition vacates its objective filtering function and degrades the Candidate into an unprincipled backlog wishlist.
-3. **One-Second Falsifiability (一秒客观可证伪性)**:
-   The condition must be verifiable with a binary Yes/No based on external reality, ecosystem release facts, or concrete repository evidence. If the external event has not occurred, the Candidate remains parked immediately without reading its full text or opening an open-ended discussion.
-
 ## Review Outcomes
 
 For each record or separable part, recommend exactly one current disposition:
