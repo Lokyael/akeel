@@ -914,9 +914,8 @@ test("akeel_handoff registers strongly-typed payload parameter schema and valida
     installArtifactExchange(ownerPi.pi, { root });
     const handoffTool = ownerPi.tools.get("akeel_handoff") as any;
     assert.ok(handoffTool);
-    assert.equal(handoffTool.parameters.additionalProperties, false);
-    assert.ok(handoffTool.parameters.properties.payload);
-    assert.equal(handoffTool.parameters.properties.payload.anyOf.length, 4);
+    assert.ok(handoffTool.parameters.anyOf);
+    assert.equal(handoffTool.parameters.anyOf.length, 6);
 
     const validRecord = {
       action: "record",
@@ -995,6 +994,23 @@ test("akeel_handoff registers strongly-typed payload parameter schema and valida
       },
     };
     assert.equal(Value.Check(handoffTool.parameters, prepareWithoutFiles), false);
+
+    const mismatchedRecordPayload = {
+      action: "record",
+      payload: validClose.payload,
+    };
+    assert.equal(Value.Check(handoffTool.parameters, mismatchedRecordPayload), false);
+
+    const mismatchedClosePayload = {
+      action: "close",
+      payload: validRecord.payload,
+    };
+    assert.equal(Value.Check(handoffTool.parameters, mismatchedClosePayload), false);
+
+    assert.equal(Value.Check(handoffTool.parameters, { action: "status", payload: validRecord.payload }), false);
+    assert.equal(Value.Check(handoffTool.parameters, { action: "view", payload: validClose.payload }), false);
+    assert.equal(Value.Check(handoffTool.parameters, { action: "status" }), true);
+    assert.equal(Value.Check(handoffTool.parameters, { action: "view" }), true);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

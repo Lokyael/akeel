@@ -12,18 +12,28 @@ import {
 
 type Handler = (event: unknown, context: ExtensionContext) => unknown | Promise<unknown>;
 
-function fakePi(): { readonly handlers: Map<string, Handler>; readonly commands: Map<string, (args: string, context: ExtensionContext) => unknown | Promise<unknown>>; readonly pi: ExtensionAPI } {
+function fakePi(): {
+  readonly handlers: Map<string, Handler>;
+  readonly commands: Map<string, (args: string, context: ExtensionContext) => unknown | Promise<unknown>>;
+  readonly pi: ExtensionAPI;
+  readonly unsubscribed: () => number;
+} {
   const handlers = new Map<string, Handler>();
   const commands = new Map<string, (args: string, context: ExtensionContext) => unknown | Promise<unknown>>();
+  let unsubscribeCount = 0;
   const pi = {
-    on(event: string, handler: Handler): void {
+    on(event: string, handler: Handler): () => void {
       handlers.set(event, handler);
+      return () => {
+        unsubscribeCount += 1;
+        handlers.delete(event);
+      };
     },
     registerCommand(name: string, options: { handler: (args: string, context: ExtensionContext) => unknown | Promise<unknown> }): void {
       commands.set(name, options.handler);
     },
   } as unknown as ExtensionAPI;
-  return { handlers, commands, pi };
+  return { handlers, commands, pi, unsubscribed: () => unsubscribeCount };
 }
 
 function context(
@@ -448,10 +458,9 @@ test("Pi production composition clears the service at session shutdown", async (
   await invoke(handlers, "session_start", {}, hostContext);
   await invoke(handlers, "session_shutdown", {}, hostContext);
 
-  assert.deepEqual(
-    await invoke(handlers, "tool_call", { toolName: "read", input: { path: "README.md" } }, hostContext),
-    { block: true, reason: "Blocked because the decision service is not initialized." },
-  );
+  assert.equal(handlers.has("session_start"), false);
+  assert.equal(handlers.has("session_shutdown"), false);
+  assert.equal(handlers.has("tool_call"), false);
 });
 
 test("Pi composition automatically equips capability asset roots with read-only admission and write hard-block", async () => {
@@ -493,4 +502,17 @@ test("Pi composition follows the host event subscription contract", () => {
   const result = installPiAccessDecision(pi, options);
   assert.equal(result, undefined);
   assert.equal(handlers.size, 3);
+});
+
+test("Pi composition disposes optional event subscriptions once at shutdown", async () => {
+  const { handlers, pi, unsubscribed } = fakePi();
+  installPiAccessDecision(pi, options);
+  const shutdown = handlers.get("session_shutdown");
+  assert.ok(shutdown);
+  const hostContext = context("/workspace/project", false, async () => false);
+
+  await shutdown!({}, hostContext);
+  await shutdown!({}, hostContext);
+
+  assert.equal(unsubscribed(), 3);
 });

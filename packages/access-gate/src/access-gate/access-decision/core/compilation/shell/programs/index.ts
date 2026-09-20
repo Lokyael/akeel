@@ -88,6 +88,9 @@ export function analyzeProgramInvocation(invocation: ProgramInvocation): Program
     if (identity.kind === "system" && identity.name === "rm") {
       return { kind: "complete", semantic: result("destroy", ["delete"], [], { hardBoundary: true }) };
     }
+    if (identity.kind === "system" && identity.name === "which") {
+      return { kind: "complete", semantic: result("execute", ["execute"], [], { opaque: true }) };
+    }
     if (identity.name === "chmod") {
       return analyzeChmodProgram(invocation.arguments);
     }

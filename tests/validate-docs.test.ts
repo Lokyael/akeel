@@ -81,6 +81,16 @@ test("Decision hygiene rejects missing required fields and section order drift",
   assert.ok(trailingDrift.errors.some((error) => error.includes("order")));
 });
 
+test("Decision hygiene ignores plain list and indented labels outside top-level structure", () => {
+  const nested = validDecision.replace(
+    "**Why:** It prevents drift.",
+    "**Why:** It prevents drift.\n\n- Plan: keep this as ordinary specification text.\n+ Alias: another ordinary list item.\n1. Numbered: a list item.\n  Note: indentation is not a record field.",
+  );
+  const result = checkDecisionHygiene(nested);
+  assert.deepEqual(result.errors, []);
+  assert.equal(result.ok, true);
+});
+
 test("Decision hygiene rejects top-level process fields but ignores nested labels", () => {
   for (const metadata of [
     "**Migration:** promoted from C-123",

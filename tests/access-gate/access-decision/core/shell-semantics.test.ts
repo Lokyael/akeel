@@ -289,6 +289,15 @@ test("which rejects options, multiple targets, and path-form targets", () => {
   }
 });
 
+test("system path-form which does not reuse transparent bare-name semantics", () => {
+  for (const command of ["/bin/which herdr", "/usr/bin/which herdr"]) {
+    const analysis = complete(command);
+    assert.equal(analysis.commandClass, "execute", command);
+    assert.deepEqual(analysis.effects, ["execute"], command);
+    assert.equal(analysis.semantic.opaquePathAccess, true, command);
+  }
+});
+
 test("a supported inspection command has explicit class and read effect", () => {
   assert.deepEqual(analyzeShellCommand("cat README.md"), {
     kind: "complete",

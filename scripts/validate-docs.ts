@@ -151,7 +151,7 @@ function selfCheck(): void {
 
 // ─── Decision hygiene ───
 
-const TOP_LEVEL_FIELD_RE = /^(?:\*\*)?([^*\n:]+?)(?::\*\*|:)(?:\s.*)?$/;
+const TOP_LEVEL_FIELD_RE = /^(?!\s|>\s|[-+*]\s|\d+[.)]\s)(?:\*\*)?([^*\n:]+?)(?::\*\*|:)(?:\s.*)?$/;
 const REVERSAL_RE = /^(?:\*\*)?Reversal surface(?::\*\*|:) (?:user-boundary|engineering)$/;
 const TASK_REF_RE = /\bT-\d{3}\b/;
 const PROCESS_WORD_RE = /\bdismiss(?:ed|al)?\s*(?:\(|（)?C-\d{3}\b|\b(?:migrated|promoted|moved)\s+from\s+[CT]-\d{3}\b|(?:从|由)\s*[CT]-\d{3}\s*(?:迁移|提升|移入|转入)/i;

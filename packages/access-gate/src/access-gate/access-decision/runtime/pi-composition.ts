@@ -283,7 +283,31 @@ function installComposition(
     },
   });
 
-  pi.on("session_start", (_event, context) => {
+  const subscriptions: Array<() => void> = [];
+  let disposed = false;
+
+  function rememberSubscription(subscription: void | (() => void)): void {
+    if (typeof subscription === "function") subscriptions.push(subscription);
+  }
+
+  function dispose(): void {
+    if (disposed) return;
+    disposed = true;
+    session?.close();
+    project?.dispose();
+    session = undefined;
+    project = undefined;
+    sessionHome = undefined;
+    for (const unsubscribe of subscriptions.splice(0)) {
+      try {
+        unsubscribe();
+      } catch {
+        // Host cleanup must continue even when one subscription rejects disposal.
+      }
+    }
+  }
+
+  rememberSubscription(pi.on("session_start", (_event, context) => {
     session?.close();
     project?.dispose();
     context.ui?.setStatus?.(POLICY_STATUS_ID, undefined);
@@ -317,24 +341,20 @@ function installComposition(
       project?.dispose();
       project = undefined;
     }
-  });
+  }));
 
-  pi.on("session_shutdown", (_event, context) => {
-    session?.close();
-    project?.dispose();
+  rememberSubscription(pi.on("session_shutdown", (_event, context) => {
     context.ui?.setStatus?.(POLICY_STATUS_ID, undefined);
-    session = undefined;
-    project = undefined;
-    sessionHome = undefined;
-  });
+    dispose();
+  }));
 
-  pi.on("tool_call", async (event, context) => {
+  rememberSubscription(pi.on("tool_call", async (event, context) => {
     if (currentConfiguration?.kind === "off") return undefined;
     if (!session) {
       return adaptPiGateToolCall(event, context).kind === "passthrough" ? undefined : initializationFailure();
     }
     return handleGateSessionToolCall(session, event, context);
-  });
+  }));
 }
 
 export function installPiAccessDecision(pi: ExtensionAPI, options: PiCompositionOptions): void {

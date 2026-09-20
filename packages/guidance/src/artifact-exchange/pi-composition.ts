@@ -104,24 +104,26 @@ const PREPARE_PAYLOAD_SCHEMA = Type.Object({
   }, { additionalProperties: false }),
 }, { additionalProperties: false });
 
-const HANDOFF_PAYLOAD_SCHEMA = Type.Union([
-  RECORD_PAYLOAD_SCHEMA,
-  CLOSE_PAYLOAD_SCHEMA,
-  RECONCILE_PAYLOAD_SCHEMA,
-  PREPARE_PAYLOAD_SCHEMA,
+const HANDOFF_PARAMETERS = Type.Union([
+  Type.Object({
+    action: Type.Literal("record"),
+    payload: RECORD_PAYLOAD_SCHEMA,
+  }, { additionalProperties: false }),
+  Type.Object({
+    action: Type.Literal("close"),
+    payload: CLOSE_PAYLOAD_SCHEMA,
+  }, { additionalProperties: false }),
+  Type.Object({
+    action: Type.Literal("prepare"),
+    payload: PREPARE_PAYLOAD_SCHEMA,
+  }, { additionalProperties: false }),
+  Type.Object({
+    action: Type.Literal("reconcile"),
+    payload: RECONCILE_PAYLOAD_SCHEMA,
+  }, { additionalProperties: false }),
+  Type.Object({ action: Type.Literal("status") }, { additionalProperties: false }),
+  Type.Object({ action: Type.Literal("view") }, { additionalProperties: false }),
 ]);
-
-const HANDOFF_PARAMETERS = Type.Object({
-  action: Type.Union([
-    Type.Literal("record"),
-    Type.Literal("close"),
-    Type.Literal("status"),
-    Type.Literal("prepare"),
-    Type.Literal("reconcile"),
-    Type.Literal("view"),
-  ]),
-  payload: Type.Optional(HANDOFF_PAYLOAD_SCHEMA),
-}, { additionalProperties: false });
 
 const SEMANTIC_ENTRY = "akeel:semantic-ledger";
 
