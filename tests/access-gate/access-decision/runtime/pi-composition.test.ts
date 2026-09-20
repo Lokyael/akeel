@@ -16,11 +16,8 @@ function fakePi(): { readonly handlers: Map<string, Handler>; readonly commands:
   const handlers = new Map<string, Handler>();
   const commands = new Map<string, (args: string, context: ExtensionContext) => unknown | Promise<unknown>>();
   const pi = {
-    on(event: string, handler: Handler): () => void {
+    on(event: string, handler: Handler): void {
       handlers.set(event, handler);
-      return () => {
-        handlers.delete(event);
-      };
     },
     registerCommand(name: string, options: { handler: (args: string, context: ExtensionContext) => unknown | Promise<unknown> }): void {
       commands.set(name, options.handler);
@@ -491,10 +488,9 @@ test("Pi composition automatically equips capability asset roots with read-only 
   assert.equal((credBlock as any)?.block, true);
 });
 
-test("Pi composition disposal cleans up active session and unregisters handlers", async () => {
+test("Pi composition follows the host event subscription contract", () => {
   const { handlers, pi } = fakePi();
-  const dispose = installPiAccessDecision(pi, options);
+  const result = installPiAccessDecision(pi, options);
+  assert.equal(result, undefined);
   assert.equal(handlers.size, 3);
-  dispose();
-  assert.equal(handlers.size, 0);
 });

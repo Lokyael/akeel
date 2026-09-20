@@ -100,7 +100,7 @@ const PREPARE_PAYLOAD_SCHEMA = Type.Object({
   }, { additionalProperties: false }),
   workspace: Type.Object({
     cwd: Type.String(),
-    files: Type.Optional(Type.Array(Type.String())),
+    files: Type.Array(Type.String()),
   }, { additionalProperties: false }),
 }, { additionalProperties: false });
 

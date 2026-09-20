@@ -8,11 +8,8 @@ type Handler = (event: unknown, context: ExtensionContext) => unknown | Promise<
 function fakePi() {
   const handlers = new Map<string, Handler>();
   const pi = {
-    on(event: string, handler: Handler): () => void {
+    on(event: string, handler: Handler): void {
       handlers.set(event, handler);
-      return () => {
-        handlers.delete(event);
-      };
     },
   } as unknown as ExtensionAPI;
   return { handlers, pi };
@@ -20,7 +17,7 @@ function fakePi() {
 
 test("akeelBootstrap registers before_agent_start and injects akeel_principles section", () => {
   const { handlers, pi } = fakePi();
-  const unsub = akeelBootstrap(pi);
+  akeelBootstrap(pi);
 
   assert.equal(handlers.size, 1);
   const handler = handlers.get("before_agent_start");
@@ -40,10 +37,6 @@ test("akeelBootstrap registers before_agent_start and injects akeel_principles s
   assert.ok(event.systemPromptOptions.sections.akeel_principles.includes("## Core Behavioral Principles"));
   assert.ok(event.systemPromptOptions.sections.akeel_principles.includes("### 1. Think Before Coding"));
   assert.ok(!event.systemPromptOptions.sections.akeel_principles.includes("<AKEEL_PRINCIPLES>"));
-
-  // Unsubscribe cleans up handler
-  unsub();
-  assert.equal(handlers.size, 0);
 });
 
 test("akeelBootstrap initializes sections if missing", () => {

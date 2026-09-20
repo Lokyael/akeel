@@ -56,6 +56,10 @@ test("in-session handoff advances through append-only switch, successor receipt,
   const switchIntent = store.beginSwitch(sourceEntries, "source-session");
   sourceEntries.push(switchIntent);
   assert.equal(store.status(sourceEntries).state, "switch-started");
+  assert.throws(
+    () => store.createSuccessorEntry(sourceEntries, "other-source", "successor-session"),
+    /handoff-store-denied/,
+  );
 
   const successorEntry = store.createSuccessorEntry(sourceEntries, "source-session", "successor-session");
   assert.equal(store.status(sourceEntries).state, "switch-started");
@@ -89,8 +93,16 @@ test("cancelled and unresolved handoffs fail closed within session entries", () 
     /handoff-store-denied/,
   );
 
+  // A successor receipt requires the source freeze intent.
+  const preparedOnly: SessionEntry[] = [store.prepareCapsule(capsule).entry];
+  assert.throws(
+    () => store.createSuccessorEntry(preparedOnly, "source-session", "successor-session"),
+    /handoff-store-denied/,
+  );
+
   // Attempting reconciliation with unresolved item produces a blocked state record without crashing
   const freshEntries: SessionEntry[] = [store.prepareCapsule(capsule).entry];
+  freshEntries.push(store.beginSwitch(freshEntries, "source-session"));
   const successorEntry = store.createSuccessorEntry(freshEntries, "source-session", "successor-session");
   const successorEntries: SessionEntry[] = [successorEntry];
 
@@ -108,7 +120,9 @@ test("cancelled and unresolved handoffs fail closed within session entries", () 
 test("reconciled session can prepare a fresh outbound capsule and advance multi-hop handoffs", () => {
   const store = createHandoffStore();
   const capsule = sampleCapsule();
-  const successorEntry = store.createSuccessorEntry([store.prepareCapsule(capsule).entry], "s1", "s2");
+  const sourceEntries: SessionEntry[] = [store.prepareCapsule(capsule).entry];
+  sourceEntries.push(store.beginSwitch(sourceEntries, "s1"));
+  const successorEntry = store.createSuccessorEntry(sourceEntries, "s1", "s2");
   const s2Entries: SessionEntry[] = [successorEntry];
 
   const reconciled = store.reconcile(s2Entries, "s2", {

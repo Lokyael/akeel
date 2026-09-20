@@ -225,7 +225,8 @@ export function createHandoffStore(): HandoffStore {
 
     createSuccessorEntry(entries: readonly unknown[], sourceSessionId: string, successorSessionId: string) {
       const currentStatus = this.status(entries);
-      if ((currentStatus.state !== "switch-started" && currentStatus.state !== "prepared") ||
+      if (currentStatus.state !== "switch-started" ||
+        currentStatus.sourceSessionId !== sourceSessionId ||
         !currentStatus.digest || !sourceSessionId || !successorSessionId || sourceSessionId === successorSessionId) denied();
       const active = this.getActiveCapsule(entries);
       if (!active || active.digest !== currentStatus.digest) denied();

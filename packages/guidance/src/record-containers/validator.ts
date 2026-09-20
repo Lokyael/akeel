@@ -81,7 +81,6 @@ function structuralLines(content: string): string[] {
 
 const TASK_HEADING_RE = /^## (T-\d{2,}): (.+)$/;
 const METADATA_BULLET_RE = /^-\s+(?:\*\*)?([^*\n:]+?)(?::\*\*|:)\s*(.*)$/;
-const LEGACY_METADATA_BULLET_RE = /^-\s+\*\*([^*\n:]+):\*\*\s*(.*)$/;
 const TASK_FIELD_LINE_RE = /^(?:\*\*)?(Kind|Status|Reversal surface)(?::\*\*|:)\s*(.*)$/;
 const CANDIDATE_FIELD_LINE_RE = /^(?:\*\*)?(Why Not Now|Revisit condition|Status)(?::\*\*|:)\s*(.*)$/;
 
@@ -155,18 +154,12 @@ export function checkTaskHygiene(content: string, file = "docs/task.md"): Contai
       if (bulletMatch) {
         const field = bulletMatch[1]!.trim();
         const value = bulletMatch[2]!.trim();
-        const isLegacyMetadata = LEGACY_METADATA_BULLET_RE.test(trimmed);
-
         if (seenFields.has(field)) {
           errors.push(`${file}:${i + 1}: duplicate Task field: ${field}`);
           continue;
         }
         if (field !== "Kind" && field !== "Status" && field !== "Reversal surface") {
-          if (isLegacyMetadata) {
-            errors.push(`${file}:${i + 1}: unrecognized Task metadata field: ${field}`);
-          } else {
-            inMetadata = false;
-          }
+          errors.push(`${file}:${i + 1}: unrecognized Task metadata field: ${field}`);
           continue;
         }
         seenFields.add(field);

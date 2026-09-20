@@ -978,6 +978,23 @@ test("akeel_handoff registers strongly-typed payload parameter schema and valida
       },
     };
     assert.equal(Value.Check(handoffTool.parameters, validReconcileBlocked), true);
+
+    const prepareWithoutFiles = {
+      action: "prepare",
+      payload: {
+        taskRef: "docs/task.md",
+        authorityRefs: [],
+        roots: ["rec-1"],
+        checkpoint: {
+          state: "incomplete",
+          currentSlice: "Schema validation",
+          actualState: "Checking workspace files.",
+          nextActionId: "rec-1",
+        },
+        workspace: { cwd: "/workspace/project" },
+      },
+    };
+    assert.equal(Value.Check(handoffTool.parameters, prepareWithoutFiles), false);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

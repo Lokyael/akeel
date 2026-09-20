@@ -141,7 +141,7 @@ declare module "@earendil-works/pi-coding-agent" {
         event: ExtensionEventMap[K],
         ctx: ExtensionContext,
       ) => unknown | Promise<unknown>,
-    ): () => void;
+    ): void;
     registerCommand(
       name: string,
       options: {

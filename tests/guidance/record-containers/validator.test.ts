@@ -136,6 +136,13 @@ test("checkTaskHygiene: rejects Origin metadata", () => {
   assert.ok(res.errors.some((e) => e.includes("unrecognized Task metadata field: Origin")));
 });
 
+test("checkTaskHygiene: rejects unknown plain metadata", () => {
+  const content = `# Tasks\n\n## T-001: Task\n\n- Kind: refactor\n- Status: in-progress\n- Reversal surface: user-boundary\n- Origin: C-012\n\n### Plan\n\n## T-002: 待创建\n`;
+  const res = checkTaskHygiene(content);
+  assert.equal(res.ok, false);
+  assert.ok(res.errors.some((e) => e.includes("unrecognized Task metadata field: Origin")));
+});
+
 test("checkTaskHygiene: rejects non-standard Task Status such as complete", () => {
   const content = `# Tasks\n\n## T-001: Task\n\n- **Kind:** refactor\n- **Status:** complete\n- **Reversal surface:** user-boundary\n\n### Plan\n\n## T-002: 待创建\n`;
   const res = checkTaskHygiene(content);

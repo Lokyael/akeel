@@ -873,7 +873,7 @@ Rejected:
 - **通过用户可配置规则 DSL 或动态 analyzer plugin 扩展系统边界：** 会使 hard-boundary 单调性和 analyzer 信任来源无法由封闭代码合同证明。
 - **在现有 Access Gate 内顺带加入 OS broker/sandbox：** 这会改变执行所有权和安全承诺，不是本模块结构重构。
 
-Out of Scope: 新增或放宽 Shell 语法、程序族、destroy/delete、网络或路径能力；改变 `policy.yaml` 用户 schema、内置 preset、凭据分类、Access Root、staging lifecycle 或 `accessGate: disabled` 语义；OS sandbox、fd broker、TOCTOU 消除、执行期子进程/网络隔离；Static Flow、Explanation Replay、Runtime Audit、Runtime Content Flow 和 delegated child policy。
+Out of Scope: 新增或放宽 Shell 语法、程序族、destroy/delete、网络或路径能力；改变 `policy.yaml` 用户 schema、内置 preset、凭据分类、Access Root、staging lifecycle 或 `accessGate: off` 语义；OS sandbox、fd broker、TOCTOU 消除、执行期子进程/网络隔离；Static Flow、Explanation Replay、Runtime Audit、Runtime Content Flow 和 delegated child policy。
 
 ## D-088: Session-owned Staging 生命周期与保留策略
 
