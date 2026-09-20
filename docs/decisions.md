@@ -116,7 +116,7 @@
 
 **Reversal surface:** user-boundary
 
-**Decision:** 用户项目使用分层 Project Record 模型：`docs/candidates.md` 的 `C-xxx` 是未采纳候选；`docs/task.md` 或 `docs/task-<topic>.md` 的 `T-xxx` 是已承诺 Task；`docs/decisions.md` 的 `D-xxx` 是已采纳长期结论；`CONTEXT.md` 只表达当前事实与 active Decision 索引。Requirements、Design、Plan 只作为 Task Record 章节，不建独立 plan/spec 文档类型。
+**Decision:** 用户项目使用分层 Project Record 模型：`docs/candidates.md` 的 `C-xxx` 是未采纳候选；`docs/task.md` 的 `T-xxx` 是已承诺 Task；`docs/decisions.md` 的 `D-xxx` 是已采纳长期结论；`CONTEXT.md` 只表达当前事实与 active Decision 索引。Requirements、Design、Plan 只作为 Task Record 章节，不建独立 plan/spec 文档类型。
 
 Task 容器由 Git 跟踪，正文只在 active 期间留在当前树。每个 T-ID 在实施或清档前必须有一个包含已批准 Requirements 与必要 Design/Plan 的可达 checkpoint；占位推进或 commit message 提及不算记录。只为跨会话、交接或权威输入变化提交后续 Task 状态，不保存步骤日志。提炼 durable content 后在后续 commit 清档，并保留至少一个可达 checkpoint。
 
@@ -675,13 +675,11 @@ Tilde expansion 仅适用于受支持 Shell word 中位于开头、未引用、�
 
 **Reversal surface:** engineering
 
-**Decision:** workflows 按所需介入方式选择触发模型。需要用户明确意图的 workflow 设置 `disable-model-invocation: true`，并以 `Use /skill:<name>` 作为 description 的调用指引；需要模型即时响应任务状态的 workflow 使用 trigger-first description。当前手动 workflows 包括 assess-modularity、brainstorm-design、grill-docs、handoff-session 和 implement-work；survey-context 响应任务启动与状态恢复。文件恢复遵循 `principles.md §10`，宿主会话导航遵循 Pi 自身合同。
+**Decision:** workflows 按所需介入方式选择触发模型。需要用户明确意图的 workflow 设置 `disable-model-invocation: true`，并以 `Use /skill:<name>` 作为 description 的调用指引；需要模型即时响应任务状态的 workflow 使用 trigger-first description。当前手动 workflows 包括 assess-modularity、brainstorm-design、grill-docs 和 implement-work；survey-context 响应任务启动与状态恢复。文件恢复遵循 `principles.md §10`，宿主会话导航遵循 Pi 自身合同。
 
 **Why:** 显式调用为方案处理、实施和交接提供清晰的用户意图；模型调用适合由当前任务状态直接判定的即时介入。沿用 Pi 的 skill command 与 discovery 合同，可以保持触发描述、实际入口和用户预期一致。
 
 **Impact:** `validate-skills.ts` 校验手动 workflow 的调用指引和模型可调用 workflow 的 trigger-first description。skill 作者职责与目录边界由 D-073 定义，具体 workflow 持有各自的执行合同。
-
-**Out of Scope:** `handoff-session` 的交接内容和安全边界由该 workflow 自身承载。
 
 ## D-079: 模块设计方法与模块化评估工作流分界
 
@@ -977,13 +975,13 @@ Artifact tools 是独立自授权的 Pi custom tool surfaces，不改变 Access 
 
 Handoff 彻底消除外部 `/tmp/akeel/handoffs/` 孤儿目录，将胶囊数据与生命周期状态 100% 内嵌至 Pi 原生会话文件（JSONL）：source 会话追加 `akeel:prepared-capsule` 与 `akeel:switch-intent`（取消时为 `akeel:switch-cancelled`），successor 会话追加 `akeel:continuation-capsule`（承载源会话转交与胶囊事实）与 `akeel:reconciliation`；生命周期随会话文件一并清理，跨系统重启自然免疫。规范化 JSON 是 capsule 的语义载荷，Markdown 只作确定性投影与终端展示；successor reconciliation 必须把每个 live semantic ID 唯一分类为 imported、conflict 或 unresolved，并核对当前 workspace，receipt 只证明 captured semantics 的覆盖和传输完整性，不证明模型理解、未表达意图或未捕获隐含语义。
 
-用户端统一为 `/akeel-handoff [optional-next-action|view]` 单一交互入口。`/akeel-handoff view` 仅在终端打印当前活动胶囊，不切换会话亦不产生磁盘文件；直接运行 `/akeel-handoff` 时，支持带参数覆盖/声明下一步，未预制胶囊时由命令内部自动完成深度推理合成并在当前会话写入胶囊，随后调用 Pi 原生 `ctx.newSession({ parentSession, withSession })` 替换会话。replacement 后只使用 fresh context，绑定唯一 successor，向新会话发送带 HUD 看板的有界 kickoff，并将旧会话工具永久冻结防裂脑。普通 event/tool handler 不调用 command-only replacement API，不通过 Shell 启动 Pi、扫描外部 session JSONL、自动 commit/stash/revert 或把 compaction 当作 handoff receipt。
+用户端统一为 `/handoff [optional-next-action|view]` 单一交互入口，废除独立的 `handoff-session` 技能与 `akeel-` 命名空间前缀。`/handoff view` 仅在终端打印当前活动胶囊，不切换会话亦不产生磁盘文件；直接运行 `/handoff` 时，支持带参数覆盖/声明下一步，未预制胶囊时由命令内部自动完成深度推理合成并在当前会话写入胶囊，随后调用 Pi 原生公开 `ctx.newSession({ parentSession, withSession })` 替换会话。replacement 后只使用 fresh context，绑定唯一 successor，向新会话发送带 HUD 看板的有界 kickoff，并将旧会话工具永久冻结防裂脑。普通 event/tool handler 不调用 command-only replacement API，不通过 Shell 启动 Pi、扫描外部 session JSONL、自动 commit/stash/revert 或把 compaction 当作 handoff receipt。
 
-**Why:** 对话末端摘要无法完备识别未来必要信息；“工作已完成”也不表示其结论、外部副作用或防重复价值已经失效。把 load-bearing 语义在产生时外部化、对已捕获单元建立 source-to-destination 映射，并在 successor 继续前重新核对现实，可以把静默遗漏转化为可检测的 fail-closed 状态。将会话交接内嵌至宿主 JSONL 文件，彻底消除了外部孤儿文件泄漏与手动清理负担，使交接天然具备抗机器重启能力。Pi 原生 replacement 保留 parent lineage 并避免第二套进程编排；单命令入口消除了先跑 skill 后敲命令的两步摩擦，同时通过参数直接传递断点意图。
+**Why:** 对话末端摘要无法完备识别未来必要信息；“工作已完成”也不表示其结论、外部副作用或防重复价值已经失效。把 load-bearing 语义在产生时外部化、对已捕获单元建立 source-to-destination 映射，并在 successor 继续前重新核对现实，可以把静默遗漏转化为可检测的 fail-closed 状态。将会话交接内嵌至宿主 JSONL 文件，彻底消除了外部孤儿文件泄漏与手动清理负担，使交接天然具备抗机器重启能力。Pi 原生 replacement 保留 parent lineage 并避免第二套进程编排；统一收敛为单一 `/handoff` 原生命令彻底消除了技能与命令双重入口的认知割裂，以及先跑 skill 后敲命令的两步摩擦，同时通过参数直接传递断点意图。
 
-**Impact:** Guidance package 增加 semantic handoff document、session-embedded ledger、状态收据机与单命令 replacement composition；`handoff-session` 技能转为辅助语义审计，日常推荐入口统一为 `/akeel-handoff`。D-075 的唯一 Task Owner 不变：source 在 transfer 前持有 authority，绑定 successor 后由后继持有；D-078 的 handoff 保持用户显式意图；D-089 的临时资源收敛为 `sessions/` 与 `runs/` 两类，不再创建 `handoffs/` 外部目录。
+**Impact:** Guidance package 增加 semantic handoff document、session-embedded ledger、状态收据机与单命令 replacement composition；移除冗余的独立 `handoff-session` 技能，入口全面归一为 `/handoff`。D-075 的唯一 Task Owner 不变：source 在 transfer 前持有 authority，绑定 successor 后由后继持有；D-078 的 handoff 保持用户显式意图；D-089 的临时资源收敛为 `sessions/` 与 `runs/` 两类，不再创建 `handoffs/` 外部目录。
 
-**Rejected:** 仅扩大摘要长度（仍会静默漏掉隐含必要语义）；以操作 complete 直接判定语义可删（会丢失结论、风险和外部副作用）；把全量历史注入 successor（复制噪声、秘密与注意力退化）；每轮写 Project Record（把过程日志污染为长期权威）；事件 handler 直接调用 session replacement 或 Shell 启动新 Pi（违反公开宿主边界并产生死锁或 split-brain）；要求 handoff 前 tests green 或 Git clean（排除合法的 TDD Red、blocked 与准确描述的 incomplete checkpoint）；把 reconciliation receipt 宣称为模型理解或零损失证明。
+**Rejected:** 维护技能与命令并行的双重交互入口（造成认知割裂与“跑完技能再敲命令”的两步摩擦）；仅扩大摘要长度（仍会静默漏掉隐含必要语义）；以操作 complete 直接判定语义可删（会丢失结论、风险和外部副作用）；把全量历史注入 successor（复制噪声、秘密与注意力退化）；每轮写 Project Record（把过程日志污染为长期权威）；事件 handler 直接调用 session replacement 或 Shell 启动新 Pi（违反公开宿主边界并产生死锁或 split-brain）；要求 handoff 前 tests green 或 Git clean（排除合法的 TDD Red、blocked 与准确描述的 incomplete checkpoint）；把 reconciliation receipt 宣称为模型理解或零损失证明。
 
 **Out of Scope:** 未表达或未捕获语义的绝对完备性、跨未加载 AKeel 的进程实施全局 Owner 锁、无人值守异步 orchestration、跨 Agent session 文件扫描、自动 Git/发布副作用、handoff GC、OS sandbox，以及替换 Pi compaction。Source 冷归档与 unknown-live fallback 提供恢复面，但不消除自然语言理解的理论边界。
 

@@ -5,7 +5,7 @@ description: Use when reviewing pending changes, before merge, during verify-wor
 
 # Security Review
 
-> **HARD GATE** — Requires git context (branch with merge-base or diff). Run the scan in a Herdr Agent and return the structured report artifact to the Task Owner Session. The Task Owner records it in the current security-review section of the active Task Record (`docs/task.md` or `docs/task-<topic>.md`) and creates a `Kind: maintenance` Task Record in `docs/task.md` (Kind per principles.md Project Records — Record Lifecycle) when no active task exists.
+> **HARD GATE** — Requires git context (branch with merge-base or diff). Run the scan in a Herdr Agent and return the structured report artifact to the Task Owner Session. The Task Owner records it in the current security-review section of the active Task Record (`docs/task.md`) and creates a `Kind: maintenance` Task Record in `docs/task.md` (Kind per principles.md Project Records — Record Lifecycle) when no active task exists.
 
 ## 5-Phase Scan
 

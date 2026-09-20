@@ -50,10 +50,9 @@ When a term or current constraint crystallises, add it to `CONTEXT.md` immediate
 Before creating, revising, merging, or splitting a Candidate, read `../../workflows/survey-context/candidate-review.md` and apply its record-boundary and zero-loss checks.
 
 When an idea may matter later but is neither adopted nor committed work, offer
-to add a `C-xxx` entry to `docs/candidates.md` (per principles.md Next-ID slots); fields per principles.md Project
-Records — Document Set; non-binding semantics per principles.md Project
-Records — Project Record Authority. Create that file lazily. Its wording,
-date, or presence carries no approval — design or implement the idea only when
+to add a `C-xxx` entry to `docs/candidates.md` using the canonical structure in `candidate-review.md` (consume slot per principles.md Next-ID slots; non-binding semantics per principles.md Project
+Records — Project Record Authority). Never add `Status` metadata. Formulate `Why Not Now` as an objective blocker and pair it with an inverted, falsifiable `Revisit condition`. Create that file lazily. Its wording,
+presence, or revisit condition carries no approval — design or implement the idea only when
 the user explicitly promotes it in the current conversation. When promoted,
 move the durable content and remove the C entry in the same change (per
 principles.md Project Records — Migration Protocol).

@@ -64,4 +64,8 @@ CONTEXT.md              # 当前事实、术语、架构与 Active Decisions 索
 - **引用取舍（D-054）**：共享规则在目标与消费者处于可达读取或注入面、目标短而显著且单源收益高于解析成本时使用引用。跨文件引用在消费时真实读取目标；长操作细节随执行方提供。审批否决、分类守卫、防误删和其他执行必需条件留在动作点。引用解析具备可测失败或情境兜底，每次触及引用时重新核对映射可靠性。
 - **安全动作点**：失败路径的支持工具枚举、禁止重试或绕过、用户纠正路径和审批边界属于可执行判据，并在对应 Guidance 中形成完整合同。
 - **术语归属**：Shell approval 使用 `literal form` 表示待审批命令原形；principles 使用 `fixed text` 表示无动态展开的 Shell 参数；deny path 使用 `static bounded Guidance` 或具体 renderer 合同中的 `static block reason`。同一概念沿用其权威载体中的术语。
+- **Prompt Surface 修改三道自检门禁**：在触碰 `principles.md` 前必须严格执行三项自检，未通过前禁止向全局原则注入：
+  1. **普适性闸门（Universality Test）**：该规则是否对所有用户项目、所有普通编码/修 Bug/跑单测的会话都成立且必要？若非全局通用，坚决移入对应 Skill；
+  2. **角色闸门（Schema vs Methodology Test）**：这是在定义不可逾越的物理结构与法律底线（Schema/Invariants），还是在指导“如何把事情做得更好”的编写教程（Tactics/Heuristics）？具体战术、写作教程 100% 收敛至按需伴随文档（如 `candidate-review.md`）；
+  3. **物理成本闸门（Token ROI Test）**：全局注入增加的 Token 物理开销，是否换来了等额的全局安全或防越权收益？严禁单点规范让全局会话永久买单。
 - **验证**：修改前后的语义清单逐项对应，principles 锚点和 skill 引用通过结构校验；安全限定词、用户批准条件和唯一动作点通过人工语义审查。

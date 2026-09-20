@@ -24,7 +24,9 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import {
+  checkCandidateHygiene,
   checkContainerContent,
+  checkTaskHygiene,
   RECORD_SLOT_RE,
   STANDARD_CONTAINERS,
 } from "../packages/guidance/src/record-containers/validator.js";
@@ -463,6 +465,22 @@ function main(): void {
       for (const e of result.errors) console.log(`  ❌ ${e}`);
       totalErrors += result.errors.length;
     }
+  }
+  const candidatesContent = readFileSync(join(import.meta.dirname!, "..", "docs/candidates.md"), "utf-8");
+  const candidateHygieneResult = checkCandidateHygiene(candidatesContent, "docs/candidates.md");
+  if (candidateHygieneResult.ok) {
+    console.log("  ✅ docs/candidates.md — Candidate hygiene ok");
+  } else {
+    for (const error of candidateHygieneResult.errors) console.log(`  ❌ ${error}`);
+    totalErrors += candidateHygieneResult.errors.length;
+  }
+  const taskContent = readFileSync(join(import.meta.dirname!, "..", "docs/task.md"), "utf-8");
+  const taskHygieneResult = checkTaskHygiene(taskContent, "docs/task.md");
+  if (taskHygieneResult.ok) {
+    console.log("  ✅ docs/task.md — Task hygiene ok");
+  } else {
+    for (const error of taskHygieneResult.errors) console.log(`  ❌ ${error}`);
+    totalErrors += taskHygieneResult.errors.length;
   }
   const decisionsContent = readFileSync(join(import.meta.dirname!, "..", "docs/decisions.md"), "utf-8");
   const hygieneResult = checkDecisionHygiene(decisionsContent);

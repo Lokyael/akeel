@@ -1,6 +1,6 @@
 ---
 name: implement-work
-description: Use /skill:implement-work when ready to build. Implement an approved Task Record from `docs/task.md` or `docs/task-<topic>.md`, orchestrating test-driven-development, change preflight, independent review, and documentation synchronization.
+description: Use /skill:implement-work when ready to build. Implement an approved Task Record from `docs/task.md`, orchestrating test-driven-development, change preflight, independent review, and documentation synchronization.
 disable-model-invocation: true
 ---
 
@@ -12,7 +12,7 @@ Require a writable policy before making modifications; if permissions are insuff
 
 **Lifecycle:**
 
-- **Start:** Require a Task Record in `docs/task.md` or `docs/task-<topic>.md`. If none exists, ask: "Where is the Task Record, or what task should be recorded?" Set it from `draft` to `in-progress`.
+- **Start:** Require a Task Record in `docs/task.md`. If none exists, ask: "Where is the Task Record, or what task should be recorded?" Set it from `draft` to `in-progress`.
 - **Checkpoint:** Before implementation, confirm reachable Git history contains its heading, approved Requirements, and necessary Design/Plan. If not, commit only the Task Record as a checkpoint, with no implementation or unrelated changes. If repository state or commit authority prevents that commit, stop and ask the user. A slot advance or commit-message mention is not a checkpoint.
 
 Use approved Plan Slices as the implementation order and Requirements-to-verification map. A Task that fits one coherent test cycle can proceed directly; multi-step work receives an implementation-ready Plan through `implementation-planning` before code changes. Do not commit Task Record changes for individual slices, tests, or steps. Update it only for cross-session continuity, handoff, or material authority changes.

@@ -22,7 +22,7 @@ Activate automatically after:
 Scan the repository for documentation files whose content may be affected by the code change:
 - Project guides, user docs, and README;
 - Central project knowledge in `CONTEXT.md`;
-- Authoritative record containers: `docs/candidates.md`, `docs/decisions.md`, `docs/task.md`, and any active `docs/task-*.md`.
+- Authoritative record containers: `docs/candidates.md`, `docs/decisions.md`, and `docs/task.md`.
 
 ### Step 2: Verify Each Against Code
 

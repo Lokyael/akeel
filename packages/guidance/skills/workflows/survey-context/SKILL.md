@@ -34,9 +34,7 @@ During a routine survey, keep the context focused on current truth and active Ta
 
 ### 5. Read active tasks
 
-Read `docs/task.md` and any flat `docs/task-<topic>.md` files if they exist. For each active Task Record, note its `Kind` and `Status`, goal, scope, Requirements, unresolved risks or decisions, and required durable updates (structure per principles.md Project Records — Record Lifecycle). Routine survey reads the current tree only. It does not load cleared Task Records from Git history; read history only to verify checkpoint reachability or audit a specific Task.
-
-Keep task files flat in `docs/` without nested subdirectories or date-based artifact paths.
+Read `docs/task.md`. For each active Task Record, note its `Kind` and `Status`, goal, scope, Requirements, unresolved risks or decisions, and required durable updates (structure per principles.md Project Records — Record Lifecycle). Routine survey reads the current tree only. It does not load cleared Task Records from Git history; read history only to verify checkpoint reachability or audit a specific Task.
 
 ### 6. Check Git state
 

@@ -304,6 +304,19 @@ export function checkSkillReferences(skill: SkillMeta, registry: Map<string, Ski
 
 const PRINCIPLES_FILE = join(import.meta.dirname!, "..", "packages", "guidance", "src", "bootstrap", "principles.md");
 
+export const MAX_PRINCIPLES_LINES = 300;
+
+export function checkPrinciplesBudget(content = readFileSync(PRINCIPLES_FILE, "utf-8")): CheckResult {
+  const lines = content.split(/\r?\n/);
+  const errors: string[] = [];
+  if (lines.length > MAX_PRINCIPLES_LINES) {
+    errors.push(
+      `principles.md is ${lines.length} lines (budget: ${MAX_PRINCIPLES_LINES}). principles.md is the global high-frequency bootstrap surface; do not bloat it with methodology guides or tutorials per AGENTS.md Prompt Surface overlay.`,
+    );
+  }
+  return { pass: errors.length === 0, warnings: [], errors };
+}
+
 interface PrinciplesAnchors {
   /** Quick Reference 与 Project Records 两节的 ### 锚点（S4b 拆节后合并收集）。 */
   anchorSections: Set<string>;
@@ -403,6 +416,14 @@ function main() {
 
   let totalErrors = 0;
   let totalWarnings = 0;
+
+  const principlesBudget = checkPrinciplesBudget();
+  if (!principlesBudget.pass) {
+    for (const e of principlesBudget.errors) console.log(`  ❌ [principles.md] ${e}`);
+    totalErrors += principlesBudget.errors.length;
+  } else {
+    console.log(`  ✅ [principles.md] — line budget ok (<= ${MAX_PRINCIPLES_LINES} lines)`);
+  }
 
   for (const skill of skills) {
     const label = `[${skill.layer}/${skill.dirName}]`;

@@ -201,7 +201,7 @@ Classify new information in order:
 3. Uncommitted candidate with a concrete revisit condition → Candidate Record.
 4. Otherwise create no Project Record.
 
-Requirements, Design, and Plan are Task sections, not separate document types. **Durable Content** is information that remains load-bearing after the work or session: adopted conclusions, security invariants, external ownership boundaries, tradeoffs, commitments, and rejected alternatives. Implementation steps, test logs, and review reports are process artifacts, not Durable Content, and never enter these containers. When changing a record's type, move rather than copy its durable content and remove the source in the same change. Only an active Task promoted from a Candidate may carry optional `Origin: C-xxx`; Decisions carry no process provenance because Git retains history.
+Requirements, Design, and Plan are Task sections, not separate document types. **Durable Content** is information that remains load-bearing after the work or session: adopted conclusions, security invariants, external ownership boundaries, tradeoffs, commitments, and rejected alternatives. Implementation steps, test logs, and review reports are process artifacts, not Durable Content, and never enter these containers. When changing a record's type, move rather than copy its durable content and remove the source in the same change. Tasks and Decisions carry no process provenance because Git retains history.
 
 ### Document Set
 
@@ -212,7 +212,7 @@ Requirements, Design, and Plan are Task sections, not separate document types. *
 | `docs/decisions.md` | Load-bearing decisions, rationale, and rejected alternatives | Active while present; prune after completed `superseded` / `retired` transition |
 | `docs/task.md` | Active feature, bug, refactor, design, plan, or maintenance task | Git-tracked container; checkpoint active records, then clear completed sections after durable updates |
 
-Use flat `docs/task-<topic>.md` files only for genuinely independent lifecycles. Do not create subdirectories or dated copies.
+Do not create subdirectories, dated copies, or split task files.
 
 ### Record Lifecycle
 
@@ -231,7 +231,7 @@ Task `Kind` is `feature | bug | refactor | investigation | maintenance`. Keep `O
 
 After verification, confirm the checkpoint remains reachable, apply needed updates to `CONTEXT.md` and `docs/decisions.md`, and clear the Task in the completion commit before starting another Task. Git or an adopted external tracker retains process history; do not create a default archive. Update one record through an iterative design arc and clear it only when the work lands, rather than allocating an ID per iteration.
 
-**Next-ID slots**: each C/T/D container ends with exactly one `## X-0NN: 待创建` placeholder holding the next available ID. Create a record by filling that slot and appending number + 1. A flat `task-<topic>.md` consumes and advances the T slot in `docs/task.md`. Removing or editing a record never changes the slot; edits stop before the placeholder. If the slot is missing or duplicated, restore one highest-numbered slot as Git-history max + 1 before creating. Git history remains the audit authority; IDs are never reused.
+**Next-ID slots**: each C/T/D container ends with exactly one `## X-0NN: 待创建` placeholder holding the next available ID. Create a record by filling that slot and appending number + 1. Removing or editing a record never changes the slot; edits stop before the placeholder. If the slot is missing or duplicated, restore one highest-numbered slot as Git-history max + 1 before creating. Git history remains the audit authority; IDs are never reused.
 
 ### Decision Record Format
 
@@ -241,19 +241,19 @@ Use this order: `## D-xxx: <title>` → required unique `Reversal surface` → r
 
 ### Migration Protocol
 
-| Transition | Move | Source handling | Origin |
-|---|---|---|---|
-| C → T | durable content | remove C in the same change | optional `Origin: C-xxx` while Task is active |
-| C → D / other authority | durable content | remove C in the same change | — |
-| C → dismissed | none | remove C in the same change | — |
-| T → D / CONTEXT | extracted long-term information | clear T in the same change | — |
-| D → superseded | full conclusion, rationale, and rejected alternatives | prune after the absorbing D fully lands | — |
-| D → retired (withdrawn) | residual durable claims → Negative Space | prune after destination lands | — |
-| D → retired (external handoff) | ownership boundary → boundary Decision / CONTEXT | prune after destination lands | — |
+| Transition | Move | Source handling |
+|---|---|---|
+| C → T | durable content | remove C in the same change |
+| C → D / other authority | durable content | remove C in the same change |
+| C → dismissed | none | remove C in the same change |
+| T → D / CONTEXT | extracted long-term information | clear T in the same change |
+| D → superseded | full conclusion, rationale, and rejected alternatives | prune after the absorbing D fully lands |
+| D → retired (withdrawn) | residual durable claims → Negative Space | prune after destination lands |
+| D → retired (external handoff) | ownership boundary → boundary Decision / CONTEXT | prune after destination lands |
 
 Records leave a register only through content transfer or abandonment; every terminal names its reason and destination. Update code and documentation references to an absorbing record in the same change; Git, not archives or tombstones, retains history.
 
-`survey-context` routinely reads `CONTEXT.md`, `docs/task.md`, flat `docs/task-*.md`, and only scope-relevant Decisions. It reads Candidates only during explicit Candidate review, and owns the bounded Candidate-reading procedure. A missing `docs/candidates.md` means no recorded Candidates, not an error. Use no legacy or type-specific artifact paths.
+`survey-context` routinely reads `CONTEXT.md`, `docs/task.md`, and only scope-relevant Decisions. It reads Candidates only during explicit Candidate review, and owns the bounded Candidate-reading procedure. A missing `docs/candidates.md` means no recorded Candidates, not an error. Use no legacy or type-specific artifact paths.
 
 ---
 

@@ -6,13 +6,13 @@
 
 - **Why Not Now:** 当前没有真实 delegated workflow 证明现有能力不足以完成任务，或证明 child 必须自行执行验证才能形成可审计结果；宽泛 execute 仍可能变成任意代码执行授权，`node -e` 等形态不能因“验证”名义获得能力。
 - **Scope:** 评估按任务类型授予最小能力：只读调查、受限修改和有界验证分别处理；删除、发布和任意执行不作为普通 child 能力。子代理能力不得超过父会话，授权关系不明时不得放宽；不预设 T0/T1/T2、角色映射、策略传播或具体执行面，也不把 worktree 隔离解释为执行授权。
-- **Revisit condition:** 真实 delegated workflow 证明当前能力分层无法完成必要任务或形成可审计结果，且现有同步 Owner 验证或其他受限替代不能合理闭环；或用户明确要求重新评估该能力边界。
+- **Revisit condition:** 真实 delegated workflow 证明当前能力分层无法完成必要任务或形成可审计结果，且现有同步 Owner 验证或其他受限替代不能合理闭环。
 
 ## C-015: 复杂 Shell 语义验证方法收敛（停止判据 + Bash 差分语料仲裁）
 
 - **Why Not Now:** 当前没有已采纳的 Shell 语义扩展 Task 需要新增验证机制；现行支持子集已有基于 Bash/Linux 外部合同和 public seam 的测试。独立差分语料会增加 oracle、fixture 与跨版本维护成本，只有未来语义扩展暴露纸面分析无法仲裁的分歧时才值得采用。
 - **Proposal:** ①当架构级与下近似疑点均已转化为可执行语料，继续纸面评审不再能区分替代语义时停止纸面评审，不采用固定评审轮数；②建立由真实 Bash 行为独立核对的差分语料，以 `literal input → expected Canonical outcome/facts → expected Policy/render result` 锁定当前 public seam；③每个新增 Shell 语义守卫必须附带至少一条能证明其必要性的语料；④按高风险语义垂直切片实施并以差分测试收敛，不以旧实现、旧 reducer 或旧测试输出作为 oracle。
-- **Revisit condition:** 已采纳的 Shell 语义扩展（包括 C-029 若未来被采纳）出现纸面模型与真实 Bash 行为无法仲裁的分歧，或用户明确选择建立差分语料体系。
+- **Revisit condition:** 已采纳的 Shell 语义扩展（包括 C-029 若未来被采纳）出现纸面模型与真实 Bash 行为无法仲裁的分歧。
 
 ## C-016: 项目 `.env` 的受管读取与按名掩码
 
@@ -27,7 +27,7 @@
 
 - **Why Not Now:** 当前项目只有 Operation Admission 信任链，没有可验证的 Content Flow producer/consumer、payload capture、enforcement 或 receipt seam。现在实现会把宿主的 substitution/projection 误称为发布控制，并制造超出实际能力的安全承诺。
 - **Exploration Direction:** 若未来具备真实 seam，重新探索以下边界：Operation Admission 与 Content Flow 独立；静态 Normalized Flow 与运行时 Evidence 分离；Publication、Network Send、Process Start、File Commit 各自拥有 checkpoint 规则、授权、enforcement 和 receipt；只有受控绑定的 `exact` evidence 才能参与进一步判断，`unknown`/`unavailable`/`no-coverage` 不得解释为 clean、safe 或 permit；payload、lineage 和运行时授权不进入 `CompleteAccessPlan`。
-- **Revisit condition:** 用户明确启动 Content Flow 方向的探索，或宿主提供可测试的发布/发送/进程/提交 enforcement seam，并出现真实 producer/consumer 工作流。
+- **Revisit condition:** 宿主提供可测试的发布/发送/进程/提交 enforcement seam，并出现真实 producer/consumer 工作流。
 
 ## C-021: 受管执行的 OS-level confinement
 
@@ -36,7 +36,7 @@
 - **Why Not Now:** Access Gate 当前只拥有 tool-call 准入权，不拥有已放行进程、helper、子进程或 socket 的执行控制权。仅增加 `network` 标签、preset 或路径策略不能限制运行期外联；Pi 也尚未提供可验证的执行包装与隔离 seam。
 - **Exploration Direction:** 只有宿主提供实际执行接缝后，才比较由独立 provider 建立的 Linux 隔离配置。provider 必须能证明文件系统、网络、凭据可见性、子进程、进程树终止和输出处理；Access Gate 只声明所需能力，不自行调用 Shell 包装器。若策略要求隔离而 provider 不可用，结果必须是拒绝；`prefer` 式降级只能明确表示“未隔离”，不能继续作出隔离承诺。
 - **Boundary:** provider 不改变 Canonical、Admission、Mandatory Boundary 或 Policy 的语义；worktree、path admission、preset 和 Gate disabled 都不能被描述为 OS sandbox。C-039 只处理已知外部状态变更，C-020/C-038 分别处理内容流与不可信输入权威。
-- **Revisit condition:** 用户正式启动外部不可信仓库的自动化审计、构建或重构流水线；供应链脚本或 helper 执行成为高频实际威胁；Pi 提供可测试的执行接缝；或用户明确要求评估 Linux OS-level confinement。
+- **Revisit condition:** 外部不可信仓库自动化审计或供应链脚本执行成为真实高频威胁，且 Pi 提供可测试的物理执行隔离接缝。
 
 
 ## C-023: 项目级 Policy 单向收紧
@@ -46,7 +46,7 @@
 - **Why Not Now:** D-069 当前只接受全局 `policy.yaml`，尚未定义项目配置的发现、信任、合成、错误处理或审计合同。过早增加项目规则会同时扩大配置来源和静态证明负担；当前也没有复杂仓库反复误碰核心文件的实证。
 - **Exploration Direction:** 只探索在全局 Policy 与系统 hard boundary 之上追加项目局部限制，不允许项目配置扩大任何权限。复审必须定义可信项目、配置位置、全局与项目规则合成、非法或不可读配置的 fail-closed 行为、preset 切换关系，以及项目内容不能通过自带配置解除宿主边界。发布脚本、分支配置等项目工件只是可能用例，不预先形成默认清单。
 - **Out of Scope:** 网络副作用授权由 C-039 评估；参数级隐式执行由对应程序语义合同评估；`.env` 受管面由 C-016/C-035/C-036 评估，OS confinement 由 C-021 评估，历史敏感路径已由 D-070/D-090 三域模型吸收，不在本记录内组成统一“多维策略”。
-- **Revisit condition:** 真实复杂仓库反复出现需要项目局部限制、且全局 policy 无法合理表达的误操作风险；或用户明确要求只收紧、不放宽的项目级 Policy overlay。
+- **Revisit condition:** 真实复杂仓库反复出现需要项目局部限制、且全局 policy 无法合理表达的误操作风险。
 
 ## C-028: Destroy 操作边界与可审批准入复核
 
@@ -54,7 +54,7 @@
 
 - **Why Not Now:** T-0117 已解决日常单文件清理痛点；当前未深入证明递归删除（`-r`）、父级目录影响（`rmdir -p`）、通配符展开、Git 高危子命令（`reset --hard`、`clean -f`、`branch -D`）以及混合 flow 聚合等更宽场景。
 - **Exploration Direction:** 在现有单文件有界证明基础上，评估是否能进一步为受限目录删除或特定 Git 丢弃操作建立形式化边界证明，并在证明成立后引入受控的审批合同。复核需覆盖递归影响界限、路径和凭据硬边界、unknown 形态和无 UI 行为。
-- **Revisit condition:** 真实工作流反复因无法删除目录或执行特定 Git 清理受阻，且可提供完整的外部语义证据与边界证明方案；或者用户明确启动更宽破坏操作的独立评估。
+- **Revisit condition:** 真实工作流反复因无法删除目录或执行特定 Git 清理受阻，且可提供完整的外部语义证据与边界证明方案。
 - **Out of Scope:** 本候选未被进一步采纳前，递归删除、`rmdir`、Git 高危破坏子命令继续永久 hard-deny，不创建实现 Task。
 
 ## C-029: 有界静态迭代语义（Shell `for`）复核
@@ -70,7 +70,7 @@
   - 若存在 ask，必须重新定义原始循环、展开路径和 bounded evidence 的人类展示关系；不恢复旧 Explanation Replay 或旧 expanded-form 合同。
   - 验证以 Bash/Linux 外部行为、当前 Canonical/Admission/Display public seam 和安全不变量为依据；旧 reducer、旧测试数量及旧输出只能作为历史线索。
 - **Current Boundary:** 在本候选被明确采纳前，`for` 继续 fail-closed；不因旧实现可检索而触发恢复。
-- **Revisit condition:** 出现真实工作流因有限静态迭代被阻塞，且可提供不依赖动态值、运行时 glob、命令替换或隐式执行的最小场景与外部语义证据；或者用户明确启动该语义的独立重新设计。
+- **Revisit condition:** 出现真实工作流因有限静态迭代被阻塞，且可提供不依赖动态值、运行时 glob、命令替换或隐式执行的最小场景与外部语义证据。
 - **Out of Scope:** 完整 Bash 循环语义、动态/运行时词表、旧 reducer 迁移、旧 Explanation Replay、Direct 工具等价物、通用 Static Flow、实现 Task，以及任何未经独立证明的旧循环行为。
 
 ## C-031: 异步 child 与无人值守自动多代理流水线
@@ -79,7 +79,7 @@
 
 - **Why Not Now:** 当前结果仍需既有 Task Owner 裁决的隔离工作可由同步 Herdr child 加预定 artifact 直接满足；可独立验收的长期工作由用户授权新的范围互斥 Task Owner Session，不需要回灌旧 Owner。异步 child 还需额外定义 mailbox、结果发布、重复通知去重、跨重启恢复、资源预算、权限、失败恢复和验收状态，复杂度与上下文成本超过当前收益；确定性资源回收是可独立演进的 C-034，不以采用异步流水线为前提。
 - **Exploration Direction:** 若未来出现必须从属于既有 Task、但 Owner 又不能等待的长周期后台工作，再设计最小的异步合同：稳定 run/attempt ID，原子结果与 digest，completion mailbox，ACK/receipt，parent restart 恢复，重复交付去重，abandoned lease，以及 bounded 状态与错误输出。只有多个 child、自动重试或自动结果消费成为真实需求后，才增加 Herdr event subscriber、可信固定 callback、lane 聚合和确定性 orchestration extension；该合同可向 C-034 提供资源所有权与结果 receipt 事实，但不因此授权删除，child verdict 也不自动获得验收、记录、合并或发布权。
-- **Revisit condition:** 用户明确启动异步从属工作或无人值守自动流水线；或出现真实长周期后台任务，证明同步 join 与独立 Task Owner Session 都无法满足吞吐、时效或跨重启要求。
+- **Revisit condition:** 出现真实长周期后台任务，证明同步 join 与独立 Task Owner Session 都无法满足吞吐、时效或跨重启要求。
 - **Out of Scope:** 在本候选被明确采纳前，不提供 detached child、completion mailbox、自动 callback/续跑/重试/结果聚合、定时任务、token/cost budget 或基于 child verdict 的自动发布/合并；确定性 pane/workspace/worktree/临时运行资源回收由 C-034 独立记录。当前委托使用同步 Herdr artifact pull，并由唯一 Task Owner 保留最终裁决。
 
 ## C-033: Agent Capability Contract Assessment discipline
@@ -87,7 +87,7 @@
 - **Why Not Now:** `instruction-editing` 已处理已批准 agent-facing 合同的语义保持型表达，`domain-modeling` 处理术语与长期裁决，当前只有一次 skill 治理证明曾需要从用户价值重新核对能力；尚不能证明这种复评会反复形成完整、独立的调用场景。
 - **Proposal:** 评估模型可按需加载的 `capability-assessment` discipline，只面向一个已知 agent capability（尤其 skill 或 workflow），从目标用户、核心场景和可核查价值出发，分别判断名称、触发、能力承诺、边界与内容，并检查五者对齐。结果可建议保持、重命名、重塑边界、重写内容、合并、拆分或移除，每项结论附场景与证据；本候选不直接编辑合同或采纳裁决。
 - **Boundary:** `instruction-editing` 继续表达已经批准的当前合同，`domain-modeling` 继续维护术语和长期裁决，`module-design`/`assess-modularity` 继续处理代码模块，`code-review` 继续审查固定变更面。本候选不承诺通用 module、任意产品能力或用户领域能力评估。
-- **Revisit condition:** 至少两个不同 skill/workflow 的真实复评再次需要重复组合现有 disciplines，或现有方法持续遗漏目标用户、核心场景、价值证据及名称/触发/承诺/边界/内容对齐中的任一维度；也可在用户明确选择建立该专门能力时复审。
+- **Revisit condition:** 至少两个不同 skill/workflow 的真实复评再次需要重复组合现有 disciplines，或现有方法持续遗漏目标用户、核心场景、价值证据及名称/触发/承诺/边界/内容对齐中的任一维度。
 
 ## C-034: Herdr child 资源的确定性自动回收
 
@@ -95,7 +95,7 @@
 
 - **Why Not Now:** 当前同步 fork-join 仍有存活的 Task Owner 可在拉取并裁决 artifact 后检查和清理资源，尚无反复 orphan 或并发规模证明自动化收益足以覆盖持久状态机成本。Herdr 0.9.0 已提供 worktree 非强制删除、worktree provenance、Agent/pane 生命周期事件、plugin event hook 与 startup hook，但未提供原生 owner/lease/TTL/reaper 或 artifact readiness；`done`/`idle` 不证明成果已落盘，`pane.exited` 不提供充分的成功语义，Git non-force 只保护 dirty/untracked checkout 而不能识别 clean 但未合并的 commit。现在实施必须先新增 owned-run registry、artifact receipt、commit-preservation、重启 reconciliation、幂等和路径复用防护，已超出小型 cleanup hook。
 - **Exploration Direction:** 若重新评估，先比较 Herdr 原生 lease/reaper、持久 registry 加 event hook/startup reconciliation 的 Herdr plugin，以及有独立监督需求时的外部 lifecycle controller；优先由资源 owner 承担生命周期。只有 AKeel 在创建时登记并能以稳定 run identity、repo/worktree provenance 和当前 Herdr/Git 事实精确复核的资源可进入候选集合；扫描可用于核验和发现异常，不得按 label、branch 前缀或目录模式认领外来资源。自动回收还必须同时证明 child 已终止、artifact 具有原子 ready/receipt、checkout clean、没有需保留的未合并 commit、当前身份未被路径或 workspace 复用，并且 Herdr non-force 操作可完成；dirty、未合并、unknown、artifact 缺失、provenance 不匹配、仍有活动进程或需要 force 的状态只报告给存活 Owner/用户。事件重复、清理已完成和重启后重放应幂等处理；模型继续裁决异常成果的保留、导入、合并和验收，不承担机械 reaper。
-- **Revisit condition:** 同步 child 已反复遗留 pane/workspace/worktree 或临时资源并造成实际维护负担；并行、异步或跨重启 child 使 Owner 手工清理明显不可靠；Herdr 提供可验证的 owner/lease/reaper 合同；或用户明确启动 owned-run registry、artifact receipt 与 commit-preservation 设计。
+- **Revisit condition:** 同步 child 反复遗留资源并造成实际维护负担，并行或异步 child 使手工清理不可靠，且 Herdr 提供可验证的 owner/lease/reaper 合同。
 - **Out of Scope:** 在本候选被明确采纳前，不新增 plugin、daemon、timer、registry 或 AKeel runtime dependency，不自动扫描认领、force-remove、删除 branch、接受 artifact、导入/合并结果、更新 Project Record 或发布；当前仍由存活 Task Owner 检查后执行清理，child 不自删除。
 
 ## C-035: 项目 `.env` 的受管写入
@@ -124,7 +124,7 @@
 - **Why Not Now:** Access Gate 是执行前的语义准入系统，无法限制已放行脚本、helper、依赖生命周期或未知命令的运行期 socket。通用 network policy 会混合远程读取、外部写入和 opaque 行为，扩大命令方言与虚假安全承诺；当前 Git 远程/transport 边界已有更窄的 hard-boundary 处理。
 - **Open Question:** 若真实工作流证明当前 `opaque` 或既有 hard-boundary 过宽/过窄，是否在 Canonical/Admission 中增加少数“已知外部状态变更”事实，并为 `git push`、package publish/upload 等明确动作定义统一的策略、混合 flow、无 UI 和显示合同。分类必须依赖完整的程序/选项合同，不因命令名称、URL 或参数外观猜测运行期行为。
 - **Safety Boundary:** 该候选只保护被静态识别的外部状态变更；未知脚本、helper、依赖执行和任意网络外联仍是 `opaque`，不因该分类获得路径或网络隔离。审批不表示已执行；C-021 拥有执行期隔离，C-020 拥有 payload/lineage，C-038 拥有不可信输入 provenance。
-- **Revisit condition:** 真实工作流证明显式外部状态变更需要区别于本地 `write`/`execute`，且现有边界无法合理表达；或用户明确启动该狭窄准入复核。未满足前，不新增 network policy axis 或实现 Task。
+- **Revisit condition:** 真实工作流证明显式外部状态变更需要区别于本地 `write`/`execute`，且现有边界无法合理表达。未满足前，不新增 network policy axis 或实现 Task。
 
 ## C-040: Pi render-only tool-result renderer 与测试模型视图
 
@@ -132,7 +132,7 @@
 
 - **Why Not Now:** 当前 Pi 的 `registerTool` 与 `renderResult` 仍把渲染定义绑定在工具定义上，没有只装饰内置 `bash` tool result、同时保持执行所有权和 session 持久化不变的公开接口。AKeel 当前已完成 context projection，但没有安全的宿主接缝可实现同一条 TUI 结果中的原始输出与模型视图；现在通过覆盖 `bash`、写入 custom message/entry、处理 `bashExecution` 或 monkey-patch 宿主组件都会越过 D-084 与当前范围边界。
 - **Exploration Direction:** 仅在 Pi 提供并验证 render-only seam 后，评估在不接管内置 `bash` 执行、不改变 session 持久化的前提下，从原始结果生成临时模型视图。恢复 session 时从原始消息重新计算，不持久化 projection；宿主组合、fallback、异常和非 TUI 行为由 Pi public seam 测试先行确定。
-- **Revisit condition:** Pi 发布可供扩展使用、保持单一执行所有权且能通过测试观察 persistence/render 边界的 render-only tool-result 接口；或用户明确要求重新启动该候选的宿主接口与 TUI 视图评估。
+- **Revisit condition:** Pi 发布可供扩展使用、保持单一执行所有权且能通过测试观察 persistence/render 边界的 render-only tool-result 接口。
 - **Out of Scope:** 在本候选被明确采纳前，不修改 Pi 安装副本，不覆盖或重实现内置 `bash`，不改变 `bashExecution`、Access Gate、session file、tool result details、模型 context projection 或现有 TUI 展示；不创建 T-xxx 实现任务。
 
 ## C-044: 非 bounded 程序的参数级隐式执行与选项消费边界
@@ -143,13 +143,13 @@
 - **Open Question:** 是否继续维持“已证明的命令专属合同 + 未证明形态 opaque”的分层，还是为剩余程序族与未知程序重新设计更统一的参数级安全合同。复核必须分别判断：选项值消费是否完整、值是否产生路径事实、参数是否可能启动 helper/子进程、外部状态变更或破坏动作，以及 `opaque` 策略是否足以表达未证明风险；不能把这些问题合并为通用 Shell 解析、网络策略或 OS-level confinement。
 - **Scope:** 只复核当前 Git/Python/uv/herdr/npm 族的 option scanner 覆盖与高风险选项边界，并核对未知命令的 `unknown`、`opaque`、路径边界和策略组合。外部实现（包括 pi-guard）只能作为可核查语料或合同参考，不作为正确性 oracle。
 - **Safety Boundary:** 不因命令名称或选项外观推断脚本、helper 或运行期访问已经被分析；未知、动态、未消费或无法证明的值不得静默变成 positional path 或更宽授权。任何复核方案都不得削弱 D-018 的 fail-closed 规则、D-067 的 opaque 分层、Git/`find` 现有 hard boundary、D-071 的 destroy 永久拒绝或把 `allowedRoots` 描述为 opaque 运行期强制。
-- **Revisit condition:** 出现真实安全证据表明参数级 helper/隐式执行可穿过当前边界，或真实工作流因已知程序的选项消费误判而受阻；或者用户明确启动剩余程序族与未知命令的参数级安全合同复核。
+- **Revisit condition:** 出现真实安全证据表明参数级 helper/隐式执行可穿过当前边界，或真实工作流因已知程序的选项消费误判而受阻。
 
 ## C-045: 受管会话临时文件创建与系统临时路径准入（mktemp 语义评估）
 
 - **Why Not Now:** 静态 Shell 词法不支持变量与命令替换，生成的随机临时文件名无法被后续命令消费；Pure Gate 亦不修改进程环境，裸 `mktemp` 必然落入越界的全局 `/tmp`。
 - **Exploration Direction:** 仅在支持有界选项（如 `-d`、`-p`）并将目标路径显式约束在会话 `stagingRoot` 或工作区的前提下，评估受管临时文件创建语义。
-- **Revisit condition:** 出现能在静态无变量 Shell 下消费随机临时文件的可行方案，或宿主提供进程环境重写接缝；或用户明确要求重新评估。
+- **Revisit condition:** 出现能在静态无变量 Shell 下消费随机临时文件的可行方案，或宿主提供进程环境重写接缝。
 
 ## C-050: 无人值守 Session 自动换页与长周期自主接力
 
@@ -158,6 +158,6 @@
 - **Why Not Now:** 当前 Pi 宿主的 `ctx.newSession()` 在架构上仅对人类交互的 `ExtensionCommandContext` 开放，在事件回调或后台中直接调用存在宿主死锁风险；此外，无人值守换页需要系统具备完全自动化的静止点（Quiescence）判定、会话高频震荡（Churning）防御与自愈熔断机制。目前用户意图仍需长期安全约束，过早开放完全无人的自动换页会引入失控风险与不可控的 API 消耗。
 - **Exploration Direction:** 若未来宿主提供安全的非阻塞/后台会话替换接缝，探索基于上下文预算或 Slice 静止点的自主换页：系统自动侦测安全断点，就地合成胶囊并自动轮转至新会话接力，无需人类实时执行命令；用户仅保留异步或周期性的长期审计（Long-term Inspection & Audit），不参与日常微观审批。需设计换页频率预算门禁、工作区冲突自动熔断与异步告警通道。
 - **Safety Boundary:** 无人值守换页不得绕过 Access Gate 路径策略与 Mandatory Boundaries；出现工作区冲突、reconciliation 失败或测试严重异常时必须立即挂起并等待人类介入，严禁无限循环自动重启；父子会话冷归档与回退能力（Rollback）必须持续保持。
-- **Revisit condition:** Pi 官方发布支持后台/事件安全调用的会话替换接缝；或真实大型无人值守流水线证明单命令交互无法满足长期运行吞吐，且可提供完备的熔断防御方案；或用户明确启动无人值守会话换页的工程实施。
+- **Revisit condition:** Pi 官方发布支持后台/事件安全调用的会话替换接缝，或真实大型无人值守流水线证明单命令交互无法满足长期运行吞吐且可提供完备的熔断防御方案。
 
 ## C-051: 待创建

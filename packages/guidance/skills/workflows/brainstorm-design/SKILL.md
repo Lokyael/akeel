@@ -18,7 +18,7 @@ Do NOT invoke any implementation skill, write any code, scaffold any project, or
 2. **Ask clarifying questions** — one at a time, understand purpose, constraints, and success criteria. Prefer concrete choices where applicable. One question per message.
 3. **Propose 2–3 approaches** — with trade-offs and your recommendation. For interface-level design, apply Design Twice from `module-design`. Lead with your recommended option and explain why.
 4. **Present design** — in sections scaled to their complexity, getting user approval after each section. Cover: architecture, components, data flow, error handling, testing, and Out of Scope (per principles.md §8 format).
-5. **Record the design** — add the approved design to the current Task Record (`docs/task.md` or `docs/task-<topic>.md`), including Out of Scope (per principles.md §8) and any unresolved questions. Keep the design within the Task Record without creating separate design files.
+5. **Record the design** — add the approved design to the current Task Record (`docs/task.md`), including Out of Scope (per principles.md §8) and any unresolved questions. Keep the design within the Task Record without creating separate design files.
 6. **Work-item self-review** — check for placeholders, contradictions, and ambiguity; resolve inline.
 7. **User reviews the Task Record** — ask the user to review the design section before proceeding.
 

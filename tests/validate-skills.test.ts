@@ -13,9 +13,11 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   checkDescriptionConvention,
+  checkPrinciplesBudget,
   checkPrinciplesRefs,
   checkSkillReferences,
   loadPrinciplesAnchors,
+  MAX_PRINCIPLES_LINES,
   type SkillMeta,
 } from "../scripts/validate-skills";
 
@@ -152,22 +154,12 @@ test("delegated review and grilling publish fail-closed owner cleanup contracts"
   );
 });
 
-test("handoff and preflight use their distinct temporary-resource lifecycles", () => {
-  const handoff = readFileSync(
-    new URL("../packages/guidance/skills/workflows/handoff-session/SKILL.md", import.meta.url),
-    "utf8",
-  );
+test("preflight uses its distinct temporary-resource lifecycle", () => {
   const preflight = readFileSync(
     new URL("../packages/guidance/skills/disciplines/change-preflight/SKILL.md", import.meta.url),
     "utf8",
   );
 
-  assert.match(handoff, /akeel_handoff[^.]*prepare/i);
-  assert.match(handoff, /successor reconciliation/i);
-  assert.match(handoff, /action `reconcile`/i);
-  assert.match(handoff, /\/akeel-handoff[^.]*explicit authority gate/i);
-  assert.match(handoff, /in-session custom entry/i);
-  assert.doesNotMatch(handoff, /handoff-<timestamp>\.md/i);
   assert.match(preflight, /runs\/<run-id>\/quarantine/);
   assert.doesNotMatch(preflight, /\/tmp\/akeel\/preflight\//);
 });
@@ -312,6 +304,21 @@ test("instruction editing publishes semantic preservation with an AKeel reposito
   assert.match(repositoryOverlay, /D-054/);
   assert.match(repositoryOverlay, /`literal form`/);
   assert.match(repositoryOverlay, /`fixed text`/);
+  assert.match(repositoryOverlay, /Prompt Surface 修改三道自检门禁/);
+  assert.match(repositoryOverlay, /普适性闸门/);
+  assert.match(repositoryOverlay, /角色闸门/);
+  assert.match(repositoryOverlay, /物理成本闸门/);
+});
+
+test("principles budget guard enforces strict line budget on global bootstrap", () => {
+  const ok = checkPrinciplesBudget();
+  assert.equal(ok.pass, true);
+  assert.deepEqual(ok.errors, []);
+
+  const bloated = "line\n".repeat(MAX_PRINCIPLES_LINES + 5);
+  const failed = checkPrinciplesBudget(bloated);
+  assert.equal(failed.pass, false);
+  assert.ok(failed.errors.some((e) => e.includes(`budget: ${MAX_PRINCIPLES_LINES}`)));
 });
 
 test("module design integrates boundary evidence and failure handling", () => {

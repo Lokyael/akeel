@@ -239,7 +239,7 @@ test("owner closes captured semantics only with a closure destination and status
   }
 });
 
-test("single /akeel-handoff command synthesizes capsule and replaces session in one step with inline args", async () => {
+test("single /handoff command synthesizes capsule and replaces session in one step with inline args", async () => {
   const root = mkdtempSync(join(tmpdir(), "akeel-artifact-pi-"));
   chmodSync(root, 0o700);
   try {
@@ -276,7 +276,7 @@ test("single /akeel-handoff command synthesizes capsule and replaces session in 
       },
     };
 
-    const command = ownerPi.commands.get("akeel-handoff")!;
+    const command = ownerPi.commands.get("handoff")!;
     assert.ok(command);
     // User executes single command with inline next action
     await command.handler("Implement the next slice directly", commandContext);
@@ -286,6 +286,8 @@ test("single /akeel-handoff command synthesizes capsule and replaces session in 
     assert.match(sent[0]!, /<akeel-session-handoff>/);
     assert.match(sent[0]!, /Implement the next slice directly/);
     assert.match(sent[0]!, /Parser is recursive descent/);
+    assert.match(sent[0]!, /importedSemanticIds/);
+    assert.match(sent[0]!, /workspaceVerified/);
 
     // Old session has switched entry and tools frozen on restart
     assert.equal(ownerPi.entries.some((entry) => entry.customType === "akeel:handoff-switched"), true);
@@ -364,7 +366,7 @@ test("single /akeel-handoff command synthesizes capsule and replaces session in 
   }
 });
 
-test("/akeel-handoff view inspects active capsule without switching session", async () => {
+test("/handoff view inspects active capsule without switching session", async () => {
   const root = mkdtempSync(join(tmpdir(), "akeel-artifact-pi-"));
   chmodSync(root, 0o700);
   try {
@@ -397,7 +399,7 @@ test("/akeel-handoff view inspects active capsule without switching session", as
       },
     };
 
-    const command = ownerPi.commands.get("akeel-handoff")!;
+    const command = ownerPi.commands.get("handoff")!;
     assert.ok(command);
     await command.handler("view", commandContext);
 
@@ -409,7 +411,7 @@ test("/akeel-handoff view inspects active capsule without switching session", as
   }
 });
 
-test("/akeel-handoff view logs capsule to console when hasUI is false", async () => {
+test("/handoff view logs capsule to console when hasUI is false", async () => {
   const root = mkdtempSync(join(tmpdir(), "akeel-artifact-pi-"));
   chmodSync(root, 0o700);
   try {
@@ -443,7 +445,7 @@ test("/akeel-handoff view logs capsule to console when hasUI is false", async ()
         },
       };
 
-      const command = ownerPi.commands.get("akeel-handoff")!;
+      const command = ownerPi.commands.get("handoff")!;
       assert.ok(command);
       await command.handler("view", commandContext);
 
@@ -457,7 +459,7 @@ test("/akeel-handoff view logs capsule to console when hasUI is false", async ()
   }
 });
 
-test("/akeel-handoff view notifies gracefully without throwing when no capsule is active", async () => {
+test("/handoff view notifies gracefully without throwing when no capsule is active", async () => {
   const root = mkdtempSync(join(tmpdir(), "akeel-artifact-pi-"));
   chmodSync(root, 0o700);
   try {
@@ -478,7 +480,7 @@ test("/akeel-handoff view notifies gracefully without throwing when no capsule i
       isIdle: () => true,
     };
 
-    const command = ownerPi.commands.get("akeel-handoff")!;
+    const command = ownerPi.commands.get("handoff")!;
     assert.ok(command);
     await command.handler("view", uiContext);
     assert.equal(warningNotified, "No active continuation capsule found.");
@@ -503,7 +505,7 @@ test("/akeel-handoff view notifies gracefully without throwing when no capsule i
   }
 });
 
-test("/akeel-handoff recovers cleanly after a cancelled replacement and succeeds on retry", async () => {
+test("/handoff recovers cleanly after a cancelled replacement and succeeds on retry", async () => {
   const root = mkdtempSync(join(tmpdir(), "akeel-artifact-pi-"));
   chmodSync(root, 0o700);
   try {
@@ -522,7 +524,7 @@ test("/akeel-handoff recovers cleanly after a cancelled replacement and succeeds
       sourceRef: "docs/task.md#t-0145",
     } }, sourceContext);
 
-    const command = ownerPi.commands.get("akeel-handoff")!;
+    const command = ownerPi.commands.get("handoff")!;
     assert.ok(command);
 
     // 1. First attempt: user cancels replacement
@@ -770,7 +772,7 @@ test("prepare action fails closed on workspace cwd mismatch and canReuseActive r
       },
     };
 
-    const command = ownerPi.commands.get("akeel-handoff")!;
+    const command = ownerPi.commands.get("handoff")!;
     assert.ok(command);
     await command.handler("", changedCwdContext);
 
@@ -778,6 +780,35 @@ test("prepare action fails closed on workspace cwd mismatch and canReuseActive r
     const lastPrepared = [...ownerPi.entries].reverse().find((e) => e.customType === "akeel:prepared-capsule");
     assert.ok(lastPrepared);
     assert.equal((lastPrepared!.data as any).capsule.workspace.cwd, "/new/workspace/project");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("/handoff notifies error when session is not idle without throwing", async () => {
+  const root = mkdtempSync(join(tmpdir(), "akeel-artifact-pi-"));
+  chmodSync(root, 0o700);
+  try {
+    const ownerPi = fakePi();
+    installArtifactExchange(ownerPi.pi, { root });
+    await start(ownerPi, "busy-session");
+
+    let notifiedError: string | undefined;
+    const busyContext = {
+      ...context("busy-session", ownerPi.entries),
+      hasUI: true,
+      ui: {
+        notify: (msg: string, level?: string) => {
+          if (level === "error") notifiedError = msg;
+        },
+      },
+      isIdle: () => false,
+    };
+
+    const command = ownerPi.commands.get("handoff")!;
+    assert.ok(command);
+    await command.handler("", busyContext);
+    assert.equal(notifiedError, "Handoff session replacement failed: session is not idle.");
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

@@ -3,6 +3,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { checkContextHygiene, checkDecisionHygiene } from "../scripts/validate-docs";
+import { checkCandidateHygiene, checkTaskHygiene } from "../packages/guidance/src/record-containers/validator";
 
 const decisionId = "D-" + "123";
 const validDecision = `## ${decisionId}: Example
@@ -232,5 +233,37 @@ test("Context hygiene rejects Architecture enumerating skill roster", () => {
   const result = checkContextHygiene(withDump);
   assert.equal(result.ok, false);
   assert.ok(result.errors.some((e) => e.includes("enumerates skill workflow roster")));
+});
+
+// ─── Task Hygiene Tests ───
+
+test("Task hygiene accepts valid minimal Task Record", () => {
+  const validTask = `# Tasks\n\n## T-001: Sample Task\n\n- **Kind:** refactor\n- **Status:** verified\n- **Reversal surface:** user-boundary\n\n### Plan\n\n## T-002: 待创建\n`;
+  const result = checkTaskHygiene(validTask);
+  assert.deepEqual(result.errors, []);
+  assert.equal(result.ok, true);
+});
+
+test("Task hygiene rejects non-standard status like complete", () => {
+  const badTask = `# Tasks\n\n## T-001: Sample Task\n\n- **Kind:** refactor\n- **Status:** complete\n- **Reversal surface:** user-boundary\n\n### Plan\n\n## T-002: 待创建\n`;
+  const result = checkTaskHygiene(badTask);
+  assert.equal(result.ok, false);
+  assert.ok(result.errors.some((e) => e.includes("invalid Task Status 'complete'")));
+});
+
+// ─── Candidate Hygiene Tests ───
+
+test("Candidate hygiene accepts valid candidate records", () => {
+  const validCandidate = `# Candidates\n\n## C-001: Sample Idea\n\n- **Why Not Now:** Not needed yet.\n- **Revisit condition:** Upstream API is released.\n\n## C-002: 待创建\n`;
+  const result = checkCandidateHygiene(validCandidate);
+  assert.deepEqual(result.errors, []);
+  assert.equal(result.ok, true);
+});
+
+test("Candidate hygiene rejects candidates with Status metadata", () => {
+  const badCandidate = `# Candidates\n\n## C-001: Sample Idea\n\n- **Status:** promoted\n- **Why Not Now:** Done.\n- **Revisit condition:** Upstream API is released.\n\n## C-002: 待创建\n`;
+  const result = checkCandidateHygiene(badCandidate);
+  assert.equal(result.ok, false);
+  assert.ok(result.errors.some((e) => e.includes("Candidate records must not contain Status metadata")));
 });
 

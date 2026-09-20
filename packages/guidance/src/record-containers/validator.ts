@@ -28,6 +28,225 @@ export const STANDARD_CONTAINERS: readonly ContainerSpec[] = Object.freeze([
 
 export const RECORD_SLOT_RE = /^## ([CTD])-0\d{2,}: 待创建$/;
 
+export const TASK_KINDS = Object.freeze(new Set([
+  "feature",
+  "bug",
+  "refactor",
+  "investigation",
+  "maintenance",
+]));
+
+export const TASK_STATUSES = Object.freeze(new Set([
+  "draft",
+  "in-progress",
+  "verified",
+]));
+
+export const TASK_REVERSAL_SURFACES = Object.freeze(new Set([
+  "user-boundary",
+  "engineering",
+]));
+
+interface MarkdownFence {
+  marker: "`" | "~";
+  length: number;
+}
+
+function openingFence(line: string): MarkdownFence | undefined {
+  const match = /^ {0,3}(`{3,}|~{3,})(.*)$/.exec(line);
+  if (!match || (match[1]![0] === "`" && match[2]!.includes("`"))) return undefined;
+  return { marker: match[1]![0] as MarkdownFence["marker"], length: match[1]!.length };
+}
+
+function closesFence(line: string, fence: MarkdownFence): boolean {
+  const content = line.replace(/^ {0,3}/, "");
+  let markerLength = 0;
+  while (content[markerLength] === fence.marker) markerLength++;
+  return markerLength >= fence.length && /^[ \t]*$/.test(content.slice(markerLength));
+}
+
+function structuralLines(content: string): string[] {
+  let fence: MarkdownFence | undefined;
+  return content.split(/\r?\n/).map((line) => {
+    if (fence) {
+      if (closesFence(line, fence)) fence = undefined;
+      return "";
+    }
+    const opening = openingFence(line);
+    if (!opening) return line;
+    fence = opening;
+    return "";
+  });
+}
+
+const TASK_HEADING_RE = /^## (T-\d{2,}): (.+)$/;
+const METADATA_BULLET_RE = /^-\s+\*\*([^*]+):\*\*\s*(.*)$/;
+
+/**
+ * Validates the metadata structure and canonical terms of active Task records.
+ * Cleaned/empty task containers (only slot placeholder) pass cleanly.
+ */
+export function checkTaskHygiene(content: string, file = "docs/task.md"): ContainerCheckResult {
+  const errors: string[] = [];
+  const lines = structuralLines(content);
+
+  let inTask = false;
+  let currentTaskId = "";
+  let inMetadata = false;
+  const seenFields = new Set<string>();
+
+  function finishCurrentTask(): void {
+    if (!inTask) return;
+    for (const required of ["Kind", "Status", "Reversal surface"] as const) {
+      if (!seenFields.has(required)) {
+        errors.push(`${file}: ${currentTaskId}: missing required Task field: ${required}`);
+      }
+    }
+    inTask = false;
+    inMetadata = false;
+    currentTaskId = "";
+    seenFields.clear();
+  }
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]!;
+
+    if (/^## /.test(line)) {
+      if (RECORD_SLOT_RE.test(line)) {
+        finishCurrentTask();
+        continue;
+      }
+      const match = TASK_HEADING_RE.exec(line);
+      if (!match) {
+        errors.push(`${file}:${i + 1}: malformed Task heading: ${line}`);
+        continue;
+      }
+      finishCurrentTask();
+      inTask = true;
+      currentTaskId = match[1]!;
+      inMetadata = true;
+      continue;
+    }
+
+    if (!inTask) continue;
+
+    if (/^### /.test(line)) {
+      if (inMetadata) {
+        for (const required of ["Kind", "Status", "Reversal surface"] as const) {
+          if (!seenFields.has(required)) {
+            errors.push(`${file}: ${currentTaskId}: missing required Task field: ${required}`);
+          }
+        }
+        inMetadata = false;
+      }
+      continue;
+    }
+
+    if (inMetadata) {
+      const bulletMatch = METADATA_BULLET_RE.exec(line.trim());
+      if (bulletMatch) {
+        const field = bulletMatch[1]!.trim();
+        const value = bulletMatch[2]!.trim();
+
+        if (seenFields.has(field)) {
+          errors.push(`${file}:${i + 1}: duplicate Task field: ${field}`);
+          continue;
+        }
+        seenFields.add(field);
+
+        if (field === "Kind") {
+          if (!TASK_KINDS.has(value)) {
+            errors.push(
+              `${file}:${i + 1}: invalid Task Kind '${value}' (expected: ${[...TASK_KINDS].join(" | ")})`,
+            );
+          }
+          continue;
+        }
+
+        if (field === "Status") {
+          if (!TASK_STATUSES.has(value)) {
+            errors.push(
+              `${file}:${i + 1}: invalid Task Status '${value}' (expected: ${[...TASK_STATUSES].join(" | ")})`,
+            );
+          }
+          continue;
+        }
+
+        if (field === "Reversal surface") {
+          if (!TASK_REVERSAL_SURFACES.has(value)) {
+            errors.push(
+              `${file}:${i + 1}: invalid Task Reversal surface '${value}' (expected: ${[...TASK_REVERSAL_SURFACES].join(" | ")})`,
+            );
+          }
+          continue;
+        }
+
+        errors.push(`${file}:${i + 1}: unrecognized Task metadata field: ${field}`);
+      }
+    }
+  }
+
+  finishCurrentTask();
+
+  return Object.freeze({
+    ok: errors.length === 0,
+    errors: Object.freeze(errors),
+  });
+}
+
+const CANDIDATE_HEADING_RE = /^## (C-\d{2,}): (.+)$/;
+
+/**
+ * Validates candidate records in docs/candidates.md.
+ * Candidate records are parked by definition while present; they must NOT carry Status metadata.
+ * Promoted or dismissed candidates must be removed in the same change per principles.md and D-028.
+ */
+export function checkCandidateHygiene(content: string, file = "docs/candidates.md"): ContainerCheckResult {
+  const errors: string[] = [];
+  const lines = structuralLines(content);
+
+  let inCandidate = false;
+  let currentCandidateId = "";
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]!;
+
+    if (/^## /.test(line)) {
+      if (RECORD_SLOT_RE.test(line)) {
+        inCandidate = false;
+        currentCandidateId = "";
+        continue;
+      }
+      const match = CANDIDATE_HEADING_RE.exec(line);
+      if (match) {
+        inCandidate = true;
+        currentCandidateId = match[1]!;
+        continue;
+      }
+      inCandidate = false;
+      currentCandidateId = "";
+      continue;
+    }
+
+    if (!inCandidate) continue;
+
+    const bulletMatch = METADATA_BULLET_RE.exec(line.trim());
+    if (bulletMatch) {
+      const field = bulletMatch[1]!.trim();
+      if (field.toLowerCase() === "status") {
+        errors.push(
+          `${file}:${i + 1}: ${currentCandidateId}: Candidate records must not contain Status metadata (candidates are parked while present; promoted or dismissed candidates must be removed in the same change per principles.md and D-028)`,
+        );
+      }
+    }
+  }
+
+  return Object.freeze({
+    ok: errors.length === 0,
+    errors: Object.freeze(errors),
+  });
+}
+
 export interface ContainerCheckResult {
   readonly ok: boolean;
   readonly errors: readonly string[];
@@ -122,6 +341,18 @@ export function validateRecordContainers(
     const result = checkContainerContent(file, content, prefix);
     if (!result.ok) {
       allErrors.push(...result.errors);
+    }
+    if (prefix === "C") {
+      const candidateHygiene = checkCandidateHygiene(content, file);
+      if (!candidateHygiene.ok) {
+        allErrors.push(...candidateHygiene.errors);
+      }
+    }
+    if (prefix === "T") {
+      const taskHygiene = checkTaskHygiene(content, file);
+      if (!taskHygiene.ok) {
+        allErrors.push(...taskHygiene.errors);
+      }
     }
   }
 

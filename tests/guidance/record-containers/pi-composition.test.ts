@@ -55,7 +55,10 @@ test("named install exports same functionality as default export", () => {
 test("akeel_validate_records executes against workspace cwd and reports valid status", async () => {
   const tempDir = join(tmpdir(), `akeel-test-records-${Date.now()}-${Math.random().toString(36).slice(2)}`);
   mkdirSync(join(tempDir, "docs"), { recursive: true });
-  writeFileSync(join(tempDir, "docs", "task.md"), "# Tasks\n\n## T-001: First\n\n## T-002: 待创建\n");
+  writeFileSync(
+    join(tempDir, "docs", "task.md"),
+    "# Tasks\n\n## T-001: First\n\n- **Kind:** feature\n- **Status:** in-progress\n- **Reversal surface:** engineering\n\n## T-002: 待创建\n",
+  );
 
   try {
     const { pi, tools } = fakePi();

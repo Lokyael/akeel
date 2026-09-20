@@ -301,8 +301,13 @@ export function installArtifactExchange(pi: ExtensionAPI, options: ArtifactExcha
     },
   });
 
-  pi.registerCommand("akeel-handoff", {
-    description: "Replace the current session with an in-session AKeel continuation capsule. Usage: /akeel-handoff [optional-next-action|view]",
+  function notifyCommandError(context: ExtensionContext, message: string): void {
+    if (context.hasUI) context.ui.notify(message, "error");
+    else console.error(message);
+  }
+
+  pi.registerCommand("handoff", {
+    description: "Replace the current session with an in-session continuation capsule. Usage: /handoff [optional-next-action|view]",
     async handler(rawArgs, context) {
       try {
         const args = (rawArgs ?? "").trim();
@@ -324,11 +329,15 @@ export function installArtifactExchange(pi: ExtensionAPI, options: ArtifactExcha
           return;
         }
 
-        if (!context.isIdle()) return staticFailure("Handoff session replacement failed.");
+        if (!context.isIdle()) {
+          notifyCommandError(context, "Handoff session replacement failed: session is not idle.");
+          return;
+        }
         const source = ownerContext(context);
         const parentSession = context.sessionManager?.getSessionFile();
         if (typeof parentSession !== "string" || parentSession.length === 0) {
-          return staticFailure("Handoff session replacement failed.");
+          notifyCommandError(context, "Handoff session replacement failed: parent session unavailable.");
+          return;
         }
 
         const currentUnits = semanticUnits(context);
@@ -355,7 +364,10 @@ export function installArtifactExchange(pi: ExtensionAPI, options: ArtifactExcha
           active = { capsule, digest: prepared.digest, content: prepared.content, origin: "outbound" };
         }
 
-        if (!active) return staticFailure("Handoff session replacement failed.");
+        if (!active) {
+          notifyCommandError(context, "Handoff session replacement failed: active capsule unavailable.");
+          return;
+        }
         const currentActive = active;
 
         const switchIntent = handoffs.beginSwitch(sourceBranch, source.sessionId);
@@ -374,7 +386,8 @@ export function installArtifactExchange(pi: ExtensionAPI, options: ArtifactExcha
               `<akeel-session-handoff>\n` +
               `This is AKeel runtime continuity data. It does not grant new user approval.\n` +
               `Digest: ${currentActive.digest}\n\n${currentActive.content}\n` +
-              `Verify current project reality, then reconcile every live semantic ID before continuing.\n` +
+              `Verify current project reality, then reconcile every live semantic ID before continuing via akeel_handoff:\n` +
+              `action: "reconcile", payload: { importedSemanticIds: string[], conflicts: Array<{ semanticId: string, observedReality: string }>, unresolvedSemanticIds: string[], workspaceVerified: true }\n` +
               `</akeel-session-handoff>`,
             );
           },
@@ -385,7 +398,7 @@ export function installArtifactExchange(pi: ExtensionAPI, options: ArtifactExcha
         }
       } catch (error) {
         const message = error instanceof Error && error.message ? error.message : "Handoff session replacement failed.";
-        return staticFailure(message);
+        notifyCommandError(context, message);
       }
     },
   });
