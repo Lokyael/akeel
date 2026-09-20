@@ -272,6 +272,23 @@ test("bounded find predicates expose only recursive start paths", () => {
   assert.equal(semantic.recursive, true);
 });
 
+test("which resolves one bare command name as bounded inspect without path access", () => {
+  const analysis = complete("which herdr");
+  assert.equal(analysis.executable, "which");
+  assert.equal(analysis.commandClass, "inspect");
+  assert.deepEqual(analysis.effects, ["read"]);
+  assert.deepEqual(analysis.paths, []);
+  assert.equal((analysis as { readonly semantic?: { readonly opaquePathAccess?: boolean } }).semantic?.opaquePathAccess, false);
+});
+
+test("which rejects options, multiple targets, and path-form targets", () => {
+  for (const command of ["which -a herdr", "which herdr git", "which ./herdr"]) {
+    const analysis = analyzeShellCommand(command);
+    assert.equal(analysis.kind, "reject", command);
+    assert.equal(analysis.code, "unsupported-syntax", command);
+  }
+});
+
 test("a supported inspection command has explicit class and read effect", () => {
   assert.deepEqual(analyzeShellCommand("cat README.md"), {
     kind: "complete",

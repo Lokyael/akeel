@@ -11,6 +11,7 @@ import { analyzePythonToolProgram, PYTHON_TOOLS } from "./python-tools";
 import { result } from "./shared";
 import type { ProgramAnalysis, ProgramInvocation, ProgramSemantic } from "./types";
 import { analyzeUvProgram } from "./uv";
+import { analyzeWhichProgram, isSupportedWhichInvocation } from "./which";
 import { resolveExecutableIdentity } from "./identity";
 
 export type { ExecutableIdentity } from "./identity";
@@ -51,6 +52,8 @@ export {
   analyzePackageManagerProgram,
   analyzePythonToolProgram,
   analyzeUvProgram,
+  analyzeWhichProgram,
+  isSupportedWhichInvocation,
 };
 
 type ProgramAnalyzer = (name: string, args: readonly ShellWord[]) => ProgramSemantic;
@@ -60,6 +63,7 @@ const PROGRAM_ANALYZERS: ReadonlyMap<string, ProgramAnalyzer> = new Map([
   ["git", (_name, args) => analyzeGitProgram(args)],
   ["herdr", (_name, args) => analyzeHerdrProgram(args)],
   ["uv", (_name, args) => analyzeUvProgram(args)],
+  ["which", (_name, args) => analyzeWhichProgram(args)],
   ...[...INTERPRETERS].map((name) => [name, (_name: string, args: readonly ShellWord[]) => analyzeInterpreterProgram(args)] as const),
   ...[...PYTHON_TOOLS].map((name) => [name, (_name: string, args: readonly ShellWord[]) => analyzePythonToolProgram(name, args)] as const),
   ...[...PACKAGE_MANAGERS].map((name) => [name, (_name: string, args: readonly ShellWord[]) => analyzePackageManagerProgram(name, args)] as const),
@@ -86,6 +90,10 @@ export function analyzeProgramInvocation(invocation: ProgramInvocation): Program
     }
     if (identity.name === "chmod") {
       return analyzeChmodProgram(invocation.arguments);
+    }
+    if (identity.name === "which" && !isSupportedWhichInvocation(invocation.arguments)) {
+      const word = invocation.arguments[0] ?? Object.freeze({ text: "which", start: 0, end: 5, quote: "bare" as const });
+      return { kind: "reject", code: "unsupported-syntax", word };
     }
     if (DETERMINISTIC_PROGRAMS.has(identity.name)) {
       return { kind: "complete", semantic: result("inspect", [], []) };
