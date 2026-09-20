@@ -2,109 +2,133 @@
 
 > 活跃任务。验证完成后，提炼长期信息到 `docs/decisions.md` 或 `CONTEXT.md`，然后清空对应 Task Record 章节。
 
-## T-0155: 修复会话接力异常冻结并收敛未推送变更记录
+## T-0156: 简化 Task 生命周期状态
 
-- Kind: maintenance
-- Status: verified
+- Kind: refactor
+- Status: draft
 - Reversal surface: engineering
 
 ### Background & Goal
 
-修复当前未推送变更审查发现的 Session Handoff 异常路径工具未冻结问题，并为 `which` 的安全收紧和历史未推送变更补齐可追溯的 Task 权威。保持已验证的 Pi 原生接入、Access Gate hard-boundary、Git inspect、Herdr opaque policy 与 Project Record 校验行为不变。
+简化 Project Record 中 Task 的持久化生命周期，移除容易滞留且无法可靠执行的 `verified` 状态。保留 Requirements、Design、Plan、验证证据、Git checkpoint 和最终审查门禁；完成时在最终落地提交中原子清除 Task Record。
 
 ### Out of Scope
 
-- 不恢复未经证明的 `which` PATH lookup 放行；
-- 不扩展 Shell 语法、PATH 根发现、网络策略或 OS sandbox；
-- 不改写 Git 历史或重做已完成的 Pi 0.86 接入；
-- 不改变 Handoff 成功交接、reconciliation 或 Artifact capability 的既有合同。
+- 不改写 Git 历史或补造历史 Task 状态；
+- 不删除 Git 可达 checkpoint、Verification Evidence 或 Durable Updates Checklist；
+- 不改变 Candidate、Decision、Session Handoff 或 Artifact Exchange 的 verified 语义；
+- 不新增 `blocked`、`abandoned` 或其他 Task 状态。
 
 ### Requirements
 
-- REQ-1: Handoff 写入 `switch-intent` 后，replacement 成功前 source 不得继续暴露模型工具；用户明确取消时才可追加 cancellation 并恢复原工具集合。
-- REQ-2: replacement、setup 或 successor 初始化异常时，source 必须保持 fail-closed；不得留下可继续工作的 split-brain source。
-- REQ-3: 对上述异常路径增加通过公开 Pi composition seam 可观察的回归测试，并保持成功 replacement 与取消路径通过。
-- REQ-4: 将 `which <bare-command-name>` 的 hard-boundary 收紧记录为当前批准的安全语义；说明其与既有 T-0149 放行目标的修订关系，不恢复无界 PATH 查询。
-- REQ-5: 当前 Task 保持 Git 可达 checkpoint，验证完成后清档；Project Record 容器保持合法唯一 trailing slot，且不再仅推进空槽位。
+- REQ-1: 当前 Task 状态只允许 `draft` 和 `in-progress`；新记录不得使用 `verified`。
+- REQ-2: Task 验证完成后，最终落地提交必须同时完成 durable updates 与 Task 清档，不留下已验证但未清档的持久状态。
+- REQ-3: `principles.md`、`survey-context`、`implement-work`、`doc-sync`、validator 与测试必须表达同一生命周期，不保留冲突的 `verified` Task 路由。
+- REQ-4: Project Record 容器保持唯一合法 trailing slot；当前已完成 T-0155 先完成 checkpoint 与清档，再以 T-0156 的 draft 记录本变更。
+- REQ-5: 运行现有文档、技能、类型与测试验证，证明生命周期收敛没有破坏规划、实施、验证和清档门禁。
 
 ### Design
 
-Source Handoff 在发出 `switch-intent` 后保存当前 active tool 集合并立即冻结。`newSession()` 返回取消时追加 `switch-cancelled` 并恢复保存的工具集合；任何异常或状态不明均不恢复工具，保持 source 冻结。Successor 的 `setup`/`withSession` 成功路径继续只使用 successor context。
-
-`which` 保持 `inspect/read` 的静态分类和无路径事实，但由 Mandatory Boundary 以 hard-boundary 拒绝，直到 PATH lookup roots 获得可证明的 bounded 合同。该安全收紧由本 Task 记录，不通过恢复旧放行测试来解决。
+Task 持久状态收敛为 `draft → in-progress → cleared`；`cleared` 由当前树中移除 Task Record 表达，不写入 Status。验证结果继续记录在 Verification Evidence、审查结果和 durable-update checklist 中；最终提交直接清除 Task。`draft` 保留用于 implementation-planning，`in-progress` 覆盖实施、测试、文档同步、审查与 finding 修复阶段。
 
 ### Plan
 
-#### Slice 1: Handoff 异常冻结
+#### Slice 1: Validator contract
 
-**Goal:** replacement 失败或 setup 异常时 source 进入可观察的 fail-closed 状态。
+**Goal:** validator 拒绝新 `verified` 状态，只接受 `draft` 与 `in-progress`。
 
-**Requirements covered:** REQ-1, REQ-2, REQ-3
+**Requirements covered:** REQ-1, REQ-5
 
 **Depends on:** none
 
 **Acceptance Criteria:**
-- [x] `newSession()` 抛错后 source 工具为空，且保留 switch intent。
-- [x] setup 异常后 source 不恢复工具。
-- [x] 用户取消 replacement 时 source 工具恢复，且写入 cancellation。
-- [x] 成功 replacement 与 successor reconciliation 现有测试继续通过。
+- [ ] validator 接受 `draft` 与 `in-progress`；
+- [ ] validator 拒绝 `verified` 并给出合法状态提示；
+- [ ] 测试通过公共 `checkTaskHygiene` seam 证明该行为。
 
 **Files and Seams:**
-- Modify: `packages/guidance/src/artifact-exchange/pi-composition.ts` — `/handoff` command and active-tool lifecycle.
-- Test: `tests/guidance/artifact-exchange/pi-composition.test.ts` — command replacement failure/cancellation seam.
+- Modify: `packages/guidance/src/record-containers/validator.ts` — `TASK_STATUSES` and `checkTaskHygiene`;
+- Test: `tests/guidance/record-containers/validator.test.ts` — Task status hygiene seam。
 
 **Verification:**
-- `npm run test:file -- tests/guidance/artifact-exchange/pi-composition.test.ts`
+- `npm run test:file -- tests/guidance/record-containers/validator.test.ts`
 
 **Steps:**
-1. Add a failing regression test for replacement rejection and source tool freeze.
-2. Implement immediate freeze, cancellation restoration, and fail-closed exception handling.
-3. Re-run focused tests and the existing handoff suite.
+1. Add the failing rejection test for `verified`.
+2. Remove `verified` from the accepted status vocabulary.
+3. Run the focused validator suite.
 
-#### Slice 2: Record and requirement reconciliation
+#### Slice 2: Lifecycle guidance convergence
 
-**Goal:** current change has an authoritative Task and the `which` safety revision is explicit.
+**Goal:** all lifecycle guidance routes completion directly to clearing without a persisted `verified` state。
 
-**Requirements covered:** REQ-4, REQ-5
+**Requirements covered:** REQ-2, REQ-3
 
 **Depends on:** Slice 1
 
 **Acceptance Criteria:**
-- [x] `docs/task.md` contains this Task and exactly one next-ID slot.
-- [x] `which` hard-boundary behavior and its rationale are documented without restoring unsafe allow semantics.
-- [x] Decision and context references remain valid.
+- [ ] principles lifecycle uses `draft → in-progress → cleared`;
+- [ ] survey-context no longer routes `verified` Tasks;
+- [ ] implement-work clears in the final landing surface without setting `verified`;
+- [ ] doc-sync checks active-or-cleared reality without requiring `verified`。
 
 **Files and Seams:**
-- Modify: `docs/task.md`, `CONTEXT.md`, `docs/decisions.md` as needed.
-- Test: `tests/access-gate/access-decision/core/shell-semantics.test.ts`, `tests/access-gate/access-decision/core/shell-policy.test.ts` — current which boundary.
+- Modify: `packages/guidance/src/bootstrap/principles.md`, `packages/guidance/skills/workflows/survey-context/SKILL.md`, `packages/guidance/skills/workflows/implement-work/SKILL.md`, `packages/guidance/skills/disciplines/doc-sync/SKILL.md`;
+- Test: `tests/validate-skills.test.ts` — skill lifecycle contract seam。
 
 **Verification:**
-- `akeel_validate_records`
+- `npm run test:file -- tests/validate-skills.test.ts`
+- `npx tsx scripts/validate-skills.ts`
+
+**Steps:**
+1. Replace persisted verified-state instructions with evidence-plus-atomic-clear instructions.
+2. Update skill contract tests and run the focused validation.
+3. Scan repository references for stale Task `verified` routing.
+
+#### Slice 3: Records and full verification
+
+**Goal:** the current record containers and durable Decision state match the simplified lifecycle。
+
+**Requirements covered:** REQ-4, REQ-5
+
+**Depends on:** Slice 1, Slice 2
+
+**Acceptance Criteria:**
+- [ ] T-0155 is cleared after its checkpoint is reachable;
+- [ ] T-0156 is a complete implementation-ready Task Record with one trailing slot;
+- [ ] D-095 and CONTEXT active index record the adopted lifecycle decision;
+- [ ] full repository validation passes。
+
+**Files and Seams:**
+- Modify: `docs/task.md`, `docs/decisions.md`, `CONTEXT.md`;
+- Test: `tests/guidance/record-containers/validator.test.ts`, `tests/validate-docs.test.ts` — record and reference seams。
+
+**Verification:**
+- `npx tsx -e 'import {validateRecordContainers} from "./packages/guidance/src/record-containers/validator.ts"; console.log(validateRecordContainers(process.cwd()))'`
+- `npx tsx scripts/validate-docs.ts`
 - `npm test`
 - `git diff --check`
 
 **Steps:**
-1. Preserve the safety-tightening tests and record the revised requirement in this Task.
-2. Check all changed record references and current architecture statements.
-3. Mark the Task verified only after fresh validation, then clear it in the completion change.
+1. Validate and clear T-0155, then retain T-0156 as the current Task.
+2. Synchronize the adopted Decision and active index.
+3. Run focused checks and the complete test suite before final review.
 
 ### Verification Evidence
 
-- Focused Handoff suite: 16 passed, 0 failed.
-- Full `npm test`: 594 passed, 0 failed; includes TypeScript, docs, skills, package, Access Gate and Guidance checks.
-- Source `validateRecordContainers(process.cwd())`: passed for all three standard containers.
-- `npx tsx scripts/validate-docs.ts`: passed; 44 live Decision references resolve.
-- `git diff --check`: passed.
+- Pending implementation.
 
 ### Durable Updates Checklist
 
-- [x] `packages/guidance/src/artifact-exchange/pi-composition.ts`
-- [x] `tests/guidance/artifact-exchange/pi-composition.test.ts`
-- [x] `packages/access-gate/src/access-gate/access-decision/core/compilation/shell/programs/which.ts`
-- [x] `tests/access-gate/access-decision/core/shell-semantics.test.ts`
-- [x] `tests/access-gate/access-decision/core/shell-policy.test.ts`
-- [x] `CONTEXT.md`
-- [x] `docs/decisions.md`
-- [x] `docs/task.md`
+- [ ] `packages/guidance/src/record-containers/validator.ts`
+- [ ] `packages/guidance/src/bootstrap/principles.md`
+- [ ] `packages/guidance/skills/workflows/survey-context/SKILL.md`
+- [ ] `packages/guidance/skills/workflows/implement-work/SKILL.md`
+- [ ] `packages/guidance/skills/disciplines/doc-sync/SKILL.md`
+- [ ] `tests/guidance/record-containers/validator.test.ts`
+- [ ] `tests/validate-skills.test.ts`
+- [ ] `CONTEXT.md`
+- [ ] `docs/decisions.md`
+- [ ] `docs/task.md`
 
-## T-0156: 待创建
+## T-0157: 待创建

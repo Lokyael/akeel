@@ -1017,5 +1017,23 @@ Rejected:
 
 Out of Scope: PATH 受管发现、别名/函数解析、多个目标、选项扩展、Shell 动态展开和对执行后 `which` 输出的内容过滤。
 
-## D-095: 待创建
+## D-095: Task 生命周期收敛为验证证据与原子清档
+
+Reversal surface: engineering
+
+Decision: Task 的持久化 Status 只保留 `draft` 与 `in-progress`；`verified` 不再作为新记录状态。验证由 Verification Evidence、审查结论和 durable-update checklist 表达，Task 在完成 durable updates 的最终落地提交中直接清档；`cleared` 由当前树中不存在 Task Record 表达，不写入状态字段。
+
+Why: `verified` 与清档之间没有独立的权威行为，反而形成容易滞留的中间记录，并允许历史流程跳过或重复状态而不被 validator 证明。保留 `draft` 可维护规划到实施的入口边界，保留 `in-progress` 可覆盖实施、测试、文档同步和审查；把验证保留在证据与最终提交门禁中，可以降低状态复杂度而不削弱 checkpoint、审查或清档要求。
+
+Impact: principles、survey-context、implement-work、doc-sync、record validator 与测试统一使用 `draft → in-progress → cleared`。历史 Git checkpoint 不改写；旧历史中的 `verified` 只作为审计事实存在，当前新记录不再生成该状态。
+
+Rejected:
+
+- **保留 `verified` 作为强制中间提交状态：** 增加一次持久化转换，却不能阻止已验证记录滞留或生命周期跳转。
+- **删除 `draft`：** 会丢失 implementation-planning 与 implementation start 之间的明确边界。
+- **新增 `blocked`、`abandoned` 等状态：** 当前没有独立的权威语义、清理责任或恢复合同，应用状态章节和开放风险即可表达。
+
+Out of Scope: Candidate、Decision、Artifact Exchange verified collect、Session Handoff reconciliation 与 Git 历史中的既有 Task 状态。
+
+## D-096: 待创建
 

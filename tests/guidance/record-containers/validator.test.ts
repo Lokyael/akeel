@@ -108,6 +108,13 @@ test("checkTaskHygiene: accepts valid active Task record with draft, in-progress
   }
 });
 
+test("checkTaskHygiene: rejects persisted verified status after lifecycle simplification", () => {
+  const content = `# Tasks\n\n## T-001: Sample Task\n\n- Kind: refactor\n- Status: verified\n- Reversal surface: engineering\n\n### Plan\n\n## T-002: 待创建\n`;
+  const res = checkTaskHygiene(content);
+  assert.equal(res.ok, false);
+  assert.ok(res.errors.some((e) => e.includes("invalid Task Status 'verified'")));
+});
+
 test("checkTaskHygiene: accepts empty / cleared task container", () => {
   const content = `# Tasks\n\n> 活跃任务\n\n## T-044: 待创建\n`;
   const res = checkTaskHygiene(content);
