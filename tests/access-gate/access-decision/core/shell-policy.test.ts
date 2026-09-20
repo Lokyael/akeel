@@ -1160,15 +1160,18 @@ test("recursive paths cannot traverse a blocked component before reaching an all
   });
 });
 
-test("which lookup is admitted as bounded inspect under read policy", () => {
-  const inspectPolicy = freezeShellPolicySnapshot({
+test("which lookup fails closed when the lookup roots are not bounded", () => {
+  const scopedPolicy = freezeShellPolicySnapshot({
     ...policy,
     inspect: "allow",
     unknown: "deny",
     opaque: "deny",
+    allowedRoots: ["/workspace/project"],
+    blockedRoots: [],
   });
-  assert.deepEqual(evaluateShellAdmission(admission("which herdr"), inspectPolicy), {
-    kind: "allow",
+  assert.deepEqual(evaluateShellAdmission(admission("which herdr"), scopedPolicy), {
+    kind: "deny",
+    code: "hard-boundary",
   });
 });
 

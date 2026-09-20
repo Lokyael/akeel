@@ -111,6 +111,7 @@
 - [D-091 多语言构建工具族语义分类与防误删硬边界](docs/decisions.md#d-091-多语言构建工具族语义分类与防误删硬边界)
 - [D-092 必要语义保活、会话内嵌 Handoff 与单入口原生 Session 接力](docs/decisions.md#d-092-必要语义保活会话内嵌-handoff-与单入口原生-session-接力)
 - [D-093 Session Handoff 采用 source intent 与 successor receipt 的单向两阶段交接](docs/decisions.md#d-093-session-handoff-采用-source-intent-与-successor-receipt-的单向两阶段交接)
+- [D-094 `which` PATH 查询的未界定根硬边界](docs/decisions.md#d-094-which-path-查询的未界定根硬边界)
 
 ## Negative Space
 

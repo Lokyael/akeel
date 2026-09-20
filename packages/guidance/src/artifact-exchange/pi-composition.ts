@@ -115,7 +115,7 @@ const HANDOFF_PARAMETERS = Type.Union([
   }, { additionalProperties: false }),
   Type.Object({
     action: Type.Literal("prepare"),
-    payload: PREPARE_PAYLOAD_SCHEMA,
+    payload: Type.Optional(PREPARE_PAYLOAD_SCHEMA),
   }, { additionalProperties: false }),
   Type.Object({
     action: Type.Literal("reconcile"),
@@ -449,8 +449,10 @@ export function installArtifactExchange(pi: ExtensionAPI, options: ArtifactExcha
         const currentActive = active;
 
         const switchIntent = handoffs.beginSwitch(sourceBranch, source.sessionId);
+        const previousActiveTools = [...pi.getActiveTools()];
         pi.appendEntry(switchIntent.customType, switchIntent.data);
         sourceBranch.push(switchIntent);
+        pi.setActiveTools([]);
 
         replacementAttempted = true;
         const replacement = await context.newSession({
@@ -485,6 +487,7 @@ export function installArtifactExchange(pi: ExtensionAPI, options: ArtifactExcha
         if (replacement.cancelled) {
           const cancel = handoffs.cancelSwitch(sourceBranch, source.sessionId);
           pi.appendEntry(cancel.customType, cancel.data);
+          pi.setActiveTools(previousActiveTools);
         }
       } catch (error) {
         const message = error instanceof Error && error.message ? error.message : "Handoff session replacement failed.";

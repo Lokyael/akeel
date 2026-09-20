@@ -607,8 +607,9 @@ test("/handoff recovers cleanly after a cancelled replacement and succeeds on re
     };
     await command.handler("", cancelledContext);
 
-    // Session has recorded the cancellation entry
+    // Session has recorded the cancellation entry and restored source tools.
     assert.equal(ownerPi.entries.some((entry) => entry.customType === "akeel:switch-cancelled"), true);
+    assert.deepEqual(ownerPi.active(), ["read", "write", "akeel_run_artifact", "akeel_handoff"]);
 
     // 2. Second attempt: user retries without arguments and confirms replacement
     const sentMessages: string[] = [];
@@ -651,6 +652,70 @@ test("/handoff recovers cleanly after a cancelled replacement and succeeds on re
       workspaceVerified: true,
     } }, context("retry-successor", successorEntries));
     assert.equal(reconciled.details.result.state, "reconciled");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("/handoff freezes source tools when session replacement fails", async () => {
+  const root = mkdtempSync(join(tmpdir(), "akeel-artifact-pi-"));
+  chmodSync(root, 0o700);
+  try {
+    const ownerPi = fakePi();
+    installArtifactExchange(ownerPi.pi, { root });
+    await start(ownerPi, "source-session");
+    const sourceContext = context("source-session", ownerPi.entries);
+    const command = ownerPi.commands.get("handoff")!;
+    const originalError = console.error;
+    console.error = () => {};
+    try {
+      await command.handler("", {
+        ...sourceContext,
+        isIdle: () => true,
+        newSession: async () => { throw new Error("replacement failed"); },
+      });
+    } finally {
+      console.error = originalError;
+    }
+
+    assert.deepEqual(ownerPi.active(), []);
+    assert.equal(ownerPi.entries.some((entry) => entry.customType === "akeel:switch-intent"), true);
+    assert.equal(ownerPi.entries.some((entry) => entry.customType === "akeel:switch-cancelled"), false);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("/handoff keeps source tools frozen when successor setup fails", async () => {
+  const root = mkdtempSync(join(tmpdir(), "akeel-artifact-pi-"));
+  chmodSync(root, 0o700);
+  try {
+    const ownerPi = fakePi();
+    installArtifactExchange(ownerPi.pi, { root });
+    await start(ownerPi, "source-session");
+    const sourceContext = context("source-session", ownerPi.entries);
+    const command = ownerPi.commands.get("handoff")!;
+    const originalError = console.error;
+    console.error = () => {};
+    try {
+      await command.handler("", {
+        ...sourceContext,
+        isIdle: () => true,
+        newSession: async (options: any) => {
+          await options.setup({
+            getSessionId: () => "successor-session",
+            appendCustomEntry: () => { throw new Error("successor setup failed"); },
+          });
+          return { cancelled: false };
+        },
+      });
+    } finally {
+      console.error = originalError;
+    }
+
+    assert.deepEqual(ownerPi.active(), []);
+    assert.equal(ownerPi.entries.some((entry) => entry.customType === "akeel:switch-intent"), true);
+    assert.equal(ownerPi.entries.some((entry) => entry.customType === "akeel:switch-cancelled"), false);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
@@ -977,6 +1042,8 @@ test("akeel_handoff registers strongly-typed payload parameter schema and valida
       },
     };
     assert.equal(Value.Check(handoffTool.parameters, validReconcileBlocked), true);
+
+    assert.equal(Value.Check(handoffTool.parameters, { action: "prepare" }), true);
 
     const prepareWithoutFiles = {
       action: "prepare",

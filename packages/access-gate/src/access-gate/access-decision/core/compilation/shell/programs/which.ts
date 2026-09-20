@@ -8,7 +8,7 @@ export function isSupportedWhichInvocation(args: readonly ShellWord[]): boolean 
   return args.length === 1 && BARE_COMMAND_NAME.test(args[0]!.text);
 }
 
-/** Analyze only the bounded `which <bare-command-name>` lookup form. */
+/** Keep PATH lookup fail-closed until its filesystem roots can be bounded. */
 export function analyzeWhichProgram(_args: readonly ShellWord[]): ProgramSemantic {
-  return result("inspect", ["read"]);
+  return result("inspect", ["read"], [], { hardBoundary: true });
 }

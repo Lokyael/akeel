@@ -272,13 +272,14 @@ test("bounded find predicates expose only recursive start paths", () => {
   assert.equal(semantic.recursive, true);
 });
 
-test("which resolves one bare command name as bounded inspect without path access", () => {
+test("which fails closed until its lookup roots are bounded", () => {
   const analysis = complete("which herdr");
   assert.equal(analysis.executable, "which");
   assert.equal(analysis.commandClass, "inspect");
   assert.deepEqual(analysis.effects, ["read"]);
   assert.deepEqual(analysis.paths, []);
   assert.equal((analysis as { readonly semantic?: { readonly opaquePathAccess?: boolean } }).semantic?.opaquePathAccess, false);
+  assert.equal((analysis as { readonly semantic?: { readonly hardBoundary?: boolean } }).semantic?.hardBoundary, true);
 });
 
 test("which rejects options, multiple targets, and path-form targets", () => {

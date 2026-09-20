@@ -999,5 +999,23 @@ Rejected: replacement 后继续使用捕获的 `pi` 或 command context；在 `w
 
 Out of Scope: Pi runtime 本身的 replacement/cancellation 实现、跨 Owner handoff、异步 mailbox、外部 handoff 文件和 source session 在 replacement 成功后的二次写入机制。
 
-## D-094: 待创建
+## D-094: `which` PATH 查询的未界定根硬边界
+
+Reversal surface: engineering
+
+Decision: 裸名 `which <bare-command-name>` 可以在 Canonical 层表达为 `inspect`、`read` 且不发行路径事实，但由于 PATH 搜索根与运行期查找范围尚未形成可证明的 bounded contract，该语义继续由 Mandatory Boundary 发行 `hard-boundary` 拒绝，不进入 preset 的普通 inspect 策略求值。选项、多目标、空目标、动态值和路径形式不因该语义获得放行；系统路径形式继续遵循 D-067 的 opaque execute 边界。
+
+Why: `which` 的结果依赖进程 PATH 和执行期文件系统搜索。没有受管的 PATH authority、根集合与 lookup 事实时，“不发行路径事实”不能证明没有越界读取；仅以 `inspect: allow` 放行会把未证明的运行期访问隐藏在静态分类之后。hard-boundary 保持 D-018 的 fail-closed 和 D-072 的 Access Root 不扩张不变量。
+
+Impact: `which <bare-command-name>` 在所有 preset 下保持安全拒绝，直到未来建立独立的 bounded PATH lookup 合同；当前不恢复 T-0149 原先的普通 inspect 放行目标。现有选项/多目标/路径形式负例和无路径事实测试继续作为边界证据。
+
+Rejected:
+
+- **仅因 Canonical 没有 path fact 就放行：** 忽略 PATH 搜索的隐含文件系统访问范围。
+- **用当前进程 PATH 或 PATH 字符串前缀猜测安全根：** 环境值和运行期解析不是当前 Gate 可验证的静态授权事实。
+- **把 system path-form `which` 透明映射为裸名 inspect：** 会绕过既有 path-form opaque 边界。
+
+Out of Scope: PATH 受管发现、别名/函数解析、多个目标、选项扩展、Shell 动态展开和对执行后 `which` 输出的内容过滤。
+
+## D-095: 待创建
 
