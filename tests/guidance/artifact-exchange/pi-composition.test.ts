@@ -54,6 +54,7 @@ function context(sessionId: string, entries: CustomEntry[] = []): ExtensionConte
     ui: {
       notify: () => {},
     },
+    waitForIdle: async () => {},
     sessionManager: {
       getSessionId: () => sessionId,
       getSessionFile: () => `/sessions/${sessionId}.jsonl`,
@@ -288,7 +289,7 @@ test("single /handoff command synthesizes capsule and replaces session in one st
     const successorEntries: CustomEntry[] = [];
     const successorContext = {
       ...context("successor-session", successorEntries),
-      sendUserMessage: async (message: string) => { sent.push(message); },
+      sendMessage: async (message: { content: string }) => { sent.push(message.content); },
     };
     const commandContext = {
       ...sourceContext,
@@ -352,7 +353,7 @@ test("single /handoff command synthesizes capsule and replaces session in one st
     const s3Entries: CustomEntry[] = [];
     const s3Context = {
       ...context("session-3", s3Entries),
-      sendUserMessage: async (msg: string) => { sent.push(msg); },
+      sendMessage: async (message: { content: string }) => { sent.push(message.content); },
     };
     const s2CommandContext = {
       ...context("successor-session", successorEntries),
@@ -403,7 +404,7 @@ test("/handoff writes the successor receipt through setup before using the fresh
     await start(ownerPi, "source-session");
     const sourceContext = context("source-session", ownerPi.entries);
     const successorEntries: CustomEntry[] = [];
-    const sent: string[] = [];
+    const sent: Array<{ message: any; options: any }> = [];
     const successorManager = {
       getSessionId: () => "successor-session",
       appendCustomEntry(customType: string, data: unknown): string {
@@ -413,7 +414,7 @@ test("/handoff writes the successor receipt through setup before using the fresh
     };
     const successorContext = {
       ...context("successor-session", successorEntries),
-      sendUserMessage: async (message: string) => { sent.push(message); },
+      sendMessage: async (message: any, options: any) => { sent.push({ message, options }); },
     };
     const commandContext = {
       ...sourceContext,
@@ -431,6 +432,11 @@ test("/handoff writes the successor receipt through setup before using the fresh
     await command.handler("Continue in the successor", commandContext);
 
     assert.equal(sent.length, 1);
+    assert.equal(sent[0]!.message.customType, "akeel:session-handoff");
+    assert.equal(sent[0]!.message.display, false);
+    assert.equal(sent[0]!.message.details.digest.startsWith("sha256:"), true);
+    assert.equal(sent[0]!.options.triggerTurn, true);
+    assert.match(sent[0]!.message.content, /<akeel-session-handoff>/u);
     assert.equal(successorEntries.some((entry) => entry.customType === "akeel:continuation-capsule"), true);
     assert.equal(ownerPi.entries.some((entry) => entry.customType === "akeel:handoff-switched"), false);
   } finally {
@@ -617,7 +623,7 @@ test("/handoff recovers cleanly after a cancelled replacement and succeeds on re
     const successorEntries: CustomEntry[] = [];
     const successorCtx = {
       ...context("retry-successor", successorEntries),
-      sendUserMessage: async (msg: string) => { sentMessages.push(msg); },
+      sendMessage: async (message: { content: string }) => { sentMessages.push(message.content); },
     };
     const confirmedContext = {
       ...sourceContext,
@@ -903,7 +909,7 @@ test("prepare action fails closed on workspace cwd mismatch and canReuseActive r
         const successorCtx = {
           ...context("cwd-successor", successorEntries),
           cwd: "/new/workspace/project",
-          sendUserMessage: async () => {},
+          sendMessage: async () => {},
         };
         await options.setup(successorCtx.sessionManager);
         await options.withSession(successorCtx);
@@ -924,7 +930,7 @@ test("prepare action fails closed on workspace cwd mismatch and canReuseActive r
   }
 });
 
-test("/handoff notifies error when session is not idle without throwing", async () => {
+test("/handoff waits for a busy session to settle before replacement", async () => {
   const root = mkdtempSync(join(tmpdir(), "akeel-artifact-pi-"));
   chmodSync(root, 0o700);
   try {
@@ -932,22 +938,23 @@ test("/handoff notifies error when session is not idle without throwing", async 
     installArtifactExchange(ownerPi.pi, { root });
     await start(ownerPi, "busy-session");
 
-    let notifiedError: string | undefined;
+    let waitCalls = 0;
+    let replacementCalls = 0;
     const busyContext = {
       ...context("busy-session", ownerPi.entries),
-      hasUI: true,
-      ui: {
-        notify: (msg: string, level?: string) => {
-          if (level === "error") notifiedError = msg;
-        },
-      },
       isIdle: () => false,
+      waitForIdle: async () => { waitCalls += 1; },
+      newSession: async () => {
+        replacementCalls += 1;
+        return { cancelled: true };
+      },
     };
 
     const command = ownerPi.commands.get("handoff")!;
     assert.ok(command);
     await command.handler("", busyContext);
-    assert.equal(notifiedError, "Handoff session replacement failed: session is not idle.");
+    assert.equal(waitCalls, 1);
+    assert.equal(replacementCalls, 1);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

@@ -6,6 +6,7 @@ import {
   shellCommandOutcomes,
 } from "../../../../packages/access-gate/src/access-gate/access-decision/core/compilation/shell/invocation";
 import type { ShellWord } from "../../../../packages/access-gate/src/access-gate/access-decision/core/compilation/shell/language";
+import { gitDiffCommand } from "../../fixtures";
 
 const policyContract = {
   source: "new-policy",
@@ -478,6 +479,24 @@ test("Git inspect commands are bounded repository reads", () => {
       { text: "src/app.ts", role: "source" },
     ],
   });
+});
+
+test("Git diff rename and copy detection flags remain bounded inspect options", () => {
+  for (const variant of [
+    gitDiffCommand(),
+    gitDiffCommand({ flags: ["--find-renames=50", "--find-copies=50"] }),
+  ]) {
+    const analysis = complete(variant);
+    assert.equal(analysis.commandClass, "inspect", variant);
+    assert.deepEqual(analysis.effects, ["read"], variant);
+    assert.equal(analysis.semantic.opaquePathAccess, false, variant);
+    assert.equal(analysis.semantic.hardBoundary, false, variant);
+    assert.deepEqual(analysis.paths.map((entry) => entry.text), [
+      ".",
+      "src/old.ts",
+      "src/new.ts",
+    ], variant);
+  }
 });
 
 test("Git command-local cwd facts keep token order and path bases", () => {

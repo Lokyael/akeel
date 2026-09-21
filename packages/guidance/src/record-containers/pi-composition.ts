@@ -28,6 +28,7 @@ export function installRecordContainerValidator(pi: ExtensionAPI): void {
     description: "Validate Project Record containers (docs/candidates.md, docs/task.md, docs/decisions.md) for slot placement, unique slot invariant, prefix matching, and Candidate/Task field hygiene.",
     parameters: VALIDATE_PARAMETERS,
     executionMode: "sequential",
+    constrainedSampling: { type: "json_schema", strict: "prefer" },
     async execute(_toolCallId, rawParams, _signal, _onUpdate, context: ExtensionContext) {
       const params = (rawParams ?? {}) as { projectRoot?: string };
       const root = params.projectRoot ? resolve(context.cwd, params.projectRoot) : context.cwd;

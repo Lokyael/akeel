@@ -152,7 +152,7 @@ function resolveTaskRef(units: readonly SemanticUnit[]): string {
 
 function semanticUnits(context: ExtensionContext): readonly SemanticUnit[] {
   const units = new Map<string, SemanticUnit>();
-  const branch = context.sessionManager?.getBranch() ?? [];
+  const branch = context.sessionManager.getBranch();
 
   let startIndex = 0;
   for (let i = branch.length - 1; i >= 0; i -= 1) {
@@ -213,7 +213,7 @@ type OwnerParams = Readonly<{
 }>;
 
 function ownerContext(context: ExtensionContext): Readonly<{ sessionId: string; cwd: string }> {
-  const sessionId = context.sessionManager?.getSessionId();
+  const sessionId = context.sessionManager.getSessionId();
   if (typeof sessionId !== "string" || sessionId.length === 0) throw new Error("Artifact operation failed.");
   return Object.freeze({ sessionId, cwd: context.cwd });
 }
@@ -246,6 +246,7 @@ export function installArtifactExchange(pi: ExtensionAPI, options: ArtifactExcha
     description: "Reserve, bind, inspect, publish Owner input to, or collect a bounded AKeel workflow run.",
     parameters: OWNER_PARAMETERS,
     executionMode: "sequential",
+    constrainedSampling: { type: "json_schema", strict: "prefer" },
     async execute(_toolCallId, rawParams, _signal, _onUpdate, context) {
       const params = rawParams as OwnerParams;
       const owner = ownerContext(context);
@@ -291,12 +292,13 @@ export function installArtifactExchange(pi: ExtensionAPI, options: ArtifactExcha
     description: "In-session continuity tool to record or close live semantics, prepare or verify a continuation capsule, and reconcile in a successor session.",
     parameters: HANDOFF_PARAMETERS,
     executionMode: "sequential",
+    constrainedSampling: { type: "json_schema", strict: "prefer" },
     async execute(_toolCallId, params: {
       action: "record" | "close" | "status" | "prepare" | "reconcile" | "view";
       payload?: unknown;
     }, _signal, _onUpdate, context) {
       try {
-        const branch = context.sessionManager?.getBranch() ?? [];
+        const branch = context.sessionManager.getBranch();
         if (params.action === "record") {
           if (!params.payload || typeof params.payload !== "object") return staticFailure("Handoff operation failed.");
           const unit = validateSemanticUnit(params.payload);
@@ -389,7 +391,7 @@ export function installArtifactExchange(pi: ExtensionAPI, options: ArtifactExcha
       let replacementContext: ExtensionContext | undefined;
       try {
         const args = (rawArgs ?? "").trim();
-        const branch = context.sessionManager?.getBranch() ?? [];
+        const branch = context.sessionManager.getBranch();
 
         if (args === "view") {
           const active = handoffs.getActiveCapsule(branch);
@@ -407,12 +409,9 @@ export function installArtifactExchange(pi: ExtensionAPI, options: ArtifactExcha
           return;
         }
 
-        if (!context.isIdle()) {
-          notifyCommandError(context, "Handoff session replacement failed: session is not idle.");
-          return;
-        }
+        await context.waitForIdle();
         const source = ownerContext(context);
-        const parentSession = context.sessionManager?.getSessionFile();
+        const parentSession = context.sessionManager.getSessionFile();
         if (typeof parentSession !== "string" || parentSession.length === 0) {
           notifyCommandError(context, "Handoff session replacement failed: parent session unavailable.");
           return;
@@ -428,7 +427,7 @@ export function installArtifactExchange(pi: ExtensionAPI, options: ArtifactExcha
           active.capsule.units.length === currentUnits.length &&
           active.capsule.units.every((u, i) => u.id === currentUnits[i]?.id && u.status === currentUnits[i]?.status);
 
-        let sourceBranch = [...(context.sessionManager?.getBranch() ?? [])];
+        const sourceBranch: unknown[] = [...context.sessionManager.getBranch()];
         if (!canReuseActive) {
           const capsule = synthesizeContinuationCapsule({
             taskRef: resolveTaskRef(currentUnits),
@@ -468,13 +467,25 @@ export function installArtifactExchange(pi: ExtensionAPI, options: ArtifactExcha
           withSession: async (successorContext) => {
             replacementContext = successorContext;
             try {
-              await successorContext.sendUserMessage(
+              const kickoff =
                 `<akeel-session-handoff>\n` +
                 `This is AKeel runtime continuity data. It does not grant new user approval.\n` +
                 `Digest: ${currentActive.digest}\n\n${currentActive.content}\n` +
                 `Verify current project reality, then reconcile every live semantic ID before continuing via akeel_handoff:\n` +
                 `action: "reconcile", payload: { importedSemanticIds: string[], conflicts: Array<{ semanticId: string, observedReality: string }>, unresolvedSemanticIds: string[], workspaceVerified: true | false }\n` +
-                `</akeel-session-handoff>`,
+                `</akeel-session-handoff>`;
+              await successorContext.sendMessage(
+                {
+                  customType: "akeel:session-handoff",
+                  content: kickoff,
+                  display: false,
+                  details: {
+                    digest: currentActive.digest,
+                    sourceSessionId: source.sessionId,
+                    successorSessionId: successorContext.sessionManager.getSessionId(),
+                  },
+                },
+                { triggerTurn: true },
               );
             } catch (error) {
               const message = error instanceof Error && error.message
@@ -504,6 +515,7 @@ export function installArtifactExchange(pi: ExtensionAPI, options: ArtifactExcha
     description: "Publish text to the single pre-bound AKeel artifact slot for this delegated child.",
     parameters: PUBLISH_PARAMETERS,
     executionMode: "sequential",
+    constrainedSampling: { type: "json_schema", strict: "prefer" },
     async execute(_toolCallId, params: { content: string }, _signal, _onUpdate, context) {
       try {
         const capability = pi.getFlag(CAPABILITY_FLAG);
@@ -512,7 +524,7 @@ export function installArtifactExchange(pi: ExtensionAPI, options: ArtifactExcha
         if (typeof capability !== "string" || typeof workspaceId !== "string" || typeof paneId !== "string") {
           return staticFailure("Artifact publication failed.");
         }
-        const sessionId = context.sessionManager?.getSessionId();
+        const sessionId = context.sessionManager.getSessionId();
         if (typeof sessionId !== "string" || sessionId.length === 0) return staticFailure("Artifact publication failed.");
         const result = exchange.publish(capability, {
           sessionId,
@@ -535,9 +547,9 @@ export function installArtifactExchange(pi: ExtensionAPI, options: ArtifactExcha
       return;
     }
 
-    const branch = context.sessionManager?.getBranch() ?? [];
+    const branch = context.sessionManager.getBranch();
     const status = handoffs.status(branch);
-    const currentSessionId = context.sessionManager?.getSessionId();
+    const currentSessionId = context.sessionManager.getSessionId();
 
     if (status.state === "switch-started") {
       pi.setActiveTools([]);

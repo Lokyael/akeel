@@ -25,6 +25,16 @@ test("Pi gate adapter normalizes aliases ls, grep, find to canonical surfaces", 
   assert.equal(findResult.kind === "managed" && findResult.request.surface, "search");
 });
 
+test("Pi gate adapter rejects Pi PowerShell as an unsupported governed surface", () => {
+  assert.deepEqual(
+    adaptPiGateToolCall(
+      { toolName: "powershell", input: { command: "Get-ChildItem" } },
+      { cwd: "/workspace/project", hasUI: false },
+    ),
+    { kind: "reject", code: "unsupported-surface" },
+  );
+});
+
 test("Pi gate adapter passes through unowned tools without checking context", () => {
   const result = adaptPiGateToolCall(
     { toolName: "web_search", input: { query: "pi" } },

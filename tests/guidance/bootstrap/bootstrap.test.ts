@@ -56,3 +56,24 @@ test("akeelBootstrap initializes sections if missing", () => {
 
   assert.ok(event.systemPromptOptions.sections?.akeel_principles);
 });
+
+test("akeelBootstrap preserves existing prompt sections while patching principles", () => {
+  const { handlers, pi } = fakePi();
+  akeelBootstrap(pi);
+
+  const handler = handlers.get("before_agent_start");
+  assert.ok(handler);
+
+  const event = {
+    prompt: "hello",
+    systemPrompt: "You are an assistant.",
+    systemPromptOptions: {
+      sections: { existing: "Keep this section." },
+    },
+  } as unknown as BeforeAgentStartEvent;
+
+  handler(event, {} as ExtensionContext);
+
+  assert.equal(event.systemPromptOptions.sections?.existing, "Keep this section.");
+  assert.ok(event.systemPromptOptions.sections?.akeel_principles);
+});

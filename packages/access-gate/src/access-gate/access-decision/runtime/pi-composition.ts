@@ -1,13 +1,16 @@
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { join } from "node:path";
+import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import {
   adaptPiGateToolCall,
   decodePolicyConfiguration,
+  isExplicitlyUnsupportedToolCall,
   loadDecodedPolicyFile,
   resolveAgentDir,
 } from "../adapters/index";
 import type { DecodedPolicyConfiguration } from "../adapters/index";
 import { createLinuxPathEvidence } from "../core/compilation/index";
 import { handleGateSessionToolCall } from "./host-composition";
+import { renderHostBlock } from "./host-render";
 import type { PiToolCallHandlerResult } from "./host-composition";
 import { createGateSession } from "./gate-session";
 import type { GateSession } from "./gate-session";
@@ -36,6 +39,8 @@ type SessionProject = Readonly<{
   readonly context: ProjectContext;
   readonly dispose?: () => void;
 }>;
+
+type PolicyContext = Pick<ExtensionContext, "cwd" | "hasUI" | "mode" | "ui">;
 
 const INITIALIZATION_FAILURE_REASON = "Blocked because the decision service is not initialized.";
 const BUILTIN_POLICY_PRESET_LABELS: Readonly<Record<string, string>> = Object.freeze({
@@ -111,17 +116,25 @@ function credentialRoots(agentDir: string): readonly string[] {
   return Object.freeze(resolved === undefined || resolved === agentDir ? [agentDir] : [agentDir, resolved]);
 }
 
-function defaultCapabilityRoots(agentDir: string): readonly string[] {
-  const subDirs = ["git", "node_modules", "skills", "extensions"];
+function capabilityRootsForSession(
+  agentDir: string,
+  cwd: string,
+  home: string | undefined,
+  configuredRoots?: readonly string[],
+): readonly string[] {
+  const rawRoots = [
+    ...["git", "npm", "node_modules", "skills", "extensions"].map((sub) => join(agentDir, sub)),
+    ...(home === undefined ? [] : [join(home, ".agents", "skills")]),
+    join(cwd, ".pi", "git"),
+    join(cwd, ".pi", "npm"),
+    ...(configuredRoots ?? []),
+  ];
   const roots: string[] = [];
   const evidence = createLinuxPathEvidence();
-  for (const sub of subDirs) {
-    const raw = `${agentDir}/${sub}`;
+  for (const raw of rawRoots) {
     const resolved = evidence.resolve("/", raw)?.candidate;
     roots.push(raw);
-    if (resolved !== undefined && resolved !== raw) {
-      roots.push(resolved);
-    }
+    if (resolved !== undefined && resolved !== raw) roots.push(resolved);
   }
   return Object.freeze([...new Set(roots)]);
 }
@@ -139,9 +152,6 @@ function installComposition(
   let currentConfiguration: DecodedPolicyConfiguration | undefined = policyProvider();
   const pathEvidence = createLinuxPathEvidence();
   const protectedRoots = credentialRoots(agentDir);
-  const activeCapabilityRoots = Object.freeze([
-    ...new Set([...defaultCapabilityRoots(agentDir), ...(configuredCapabilityRoots ?? [])]),
-  ]);
 
   function currentBadge(): string {
     if (currentConfiguration?.kind === "off") {
@@ -150,12 +160,12 @@ function installComposition(
     return formatPolicyBadge(policyStatus(currentConfiguration, session), currentConfiguration);
   }
 
-  function syncPolicyStatus(context: any): void {
+  function syncPolicyStatus(context: PolicyContext): void {
     const status = currentConfiguration === undefined ? undefined : currentBadge();
-    context.ui?.setStatus?.(POLICY_STATUS_ID, status);
+    context.ui.setStatus(POLICY_STATUS_ID, status);
   }
 
-  function activatePresetOrOff(name: string, context: any): boolean {
+  function activatePresetOrOff(name: string, context: PolicyContext): boolean {
     if (name === "off") {
       session?.close();
       session = undefined;
@@ -203,7 +213,7 @@ function installComposition(
         stagingRoot: project ? project.context.stagingRoot : context.cwd,
         home: sessionHome,
         credentialRoots: protectedRoots,
-        capabilityRoots: activeCapabilityRoots,
+        capabilityRoots: capabilityRootsForSession(agentDir, context.cwd, sessionHome, configuredCapabilityRoots),
         configuration: newConfig,
         pathEvidence,
       });
@@ -215,7 +225,7 @@ function installComposition(
     }
   }
 
-  async function confirmAndTurnOff(context: any): Promise<void> {
+  async function confirmAndTurnOff(context: PolicyContext): Promise<void> {
     if (currentConfiguration?.kind === "off") {
       notifyPolicy(context, "Access Gate is already turned off for this session.", "info");
       return;
@@ -310,7 +320,7 @@ function installComposition(
   rememberSubscription(pi.on("session_start", (_event, context) => {
     session?.close();
     project?.dispose();
-    context.ui?.setStatus?.(POLICY_STATUS_ID, undefined);
+    context.ui.setStatus(POLICY_STATUS_ID, undefined);
     session = undefined;
     project = undefined;
     sessionHome = captureSessionHome();
@@ -331,7 +341,7 @@ function installComposition(
         stagingRoot: sessionProject.context.stagingRoot,
         home: sessionHome,
         credentialRoots: protectedRoots,
-        capabilityRoots: activeCapabilityRoots,
+        capabilityRoots: capabilityRootsForSession(agentDir, sessionProject.context.cwd, sessionHome, configuredCapabilityRoots),
         configuration: currentConfiguration,
         pathEvidence,
       });
@@ -344,14 +354,24 @@ function installComposition(
   }));
 
   rememberSubscription(pi.on("session_shutdown", (_event, context) => {
-    context.ui?.setStatus?.(POLICY_STATUS_ID, undefined);
+    context.ui.setStatus(POLICY_STATUS_ID, undefined);
     dispose();
   }));
 
   rememberSubscription(pi.on("tool_call", async (event, context) => {
-    if (currentConfiguration?.kind === "off") return undefined;
+    if (currentConfiguration?.kind === "off") {
+      if (isExplicitlyUnsupportedToolCall(event)) {
+        return Object.freeze({ block: true, reason: renderHostBlock("unsupported-surface").reason });
+      }
+      return undefined;
+    }
     if (!session) {
-      return adaptPiGateToolCall(event, context).kind === "passthrough" ? undefined : initializationFailure();
+      const adapted = adaptPiGateToolCall(event, context);
+      if (adapted.kind === "passthrough") return undefined;
+      if (adapted.kind === "reject" && adapted.code === "unsupported-surface") {
+        return Object.freeze({ block: true, reason: renderHostBlock("unsupported-surface").reason });
+      }
+      return initializationFailure();
     }
     return handleGateSessionToolCall(session, event, context);
   }));

@@ -5,6 +5,6 @@ export type {
   PolicyConfig,
   PolicyPresetName,
 } from "./config";
-export { adaptPiGateToolCall } from "./host";
+export { adaptPiGateToolCall, isExplicitlyUnsupportedToolCall } from "./host";
 export type { GateHostToolCall, HostContext } from "./host";
 export { loadDecodedPolicyFile, resolveAgentDir } from "./policy-file";

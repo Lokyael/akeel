@@ -1,4 +1,4 @@
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import type { ContextEvent, ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
 const SUCCESS_OUTPUT = "All tests passed";
 const DIAGNOSTIC_CONTEXT_RADIUS = 1;
@@ -45,7 +45,9 @@ export function pruneTestContext(messages: readonly unknown[]): unknown[] {
 }
 
 export default function contextPruner(pi: ExtensionAPI): void {
-  pi.on("context", (event) => ({ messages: pruneTestContext(event.messages) }));
+  pi.on("context", (event: ContextEvent) => ({
+    messages: pruneTestContext(event.messages) as ContextEvent["messages"],
+  }));
 }
 
 function pruneMessage(message: unknown, bashCalls: ReadonlyMap<string, BashToolCall>): unknown {

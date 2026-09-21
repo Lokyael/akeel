@@ -118,6 +118,7 @@ const GIT_LOG_INSPECT_OPTIONS: readonly OptionSpec<GitSubcommandKey>[] = [
 
 const GIT_DIFF_INSPECT_OPTIONS: readonly OptionSpec<GitSubcommandKey>[] = [
   { key: "flag", names: ["--check"], arity: "flag" },
+  { key: "flag", names: ["--find-renames", "--find-copies"], arity: "optional-attached" },
 ];
 
 const GIT_REV_PARSE_INSPECT_OPTIONS: readonly OptionSpec<GitSubcommandKey>[] = [

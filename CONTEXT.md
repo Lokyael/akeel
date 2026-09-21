@@ -14,7 +14,7 @@
 - **Policy Snapshot**：与配置格式无关、不可变的授权值；只由新 policy.yaml adapter 发行。
 - **Policy Preset**：会话可绑定的完整策略定位；内置 `review`、`guided`、`develop`，并可加载合法的自定义 preset；不使用继承式 Profile，`status` 是命令保留字。
 - **Human-only Status**：只面向用户显示、不会进入 LLM context、tool description 或 system prompt 的策略状态或选择界面。
-- **Access Gate Off Mode**：用户在 `policy.yaml` 中显式设置 `accessGate: off` 或会话内 `/policy off` 后，仅保留 bootstrap 与 skills，Access Gate 不执行 tool-call 准入。
+- **Access Gate Off Mode**：用户在 `policy.yaml` 中显式设置 `accessGate: off` 或会话内 `/policy off` 后，仅保留 bootstrap 与 skills，Access Gate 不执行普通 tool-call 的 Operation Admission；mandatory unsupported host-surface boundary 仍然有效。
 - **Policy Kernel**：Configured Policy 阶段中只消费 Admission Plan 与 Policy Snapshot 的同步纯函数，不读取原始请求、配置 loader、Shell parser 或 host UI。
 - **Gate Session**：绑定单次 Pi session 的 runtime aggregate，拥有固定 Access Root、session-start `$HOME`、活动 Policy Snapshot、credential boundary 与 lifecycle。
 - **Session Resource Envelope**：Access Gate 为一个 Pi session 在 `/tmp/akeel/sessions/session-*/` 创建的受管临时资源，包含 metadata、lock 与唯一 stagingRoot；正常 shutdown 删除，异常 residue 进入 D-088 retention。
@@ -59,11 +59,11 @@
 
 - **系统分发与组件拓扑（Distribution & Packaging，D-086, D-090）**：AKeel 分为三个可独立安装的 package：`akeel-guidance`（bootstrap、skills、Artifact Exchange、Handoff Store 与 Record Containers 校验工具）、`akeel-access-gate`（Access Gate 准入引擎）和 `akeel-context-pruner`（测试输出上下文裁剪）；根 `akeel` package 提供三者的全量 manifest。外部通过 Pi 宿主标准接口（`pi.extensions` 与 `pi.skills`）集成；各包分发目录归入能力资产域实施防篡改硬拦截，工作区源码 checkout 是唯一合法修改源。
 - **提示词面与工程纪律注入（Prompt Surface & Guidance，D-030, D-053, D-073, D-084）**：`packages/guidance/src/bootstrap/` 通过 `before_agent_start` 原生注入包含工程原则的系统提示词 sections，天然具备会话转录持久化与 compaction 继承能力，Project Records 规范遵循宿主对称性（Host Symmetry Invariant），自仓与用户项目平等消费 guidance 提供的确定性容器校验工具；`packages/context-pruner/src/context-pruner/` 在构建模型 context 时无模型介入地将携带受支持运行器正向摘要的 `npm test` 成功输出进行正向证据投影裁剪，用户终端执行（`bashExecution`）与原始会话无损保留，TUI 呈现受限于临时 Human-only 视图（D-084）。Skills 严格按作者职责划分为 `disciplines/`（可复用方法）与 `workflows/`（端到端编排），按需全量加载；Policy Snapshot、配置文件与活动策略状态严格对 LLM 隔离（D-053），模型仅在失败路径接触静态有界的引导文案（D-023）。
-- **Access Gate 单一授权信任链（Single Trust Chain Pipeline，D-059, D-060, D-087）**：受管工具（Direct `read`/`write`/`edit`/`find`/`grep`/`ls` 与 Shell `bash`）统一进入单向信任链：`compileManagedCall` facade 封装 Direct 与 Shell 私有语义车道，对请求执行一次权威、有界解释并发行 opaque `CanonicalCompilation`；compiler 内部可在固定预算内采用确定性的多阶段或常数次线性遍历，下游不得从原始请求重建同一事实。同一制品向授权域单次投影 sealed `AdmissionPlan`，依次经 `Mandatory Boundary`（不可放宽的硬安全截断，违规附带 terminate 熔断）与 `Configured Policy`（消费 Admission 与 Policy Snapshot 的纯函数内核）求值发行动作结论；Pi 宿主独占将审批要求映射为确认或静态 no-UI 阻断。未受管工具直通。
-- **三域正交路径模型与强制安全硬边界（Three-Tier Path Domain & Mandatory Boundaries，D-070, D-071, D-090）**：路径准入划分为三个正交域：凭据域（实时凭据工件受管读写列搜一律硬阻断，D-070）、能力资产域（插件分发目录隐式只读准入，写删副作用实施不可放宽的防篡改硬拦截，D-090）与工作区主域（绑定会话启动时 `cwd` 的 `accessRoot` 与受管 `stagingRoot`，受 Preset 策略管辖，D-072, D-088）。破坏性删除（`destroy`）默认永久硬拒绝；仅显式非递归且具备完备路径证明的单文件裸 `rm` 接入知情同意（D-071）。
+- **Access Gate 单一授权信任链（Single Trust Chain Pipeline，D-059, D-060, D-087）**：模型发起的受管工具（Direct `read`/`write`/`edit`/`find`/`grep`/`ls` 与 Shell `bash`）统一进入单向信任链：`compileManagedCall` facade 封装 Direct 与 Shell 私有语义车道，对请求执行一次权威、有界解释并发行 opaque `CanonicalCompilation`；compiler 内部可在固定预算内采用确定性的多阶段或常数次线性遍历，下游不得从原始请求重建同一事实。同一制品向授权域单次投影 sealed `AdmissionPlan`，依次经 `Mandatory Boundary`（不可放宽的硬安全截断，违规附带 terminate 熔断）与 `Configured Policy`（消费 Admission 与 Policy Snapshot 的纯函数内核）求值发行动作结论；Pi 宿主独占将审批要求映射为确认或静态 no-UI 阻断。未受管工具直通。
+- **三域正交路径模型与强制安全硬边界（Three-Tier Path Domain & Mandatory Boundaries，D-070, D-071, D-090）**：路径准入划分为三个正交域：凭据域（实时凭据工件受管读写列搜一律硬阻断，D-070）、能力资产域（Pi 安装分发存储与全局分发资源隐式只读准入，项目安装根按 session cwd 计算，写删副作用实施不可放宽的防篡改硬拦截，D-090）与工作区主域（绑定会话启动时 `cwd` 的 `accessRoot`、受管 `stagingRoot` 及项目源码资源，受 Preset 策略管辖，D-072, D-088）。破坏性删除（`destroy`）默认永久硬拒绝；仅显式非递归且具备完备路径证明的单文件裸 `rm` 接入知情同意（D-071）。
 - **Shell 分析器注册表与有界执行流（Shell Analyzers & Execution Flows，D-067, D-087, D-091）**：封闭分析器注册表（`programs/`）为已知程序族（Git、bounded coreutils、解释器、Python、uv、herdr、包管理器、多语言构建工具族与 Java 运行工具）提供专有选项与路径事实提取；分层多命令程序采用共享确定性分段语法与程序私有 Invocation Plan / 语义投影的两阶段解耦架构，平坦命令保留专用有界分析器（D-067）；规范系统路径（`/bin/`、`/usr/bin/`）命中已知程序时复用裸名语义，自定义与非规范路径作为 source 路径事实纳入 Mandatory Boundary 并按 opaque execute 处理；支持字面 `/dev/null` 重定向流丢弃特例、确定性无副作用 inspect 命令（`true`/`false`/`:`），以及深度为 2 的有界静态管道流（上游纯只读 inspect 且零写副作用，下游限定为受支持文本过滤器或受管 `tee` 流式写入器）；多语言构建工具族（`cargo`、`go`、`make/gmake`、`mvn/mvnw`、`gradle/gradlew`）全面实现破坏性清理（`clean`）一票否决硬拦截与工作区变异参数消费（D-091）；未建模语法、无界修改与外部/网络 transport 严格 fail-closed。
 - **编译期三层正交预算守卫（Static Resource & Analysis Budget Guard）**：Canonical 编译期实行三层硬预算防御，超限在语法解析层直接拒绝（`resource-limit`）且不进入后续授权内核：POSIX 路径边界管辖 Direct 路径、CWD 与搜索模式（`MAX_PATH_BYTES`）；对称数据载荷信封统筹 Direct `write` 与 `edit` 的内容与全部替换块总量（`MAX_DIRECT_PAYLOAD_BYTES`）；算法复杂度守卫维持命令行长度（`MAX_SHELL_COMMAND_BYTES`）、命令总数、条件流 CWD 状态分支数及 edit 替换块数的紧凑防线。
-- **策略预设与会话暂存区生命周期（Policy Presets & Session Lifecycle，D-066, D-069, D-088）**：生产入口仅读取全局 `policy.yaml`，内置 `review`、`guided`、`develop` 并支持自定义 preset；每个 preset 声明独立 path scope，系统硬边界始终优先。`/policy` 提供临时选择面板、动态切换与状态查询；支持显式关闭 Access Gate（`off` 模式，D-066）。每个会话在受管临时资源目录下拥有专属的 `Session Resource Envelope`（含元数据、锁与唯一 `stagingRoot`），正常退出自动清理，异常残留遵循 retention 配额并由新会话异步回收（D-088）。
+- **策略预设与会话暂存区生命周期（Policy Presets & Session Lifecycle，D-069, D-088, D-097）**：生产入口仅读取全局 `policy.yaml`，内置 `review`、`guided`、`develop` 并支持自定义 preset；每个 preset 声明独立 path scope，系统硬边界始终优先。`/policy` 提供临时选择面板、动态切换与状态查询；支持显式关闭 Access Gate（`off` 模式，D-097）。每个会话在受管临时资源目录下拥有专属的 `Session Resource Envelope`（含元数据、锁与唯一 `stagingRoot`），正常退出自动清理，异常残留遵循 retention 配额并由新会话异步回收（D-088）。
 - **任务权威上下文、Session 接力与委托协作模型（Context Admission & Delegation Runtime，D-075, D-089, D-092）**：Task Owner Session 持有用户意图、需求、架构决策与最终验收的唯一 Authority Context；同一 Owner 的 session 接力通过 Pi custom-entry semantic ledger、no-silent-drop Continuation Capsule、会话内嵌收据状态机、显式 `/handoff [optional-notes]` 原生 replacement 与 successor reconciliation 转移 captured live semantics，零外部文件残留，source 原始 session 保留为冷归档但不整体注入后继 context（D-092）。需要隔离过程探索的工作通过 Herdr 同步子代理执行，有效写能力的委托代理强制进入独立 worktree（D-075）；结果返回原 Owner 时由 `Capability Artifact Exchange` 预留 run、发行单次有时限的 opaque capability，并在核验 binding、receipt、长度与摘要后原子 collect（D-089）。
 
 ## Active Decisions
@@ -86,7 +86,7 @@
 - [D-059 Greenfield Access Decision Pipeline 与原子替换](docs/decisions.md#d-059-greenfield-access-decision-pipeline-与原子替换)
 - [D-060 受保护 Canonical 制品、窄 Admission 投影与有界求值](docs/decisions.md#d-060-受保护-canonical-制品窄-admission-投影与有界求值)
 - [D-063 Direct edit 独立策略与显式本地配置](docs/decisions.md#d-063-direct-edit-独立策略与显式本地配置)
-- [D-066 Access Gate 显式关闭与仅技能运行模式（off）](docs/decisions.md#d-066-access-gate-显式关闭与仅技能运行模式off)
+- [D-097 Access Gate off mode retains mandatory host boundaries](docs/decisions.md#d-097-access-gate-off-mode-retains-mandatory-host-boundaries)
 - [D-067 Canonical 程序语义族、可执行文件身份与委托执行边界](docs/decisions.md#d-067-canonical-程序语义族可执行文件身份与委托执行边界)
 - [D-069 Policy 配置文件、Preset 注册表与用户交互界面](docs/decisions.md#d-069-policy-配置文件preset-注册表与用户交互界面)
 - [D-070 宿主凭据工件的系统硬边界与分类规则](docs/decisions.md#d-070-宿主凭据工件的系统硬边界与分类规则)
@@ -113,13 +113,14 @@
 - [D-093 Session Handoff 采用 source intent 与 successor receipt 的单向两阶段交接](docs/decisions.md#d-093-session-handoff-采用-source-intent-与-successor-receipt-的单向两阶段交接)
 - [D-094 `which` PATH 查询的未界定根硬边界](docs/decisions.md#d-094-which-path-查询的未界定根硬边界)
 - [D-095 Task 生命周期收敛为验证证据与原子清档](docs/decisions.md#d-095-task-生命周期收敛为验证证据与原子清档)
+- [D-096 Linux-only host boundary rejects Pi PowerShell](docs/decisions.md#d-096-linux-only-host-boundary-rejects-pi-powershell)
 
 ## Negative Space
 
 - 不提供 OS-level sandbox、容器、VM、seccomp、Landlock、network namespace 或独立 network policy 轴。
 - 仅保证支持 Linux 平台及默认大小写敏感的本地文件系统语义；不提供 Windows、macOS、BSD 支持，不建模其路径和选项方言，也不覆盖 casefold 目录或 CIFS/VFAT/NTFS 挂载点上的大小写别名语义。
 - 不承诺 pathname check 与实际文件操作之间的 TOCTOU 消除；gate 只做纯决策，不执行文件操作或传递 fd。
-- 不拦截 `user_bash`、`shellCommandPrefix`、Bash `spawnHook`、tool override、custom tool backend、未知 Direct tool surface 或其他 Extension 的直接操作。
+- 不拦截 `user_bash`、`shellCommandPrefix`、Bash `spawnHook`、tool override、custom tool backend、未知 Direct tool surface 或其他 Extension 的直接操作；Pi `powershell` 是显式 unsupported surface，按 Linux-only 边界阻断，不属于未知 surface passthrough。
 - 审批后的实际文件操作由操作系统权限决定；gate 不控制执行后的行为，也不提供完整 security log scrubbing。
 - Policy Preset 只通过 `/policy` 的临时 human-only 选择面板、显式命令和状态查询使用；自定义 preset 不通过 UI 创建或编辑。
 - 不提供 AKeel 管理的 delegated child 能力分层、父子权限钳制或子代理 preset 继承；按任务类型的能力与风险边界仍属 C-009 候选范围。
@@ -136,7 +137,7 @@
 - 不分发独立 `grill-plan` 或响应自然语言 grill 触发词；grilling 只由用户手动调用 `grill-docs`。
 - 不把 Herdr 声明为 AKeel runtime dependency；`grill-docs` 使用 Herdr 固定执行面和 Artifact Exchange verified collect。当前不提供异步 child mailbox、无人值守续跑、结果聚合、run/handoff GC、Task accepted/abandoned 状态或 pane/workspace/worktree 的确定性自动回收；artifact publication receipt 只证明结果完整发布，Session Handoff reconciliation receipt 只证明 captured live semantic ID 覆盖与 workspace 核对，均不证明模型理解、Task 验收、commit 保留或资源可删除。长期独立工作使用用户授权、范围互斥的 Task Owner Session，child 与临时资源仍由存活 Owner 检查并在用户批准后精确清理。
 - `assess-modularity` 不提供覆盖数据所有权、运行时拓扑、部署、可靠性、安全和容量的广义 architecture review，也不实施或采纳其 findings。
-- 能力资产域（Capability Domain）仅针对宿主已注册扩展与技能分发子目录（`git`、`node_modules`、`skills`、`extensions`）赋予只读准入，不放宽工作区外普通业务文件的读写，不将 `agentDir` 根目录自身纳入能力域，不对 Shell 任意动态或未建模命令开放能力资产执行，也不放宽分发目录的任何写/改/删操作（防篡改硬拦截）。
+- 能力资产域（Capability Domain）仅针对 Pi 安装分发存储与全局分发资源（全局 `git`、`npm`、`node_modules`、`extensions`、`skills`、`$HOME/.agents/skills`，以及当前 session 项目的 `.pi/git`、`.pi/npm`）赋予只读准入；项目 `.pi/extensions`、`.pi/skills` 与 `.agents/skills` 保持工作区源码语义，不自动升级为能力根。不放宽工作区外普通业务文件的读写，不将 `agentDir` 根目录自身纳入能力域，不对 Shell 任意动态或未建模命令开放能力资产执行，也不放宽安装分发目录的任何写/改/删操作（防篡改硬拦截）。
 
 ## Project Documents
 

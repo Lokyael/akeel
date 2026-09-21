@@ -11,6 +11,7 @@ import {
   createCompileEnvironment,
   createLinuxPathEvidence,
 } from "../../../../packages/access-gate/src/access-gate/access-decision/core/compilation/index";
+import { gitDiffCommand } from "../../fixtures";
 
 const unifiedPolicy = Symbol("unified-policy");
 type TestPolicy = Readonly<Record<string, unknown>> & Readonly<{ [unifiedPolicy]: ReturnType<typeof freezeUnifiedPolicySnapshot> }>;
@@ -713,6 +714,7 @@ test("Git inspect commands are admitted under develop and review while helper co
   for (const command of [
     "git status",
     "git diff -- src/app.ts",
+    gitDiffCommand(),
     "git log",
     "git show",
     "git log --oneline -8 --decorate",

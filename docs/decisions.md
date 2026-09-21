@@ -408,23 +408,6 @@ Rejected:
 
 Out of Scope: edit 的实际文件读取、文本替换、唯一匹配和重叠处理；这些仍由 Pi host 的 edit 工具负责。
 
-## D-066: Access Gate 显式关闭与仅技能运行模式（off）
-
-Reversal surface: user-boundary
-
-Decision: 用户可在 `policy.yaml` 中以唯一配置 `accessGate: off` 显式关闭 AKeel Access Gate。该模式不执行 Operation Admission 决策，所有 Pi `tool_call` 直接 passthrough；principles 注入与 skills 继续可用。缺失该字段或配置不可用时按默认安全基线启用 Gate。会话运行时支持双向热切换：初始为 `off` 的会话可随时通过 `/policy <preset>` 命令动态载入预设并启用 Access Gate；受控会话也可经 TUI 二次知情同意确认后通过 `/policy off` 临时关闭 Gate，新建或重启会话后自动恢复磁盘配置。
-
-Why: 某些工作流需要保留工程原则与按需技能，但不希望 AKeel 对工具调用施加操作准入。将默认选择放在全局 `policy.yaml` 中，并在会话内支持受控的双向热切换，兼顾了灵活性与重启后的安全基线复原。
-
-Impact: Access Gate 处于 `off` 期间，不对 Direct/Shell 操作执行准入或路径检查；宿主 status 显示为 `🛡️ off`。通过 `/policy <preset>` 启用 Gate 时原子装配 Session 并恢复准入。
-
-Rejected:
-
-- **只绕过 `policy-denied`：** 无法覆盖异常阻断的其他 Gate 拒绝路径，且会制造未声明的部分安全保证。
-- **把禁用状态建成 `unrestricted` preset：** 会与 Policy Preset 的授权语义混淆，并破坏 D-069 对硬边界的约束。
-- **隐式环境变量开关：** 不属于单一配置与用户交互界面来源，难以审计且容易误用。
-
-Out of Scope: OS sandbox、容器、按工具/路径粒度的开关、子代理策略传播和替代性安全审计层。
 
 ## D-067: Canonical 程序语义族、可执行文件身份与委托执行边界
 
@@ -432,7 +415,7 @@ Reversal surface: engineering
 
 Decision: Canonical Shell 在词法与 flow 解析之后增加独立的 `core/compilation/shell/programs/` 语义层。该层只把已扫描的程序调用转换为命令分类、effects、路径事实和 bounded/opaque 路径知识；registry 只负责可执行文件分派，Policy、配置和 host 不进入该层。Git、bounded coreutils、解释器、Python 工具、uv、herdr 与 npm/pnpm/yarn/npx 使用各自的声明表和少量专用分析器；已注册程序的未知选项和未声明值形态在 Canonical 阶段保持显式不确定性并 fail-closed：若未知选项的 arity 无法证明，当前参数段余部不得继续发行已证明的 option、operand 或 path 事实；程序专属合同按风险映射为 Canonical reject、hard boundary 或 `opaque`，此前已证明的前缀事实与 source anchor 可以保留。未知程序和未知子命令保持 `unknown + opaque`。`uv run` 与 `herdr agent start/prompt` 分类为 `execute`；uv 与 herdr 的版本/帮助调用、状态查询和只读观测分类为 `inspect`，其他未建模顶层子命令保持 `unknown + opaque`。
 
-已知且路径访问可完整证明、且不依赖仓库或用户配置执行 helper 的命令可进入普通 `inspect`/`modify`/`execute` 策略；其中纯只读审查命令（`git status`、`diff`、`log`、`show`、`blame`、`grep` 等）解耦使用专属的 Inspect 选项契约，完整纳管安全展示标志（`--graph`、`--follow`、`--topo-order`、`--no-merges`、`--summary`、`--decorate`、`-p` 等）、带值过滤标量（`-S`、`-G`、`--grep`、`--author`、`--since`、`--until`、`--format`、`-L`、`--diff-filter` 等）、`diff --check` 以及 `rev-parse --show-toplevel`/`--abbrev-ref`/`--symbolic-full-name` 等有界只读查询，以及 `log`/`rev-list` 的纯数字行数限制缩写（`-[1-9][0-9]*`，如 `-5`），选项扫描严格成对原子消费参数值并杜绝伪路径溢出，在未显式声明 `--ext-diff` 或 `--textconv` 的前提下作为 bounded inspect read 进入常规策略求值，在 `review`、`guided`、`develop` 预设下均直接放行；`git branch --show-current` 纳入已知安全选项白名单，在无创建/删除参数时作为 inspect read 放行；非 inspect 子命令（如 `checkout`、`add`、`commit`）隔离不继承该只读选项集；有界本地变更命令 `git add`（无未建模或交互式选项）与 `git commit`（必须显式包含非空 `-m`/`--message` 或 `--file`/`-F`，且无 `-c`、`-e`、`-p` 或外部驱动参数）在 Git 控制面工件（`.git/hooks/**`、`.husky/**`、`.githooks/**`、`.lefthook/**`、`.git/config*`、`.gitattributes`）获得系统级绝对不可变写保护的前提下，归类为 `modify` 并进入常规策略求值。显式声明 external driver（`--ext-diff`、`--textconv`）、无消息或交互式的 commit、涉及外部 transport 或 network helper 的操作（如 `push`、`fetch`、`pull`、`clone`、`init`、`help`、`grep`、`blame`、`gc`、checkout/switch/restore、merge/rebase/tag/reset/cherry-pick/revert/stash/submodule 等已建模操作），以及 `git config`，固定进入 hard boundary。解释器脚本、`uv run`、`pytest`、`npm/pnpm/yarn` 的脚本或安装执行、`npx` 以及含未建模运行期访问的命令标记 opaque；opaque 风险由独立的 `commands.opaque` 策略轴控制，并与命令类别策略同时求值，不因显式 `allowedRoots`、`blockedRoots` 或 `blockedPaths` 自动升级为 hard boundary。`develop` 默认允许 opaque，`guided` 默认要求审批，`review` 默认拒绝；程序语义不递归解释委托的子命令或脚本内容。
+已知且路径访问可完整证明、且不依赖仓库或用户配置执行 helper 的命令可进入普通 `inspect`/`modify`/`execute` 策略；其中纯只读审查命令（`git status`、`diff`、`log`、`show`、`blame`、`grep` 等）解耦使用专属的 Inspect 选项契约，完整纳管安全展示标志（`--graph`、`--follow`、`--topo-order`、`--no-merges`、`--summary`、`--decorate`、`-p` 等）、带值过滤标量（`-S`、`-G`、`--grep`、`--author`、`--since`、`--until`、`--format`、`-L`、`--diff-filter` 等）、`diff --check`、`diff --find-renames`、`diff --find-copies` 以及 `rev-parse --show-toplevel`/`--abbrev-ref`/`--symbolic-full-name` 等有界只读查询，以及 `log`/`rev-list` 的纯数字行数限制缩写（`-[1-9][0-9]*`，如 `-5`），选项扫描严格成对原子消费参数值并杜绝伪路径溢出，在未显式声明 `--ext-diff` 或 `--textconv` 的前提下作为 bounded inspect read 进入常规策略求值，在 `review`、`guided`、`develop` 预设下均直接放行；`git branch --show-current` 纳入已知安全选项白名单，在无创建/删除参数时作为 inspect read 放行；非 inspect 子命令（如 `checkout`、`add`、`commit`）隔离不继承该只读选项集；有界本地变更命令 `git add`（无未建模或交互式选项）与 `git commit`（必须显式包含非空 `-m`/`--message` 或 `--file`/`-F`，且无 `-c`、`-e`、`-p` 或外部驱动参数）在 Git 控制面工件（`.git/hooks/**`、`.husky/**`、`.githooks/**`、`.lefthook/**`、`.git/config*`、`.gitattributes`）获得系统级绝对不可变写保护的前提下，归类为 `modify` 并进入常规策略求值。显式声明 external driver（`--ext-diff`、`--textconv`）、无消息或交互式的 commit、涉及外部 transport 或 network helper 的操作（如 `push`、`fetch`、`pull`、`clone`、`init`、`help`、`grep`、`blame`、`gc`、checkout/switch/restore、merge/rebase/tag/reset/cherry-pick/revert/stash/submodule 等已建模操作），以及 `git config`，固定进入 hard boundary。解释器脚本、`uv run`、`pytest`、`npm/pnpm/yarn` 的脚本或安装执行、`npx` 以及含未建模运行期访问的命令标记 opaque；opaque 风险由独立的 `commands.opaque` 策略轴控制，并与命令类别策略同时求值，不因显式 `allowedRoots`、`blockedRoots` 或 `blockedPaths` 自动升级为 hard boundary。`develop` 默认允许 opaque，`guided` 默认要求审批，`review` 默认拒绝；程序语义不递归解释委托的子命令或脚本内容。
 
 路径选项和隐式 repository/project scope 必须进入 Canonical 统一解析；Admission 只消费已解析的路径候选，不重新理解程序参数。Git `-C`、`--git-dir` 和 `--work-tree` 已在 Canonical command-local cwd seam 中按 token 顺序解析，后续 repository、基本 path candidate、output 候选和显式项目内 `file://` remote 使用所得 cwd；完整 Git pathspec 语法、HTTPS/SSH 等外部 transport、hosted `file://`、alias、间接 config remote、`clone --separate-git-dir` 及其他尚未形成 Canonical seam 的 location 选项继续 fail-closed。Git repository discovery 只接受真实 `.git` 目录，拒绝 symlink 或 gitfile metadata，避免隐式 Git scope 指向项目外 repository。当前不增加 network policy 轴；Git helper 的执行期隔离不在本条内提供，未形成安全合同的 helper-capable 操作直接 hard-deny。
 
@@ -487,7 +470,7 @@ Decision: Policy Preset 注册表由三个内置 preset 与 `policy.yaml` 中显
 
 自定义 preset 与内置 preset 使用同一 Policy Snapshot、Admission 和 Policy Kernel 合同。配置层只发行已加载的合法 registry；preset 名称、策略内容和活动状态不进入模型上下文、tool description 或 system prompt。
 
-Policy file loading: 用户全局 Policy 输入固定为 `$PI_CODING_AGENT_DIR/akeel/policy.yaml`，默认目录为 `~/.pi/agent`。flat `paths`/`commands` 形式表示使用完整定义的单一静态 policy，不提供 preset registry 或会话切换；具名 `presets` 形式以三个内置 preset 为注册表基础，并可增加合法的完整自定义 preset。自定义 preset 允许可选 `badge` 字段自定义 1~4 字符短码，未指定时按 kebab-case 首字母或前缀确定性消歧。外置文件缺失、为空、格式/schema 错误、根非 mapping、必需字段缺失或其他不可用状态时，整体忽略并使用内置 `review` 基线，不部分采用无效内容。唯一合法的 `accessGate: off` 形式及其运行时语义由 D-066 规定。
+Policy file loading: 用户全局 Policy 输入固定为 `$PI_CODING_AGENT_DIR/akeel/policy.yaml`，默认目录为 `~/.pi/agent`。flat `paths`/`commands` 形式表示使用完整定义的单一静态 policy，不提供 preset registry 或会话切换；具名 `presets` 形式以三个内置 preset 为注册表基础，并可增加合法的完整自定义 preset。自定义 preset 允许可选 `badge` 字段自定义 1~4 字符短码，未指定时按 kebab-case 首字母或前缀确定性消歧。外置文件缺失、为空、格式/schema 错误、根非 mapping、必需字段缺失或其他不可用状态时，整体忽略并使用内置 `review` 基线，不部分采用无效内容。唯一合法的 `accessGate: off` 形式及其运行时语义由 D-097 规定。
 
 User interaction surface: 原生 TUI 中，`/policy` 无参数打开临时选择面板，供用户选择已加载的 preset 或 `off`；确认后通过宿主公开的 `ui.setStatus` 同步策略 Badge（如 `🛡️ R`、`🛡️ G`、`🛡️ D`、自定义 badge 或消歧短码，关闭时为 `🛡️ off`），会话结束时清除。取消或无效选择保持不变。`/policy <preset>` 与 `/policy status` 保留；非 TUI 模式不打开面板。交互与状态均为 human-only UI。
 
@@ -514,7 +497,7 @@ Reversal surface: user-boundary
 
 Decision: 将宿主拥有、用于保存实时凭据的凭据工件归入系统 hard boundary；当前确认范围包括 pi host 的 `auth.json` 及其备份或变体，但模板类工件不属于该类别。当前没有可验证的 Pi Host 工件角色 metadata seam，因此以受信任 agent 目录下的路径身份契约识别类别，不读取文件内容、不做值级猜测。对 Canonical 阶段明确识别为该类别的受管路径操作 `read`、`write`、`edit`、`list`、`search` 一律 hard deny，任何 preset 都不得放宽；模板类工件继续由 preset/path policy 管理。递归 `search` 若其候选路径与 credential root 相交——候选位于 credential root 内，或 credential root 位于候选路径内——一律 hard deny，以避免通过父目录或 agent 根递归枚举凭据；这只收紧递归搜索，不把整棵 agent 目录的非递归操作普遍封锁，也不为无法发行具体路径的 opaque Shell access 增加凭据专用拒绝。
 
-`accessGate: off` 时沿用 D-066：AKeel 不提供任何 tool-call、路径或凭据保护保证。该边界不扩展为整棵宿主 agent 目录的拒绝，也不宣称 AKeel 能保护所有可能承载凭据的文件。
+`accessGate: off` 时沿用 D-097：AKeel 不提供普通 tool-call、路径或凭据保护保证，但 mandatory host-surface boundary 仍然有效。该边界不扩展为整棵宿主 agent 目录的拒绝，也不宣称 AKeel 能保护所有可能承载凭据的文件。
 
 Why: 实时凭据工件同时承载高敏感性与完整性风险，`ask` 或可切换 preset 都不能构成可靠的保护边界。明确文件路径时按工件职责分类可以保护凭据存储，同时保留模板类文件的正常使用场景；递归搜索无法发行单个后代文件事实，若继续放行就能通过父目录间接读取凭据，因此以 credential root 的路径相交关系作为有界的 fail-closed 判据。把规则置于 preset 之前，也避免用户自定义策略或会话切换解除系统底线。
 
@@ -873,7 +856,7 @@ Rejected:
 - **通过用户可配置规则 DSL 或动态 analyzer plugin 扩展系统边界：** 会使 hard-boundary 单调性和 analyzer 信任来源无法由封闭代码合同证明。
 - **在现有 Access Gate 内顺带加入 OS broker/sandbox：** 这会改变执行所有权和安全承诺，不是本模块结构重构。
 
-Out of Scope: 新增或放宽 Shell 语法、程序族、destroy/delete、网络或路径能力；改变 `policy.yaml` 用户 schema、内置 preset、凭据分类、Access Root、staging lifecycle 或 `accessGate: off` 语义；OS sandbox、fd broker、TOCTOU 消除、执行期子进程/网络隔离；Static Flow、Explanation Replay、Runtime Audit、Runtime Content Flow 和 delegated child policy。
+Out of Scope: 新增或放宽 Shell 语法、程序族、destroy/delete、网络或路径能力；改变 `policy.yaml` 用户 schema、内置 preset、凭据分类、Access Root、staging lifecycle 或 D-097 定义的 `accessGate: off` 语义；OS sandbox、fd broker、TOCTOU 消除、执行期子进程/网络隔离；Static Flow、Explanation Replay、Runtime Audit、Runtime Content Flow 和 delegated child policy。
 
 ## D-088: Session-owned Staging 生命周期与保留策略
 
@@ -928,22 +911,24 @@ Reversal surface: user-boundary
 
 Decision: Access Gate 路径准入采用三域正交模型（Three-Tier Path Domain Model）：
 1. **凭据域（Credential Domain，D-070）**：宿主拥有且保存实时凭据的工件（`auth.json` 及其衍生变体）与相交递归搜索，享有绝对最高优先级拦截权，任何其他域不可豁免，一律永久 hard-deny。
-2. **能力资产域（Capability Domain）**：覆盖 Pi 宿主会话装配的已注册扩展与技能分发子目录（`git`、`node_modules`、`skills`、`extensions`）。对该域下的 Direct `read` 与非递归 Direct `ls` 赋予隐式只读准入，不要求路径位于工作区 `allowedRoots` 内；对 Direct `write`、`edit` 以及 Shell 中带有写或删除副作用（`write`/`delete`）的变异操作，一律触发系统级防篡改硬拒绝（`hard-boundary`），任何 preset 不得放宽。严禁将 `agentDir` 根目录自身纳入能力资产根，防止凭据与会话隐私泛化。
-3. **工作区主域（Workspace Domain，D-072 / D-069）**：覆盖会话 `accessRoot (cwd)`、`stagingRoot` 与 `/tmp/akeel`，完整受内置与自定义 Preset（`review`、`guided`、`develop`）管辖。
+2. **能力资产域（Capability Domain）**：只覆盖 Pi 的已安装分发存储与全局分发资源，不覆盖所有被 Pi 加载的项目源码。标准根包括全局 `agentDir/git`、`agentDir/npm`、`agentDir/node_modules`、`agentDir/extensions`、`agentDir/skills`、全局 `$HOME/.agents/skills`，以及当前 session 项目的 `.pi/git` 与 `.pi/npm`。这些根由 `pi-composition` 按 session cwd 计算；对该域下的 Direct `read` 与非递归 Direct `ls` 赋予隐式只读准入，不要求路径位于工作区 `allowedRoots` 内；对 Direct `write`、`edit` 以及 Shell 中带有写或删除副作用（`write`/`delete`）的变异操作，一律触发系统级防篡改硬拒绝（`hard-boundary`），任何 preset 不得放宽。严禁将 `agentDir` 根自身纳入能力资产根，防止凭据与会话隐私泛化。
+3. **工作区主域（Workspace Domain，D-072 / D-069）**：覆盖会话 `accessRoot (cwd)`、stagingRoot、`/tmp/akeel` 与项目源码资源（包括 `.pi/extensions`、`.pi/skills`、`.agents/skills`），完整受内置与自定义 Preset（`review`、`guided`、`develop`）管辖。
 
-`createMandatoryBoundaries` 接收并密封冻结 `capabilityRoots`；`createGateSession` 校验并传递该集合，工作区 `defaultRoots` 保持纯净；`pi-composition` 在会话初始化时自动装配标准分发子目录，实现用户零配置（Zero-Config UX）。
+`createMandatoryBoundaries` 接收并密封冻结 `capabilityRoots`；`createGateSession` 校验并传递该集合，工作区 `defaultRoots` 保持纯净；能力根按 session cwd 重新装配，不实现动态包扫描器。Pi 资源发现规则之外的宿主自定义资源路径继续由显式宿主集成提供 capability roots。
 
-Why: 用户在独立业务项目中加载全局技能时，技能读取伴随资源会被工作区访问根（D-072）拦截，迫使用户手动配置 `policy.yaml` 或执行 `/policy off`，破坏开箱即用体验。若简单将全局分发目录加入 `allowedRoots`，在 `develop` 预设下模型将获得对全局分发代码的写权限，直接违背 AGENTS.md“全局副本只读，拒绝直接修改”铁律。三域正交模型将能力资产提升为系统级只读基础设施，在底层通过 Mandatory Boundary 硬件级阻断篡改，同时保证凭据域的绝对压制，兼顾了零配置体验与分发代码防篡改安全。
+Why: 能力资产的安全属性来自安装副本的所有权与生命周期，而不是来自“曾被 Pi 加载”这一事实。全局与项目 package store 是 Pi 管理的分发副本，模型修改后可通过 reload 改变执行面，必须默认只读；项目 `.pi/extensions`、`.pi/skills` 与 `.agents/skills` 是宿主项目源码，自动升级为系统只读边界会阻碍用户合法开发。按 installed store 与 project source 分域，既保护 package supply chain，又保持宿主对称性与项目源码可维护性。按 session cwd 计算项目安装根，避免 session replacement 或不同项目复用过期能力根。
 
-Impact: 模型在任何工作区中可直接读取已注册技能与扩展的说明与配套资源，无需用户在 `policy.yaml` 配置白名单；任何对分发代码的修改（写、改、删）即使在 `develop` 下也被硬阻断；`agentDir/auth.json` 维持绝对不可读硬边界。
+Impact: 模型在任何工作区中可直接读取全局与项目安装副本，无需在 `policy.yaml` 配置白名单；任何对 Pi 安装存储的修改（写、改、删）即使在 `develop` 下也被硬阻断；项目源码形式的 extension、skill 与配置仍按工作区策略处理；`agentDir/auth.json` 维持绝对不可读硬边界。
 
 Rejected:
 
-- **在工作区 `allowedRoots` 中手动配置分发目录：** 破坏 Zero-Config UX，且在 `develop` 下向模型暴露分发代码写权限，存在写穿透风险。
+- **将所有 Pi 可加载目录都纳入能力域：** 会把项目自有 `.pi/extensions`、`.pi/skills` 与 `.agents/skills` 错误升级为不可修改的系统资产，破坏宿主源码所有权。
+- **只增加全局 `agentDir/npm`：** 无法保护项目 `.pi/npm`、`.pi/git` 安装副本，且能力根仍与 session cwd 脱钩。
+- **在工作区 `allowedRoots` 中手动配置安装存储：** 破坏 Zero-Config UX，且在 `develop` 下向模型暴露分发代码写权限，存在写穿透风险。
 - **将 `agentDir` 根目录直接作为能力资产根：** 会将 `auth.json`、`settings.json` 及会话日志置于能力域之下，扩大暴露面。
-- **允许对能力资产进行受审批的修改（`ask`）：** 分发安装副本在工作区会话中必须是严格只读的，修改必须在仓库源 checkout 中进行，不提供审批放宽通道。
+- **允许对能力资产进行受审批的修改（`ask`）：** Pi 安装副本在工作区会话中必须是严格只读的，修改必须通过 Pi 包管理器或源 checkout 完成，不提供审批放宽通道。
 
-Out of Scope: 工作区外普通业务文件的读写放宽、对未注册第三方文件的特例放行、Shell 任意动态或未建模命令对能力资产的执行，以及动态包扫描器的引入。
+Out of Scope: 工作区外普通业务文件的读写放宽、对未注册第三方文件的特例放行、任意自定义资源路径的自动扫描、Shell 任意动态或未建模命令对能力资产的执行，以及项目源码资源的自动只读化。
 
 ## D-091: 多语言构建工具族语义分类与防误删硬边界
 
@@ -989,11 +974,11 @@ Out of Scope: 未表达或未捕获语义的绝对完备性、跨未加载 AKeel
 
 Reversal surface: engineering
 
-Decision: Pi 原生 Session Handoff 采用单向两阶段协议：source session 在 replacement 前追加 `akeel:prepared-capsule` 与 `akeel:switch-intent`，以 source intent 进入冻结状态；successor session 通过 `newSession({ setup })` 的 successor `SessionManager` 追加唯一 `akeel:continuation-capsule`，再通过 `withSession` 的 fresh context 发送 kickoff。replacement 成功后不再使用旧 `pi`、旧 command context、旧 `SessionManager` 或旧 UI，也不向 source 追加 transfer entry。新流程不发行 `akeel:handoff-switched`，读取逻辑继续兼容历史 entry；取消仅在 `newSession()` 明确返回 `cancelled: true` 且未发生 replacement 时追加 `akeel:switch-cancelled`。
+Decision: Pi 原生 Session Handoff 采用单向两阶段协议：source session 在 replacement 前追加 `akeel:prepared-capsule` 与 `akeel:switch-intent`，以 source intent 进入冻结状态；successor session 通过 `newSession({ setup })` 的 successor `SessionManager` 追加唯一 `akeel:continuation-capsule`，再通过 `withSession` 的 fresh context 以 Pi custom message 发送隐藏 kickoff 并触发 successor turn。replacement 成功后不再使用旧 `pi`、旧 command context、旧 `SessionManager` 或旧 UI，也不向 source 追加 transfer entry。新流程不发行 `akeel:handoff-switched`，读取逻辑继续兼容历史 entry；取消仅在 `newSession()` 明确返回 `cancelled: true` 且未发生 replacement 时追加 `akeel:switch-cancelled`。
 
 Why: Pi 在成功 session replacement 后使旧 extension instance 与 session-bound handles 失效；source 在 replacement 后无法安全完成第二次提交。将 source intent 作为切换前的冻结承诺、successor continuation 作为切换后的交接收据，可以避免 entry 写错 session、保留 fail-closed 的 source 状态，并使 `setup` 在 successor 启动前完成持久化初始化。`withSession` 只承担 fresh context 上的消息投递，不承担跨 session 状态写入。
 
-Impact: HandoffStore 的新发行接口只生成 successor receipt，历史 `handoff-switched` 仍可读取；Pi 类型声明补齐 `newSession.setup` 与 successor `SessionManager.appendCustomEntry`；composition 测试使用隔离的 source/successor session seam，并验证旧 handle 在 replacement 后不可用。
+Impact: HandoffStore 的新发行接口只生成 successor receipt，历史 `handoff-switched` 仍可读取；Pi 类型声明补齐 `newSession.setup` 与 successor `SessionManager.appendCustomEntry`；kickoff 使用 `sendMessage({ customType, display: false, details })` 保留 extension provenance 与 digest 元数据，但仍以有界 content 进入模型 context；composition 测试使用隔离的 source/successor session seam，并验证旧 handle 在 replacement 后不可用。
 
 Rejected: replacement 后继续使用捕获的 `pi` 或 command context；在 `withSession` 中追加 successor entry；把 source transfer entry 写入 successor；直接操作 JSONL session 文件；删除切换前 `switch-intent` 以规避取消清理。
 
@@ -1035,5 +1020,37 @@ Rejected:
 
 Out of Scope: Candidate、Decision、Artifact Exchange verified collect、Session Handoff reconciliation 与 Git 历史中的既有 Task 状态。
 
-## D-096: 待创建
+## D-096: Linux-only host boundary rejects Pi PowerShell
+
+Reversal surface: user-boundary
+
+Decision: AKeel explicitly rejects Pi's `powershell` tool as an unsupported host surface on the Linux-only product boundary. It does not implement a PowerShell semantic lane or treat PowerShell as an unknown passthrough surface. Other genuinely unknown Direct surfaces retain the existing passthrough contract.
+
+Why: Pi 0.86 exposes PowerShell as a first-class built-in execution tool, so leaving it in the generic unknown-tool passthrough would create a new file and process execution path outside AKeel's Canonical → Admission → Policy chain. Implementing a second shell-language analyzer would expand the supported platform and semantic contract beyond the Linux/Bash boundary. Explicit static rejection preserves fail-closed behavior without pretending to authorize or analyze PowerShell.
+
+Impact: The host adapter and production integration tests must classify `powershell` as an unsupported governed surface and return bounded static rejection. README, CONTEXT Negative Space, and the Access Gate boundary documentation must distinguish this explicit rejection from passthrough of genuinely unknown tools. The change does not alter `user_bash`, custom tool backends, or the Linux Bash semantic lane.
+
+Rejected: Implementing a PowerShell parser and policy lane; allowing PowerShell through `commands.opaque`; disabling it only through active-tool selection; treating it as an ordinary unknown passthrough.
+
+Out of Scope: Windows or PowerShell support, PowerShell path/command semantics, PowerShell script analysis, and enforcement of user-entered `!`/`!!` commands.
+
+## D-097: Access Gate off mode retains mandatory host boundaries
+
+Reversal surface: user-boundary
+
+Decision: `accessGate: off` and `/policy off` disable AKeel's configurable Operation Admission, path policy, and credential checks for ordinary model `tool_call` surfaces, while mandatory host-surface boundaries remain active. In particular, Pi `powershell` remains an explicitly unsupported surface on AKeel's Linux-only boundary and is statically blocked even when Access Gate is off. Principles and skills continue to operate; genuinely unknown tools and ordinary managed calls passthrough in off mode.
+
+Why: D-096 establishes PowerShell as a host-surface boundary rather than a configurable policy decision. Allowing the off switch to bypass that boundary would contradict the Linux-only product contract and make the newly explicit unsupported surface behave as an accidental capability. Separating mandatory host admission from configurable operation/path policy preserves the intended off-mode flexibility without converting an unsupported execution path into an allowed one.
+
+Impact: Runtime composition must evaluate the explicit unsupported-host surface before the off-mode passthrough branch. User documentation must say that off removes ordinary Access Gate guarantees but does not enable unsupported Pi execution surfaces. D-096 remains the PowerShell-specific boundary; future mandatory host boundaries must state whether they survive off mode.
+
+Rejected:
+
+- **Make off passthrough every tool call:** would bypass the explicit Linux-only PowerShell boundary.
+- **Treat PowerShell as ordinary unknown passthrough in off mode:** would make host classification depend on policy state and violate D-096.
+- **Disable only through active-tool selection:** active tool loadout is not an authorization boundary.
+
+Out of Scope: OS sandbox, container isolation, user-entered `!`/`!!` commands, custom tool backends, later extension input mutation, and configurable policy/path/credential checks while off.
+
+## D-098: 待创建
 

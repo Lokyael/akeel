@@ -160,4 +160,67 @@
 - Safety Boundary: 无人值守换页不得绕过 Access Gate 路径策略与 Mandatory Boundaries；出现工作区冲突、reconciliation 失败或测试严重异常时必须立即挂起并等待人类介入，严禁无限循环自动重启；父子会话冷归档与回退能力（Rollback）必须持续保持。
 - Revisit condition: Pi 官方发布支持后台/事件安全调用的会话替换接缝，或真实大型无人值守流水线证明单命令交互无法满足长期运行吞吐且可提供完备的熔断防御方案。
 
-## C-051: 待创建
+## C-051: AKeel TUI 运行状态可观测性增强
+
+- Why Not Now: 当前 Access Gate 已通过状态栏与通知展示 policy 状态，handoff 也提供显式命令与状态查询；尚无真实工作流证据证明操作员无法据此判断当前策略、session authority 或 handoff 状态，也没有已采纳的稳定展示合同。
+- Scope / Exploration Direction: 评估 policy、handoff 与 semantic ledger 的只读状态展示，使用户能区分当前策略、source/successor authority、reconciliation 状态与阻断原因；展示不得改变授权、session lifecycle、持久化语义或向模型注入 policy 数据。
+- Boundary / Out of Scope: 不覆盖 render-only tool-result projection、模型 context 裁剪、Access Gate 决策本身或 OS-level sandbox；不因增加展示而扩大工具权限或自动执行能力。
+- Revisit condition: 出现可复现的真实工作流，证明现有状态栏、通知和状态查询不足以判断上述运行状态，且 Pi 提供可测试的只读 TUI renderer/widget 接缝。
+
+## C-052: Session fork/clone 与 Task Owner authority
+
+- Why Not Now: 当前 D-075、D-092 与 D-093 定义了唯一 Owner、原生 session replacement 和 successor receipt，但没有定义 Pi `/fork`、`/clone` 复制 session branch 后的 Owner 归属、工具能力与恢复边界；改变该行为会触及 user-boundary、session lifecycle 和现有 handoff 合同，不能作为当前资源或 UI 优化的附带修改。
+- Scope / Exploration Direction: 独立评估 Pi `session_before_fork` 与 `session_start(reason: "fork")` 的 Owner 语义，区分无活动 authority 的普通探索 session 与已捕获 live semantic/handoff authority 的 Task session，并保持 source/successor 不并行持有同一 Owner authority。
+- Boundary / Out of Scope: 本候选未被促进前不改变 `/fork`、`/clone`、`/handoff` 或工具装载行为；不引入第二个并行 Owner、observer/claim 协议、自动 reconciliation 或后台 session 编排。
+- Revisit condition: 仓库形成了关于 fork/clone Owner 归属的独立批准 Requirements/Design，并有覆盖 Pi pre-fork 取消、session replacement 不误阻断和 authority 唯一性的可执行测试接缝。
+
+## C-053: 阻塞式 AKeel UI 的取消传播
+
+- Why Not Now: 当前 Access Gate 与 `/policy` UI 没有已承诺的 abort-propagation 实现 Task，也没有覆盖 TUI/RPC 宿主取消行为的稳定测试合同；把取消语义并入其他授权或资源变更会扩大当前变更边界。
+- Scope / Exploration Direction: 独立评估工具审批、策略确认和策略选择器在 Pi session/agent 取消时的生命周期行为，保持取消不产生授权、不执行工具，并与无 UI、用户拒绝和 UI 异常保持可区分的静态阻断语义。
+- Boundary / Out of Scope: 本候选未被促进前不修改 Access Gate、`/policy`、Pi host UI、timeout、block reason 或其他 session 生命周期；不使用手工 Promise race 作为隐式 UI 管理机制。
+- Revisit condition: 仓库形成了覆盖工具审批与 `/policy` 阻塞式 UI、TUI/RPC 取消行为及“不执行”结果的独立批准 Requirements/Design 和可执行测试接缝。
+
+## C-054: Pi 类型 API 与 AKeel adapter 类型收敛
+
+- Why Not Now: 当前 Access Gate 的 `unknown` host adapter 是为 malformed input fail-closed 保留的安全边界，未出现 Pi 类型缺失导致的运行时缺陷；工具 schema 与 execute 参数类型的重复虽可整理，但尚无独立的类型漂移证据或已承诺的 cleanup Task。
+- Scope / Exploration Direction: 独立评估使用 TypeBox `Static` 消除 custom tool 参数重复，同时保留 runtime adapter validation；重新判断 Pi `ToolCallEvent`、`isToolCallEventType` 与 `defineTool` 在不削弱安全 seam 前提下的局部使用价值。
+- Boundary / Out of Scope: 不把 Access Gate 的 unknown adapter 替换为未经 runtime validation 的 Pi 类型，不引入 `defineTool` 包装层，不改变 tool-call、schema、授权或 malformed input 合同。
+- Revisit condition: 出现可复现的 schema 与 execute 参数类型漂移，或形成具有独立 Requirements、Design 和验证范围的类型收敛 Task。
+
+## C-055: Pi final tool-call authorization seam
+
+- Why Not Now: Pi 当前允许后续 `tool_call` handler 修改 `event.input`，并没有 AKeel 可依赖的最终不可变 pre-execution hook 或 handler priority；冻结输入、依赖加载顺序或自行重验都不能形成稳定安全证明，且可能破坏其他 extension 的合法 input mutation。
+- Scope / Exploration Direction: 独立评估 Pi 是否提供最终执行输入快照、不可变 preflight 或可验证的 handler ordering，使 AKeel 能对实际即将执行的 tool input 建立单一授权证明；保持 custom backend、tool override 与其他 extension 的所有权边界明确。
+- Boundary / Out of Scope: 本候选未被促进前不冻结 `event.input`、不依赖 extension 加载顺序、不增加第二次本地 parser、不声称覆盖后续 handler、tool override、custom backend 或执行后的行为。
+- Revisit condition: Pi 发布并提供可测试的最终不可变 tool-call pre-execution seam，且该 seam 能证明授权输入与实际执行输入一致。
+
+## C-056: Pi custom tool prompt discoverability
+
+- Why Not Now: 当前 custom tool schema 仍会提供给模型，尚无可复现证据表明缺少 `promptSnippet` 已导致 AKeel 工具误用或不可发现；补充 prompt surface 还需独立核对静态措辞、工具启用状态和 system prompt 测试。
+- Scope / Exploration Direction: 独立评估为 `akeel_handoff`、Artifact Exchange 与 Record Validator 增加静态短工具摘要，改善 Pi Available tools 列表中的 discoverability；不重复写入策略、权限或完整操作流程。
+- Boundary / Out of Scope: 本候选未被促进前不修改 tool description、schema、promptGuidelines、授权、active-tools 生命周期或 runtime behavior；不把动态路径、policy、digest、artifact 内容写入 prompt metadata。
+- Revisit condition: 出现可复现的 active AKeel custom tool 未进入 Pi Available tools 导致模型无法稳定发现或选择工具的证据，且形成独立的 prompt-surface 验证范围。
+
+## C-057: RPC UI 与 Policy mode boundary
+
+- Why Not Now: 当前 D-069 与 D-097 已采用 TUI-only 的 Policy selector/关闭确认边界；虽然 Pi RPC context 具备 `hasUI` 能力，但改用 `hasUI` 会改变 user-boundary，不能作为普通 host API 适配直接替换。
+- Scope / Exploration Direction: 独立评估 TUI、支持 UI 的 RPC host 与 headless/JSON 模式下，Policy preset 选择、`accessGate: off` 确认和状态查询的统一能力合同；保持策略数据不进入模型 context，并区分显式命令与人工 UI confirmation。
+- Boundary / Out of Scope: 本候选未被促进前不改变 `mode === "tui"` 判断，不自动向 RPC 开放 preset selector，不改变 `accessGate: off`、Policy Snapshot 或模型上下文隔离语义。
+- Revisit condition: 仓库形成了覆盖 TUI、交互式 RPC 与 headless mode 的批准 Policy UI Requirements/Design，并有可验证的 host UI 与安全边界测试。
+
+## C-058: 有界子代理审查编排与资源回收
+
+- Why Not Now: 当前没有已采纳的统一 delegated-review budget、超时后续处理、Review Surface 复用、子代理终止和 run/workspace 回收合同；把这些约束临时散落在各个 Task 中会形成新的流程副本和不一致清理责任。
+- Scope / Exploration Direction: 独立评估子代理审查的最大 run/agent 预算、超时与 blocked 状态、不可复用 Review Surface 的失效规则、重复启动抑制、settled agent 终止和用户授权清理；目标是在最终 surface 稳定后只产生必要的审查拓扑，并把异常资源变成可追踪的 bounded residue。
+- Boundary / Out of Scope: 本候选未被促进前不修改 Pi、Herdr 或 Artifact Exchange runtime，不自动删除 run 目录，不把 idle/done 当作结果或进程终止，不绕过 Access Gate，也不赋予 child 结果验收、发布或清理权。
+- Revisit condition: 仓库形成并通过可执行测试验证统一的 delegated-review budget、timeout/blocked 状态机、重复启动抑制和显式资源回收合同。
+
+## C-059: Git rename/copy 检测的执行期资源预算与有界准入
+
+- Why Not Now: 当前 Access Gate 只拥有静态 tool-call 准入，不控制已放行 Git 进程的 CPU、内存、执行时长或子进程生命周期；人工、低频、可信工作区审查尚无证据证明现有准入造成实际资源事故。把运行时成本估算塞进 Canonical parser 不能形成执行期安全保证，也会扩大当前 Git 语义合同。
+- Scope / Exploration Direction: 评估 `--find-renames`/`--find-copies` 与更昂贵的 `--find-copies-harder` 的候选规模、`diff.renameLimit`/`-l` 约束、阈值校验、宿主超时、取消/强制终止、CPU/内存预算、输出上限及 review/guided/develop 策略关系。优先比较宿主执行预算、显式候选上限和需审批三种方案，区分静态准入证据与运行时 enforcement；不得把普通 inspect 自动等同于低成本。
+- Boundary / Out of Scope: 本候选未被促进前不改变当前两个 bounded diff 选项的准入、不恢复 `--find-copies-harder`、不新增 OS sandbox 或独立 network policy，不在 Access Gate 中包装 Shell/Git 进程，也不把测试模板或静态命令字节预算描述为运行时资源控制。
+- Revisit condition: 出现可复现的 Git rename/copy 检测超时、CPU/内存耗尽，或不可信大型仓库/高频自动审查成为受支持工作负载；并且 Pi/宿主提供可测试的进程执行、超时取消和资源结果接缝，足以验证拒绝、终止、输出截断与策略 verdict 的一致性。
+
+## C-060: 待创建

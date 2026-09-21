@@ -186,3 +186,54 @@ test("capability asset domain grants immutable read-only admission and denies wr
   const credAdm = exports.projectUnifiedAdmission!(credComp);
   assert.deepEqual(exports.authorizeAdmission!(credAdm, credMandatory, policy), { kind: "deny", code: "hard-boundary" });
 });
+
+test("Direct capability anti-tamper follows symlink traversal evidence for writes and edits", () => {
+  const exports = core as Record<string, Function>;
+  const environment = exports.createCompileEnvironment!({
+    cwd: "/workspace",
+    pathEvidence: Object.freeze({
+      resolve() {
+        return Object.freeze({
+          candidate: "/outside/target.txt",
+          traversed: Object.freeze(["/", "/agent/npm", "/agent/npm/link", "/outside", "/outside/target.txt"]),
+        });
+      },
+    }),
+  });
+  const policy = exports.freezeUnifiedPolicySnapshot!({
+    paths: {
+      read: "allow",
+      write: "allow",
+      edit: "allow",
+      list: "allow",
+      search: "allow",
+      allowedRoots: ["/workspace"],
+      blockedRoots: [],
+      blockedPaths: [],
+    },
+    commands: {
+      inspect: "allow",
+      modify: "allow",
+      execute: "allow",
+      destroy: "allow",
+      unknown: "allow",
+    },
+  });
+  const mandatory = exports.createMandatoryBoundaries!({
+    credentialRoots: ["/credentials"],
+    capabilityRoots: ["/agent/npm"],
+  });
+
+  const readComp = exports.compileManagedCall!({ surface: "read", arguments: { path: "/agent/npm/link/target.txt" } }, environment);
+  const readAdm = exports.projectUnifiedAdmission!(readComp);
+  assert.deepEqual(exports.authorizeAdmission!(readAdm, mandatory, policy), { kind: "deny", code: "hard-boundary" });
+
+  for (const request of [
+    { surface: "write", arguments: { path: "/agent/npm/link/target.txt", content: "tamper" } },
+    { surface: "edit", arguments: { path: "/agent/npm/link/target.txt", edits: [{ oldText: "a", newText: "b" }] } },
+  ]) {
+    const compilation = exports.compileManagedCall!(request, environment);
+    const admission = exports.projectUnifiedAdmission!(compilation);
+    assert.deepEqual(exports.authorizeAdmission!(admission, mandatory, policy), { kind: "deny", code: "hard-boundary" });
+  }
+});

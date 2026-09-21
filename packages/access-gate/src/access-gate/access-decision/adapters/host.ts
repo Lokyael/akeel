@@ -21,6 +21,11 @@ export type GateHostToolCall =
   | HostReject;
 
 const MANAGED_SURFACES = new Set(["read", "write", "edit", "ls", "grep", "find", "bash"]);
+const UNSUPPORTED_SURFACES = new Set(["powershell"]);
+
+export function isExplicitlyUnsupportedToolCall(event: unknown): boolean {
+  return isRecord(event) && typeof event.toolName === "string" && UNSUPPORTED_SURFACES.has(event.toolName);
+}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -39,6 +44,7 @@ export function adaptPiGateToolCall(event: unknown, context: unknown): GateHostT
   if (!isRecord(event) || typeof event.toolName !== "string" || event.toolName.length === 0) {
     return { kind: "reject", code: "invalid-host-context" };
   }
+  if (isExplicitlyUnsupportedToolCall(event)) return { kind: "reject", code: "unsupported-surface" };
   if (!MANAGED_SURFACES.has(event.toolName)) return { kind: "passthrough", toolName: event.toolName };
   if (!validHostContext(context) || !validToolInput(event.input)) {
     return { kind: "reject", code: !validHostContext(context) ? "invalid-host-context" : "unsupported-surface" };

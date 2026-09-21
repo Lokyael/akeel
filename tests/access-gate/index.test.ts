@@ -4,6 +4,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { startSession, withEnv } from "./harness";
+import { gitDiffCommand } from "./fixtures";
 
 async function withAgentFiles(
   policy: string | undefined,
@@ -41,6 +42,27 @@ test("production extension registers only the new decision composition", async (
     assert.equal(harness.getStatus("akeel-policy"), undefined);
     assert.equal(harness.handlers.has("session_start"), true);
     assert.equal(harness.handlers.has("session_shutdown"), true);
+    assert.equal(harness.handlers.has("user_bash"), false);
+  });
+});
+
+test("Pi PowerShell is explicitly blocked while genuinely unowned tools pass through", async () => {
+  await withAgentFiles(undefined, undefined, async (_agentDir, harness) => {
+    await harness.handlers.get("session_start")!(undefined, harness.ctx);
+    assert.deepEqual(
+      await invoke(harness, { toolName: "powershell", input: { command: "Get-ChildItem" } }),
+      { block: true, reason: "Blocked because this governed tool surface is unsupported." },
+    );
+    assert.equal(await invoke(harness, { toolName: "unowned-tool", input: {} }), undefined);
+  });
+});
+
+test("Pi PowerShell keeps its unsupported-surface block before the managed decision service initializes", async () => {
+  await withAgentFiles(undefined, undefined, async (_agentDir, harness) => {
+    assert.deepEqual(
+      await invoke(harness, { toolName: "powershell", input: { command: "Get-ChildItem" } }),
+      { block: true, reason: "Blocked because this governed tool surface is unsupported." },
+    );
   });
 });
 
@@ -146,6 +168,21 @@ test("managed calls use the new allow, confirm, and deny host contract exactly o
   });
 });
 
+test("production extension admits bounded Git diff rename and copy inspection", async () => {
+  await withAgentFiles(undefined, undefined, async (_agentDir, harness) => {
+    await harness.handlers.get("session_start")!(undefined, harness.ctx);
+    assert.equal(
+      await invoke(harness, {
+        toolName: "bash",
+        input: {
+          command: gitDiffCommand(),
+        },
+      }),
+      undefined,
+    );
+  });
+});
+
 test("session shutdown removes the new decision service", async () => {
   await withAgentFiles("paths:\n  read: allow\n", undefined, async (_agentDir, harness) => {
     await harness.handlers.get("session_start")!(undefined, harness.ctx);
@@ -199,6 +236,10 @@ test("publishes off mode through the host status API and can re-enable the gate"
     assert.equal(harness.getStatus("akeel-policy"), "🛡️ off");
 
     assert.equal(await invoke(harness, { toolName: "write", input: { path: "notes.md", content: "hello" } }), undefined);
+    assert.deepEqual(
+      await invoke(harness, { toolName: "powershell", input: { command: "Get-ChildItem" } }),
+      { block: true, reason: "Blocked because this governed tool surface is unsupported." },
+    );
 
     const policyCommand = harness.commands.get("policy");
     assert.ok(policyCommand);
@@ -211,6 +252,10 @@ test("publishes off mode through the host status API and can re-enable the gate"
     await policyCommand("off", harness.ctx);
     assert.equal(harness.getStatus("akeel-policy"), "🛡️ off");
     assert.equal(await invoke(harness, { toolName: "write", input: { path: "notes.md", content: "again" } }), undefined);
+    assert.deepEqual(
+      await invoke(harness, { toolName: "powershell", input: { command: "Get-ChildItem" } }),
+      { block: true, reason: "Blocked because this governed tool surface is unsupported." },
+    );
 
     await harness.handlers.get("session_shutdown")!(undefined, harness.ctx);
     assert.equal(harness.getStatus("akeel-policy"), undefined);

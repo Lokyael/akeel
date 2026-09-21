@@ -497,6 +497,97 @@ test("Pi composition automatically equips capability asset roots with read-only 
   assert.equal((credBlock as any)?.block, true);
 });
 
+test("Pi composition protects installed npm stores per session cwd without locking project source resources", async () => {
+  const { handlers, pi } = fakePi();
+  const agentDir = "/tmp/test-agent-env";
+  installPiAccessDecision(pi, {
+    ...options,
+    agentDir,
+    policyConfig: {
+      presets: {
+        develop: {
+          paths: { read: "allow", write: "allow", edit: "allow" },
+          commands: { inspect: "allow", modify: "allow", execute: "allow" },
+        },
+      },
+      activePreset: "develop",
+    },
+  });
+  const hostContext = context("/workspace/project", false, async () => false);
+  await invoke(handlers, "session_start", {}, hostContext);
+
+  for (const subDir of ["git", "npm", "node_modules", "extensions", "skills"]) {
+    const path = `${agentDir}/${subDir}/package/index.ts`;
+    assert.equal(await invoke(handlers, "tool_call", { toolName: "read", input: { path } }, hostContext), undefined);
+    assert.equal((await invoke(handlers, "tool_call", { toolName: "write", input: { path, content: "tamper" } }, hostContext) as any)?.block, true);
+  }
+  if (process.env.HOME?.startsWith("/")) {
+    const globalSkillsPath = `${process.env.HOME}/.agents/skills/package/SKILL.md`;
+    assert.equal(await invoke(handlers, "tool_call", { toolName: "read", input: { path: globalSkillsPath } }, hostContext), undefined);
+    assert.equal((await invoke(handlers, "tool_call", { toolName: "write", input: { path: globalSkillsPath, content: "tamper" } }, hostContext) as any)?.block, true);
+  }
+  for (const subDir of ["git", "npm"]) {
+    const path = `/workspace/project/.pi/${subDir}/package/index.ts`;
+    assert.equal(await invoke(handlers, "tool_call", { toolName: "read", input: { path } }, hostContext), undefined);
+    assert.equal((await invoke(handlers, "tool_call", { toolName: "write", input: { path, content: "tamper" } }, hostContext) as any)?.block, true);
+  }
+  for (const sourcePath of ["/workspace/project/.pi/extensions/local.ts", "/workspace/project/.pi/skills/local/SKILL.md", "/workspace/project/.agents/skills/local/SKILL.md"]) {
+    assert.equal(
+      await invoke(handlers, "tool_call", { toolName: "write", input: { path: sourcePath, content: "source" } }, hostContext),
+      undefined,
+    );
+  }
+});
+
+test("global composition recalculates project installed roots when session cwd changes", async () => {
+  const agentDir = mkdtempSync(join(tmpdir(), "akeel-agent-roots-"));
+  mkdirSync(join(agentDir, "akeel"), { recursive: true });
+  writeFileSync(join(agentDir, "akeel", "policy.yaml"), [
+    "paths:",
+    "  read: allow",
+    "  write: allow",
+    "  edit: allow",
+    "commands:",
+    "  inspect: allow",
+    "  modify: allow",
+    "  execute: allow",
+    "  opaque: allow",
+    "  destroy: ask",
+    "  unknown: ask",
+    "",
+  ].join("\n"));
+  const firstRoot = mkdtempSync(join(tmpdir(), "akeel-project-one-"));
+  const secondRoot = mkdtempSync(join(tmpdir(), "akeel-project-two-"));
+  mkdirSync(join(firstRoot, ".git"));
+  mkdirSync(join(secondRoot, ".git"));
+  const { handlers, pi } = fakePi();
+  installGlobalPiAccessDecision(pi, { agentDir });
+  const firstContext = context(firstRoot, false, async () => false);
+  const secondContext = context(secondRoot, false, async () => false);
+
+  try {
+    await invoke(handlers, "session_start", {}, firstContext);
+    assert.equal(
+      await invoke(handlers, "tool_call", { toolName: "read", input: { path: `${firstRoot}/.pi/npm/package/index.ts` } }, firstContext),
+      undefined,
+    );
+    await invoke(handlers, "session_start", {}, secondContext);
+    assert.equal(
+      (await invoke(handlers, "tool_call", { toolName: "read", input: { path: `${firstRoot}/.pi/npm/package/index.ts` } }, secondContext) as any)?.block,
+      true,
+    );
+    assert.equal(
+      await invoke(handlers, "tool_call", { toolName: "read", input: { path: `${secondRoot}/.pi/npm/package/index.ts` } }, secondContext),
+      undefined,
+    );
+  } finally {
+    await invoke(handlers, "session_shutdown", {}, secondContext);
+    rmSync(agentDir, { recursive: true, force: true });
+    rmSync(firstRoot, { recursive: true, force: true });
+    rmSync(secondRoot, { recursive: true, force: true });
+  }
+});
+
 test("Pi composition follows the host event subscription contract", () => {
   const { handlers, pi } = fakePi();
   const result = installPiAccessDecision(pi, options);

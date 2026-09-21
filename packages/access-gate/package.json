@@ -5,6 +5,12 @@
   "license": "MIT",
   "keywords": ["pi-package"],
   "type": "module",
+  "engines": {
+    "node": ">=22.19.0"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*"
+  },
   "dependencies": {
     "yaml": "^2.9.0"
   },

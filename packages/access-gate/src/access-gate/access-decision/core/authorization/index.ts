@@ -266,6 +266,11 @@ function isCapabilityPath(candidate: string, capabilityRoots: readonly string[])
   return capabilityRoots.some((root) => pathWithinRoot(candidate, root));
 }
 
+function pathHitsCapabilityBoundary(path: ResolvedPathEvidence, capabilityRoots: readonly string[]): boolean {
+  return isCapabilityPath(path.candidate, capabilityRoots) ||
+    path.traversed.some((candidate) => isCapabilityPath(candidate, capabilityRoots));
+}
+
 function pathHitsCredentialBoundary(
   path: ResolvedPathEvidence,
   mandatory: MandatoryBoundaryFacts,
@@ -312,7 +317,9 @@ function authorizeDirect(
   }
 
   const isCapability = isCapabilityPath(facts.path.candidate, mandatory.capabilityRoots);
-  if (isCapability && (facts.operation === "write" || facts.operation === "edit")) {
+  const isCapabilityMutation = (facts.operation === "write" || facts.operation === "edit") &&
+    pathHitsCapabilityBoundary(facts.path, mandatory.capabilityRoots);
+  if (isCapabilityMutation) {
     return Object.freeze({ kind: "deny", code: "hard-boundary" });
   }
 

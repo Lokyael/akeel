@@ -6,6 +6,7 @@ import {
   handleGateSessionToolCall,
 } from "../../../../packages/access-gate/src/access-gate/access-decision/runtime/index";
 import type { GateSession } from "../../../../packages/access-gate/src/access-gate/access-decision/runtime/index";
+import { gitDiffCommand } from "../../fixtures";
 
 function createTestSession(configInput: unknown = { presets: { guided: {} }, activePreset: "guided" }): GateSession {
   return createGateSession({
@@ -67,6 +68,27 @@ test("Pi host composition blocks rendered denials with static reason", async () 
   const result = await handleGateSessionToolCall(
     session,
     { toolName: "write", input: { path: "private.md", content: "secret\n" } },
+    { cwd: "/workspace/project", hasUI: true, ui: {} },
+  );
+
+  assert.deepEqual(result, { block: true, reason: "Blocked by access policy." });
+});
+
+test("Pi host composition keeps unmodeled Git diff options on the static policy-denied path", async () => {
+  const session = createTestSession({
+    presets: { review: {} },
+    activePreset: "review",
+  });
+
+  const command = gitDiffCommand({ flags: ["--find-copies-harder"], paths: ["src/app.ts"] });
+  assert.deepEqual(session.evaluate({ surface: "bash", arguments: { command } }), {
+    kind: "deny",
+    code: "policy-denied",
+  });
+
+  const result = await handleGateSessionToolCall(
+    session,
+    { toolName: "bash", input: { command } },
     { cwd: "/workspace/project", hasUI: true, ui: {} },
   );
 

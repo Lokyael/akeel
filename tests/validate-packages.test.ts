@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { execFileSync } from "node:child_process";
 import { join, resolve } from "node:path";
 import test from "node:test";
 
@@ -11,6 +12,9 @@ type PiManifest = Readonly<{
 type PackageManifest = Readonly<{
   readonly name: string;
   readonly dependencies?: Readonly<Record<string, string>>;
+  readonly peerDependencies?: Readonly<Record<string, string>>;
+  readonly engines?: Readonly<Record<string, string>>;
+  readonly files?: readonly string[];
   readonly pi?: PiManifest;
 }>;
 
@@ -26,6 +30,22 @@ function assertManifestResourcesExist(packageRoot: string, manifest: PiManifest 
     assert.ok(resource.startsWith("./"), `${packageRoot} resource must be relative: ${resource}`);
     assert.ok(existsSync(join(root, packageRoot, resource)), `${packageRoot} resource is missing: ${resource}`);
   }
+}
+
+function assertPiCorePeer(packageRoot: string, manifest: PackageManifest): void {
+  assert.equal(
+    manifest.peerDependencies?.["@earendil-works/pi-coding-agent"],
+    "*",
+    `${packageRoot} must consume Pi's host-provided core package without pinning a version`,
+  );
+}
+
+function assertNodeEngine(packageRoot: string, manifest: PackageManifest): void {
+  assert.equal(
+    manifest.engines?.node,
+    ">=22.19.0",
+    `${packageRoot} must declare the current Pi Node runtime baseline`,
+  );
 }
 
 function filesNamed(directory: string, name: string): string[] {
@@ -48,6 +68,8 @@ test("three capability packages expose independent Pi manifests", () => {
   for (const [packageRoot, expectedName] of packages) {
     const manifest = readPackage(`${packageRoot}/package.json`);
     assert.equal(manifest.name, expectedName);
+    assertPiCorePeer(packageRoot, manifest);
+    assertNodeEngine(packageRoot, manifest);
     assertManifestResourcesExist(packageRoot, manifest.pi);
   }
 });
@@ -87,6 +109,9 @@ test("each capability package carries the repository license", () => {
 
 test("root akeel manifest loads each capability exactly once", () => {
   const manifest = readPackage("package.json");
+  assertPiCorePeer(".", manifest);
+  assertNodeEngine(".", manifest);
+  assert.deepEqual(manifest.files, ["packages", "README.md", "LICENSE"]);
   assert.deepEqual(manifest.pi?.extensions, [
     "./packages/guidance/src/bootstrap/index.ts",
     "./packages/guidance/src/artifact-exchange/pi-composition.ts",
@@ -99,4 +124,12 @@ test("root akeel manifest loads each capability exactly once", () => {
     "./packages/guidance/skills/workflows",
   ]);
   assertManifestResourcesExist(".", manifest.pi);
+});
+
+test("package archive validation performs installed package smoke checks", () => {
+  const output = execFileSync("npm", ["run", "validate:package-archives"], {
+    cwd: root,
+    encoding: "utf8",
+  });
+  assert.match(output, /installed and loaded/u);
 });
