@@ -18,7 +18,7 @@
 - **Policy Kernel**：Configured Policy 阶段中只消费 Admission Plan 与 Policy Snapshot 的同步纯函数，不读取原始请求、配置 loader、Shell parser 或 host UI。
 - **Gate Session**：绑定单次 Pi session 的 runtime aggregate，拥有固定 Access Root、session-start `$HOME`、活动 Policy Snapshot、credential boundary 与 lifecycle。
 - **Session Resource Envelope**：Access Gate 为一个 Pi session 在 `/tmp/akeel/sessions/session-*/` 创建的受管临时资源，包含 metadata、lock 与唯一 stagingRoot；正常 shutdown 删除，异常 residue 进入 D-088 retention。
-- **Workflow Run**：同一 Task Owner 拥有的一次 bounded 临时 workflow attempt，位于 `/tmp/akeel/runs/run-*/`；它不是 Task Record，可包含 packet、child artifacts、control receipts、quarantine 与 transport diagnostics。
+- **Workflow Run**：同一 Task Owner 拥有的一次 bounded 临时 workflow attempt，位于 `/tmp/akeel/runs/run-*/`；它不是 Task Record，可包含 packet、child artifacts、control receipts、quarantine 与 transport diagnostics；每个 Owner session 最多保留 8 次 reservation，reservation authority 持久化在 Pi session custom entries 中。
 - **Artifact Capability**：Artifact Exchange 为一个 child result slot 发行的 opaque、单次、有时限有界文本发布权。
 - **Formal Artifact Handoff**：child publication 经 binding、receipt、长度与 digest 核验后由原 Task Owner collect 的结果交接；Herdr settled state 与 terminal read 不构成该结果。
 - **Semantic Unit**：Session 连续性中一个已捕获、可独立追踪的 requirement、constraint、assumption、finding、risk、decision candidate、evidence、external effect、work state 或 next action；操作完成状态不决定其 `live` / `closed` / `superseded` 语义生命周期。
