@@ -118,6 +118,7 @@ function stageHostDependencies(installRoot: string): void {
   mkdirSync(hostRoot, { recursive: true });
   for (const [name, source] of [
     ["pi-coding-agent", join(root, "node_modules", "@earendil-works", "pi-coding-agent")],
+    ["pi-ai", join(root, "node_modules", "@earendil-works", "pi-coding-agent", "node_modules", "@earendil-works", "pi-ai")],
     ["typebox", join(root, "node_modules", "typebox")],
   ] as const) {
     const target = name === "typebox" ? join(installRoot, "node_modules", name) : join(hostRoot, name);

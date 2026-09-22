@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { chmodSync, mkdtempSync, rmSync } from "node:fs";
+import { chmodSync, existsSync, mkdtempSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { Value } from "typebox/value";
@@ -82,6 +82,53 @@ async function start(
 async function execute(tool: Tool, params: unknown, ctx: ExtensionContext): Promise<any> {
   return tool.execute("call-1", params, undefined, undefined, ctx);
 }
+
+test("artifact extension factory does not create its run root before an artifact operation", () => {
+  const parent = mkdtempSync(join(tmpdir(), "akeel-artifact-pi-"));
+  const root = join(parent, "runs");
+  try {
+    const target = fakePi();
+    installArtifactExchange(target.pi, { root });
+    assert.equal(existsSync(root), false);
+  } finally {
+    rmSync(parent, { recursive: true, force: true });
+  }
+});
+
+test("artifact run quota survives extension reconstruction for the same session", async () => {
+  const root = mkdtempSync(join(tmpdir(), "akeel-artifact-pi-"));
+  chmodSync(root, 0o700);
+  try {
+    const first = fakePi();
+    installArtifactExchange(first.pi, { root });
+    await start(first, "owner-session");
+    const ownerTool = first.tools.get("akeel_run_artifact");
+    assert.ok(ownerTool);
+    for (let index = 0; index < 8; index += 1) {
+      await execute(ownerTool!, {
+        action: "reserve",
+        kind: `run-${index}`,
+        slots: [{ name: "result", channel: "artifact", publisher: "child", mediaType: "text/markdown" }],
+      }, context("owner-session", first.entries));
+    }
+
+    const second = fakePi();
+    installArtifactExchange(second.pi, { root });
+    await start(second, "owner-session", first.entries);
+    const reconstructedOwnerTool = second.tools.get("akeel_run_artifact");
+    assert.ok(reconstructedOwnerTool);
+    await assert.rejects(
+      () => execute(reconstructedOwnerTool!, {
+        action: "reserve",
+        kind: "overflow",
+        slots: [{ name: "result", channel: "artifact", publisher: "child", mediaType: "text/markdown" }],
+      }, context("owner-session", first.entries)),
+      /Artifact operation failed/,
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
 
 test("ordinary and capability sessions activate mutually exclusive artifact tools", async () => {
   const root = mkdtempSync(join(tmpdir(), "akeel-artifact-pi-"));
@@ -735,8 +782,14 @@ test("semanticUnits isolates historical entries and preserves continuation capsu
     installArtifactExchange(ownerPi.pi, { root });
     await start(ownerPi, "isolated-session");
 
-    // Manually construct a branch with historical record, a continuation capsule, and a fresh record
+    // Manually construct a branch with historical record, a newer Pi context edit,
+    // a continuation capsule, and a fresh record.
     const syntheticBranch: CustomEntry[] = [
+      {
+        type: "context_edit",
+        targetId: "tool-result-1",
+        replacement: null,
+      } as unknown as CustomEntry,
       {
         type: "custom",
         customType: "akeel:semantic-ledger",
@@ -986,8 +1039,15 @@ test("akeel_handoff registers strongly-typed payload parameter schema and valida
     installArtifactExchange(ownerPi.pi, { root });
     const handoffTool = ownerPi.tools.get("akeel_handoff") as any;
     assert.ok(handoffTool);
+    assert.equal(typeof handoffTool.promptSnippet, "string");
+    assert.ok(Array.isArray(handoffTool.promptGuidelines));
     assert.ok(handoffTool.parameters.anyOf);
     assert.equal(handoffTool.parameters.anyOf.length, 6);
+    for (const variant of handoffTool.parameters.anyOf) {
+      const action = variant.properties.action;
+      assert.deepEqual(action.type, "string");
+      assert.ok(Array.isArray(action.enum));
+    }
 
     const validRecord = {
       action: "record",

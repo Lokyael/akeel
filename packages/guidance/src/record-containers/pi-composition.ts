@@ -26,6 +26,8 @@ export function installRecordContainerValidator(pi: ExtensionAPI): void {
     name: VALIDATE_RECORDS_TOOL,
     label: "AKeel Validate Records",
     description: "Validate Project Record containers (docs/candidates.md, docs/task.md, docs/decisions.md) for slot placement, unique slot invariant, prefix matching, and Candidate/Task field hygiene.",
+    promptSnippet: "Validate standard AKeel Project Record containers",
+    promptGuidelines: ["Use akeel_validate_records to check standard Project Record containers after changing their structure."],
     parameters: VALIDATE_PARAMETERS,
     executionMode: "sequential",
     constrainedSampling: { type: "json_schema", strict: "prefer" },

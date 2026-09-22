@@ -87,9 +87,11 @@ test("guidance owns bootstrap and skills without duplicating principles", () => 
 });
 
 test("runtime packages declare only their own extension and required dependency", () => {
+  const guidance = readPackage("packages/guidance/package.json");
   const accessGate = readPackage("packages/access-gate/package.json");
   const contextPruner = readPackage("packages/context-pruner/package.json");
 
+  assert.equal(guidance.peerDependencies?.["@earendil-works/pi-ai"], "*");
   assert.deepEqual(accessGate.pi?.extensions, ["./src/access-gate"]);
   assert.deepEqual(contextPruner.pi?.extensions, ["./src/context-pruner"]);
   assert.equal(accessGate.dependencies?.yaml, "^2.9.0");
@@ -110,6 +112,7 @@ test("each capability package carries the repository license", () => {
 test("root akeel manifest loads each capability exactly once", () => {
   const manifest = readPackage("package.json");
   assertPiCorePeer(".", manifest);
+  assert.equal(manifest.peerDependencies?.["@earendil-works/pi-ai"], "*");
   assertNodeEngine(".", manifest);
   assert.deepEqual(manifest.files, ["packages", "README.md", "LICENSE"]);
   assert.deepEqual(manifest.pi?.extensions, [

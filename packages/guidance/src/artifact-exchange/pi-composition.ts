@@ -2,8 +2,9 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { Type } from "typebox";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import { StringEnum } from "@earendil-works/pi-ai";
 import { createArtifactExchange } from "./index";
-import type { ArtifactExchangeOptions } from "./index";
+import type { ArtifactExchangeOptions, ArtifactOwner, ArtifactRunQuota } from "./index";
 import { createHandoffStore } from "../handoff-store/index";
 import {
   createContinuationCapsule,
@@ -16,17 +17,16 @@ const OWNER_TOOL = "akeel_run_artifact";
 const PUBLISH_TOOL = "akeel_publish_artifact";
 const HANDOFF_TOOL = "akeel_handoff";
 const CAPABILITY_FLAG = "akeel-artifact-capability";
+const ARTIFACT_RESERVATION_ENTRY = "akeel:artifact-run-reserved";
 
 const OWNER_PARAMETERS = Type.Object({
-  action: Type.Union([
-    Type.Literal("reserve"), Type.Literal("put"), Type.Literal("bind"), Type.Literal("status"), Type.Literal("collect"),
-  ]),
+  action: StringEnum(["reserve", "put", "bind", "status", "collect"] as const),
   kind: Type.Optional(Type.String()),
   slots: Type.Optional(Type.Array(Type.Object({
     name: Type.String(),
-    channel: Type.Union([Type.Literal("packet"), Type.Literal("artifact")]),
-    publisher: Type.Union([Type.Literal("owner"), Type.Literal("child")]),
-    mediaType: Type.Union([Type.Literal("text/markdown"), Type.Literal("application/json")]),
+    channel: StringEnum(["packet", "artifact"] as const),
+    publisher: StringEnum(["owner", "child"] as const),
+    mediaType: StringEnum(["text/markdown", "application/json"] as const),
   }))),
   runId: Type.Optional(Type.String()),
   slot: Type.Optional(Type.String()),
@@ -39,40 +39,30 @@ const OWNER_PARAMETERS = Type.Object({
 const PUBLISH_PARAMETERS = Type.Object({ content: Type.String() }, { additionalProperties: false });
 const RECORD_PAYLOAD_SCHEMA = Type.Object({
   id: Type.String({ description: "Unique semantic unit identifier" }),
-  kind: Type.Union([
-    Type.Literal("requirement"),
-    Type.Literal("constraint"),
-    Type.Literal("assumption"),
-    Type.Literal("finding"),
-    Type.Literal("risk"),
-    Type.Literal("decision-candidate"),
-    Type.Literal("evidence"),
-    Type.Literal("external-effect"),
-    Type.Literal("work-state"),
-    Type.Literal("next-action"),
-  ]),
+  kind: StringEnum([
+    "requirement",
+    "constraint",
+    "assumption",
+    "finding",
+    "risk",
+    "decision-candidate",
+    "evidence",
+    "external-effect",
+    "work-state",
+    "next-action",
+  ] as const),
   statement: Type.String({ description: "Statement of the semantic unit" }),
-  authority: Type.Union([
-    Type.Literal("user-approved"),
-    Type.Literal("project-record"),
-    Type.Literal("observed"),
-    Type.Literal("inferred"),
-  ]),
-  status: Type.Literal("live", { description: "Semantic status for recording" }),
+  authority: StringEnum(["user-approved", "project-record", "observed", "inferred"] as const),
+  status: StringEnum(["live"] as const, { description: "Semantic status for recording" }),
   sourceRef: Type.String({ description: "Source reference" }),
   dependsOn: Type.Optional(Type.Array(Type.String())),
 }, { additionalProperties: false });
 
 const CLOSE_PAYLOAD_SCHEMA = Type.Object({
   id: Type.String({ description: "Semantic ID to close" }),
-  status: Type.Union([Type.Literal("closed"), Type.Literal("superseded")]),
+  status: StringEnum(["closed", "superseded"] as const),
   closure: Type.Object({
-    disposition: Type.Union([
-      Type.Literal("materialized"),
-      Type.Literal("superseded"),
-      Type.Literal("invalidated"),
-      Type.Literal("irrelevant"),
-    ]),
+    disposition: StringEnum(["materialized", "superseded", "invalidated", "irrelevant"] as const),
     basisRef: Type.String({ description: "Evidence or basis reference" }),
     destinationRef: Type.String({ description: "Destination record or tombstone reference" }),
   }, { additionalProperties: false }),
@@ -93,7 +83,7 @@ const PREPARE_PAYLOAD_SCHEMA = Type.Object({
   authorityRefs: Type.Array(Type.String(), { description: "Authority references" }),
   roots: Type.Array(Type.String(), { description: "Root semantic unit IDs" }),
   checkpoint: Type.Object({
-    state: Type.Union([Type.Literal("complete"), Type.Literal("incomplete"), Type.Literal("blocked")]),
+    state: StringEnum(["complete", "incomplete", "blocked"] as const),
     currentSlice: Type.String(),
     actualState: Type.String(),
     nextActionId: Type.String(),
@@ -106,23 +96,23 @@ const PREPARE_PAYLOAD_SCHEMA = Type.Object({
 
 const HANDOFF_PARAMETERS = Type.Union([
   Type.Object({
-    action: Type.Literal("record"),
+    action: StringEnum(["record"] as const),
     payload: RECORD_PAYLOAD_SCHEMA,
   }, { additionalProperties: false }),
   Type.Object({
-    action: Type.Literal("close"),
+    action: StringEnum(["close"] as const),
     payload: CLOSE_PAYLOAD_SCHEMA,
   }, { additionalProperties: false }),
   Type.Object({
-    action: Type.Literal("prepare"),
+    action: StringEnum(["prepare"] as const),
     payload: Type.Optional(PREPARE_PAYLOAD_SCHEMA),
   }, { additionalProperties: false }),
   Type.Object({
-    action: Type.Literal("reconcile"),
+    action: StringEnum(["reconcile"] as const),
     payload: RECONCILE_PAYLOAD_SCHEMA,
   }, { additionalProperties: false }),
-  Type.Object({ action: Type.Literal("status") }, { additionalProperties: false }),
-  Type.Object({ action: Type.Literal("view") }, { additionalProperties: false }),
+  Type.Object({ action: StringEnum(["status"] as const) }, { additionalProperties: false }),
+  Type.Object({ action: StringEnum(["view"] as const) }, { additionalProperties: false }),
 ]);
 
 const SEMANTIC_ENTRY = "akeel:semantic-ledger";
@@ -232,7 +222,27 @@ export type ArtifactExchangeCompositionOptions = Partial<ArtifactExchangeOptions
 
 export function installArtifactExchange(pi: ExtensionAPI, options: ArtifactExchangeCompositionOptions = {}): void {
   const root = options.root ?? join(tmpdir(), "akeel", "runs");
-  const exchange = createArtifactExchange({ ...options, root });
+  let sessionEntries: readonly unknown[] = [];
+  const quota: ArtifactRunQuota = {
+    count(owner: ArtifactOwner): number {
+      const runIds = new Set<string>();
+      for (const raw of sessionEntries) {
+        if (!isRecord(raw) || raw.type !== "custom" || raw.customType !== ARTIFACT_RESERVATION_ENTRY || !isRecord(raw.data)) continue;
+        if (raw.data.sessionId !== owner.sessionId || raw.data.cwd !== owner.cwd || typeof raw.data.runId !== "string") continue;
+        if (/^run-[a-f0-9]{32}$/u.test(raw.data.runId)) runIds.add(raw.data.runId);
+      }
+      return runIds.size;
+    },
+    record(owner: ArtifactOwner, runId: string): void {
+      const data = Object.freeze({ sessionId: owner.sessionId, cwd: owner.cwd, runId });
+      pi.appendEntry(ARTIFACT_RESERVATION_ENTRY, data);
+      sessionEntries = Object.freeze([
+        ...sessionEntries,
+        Object.freeze({ type: "custom", customType: ARTIFACT_RESERVATION_ENTRY, data }),
+      ]);
+    },
+  };
+  const exchange = createArtifactExchange({ ...options, root, quota });
   const handoffs = createHandoffStore();
 
   pi.registerFlag(CAPABILITY_FLAG, {
@@ -244,6 +254,8 @@ export function installArtifactExchange(pi: ExtensionAPI, options: ArtifactExcha
     name: OWNER_TOOL,
     label: "AKeel Run Artifact",
     description: "Reserve, bind, inspect, publish Owner input to, or collect a bounded AKeel workflow run.",
+    promptSnippet: "Coordinate bounded AKeel workflow runs and collect verified artifacts",
+    promptGuidelines: ["Use akeel_run_artifact for Owner-side workflow reservation, binding, status, publication, and collection."],
     parameters: OWNER_PARAMETERS,
     executionMode: "sequential",
     constrainedSampling: { type: "json_schema", strict: "prefer" },
@@ -290,6 +302,8 @@ export function installArtifactExchange(pi: ExtensionAPI, options: ArtifactExcha
     name: HANDOFF_TOOL,
     label: "AKeel Handoff",
     description: "In-session continuity tool to record or close live semantics, prepare or verify a continuation capsule, and reconcile in a successor session.",
+    promptSnippet: "Record session semantics and reconcile bounded Pi session handoffs",
+    promptGuidelines: ["Use akeel_handoff to record or reconcile AKeel session continuity, not to modify ordinary project files."],
     parameters: HANDOFF_PARAMETERS,
     executionMode: "sequential",
     constrainedSampling: { type: "json_schema", strict: "prefer" },
@@ -513,6 +527,8 @@ export function installArtifactExchange(pi: ExtensionAPI, options: ArtifactExcha
     name: PUBLISH_TOOL,
     label: "Publish AKeel Artifact",
     description: "Publish text to the single pre-bound AKeel artifact slot for this delegated child.",
+    promptSnippet: "Publish one verified result to the pre-bound AKeel artifact slot",
+    promptGuidelines: ["Use akeel_publish_artifact only in a delegated child session with the pre-bound capability."],
     parameters: PUBLISH_PARAMETERS,
     executionMode: "sequential",
     constrainedSampling: { type: "json_schema", strict: "prefer" },
@@ -539,6 +555,7 @@ export function installArtifactExchange(pi: ExtensionAPI, options: ArtifactExcha
   });
 
   pi.on("session_start", (_event, context) => {
+    sessionEntries = context.sessionManager.getBranch();
     const capability = pi.getFlag(CAPABILITY_FLAG);
     const active = pi.getActiveTools().filter((name) => name !== OWNER_TOOL && name !== PUBLISH_TOOL && name !== HANDOFF_TOOL);
     if (typeof capability === "string" && capability.length > 0) {

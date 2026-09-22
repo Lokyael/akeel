@@ -54,6 +54,8 @@ test("Pi public loader accepts every AKeel custom tool schema", async () => {
     assert.equal(typeof tool.definition.parameters, "object");
     assert.ok(tool.definition.parameters !== null);
     assert.equal(Array.isArray(tool.definition.parameters), false);
+    assert.equal(typeof tool.definition.promptSnippet, "string");
+    assert.ok(Array.isArray(tool.definition.promptGuidelines));
     assert.deepEqual(tool.definition.constrainedSampling, { type: "json_schema", strict: "prefer" });
   }
 });

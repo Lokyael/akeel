@@ -19,7 +19,8 @@ const MAX_RUNS_PER_SESSION = 8;
 const CAPABILITY_TTL_MS = 24 * 60 * 60 * 1000;
 const SLUG = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
 
-type Owner = Readonly<{ readonly sessionId: string; readonly cwd: string }>;
+export type ArtifactOwner = Readonly<{ readonly sessionId: string; readonly cwd: string }>;
+type Owner = ArtifactOwner;
 type Child = Readonly<{
   readonly sessionId: string;
   readonly herdrWorkspaceId: string;
@@ -82,10 +83,16 @@ export type PublicationResult = Readonly<{
   readonly bytes: number;
 }>;
 
+export type ArtifactRunQuota = Readonly<{
+  readonly count: (owner: ArtifactOwner) => number;
+  readonly record: (owner: ArtifactOwner, runId: string) => void;
+}>;
+
 export type ArtifactExchangeOptions = Readonly<{
   readonly root: string;
   readonly now?: () => number;
   readonly random?: (bytes: number) => Buffer;
+  readonly quota?: ArtifactRunQuota;
 }>;
 
 function invalid(): never {
@@ -102,6 +109,10 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function validIdentity(value: string): boolean {
   return value.length > 0 && value.length <= 128 && !/[\u0000-\u001f\u007f]/.test(value);
+}
+
+function ownerKey(owner: Owner): string {
+  return `${owner.sessionId}\u0000${owner.cwd}`;
 }
 
 function validateOwner(owner: Owner): void {
@@ -162,8 +173,14 @@ export function createArtifactExchange(options: ArtifactExchangeOptions): Artifa
   if (!isRecord(options) || typeof options.root !== "string" || !options.root.startsWith("/")) invalid();
   const now = options.now ?? Date.now;
   const random = options.random ?? randomBytes;
-  ensureControlledDirectory(options.root, true);
   const sessionRunCounts = new Map<string, number>();
+  const quota = options.quota ?? {
+    count: (owner: ArtifactOwner) => sessionRunCounts.get(ownerKey(owner)) ?? 0,
+    record: (owner: ArtifactOwner) => {
+      const key = ownerKey(owner);
+      sessionRunCounts.set(key, (sessionRunCounts.get(key) ?? 0) + 1);
+    },
+  } satisfies ArtifactRunQuota;
 
   function runRoot(runId: string): string {
     if (!/^run-[a-f0-9]{32}$/.test(runId)) invalid();
@@ -267,8 +284,9 @@ export function createArtifactExchange(options: ArtifactExchangeOptions): Artifa
       validateOwner(owner);
       if (!isRecord(input) || typeof input.kind !== "string" || !SLUG.test(input.kind) || !Array.isArray(input.slots) ||
         input.slots.length === 0 || input.slots.length > MAX_SLOTS) invalid();
-      const count = sessionRunCounts.get(owner.sessionId) ?? 0;
-      if (count >= MAX_RUNS_PER_SESSION) denied();
+      const count = quota.count(owner);
+      if (!Number.isSafeInteger(count) || count < 0 || count >= MAX_RUNS_PER_SESSION) denied();
+      ensureControlledDirectory(options.root, true);
       const names = new Set<string>();
       const normalizedSlots: SlotSpec[] = [];
       for (const candidate of input.slots) {
@@ -317,7 +335,7 @@ export function createArtifactExchange(options: ArtifactExchangeOptions): Artifa
       const manifest: RunManifest = Object.freeze({ schemaVersion: 1, runId, kind: input.kind, createdAt: now(), owner: Object.freeze({ ...owner }), slots: Object.freeze(slots) });
       for (const slot of slots) paths[slot.name] = contentPath(root, slot);
       atomicNoClobber(join(root, "control", "run.json"), JSON.stringify(manifest), random);
-      sessionRunCounts.set(owner.sessionId, count + 1);
+      quota.record(owner, runId);
       return Object.freeze({ runId, paths: Object.freeze(paths), capabilities: Object.freeze(capabilities) });
     },
 
