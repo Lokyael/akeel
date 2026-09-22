@@ -47,7 +47,11 @@ function fakePi(flag?: string) {
   };
 }
 
-function context(sessionId: string, entries: CustomEntry[] = []): ExtensionContext {
+function context(
+  sessionId: string,
+  entries: CustomEntry[] = [],
+  allEntries: CustomEntry[] = entries,
+): ExtensionContext {
   return {
     cwd: "/workspace/project",
     hasUI: false,
@@ -59,7 +63,7 @@ function context(sessionId: string, entries: CustomEntry[] = []): ExtensionConte
       getSessionId: () => sessionId,
       getSessionFile: () => `/sessions/${sessionId}.jsonl`,
       getBranch: () => entries,
-      getEntries: () => entries,
+      getEntries: () => allEntries,
       appendCustomEntry: (customType: string, data: unknown) => {
         entries.push({ type: "custom", customType, data });
         return `entry-${entries.length}`;
@@ -72,11 +76,12 @@ async function start(
   target: ReturnType<typeof fakePi>,
   sessionId: string,
   entries: CustomEntry[] = target.entries,
+  allEntries: CustomEntry[] = entries,
 ): Promise<void> {
   target.useEntries(entries);
   const handler = target.handlers.get("session_start");
   assert.ok(handler);
-  await handler!({}, context(sessionId, entries));
+  await handler!({}, context(sessionId, entries, allEntries));
 }
 
 async function execute(tool: Tool, params: unknown, ctx: ExtensionContext): Promise<any> {
@@ -123,6 +128,42 @@ test("artifact run quota survives extension reconstruction for the same session"
         kind: "overflow",
         slots: [{ name: "result", channel: "artifact", publisher: "child", mediaType: "text/markdown" }],
       }, context("owner-session", first.entries)),
+      /Artifact operation failed/,
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("artifact run quota survives resuming from a shorter session branch", async () => {
+  const root = mkdtempSync(join(tmpdir(), "akeel-artifact-pi-"));
+  chmodSync(root, 0o700);
+  try {
+    const first = fakePi();
+    installArtifactExchange(first.pi, { root });
+    await start(first, "owner-session");
+    const ownerTool = first.tools.get("akeel_run_artifact");
+    assert.ok(ownerTool);
+    for (let index = 0; index < 8; index += 1) {
+      await execute(ownerTool!, {
+        action: "reserve",
+        kind: `run-${index}`,
+        slots: [{ name: "result", channel: "artifact", publisher: "child", mediaType: "text/markdown" }],
+      }, context("owner-session", first.entries));
+    }
+
+    const resumedBranch: CustomEntry[] = [];
+    const second = fakePi();
+    installArtifactExchange(second.pi, { root });
+    await start(second, "owner-session", resumedBranch, first.entries);
+    const reconstructedOwnerTool = second.tools.get("akeel_run_artifact");
+    assert.ok(reconstructedOwnerTool);
+    await assert.rejects(
+      () => execute(reconstructedOwnerTool!, {
+        action: "reserve",
+        kind: "overflow",
+        slots: [{ name: "result", channel: "artifact", publisher: "child", mediaType: "text/markdown" }],
+      }, context("owner-session", resumedBranch, first.entries)),
       /Artifact operation failed/,
     );
   } finally {

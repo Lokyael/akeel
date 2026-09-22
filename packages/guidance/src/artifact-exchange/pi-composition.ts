@@ -555,7 +555,7 @@ export function installArtifactExchange(pi: ExtensionAPI, options: ArtifactExcha
   });
 
   pi.on("session_start", (_event, context) => {
-    sessionEntries = context.sessionManager.getBranch();
+    sessionEntries = context.sessionManager.getEntries();
     const capability = pi.getFlag(CAPABILITY_FLAG);
     const active = pi.getActiveTools().filter((name) => name !== OWNER_TOOL && name !== PUBLISH_TOOL && name !== HANDOFF_TOOL);
     if (typeof capability === "string" && capability.length > 0) {

@@ -309,13 +309,11 @@ export function createArtifactExchange(options: ArtifactExchangeOptions): Artifa
       for (let attempt = 0; attempt < 8; attempt += 1) {
         runId = `run-${random(16).toString("hex")}`;
         root = runRoot(runId);
-        try {
-          mkdirSync(root, { mode: 0o700 });
-          break;
-        } catch (error) {
-          if (attempt === 7 || !isRecord(error) || error.code !== "EEXIST") throw error;
-        }
+        if (!existsSync(root)) break;
+        if (attempt === 7) denied();
       }
+      quota.record(owner, runId);
+      mkdirSync(root, { mode: 0o700 });
       ensureControlledDirectory(root);
       const capabilities: Record<string, string> = {};
       const paths: Record<string, string> = {};
@@ -335,7 +333,6 @@ export function createArtifactExchange(options: ArtifactExchangeOptions): Artifa
       const manifest: RunManifest = Object.freeze({ schemaVersion: 1, runId, kind: input.kind, createdAt: now(), owner: Object.freeze({ ...owner }), slots: Object.freeze(slots) });
       for (const slot of slots) paths[slot.name] = contentPath(root, slot);
       atomicNoClobber(join(root, "control", "run.json"), JSON.stringify(manifest), random);
-      quota.record(owner, runId);
       return Object.freeze({ runId, paths: Object.freeze(paths), capabilities: Object.freeze(capabilities) });
     },
 

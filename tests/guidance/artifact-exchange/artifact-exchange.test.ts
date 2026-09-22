@@ -136,6 +136,28 @@ test("publication is no-clobber and collect detects artifact tampering", () => {
   }
 });
 
+test("failed quota recording does not materialize an uncounted run", () => {
+  const root = mkdtempSync(join(tmpdir(), "akeel-artifact-exchange-"));
+  chmodSync(root, 0o700);
+  try {
+    const exchange = createArtifactExchange({
+      root,
+      quota: {
+        count: () => 0,
+        record: () => { throw new Error("quota-record-failed"); },
+      },
+    });
+
+    assert.throws(() => exchange.reserve(owner, {
+      kind: "code-review",
+      slots: [{ name: "result", channel: "artifact", publisher: "child", mediaType: "text/markdown" }],
+    }), /quota-record-failed/);
+    assert.deepEqual(readdirSync(root), []);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("invalid slot names, excessive runs, and oversized content are bounded", () => {
   const h = harness();
   try {
