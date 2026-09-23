@@ -503,6 +503,42 @@ test("a bounded and-or flow compiles as one opaque canonical result", () => {
   assert.deepEqual(Object.keys(compilation), []);
 });
 
+test("Canonical compilation carries every reachable CWD candidate and excludes an unreachable cd", () => {
+  const branching = compileShell({
+    ...request,
+    arguments: { command: "cd left || cd right; cat input.txt" },
+  });
+  if (isShellReject(branching)) assert.fail("expected branching flow to compile");
+  const branchingFacts = shellCompilationFacts(branching);
+  const inputCandidates = branchingFacts?.resolvedPaths
+    .flatMap((paths) => paths.map((path) => path.candidate))
+    .filter((candidate) => candidate.endsWith("/input.txt"))
+    .sort();
+  assert.deepEqual(inputCandidates, [
+    "/workspace/project/input.txt",
+    "/workspace/project/left/input.txt",
+    "/workspace/project/right/input.txt",
+  ]);
+
+  const shortCircuited = compileShell({
+    ...request,
+    arguments: { command: "false && cd /tmp || cat README.md" },
+  });
+  if (isShellReject(shortCircuited)) assert.fail("expected short-circuited flow to compile");
+  const shortCircuitCandidates = shellCompilationFacts(shortCircuited)?.resolvedPaths
+    .flatMap((paths) => paths.map((path) => path.candidate));
+  assert.deepEqual(shortCircuitCandidates, ["/workspace/project/README.md"]);
+
+  const mixedAndOr = compileShell({
+    ...request,
+    arguments: { command: "true || cd /tmp && cat README.md" },
+  });
+  if (isShellReject(mixedAndOr)) assert.fail("expected mixed and-or flow to compile");
+  const mixedCandidates = shellCompilationFacts(mixedAndOr)?.resolvedPaths
+    .flatMap((paths) => paths.map((path) => path.candidate));
+  assert.deepEqual(mixedCandidates, ["/workspace/project/README.md"]);
+});
+
 test("a flow above the command budget is rejected before semantic expansion", () => {
   const command = Array.from({ length: 129 }, () => "true").join(";");
   assert.deepEqual(compileShell({ ...request, arguments: { command } }), {

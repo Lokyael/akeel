@@ -8,8 +8,8 @@ import {
 } from "../limits";
 import { analyzeShellCommandWords, shellCommandOutcomes } from "./shell/invocation";
 import type { ShellCommandAnalysis, ShellCommandClass, ShellEffect } from "./shell/invocation";
-import { parseShellFlow } from "./shell/flow";
-import type { ShellCommandStatus, ShellFlow } from "./shell/flow";
+import { nextReachableCommand, parseShellFlow } from "./shell/flow";
+import type { ShellCommandStatus } from "./shell/flow";
 import { isKnownProgram, resolveExecutableIdentity } from "./shell/programs/index";
 
 export { createLinuxPathEvidence } from "./path-evidence";
@@ -260,7 +260,6 @@ export function compileManagedCall(
 }
 
 type CompleteShellAnalysis = Extract<ShellCommandAnalysis, { readonly kind: "complete" }>;
-type CompleteShellFlow = Extract<ShellFlow, { readonly kind: "complete" }>;
 
 type CompiledSimpleCommand = Readonly<{
   readonly kind: "simple";
@@ -486,21 +485,6 @@ function resolveEvidence(
     candidate: evidence.candidate,
     traversed: Object.freeze([...evidence.traversed]),
   });
-}
-
-function nextReachableCommand(
-  flow: CompleteShellFlow,
-  commandIndex: number,
-  status: "success" | "failure",
-): number | undefined {
-  for (let nextIndex = commandIndex + 1; nextIndex < flow.commands.length; nextIndex += 1) {
-    const operator = flow.operators[nextIndex - 1]!;
-    if (operator.kind === "sequence" || operator.kind === "and" && status === "success" ||
-      operator.kind === "or" && status === "failure") {
-      return nextIndex;
-    }
-  }
-  return undefined;
 }
 
 export type UnifiedDisplayView =

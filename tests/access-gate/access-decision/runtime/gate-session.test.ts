@@ -4,6 +4,7 @@ import { decodePolicyConfiguration } from "../../../../packages/access-gate/src/
 import {
   CanonicalCompilation,
   CompileEnvironment,
+  createLinuxPathEvidence,
 } from "../../../../packages/access-gate/src/access-gate/access-decision/core/compilation/index";
 import {
   MandatoryBoundaries,
@@ -308,5 +309,62 @@ test("GateSession enforces capabilityRoots with read-only admission and anti-tam
       pathEvidence: Object.freeze({ resolve: () => undefined }),
     });
   }, TypeError);
+});
+
+test("Capability Domain does not exempt Direct search from path scope or search policy", () => {
+  const createGateSession = (runtime as Record<string, unknown>).createGateSession as Function;
+  const capabilityRoot = "/home/user/.agents/skills";
+
+  function createSearchSession(allowedRoots: readonly string[], blockedRoots: readonly string[] = []) {
+    return createGateSession({
+      cwd: "/workspace",
+      home: "/home/user",
+      stagingRoot: "/tmp/akeel-stage",
+      credentialRoots: ["/home/user/.pi/agent"],
+      capabilityRoots: [capabilityRoot],
+      configuration: decodePolicyConfiguration({
+        paths: {
+          read: "deny",
+          write: "deny",
+          edit: "deny",
+          list: "deny",
+          search: "deny",
+          allowedRoots,
+          blockedRoots,
+          blockedPaths: [],
+        },
+        commands: {
+          inspect: "deny",
+          modify: "deny",
+          execute: "deny",
+          opaque: "deny",
+          destroy: "deny",
+          unknown: "deny",
+        },
+      }),
+      pathEvidence: createLinuxPathEvidence(),
+    });
+  }
+
+  const outsideWorkspace = createSearchSession(["/workspace"]);
+  assert.deepEqual(outsideWorkspace.evaluate({
+    surface: "search",
+    arguments: { path: capabilityRoot, pattern: "token" },
+  }), { kind: "deny", code: "hard-boundary" });
+
+  const explicitlyScoped = createSearchSession([capabilityRoot]);
+  assert.deepEqual(explicitlyScoped.evaluate({
+    surface: "search",
+    arguments: { path: capabilityRoot, pattern: "token" },
+  }), { kind: "deny", code: "policy-denied" });
+
+  const blockedDescendant = createSearchSession(
+    [capabilityRoot],
+    [`${capabilityRoot}/private`],
+  );
+  assert.deepEqual(blockedDescendant.evaluate({
+    surface: "search",
+    arguments: { path: capabilityRoot, pattern: "token" },
+  }), { kind: "deny", code: "hard-boundary" });
 });
 

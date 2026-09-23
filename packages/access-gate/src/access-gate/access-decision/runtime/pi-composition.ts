@@ -233,13 +233,13 @@ function installComposition(
     if (context.hasUI && context.mode === "tui") {
       const confirmed = await context.ui.confirm(
         "Turn off Access Gate",
-        "Bypass all tool-call and path checks for this session? Principles and skills remain active.",
+        "Disable ordinary operation and path admission for this session? Unsupported host surfaces remain blocked; principles and skills remain active.",
       );
       if (!confirmed) return;
     }
     activatePresetOrOff("off", context);
     syncPolicyStatus(context);
-    notifyPolicy(context, "Access Gate turned off for this session. Tools will passthrough.", "warning");
+    notifyPolicy(context, "Access Gate turned off for this session; ordinary managed calls will passthrough, while unsupported host surfaces remain blocked.", "warning");
   }
 
   pi.registerCommand("policy", {

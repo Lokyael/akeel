@@ -317,6 +317,8 @@ function authorizeDirect(
   }
 
   const isCapability = isCapabilityPath(facts.path.candidate, mandatory.capabilityRoots);
+  const hasCapabilityReadExemption = isCapability &&
+    (facts.operation === "read" || facts.operation === "list");
   const isCapabilityMutation = (facts.operation === "write" || facts.operation === "edit") &&
     pathHitsCapabilityBoundary(facts.path, mandatory.capabilityRoots);
   if (isCapabilityMutation) {
@@ -327,12 +329,12 @@ function authorizeDirect(
     return Object.freeze({ kind: "deny", code: "hard-boundary" });
   }
 
-  if (pathHitsPolicyBoundary(facts.path, policy.paths, isCapability) ||
+  if (pathHitsPolicyBoundary(facts.path, policy.paths, hasCapabilityReadExemption) ||
     (facts.operation === "search" && recursiveSearchReachesBlockedPath(facts.path.candidate, policy.paths))) {
     return Object.freeze({ kind: "deny", code: "hard-boundary" });
   }
 
-  if (isCapability) {
+  if (hasCapabilityReadExemption) {
     return Object.freeze({ kind: "allow" });
   }
 

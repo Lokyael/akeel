@@ -127,6 +127,49 @@ test("explicitly off access gate passes managed calls while retaining the extens
   assert.equal(notification, "Active AKeel policy: develop.");
 });
 
+test("policy off confirmation reports the mandatory host boundary that remains active", async () => {
+  const { handlers, commands, pi } = fakePi();
+  installPiAccessDecision(pi, {
+    policyConfig: {
+      presets: { review: builtinPresets.review },
+      activePreset: "review",
+    },
+    projectRoot: "/workspace/project",
+    stagingRoot: "/tmp/akeel",
+  });
+  let confirmation = "";
+  let notification = "";
+  const hostContext = context(
+    "/workspace/project",
+    true,
+    async (_title, message) => {
+      confirmation = message;
+      return true;
+    },
+    "tui",
+    async () => undefined,
+    (message) => { notification = message; },
+  );
+  await invoke(handlers, "session_start", {}, hostContext);
+  const policyCommand = commands.get("policy");
+  assert.ok(policyCommand);
+
+  await policyCommand!("off", hostContext);
+
+  assert.match(confirmation, /ordinary operation and path admission/u);
+  assert.match(confirmation, /unsupported host surfaces remain blocked/iu);
+  assert.match(notification, /ordinary managed calls will passthrough/u);
+  assert.match(notification, /unsupported host surfaces remain blocked/iu);
+  assert.equal(
+    await invoke(handlers, "tool_call", { toolName: "write", input: { path: "notes.md", content: "updated" } }, hostContext),
+    undefined,
+  );
+  assert.deepEqual(
+    await invoke(handlers, "tool_call", { toolName: "powershell", input: { command: "Get-ChildItem" } }, hostContext),
+    { block: true, reason: "Blocked because this governed tool surface is unsupported." },
+  );
+});
+
 test("Pi composition hard-denies an agent credential variant under an allowing policy", async () => {
   const agentDir = mkdtempSync(join(tmpdir(), "akeel-credential-boundary-"));
   const { handlers, pi } = fakePi();

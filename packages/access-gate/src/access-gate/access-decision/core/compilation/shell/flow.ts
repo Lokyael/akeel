@@ -1,14 +1,5 @@
-import { MAX_SHELL_CWD_STATES } from "../../limits";
-import { createLinuxPathEvidence } from "../path-evidence";
 import { scanShellWords } from "./language";
 import type { ShellWord } from "./language";
-
-type ShellPathContext = Readonly<{
-  readonly home?: string;
-  readonly pathKind?: "home-relative" | "literal";
-}>;
-
-const FLOW_PATH_EVIDENCE = createLinuxPathEvidence();
 
 export type ShellFlowOperator = Readonly<{
   readonly kind: "and" | "or" | "sequence";
@@ -31,10 +22,6 @@ export type ShellFlowPipelineCommand = Readonly<{
 export type ShellFlowCommand = ShellFlowSimpleCommand | ShellFlowPipelineCommand;
 
 export type ShellCommandStatus = "success" | "failure";
-export type ShellCwdState = Readonly<{
-  readonly commandIndex: number;
-  readonly cwd: string;
-}>;
 
 type ShellSyntaxReject = Readonly<{
   readonly kind: "reject";
@@ -155,75 +142,7 @@ export function parseShellFlow(input: string): ShellFlow {
   });
 }
 
-export function reachableShellCommands(
-  flow: Extract<ShellFlow, { kind: "complete" }>,
-  outcomes: readonly (readonly ShellCommandStatus[])[],
-): readonly number[] {
-  if (flow.commands.length === 0 || outcomes.length === 0) return Object.freeze([]);
-
-  const reachable = new Set<number>([0]);
-  const pending = [0];
-  while (pending.length > 0) {
-    const commandIndex = pending.shift()!;
-    for (const status of outcomes[commandIndex] ?? []) {
-      const nextIndex = nextReachableCommand(flow, commandIndex, status);
-      if (nextIndex === undefined || reachable.has(nextIndex)) continue;
-      reachable.add(nextIndex);
-      pending.push(nextIndex);
-    }
-  }
-  return Object.freeze([...reachable].sort((left, right) => left - right));
-}
-
-function cdTarget(command: ShellFlowCommand): ShellWord | undefined {
-  if (command.kind !== "simple") return undefined;
-  if (command.words[0]?.text !== "cd") return undefined;
-  return command.words[1];
-}
-
-export function traceShellFlowCwds(
-  flow: Extract<ShellFlow, { kind: "complete" }>,
-  initialCwd: string,
-  outcomes: readonly (readonly ShellCommandStatus[])[],
-  maxStates = MAX_SHELL_CWD_STATES,
-  context: ShellPathContext = {},
-): readonly ShellCwdState[] | undefined {
-  const states: ShellCwdState[] = [];
-  const stateKeys = new Set<string>();
-  const queuedKeys = new Set<string>([`${0}\u0000${initialCwd}`]);
-  const pending: ShellCwdState[] = [{ commandIndex: 0, cwd: initialCwd }];
-
-  while (pending.length > 0) {
-    const state = pending.shift()!;
-    const index = state.commandIndex;
-    const key = `${index}\u0000${state.cwd}`;
-    if (stateKeys.has(key)) continue;
-    if (states.length >= maxStates) return undefined;
-    stateKeys.add(key);
-    states.push(Object.freeze(state));
-
-    const target = cdTarget(flow.commands[index]!);
-    for (const status of outcomes[index] ?? []) {
-      const resolvedTarget = target === undefined
-        ? undefined
-        : FLOW_PATH_EVIDENCE.resolve(state.cwd, target.text, {
-            home: context.home,
-            pathKind: target.pathKind,
-          })?.candidate;
-      const nextCwd = status === "success" && resolvedTarget !== undefined ? resolvedTarget : state.cwd;
-      const nextIndex = nextReachableCommand(flow, index, status);
-      if (nextIndex === undefined) continue;
-      const nextKey = `${nextIndex}\u0000${nextCwd}`;
-      if (queuedKeys.has(nextKey)) continue;
-      if (states.length + pending.length >= maxStates) return undefined;
-      queuedKeys.add(nextKey);
-      pending.push({ commandIndex: nextIndex, cwd: nextCwd });
-    }
-  }
-  return Object.freeze(states);
-}
-
-function nextReachableCommand(
+export function nextReachableCommand(
   flow: Extract<ShellFlow, { kind: "complete" }>,
   commandIndex: number,
   status: ShellCommandStatus,
