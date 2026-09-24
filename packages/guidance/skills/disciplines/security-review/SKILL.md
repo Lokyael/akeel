@@ -5,13 +5,13 @@ description: Use when reviewing pending changes, before merge, during verify-wor
 
 # Security Review
 
-> **HARD GATE** — Requires git context (branch with merge-base or diff). Run the scan in a Herdr Agent and return the structured report artifact to the Task Owner Session. The Task Owner records it in the current security-review section of the active Task Record (`docs/task.md`) and creates a `Kind: maintenance` Task Record in `docs/task.md` (Kind per principles.md Project Records — Record Lifecycle) when no active task exists.
+> **HARD GATE** — Requires an immutable Owner packet containing the fixed base/head OIDs, relevant refs, captured Git status, staged and unstaged diffs, and untracked inventory/content. Run the scan in a read-only Herdr Agent, which must not execute live Git or refresh repository state, and return the structured report artifact to the Task Owner Session. Missing or stale Git evidence returns to the Owner for a refreshed packet. The Task Owner records the result in the current security-review section of the active Task Record (`docs/task.md`) and creates a `Kind: maintenance` Task Record in `docs/task.md` (Kind per principles.md Project Records — Record Lifecycle) when no active task exists.
 
 ## 5-Phase Scan
 
 | # | Phase | What |
 |---|-------|------|
-| 1 | **Scope Resolution** | Detect diff via `git diff --merge-base origin/HEAD`; resolve languages/frameworks |
+| 1 | **Scope Resolution** | Consume the packet's fixed refs, OIDs, status, diff, and untracked surface; resolve languages/frameworks without rereading live Git |
 | 2 | **Context Research** | Identify existing security patterns, sanitization, auth model in the codebase |
 | 3 | **Vulnerability Assessment** | Trace user input → sink; check auth boundaries, crypto, deserialization, path ops |
 | 4 | **False-Positive Filtering** | Cross-check each finding against exclusion rules; reject confidence < 8/10 |

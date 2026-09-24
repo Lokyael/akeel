@@ -34,38 +34,4 @@ Keep production package peer dependencies open (`*`) because Pi supplies its cor
 
 - **New host execution-surface policy, session-switch lifecycle changes, and prompt-injection redesign:** Deferred by the user; revisit only on explicit request.
 
-## T-0167: Separate live Git inspection from read-only child review
-
-- Kind: bug
-- Status: in-progress
-- Reversal surface: engineering
-
-### Background & Goal
-
-Raw Git repository inspection is not uniformly read-only: `git status` may invoke a configured fsmonitor helper and refresh the index, while patch-producing `diff`/`log`/`show`/`rev-list` forms may invoke configured external diff or text-conversion helpers. Preserve created-agent repository awareness without granting read-only children an undeclared execution path by separating immutable Owner-captured Git state from live worktree inspection.
-
-### Requirements
-
-- Mark helper-sensitive live Git inspections as opaque so built-in `review`, `guided`, and `develop` apply deny, approval, and allow respectively; model `git status` as a potential repository metadata write while preserving mandatory path and helper boundaries.
-- Keep bounded metadata-only Git queries that do not use the identified helper surfaces available through their existing inspect policy.
-- Require read-only Herdr children to consume the exact Git status, diffs, untracked inventory, refs, and OIDs supplied in their immutable Owner packet instead of re-reading live Git state; keep modifying children in isolated worktrees under their effective policy.
-- Preserve fixed Review Surface and staleness checks, update D-067 and user documentation to the corrected Git risk model, and pass focused plus full validation.
-
-### Design
-
-The Git analyzer retains the existing closed option contracts and path extraction, but adds an explicit helper-sensitive inspect set. Those commands remain inspect-class operations for user intent while carrying `opaque`; status also carries `write` because Git documents optional index refresh as a side effect. The Policy Kernel already combines command class, path effects, and opaque mode, so no new policy axis is introduced. Herdr and review instructions make the Owner packet the read-only child authority for Git state; they do not add a Git execution broker or teach the child a shell workaround.
-
-### Plan
-
-1. Add failing semantic and policy tests for helper-sensitive Git classification and preset behavior, then update the Git analyzer.
-2. Update Herdr/review packet contracts and their structural tests so read-only children use captured Git state and do not execute live Git.
-3. Revise D-067, README, and current architecture text to describe the corrected boundary without weakening existing hard-deny helper/transport rules.
-4. Run focused Access Gate and skill validation, TypeScript checking, and the full repository suite; review and clear the Task with durable updates.
-
-### Out of Scope
-
-- **Dedicated live read-only Git broker:** This task uses immutable Owner packets for read-only children and existing opaque policy for live inspection. Revisit when a read-only child has a demonstrated need to refresh Git state after creation.
-- **OS sandboxing or complete Git configuration isolation:** Access Gate still does not sandbox Git or eliminate filesystem TOCTOU. Revisit only with a separate execution-broker decision.
-- **Child policy inheritance:** This task does not add delegated preset propagation or capability clamping. Revisit through the existing delegated-child policy boundary when that feature is explicitly adopted.
-
 ## T-0168: 待创建

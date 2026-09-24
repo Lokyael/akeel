@@ -13,12 +13,14 @@ The Task Owner coordinator captures one bounded review packet before delegation.
 
 For a branch or PR, record the fixed point and committed diff from its merge base to `HEAD`. For task-in-progress work, also include:
 
-- staged changes;
-- unstaged changes;
-- in-scope untracked files;
-- `git status --short`;
+- base/head OIDs and relevant refs;
+- captured Git status;
+- staged and unstaged diffs;
+- in-scope untracked inventory and content;
 - the authoritative Task Record or other Requirements source;
 - repository standards that govern the changed paths.
+
+The Review Surface is the authoritative Git state for the review. A read-only child treats the immutable Owner packet as complete for that state and must not execute live Git commands, refresh refs, or reconstruct staged, unstaged, or untracked facts from the checkout. If the packet is missing required evidence or appears stale, report the gap; the Task Owner refreshes preflight and publishes a new Review Surface.
 
 If the fixed point does not resolve, the change set is empty, untracked content cannot be bounded, or the Requirements source is ambiguous, stop and ask. Both review axes must consume the same immutable packet rather than rereading a moving working tree independently. The reviewer never performs cleanup or mutates the surface.
 

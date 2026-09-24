@@ -28,6 +28,8 @@ Create the workspace matching the child's effective capability:
   herdr workspace create --cwd . --label "<label>" --no-focus
   ```
 
+When the delegated task depends on repository state, the Owner packet includes the fixed Git status, staged and unstaged diffs, untracked inventory, relevant refs, and base/head OIDs. A read-only child treats this immutable Owner packet as its Git authority and must not run live Git commands or refresh repository state. If the packet is missing required Git evidence or appears stale, the child reports the gap instead of reconstructing it. A modifying child may inspect live Git only in its isolated worktree and under its effective policy.
+
 Use `akeel_run_artifact` action `bind` to bind each child slot to the returned workspace ID, root pane ID, and planned unique Agent name. Then start Pi with only that slot's opaque capability:
 
 ```bash

@@ -168,17 +168,17 @@ test("managed calls use the new allow, confirm, and deny host contract exactly o
   });
 });
 
-test("production extension admits bounded Git diff rename and copy inspection", async () => {
+test("production extension applies opaque policy to bounded Git diff inspection", async () => {
   await withAgentFiles(undefined, undefined, async (_agentDir, harness) => {
     await harness.handlers.get("session_start")!(undefined, harness.ctx);
-    assert.equal(
+    assert.deepEqual(
       await invoke(harness, {
         toolName: "bash",
         input: {
           command: gitDiffCommand(),
         },
       }),
-      undefined,
+      { block: true, reason: "Blocked by access policy." },
     );
   });
 });
@@ -350,14 +350,14 @@ test("bounded rm integrates with host approval across review, develop, and no-UI
   });
 });
 
-test("redirection to /dev/null is admitted end-to-end under review mode", async () => {
+test("discard redirection preserves live Git status risk under review mode", async () => {
   await withAgentFiles(undefined, undefined, async (_agentDir, harness) => {
     await harness.handlers.get("session_start")!(undefined, harness.ctx);
 
-    // review preset allows git status 2>/dev/null without block
-    assert.equal(
+    // Discarding stderr does not erase status helper or metadata-write risk.
+    assert.deepEqual(
       await invoke(harness, { toolName: "bash", input: { command: "git status 2>/dev/null" } }),
-      undefined,
+      { block: true, reason: "Blocked by access policy." },
     );
 
     // review preset allows echo hello > /dev/null

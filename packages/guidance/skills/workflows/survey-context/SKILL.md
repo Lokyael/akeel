@@ -38,11 +38,20 @@ Read `docs/task.md`. For each active Task Record, note its `Kind` and `Status`, 
 
 ### 6. Check Git state
 
+Metadata-only branch discovery remains ordinary inspect:
+
 ```bash
-git status --short
-git log --oneline -5
 git branch --show-current
 ```
+
+Live status and history inspection are helper-sensitive and use the `opaque` policy axis. Only when policy admits them, run:
+
+```bash
+git --no-optional-locks status --short
+git log --oneline -5
+```
+
+`--no-optional-locks` suppresses Git's optional index refresh but does not sandbox configured helpers. If policy denies or approval is unavailable, report live Git state as unavailable and continue with current project records; do not retry or wrap the commands.
 
 ### 7. Synthesize and recommend
 

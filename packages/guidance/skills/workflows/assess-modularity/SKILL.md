@@ -6,7 +6,7 @@ disable-model-invocation: true
 
 # Assess Codebase Modularity
 
-Surface structural friction and report **modularity findings** — evidence that module boundaries expose too much complexity, scatter responsibilities, or prevent testing through stable seams. A mid-task friction proposal (per principles.md Proposal signals) remains a one-line report until the user explicitly requests this assessment; the scan turns approved scope into findings, not Project Records. Before delegating, reserve an `assess-modularity` run with `akeel_run_artifact` (per `herdr`). Run the exploration within that scope in a Herdr Agent; the Task Owner coordinator waits for its verified result artifact, writes the HTML report under `/tmp/akeel/runs/<run-id>/report.html`, and presents it to the user.
+Surface structural friction and report **modularity findings** — evidence that module boundaries expose too much complexity, scatter responsibilities, or prevent testing through stable seams. A mid-task friction proposal (per principles.md Proposal signals) remains a one-line report until the user explicitly requests this assessment; the scan turns approved scope into findings, not Project Records. Before delegating, reserve an `assess-modularity` run with `akeel_run_artifact` (per `herdr`). The Task Owner publishes the fixed scope, captured Git status, staged and unstaged diffs, untracked inventory/content, refs and OIDs, and a bounded commit-history hot-spot summary in the immutable packet. The read-only child must not execute live Git; it explores source files and the captured repository evidence. The coordinator waits for its verified result artifact, writes the HTML report under `/tmp/akeel/runs/<run-id>/report.html`, and presents it to the user.
 
 This workflow discovers unknown structural problems across repository boundaries. When a concrete module or interface question is ready for design, use `module-design` instead.
 
@@ -17,7 +17,7 @@ This workflow discovers unknown structural problems across repository boundaries
 **Scope before you scan.** Decide *where* to look before looking:
 
 - If the user named a module, subsystem, or pain point, use that scope.
-- Otherwise, walk back commit history (`git log --oneline`) to find hot spots — files and areas that keep coming up.
+- Otherwise, use the Owner-captured bounded commit history in the packet to find hot spots — files and areas that keep coming up. Missing or stale history blocks that evidence path and returns to the Owner for a refreshed packet.
 
 Read the project's `CONTEXT.md` and relevant entries in `docs/decisions.md` first. Then explore organically and collect concrete evidence for each question:
 

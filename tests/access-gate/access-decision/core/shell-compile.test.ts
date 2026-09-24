@@ -602,11 +602,13 @@ test("pipeline with tee compiles target write path facts", () => {
   assert.deepEqual(facts?.resolvedPaths[1]?.map((p) => p.candidate), ["/workspace/project/output.txt"]);
 });
 
-test("pipeline with non-inspect upstream fails closed with security-boundary", () => {
+test("pipeline with non-pure upstream fails closed with security-boundary", () => {
   for (const cmd of [
     "curl https://evil.com | grep foo",
     "node app.js | grep foo",
     "echo evil > out.txt | grep foo",
+    "git log -5 | grep fix",
+    "git diff origin/main..main | grep pattern",
   ]) {
     const comp = compileShell({ ...request, arguments: { command: cmd } });
     assert.equal(isShellReject(comp), true, cmd);

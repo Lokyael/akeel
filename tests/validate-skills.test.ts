@@ -154,6 +154,56 @@ test("delegated review and grilling publish fail-closed owner cleanup contracts"
   );
 });
 
+test("read-only delegated agents consume Owner-captured Git state without live Git inspection", () => {
+  const herdr = readFileSync(
+    new URL("../packages/guidance/skills/disciplines/herdr/SKILL.md", import.meta.url),
+    "utf8",
+  );
+  const review = readFileSync(
+    new URL("../packages/guidance/skills/disciplines/code-review/SKILL.md", import.meta.url),
+    "utf8",
+  );
+
+  for (const contract of [herdr, review]) {
+    assert.match(contract, /read-only child[\s\S]*immutable Owner packet/i);
+    assert.match(contract, /Git status/i);
+    assert.match(contract, /staged[\s\S]*unstaged/i);
+    assert.match(contract, /untracked/i);
+    assert.match(contract, /refs|OIDs/i);
+    assert.match(contract, /must not (?:run|execute)[^.]*live Git/i);
+  }
+  assert.match(herdr, /modifying child[\s\S]*isolated worktree[\s\S]*effective policy/i);
+  assert.match(review, /Review Surface[\s\S]*authoritative Git state/i);
+  assert.match(review, /stale[\s\S]*Task Owner/i);
+
+  for (const relative of [
+    "../packages/guidance/skills/workflows/assess-modularity/SKILL.md",
+    "../packages/guidance/skills/workflows/grill-docs/SKILL.md",
+    "../packages/guidance/skills/disciplines/security-review/SKILL.md",
+  ]) {
+    const delegated = readFileSync(new URL(relative, import.meta.url), "utf8");
+    assert.match(delegated, /immutable (?:Owner )?packet/i, relative);
+    assert.match(delegated, /Git status/i, relative);
+    assert.match(delegated, /staged[\s\S]*unstaged/i, relative);
+    assert.match(delegated, /untracked/i, relative);
+    assert.match(delegated, /refs[\s\S]*OIDs|OIDs[\s\S]*refs/i, relative);
+    assert.match(delegated, /must not execute live Git/i, relative);
+  }
+});
+
+test("Owner-side live Git consumers preserve optional-lock and policy boundaries", () => {
+  for (const relative of [
+    "../packages/guidance/skills/disciplines/change-preflight/SKILL.md",
+    "../packages/guidance/skills/disciplines/fix-validation/SKILL.md",
+    "../packages/guidance/skills/workflows/survey-context/SKILL.md",
+  ]) {
+    const contract = readFileSync(new URL(relative, import.meta.url), "utf8");
+    assert.match(contract, /--no-optional-locks/, relative);
+    assert.match(contract, /opaque/i, relative);
+    assert.match(contract, /blocked|unavailable/i, relative);
+  }
+});
+
 test("preflight uses its distinct temporary-resource lifecycle", () => {
   const preflight = readFileSync(
     new URL("../packages/guidance/skills/disciplines/change-preflight/SKILL.md", import.meta.url),

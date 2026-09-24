@@ -12,7 +12,7 @@ const GIT_GLOBAL_OPTIONS: readonly OptionSpec<GitGlobalKey>[] = Object.freeze([
   { key: "config" as const, names: ["-c"], arity: "required" as const, forms: ["separate" as const, "attached" as const] },
   { key: "gitDir" as const, names: ["--git-dir"], arity: "required" as const, forms: ["separate" as const, "equals" as const] },
   { key: "workTree" as const, names: ["--work-tree"], arity: "required" as const, forms: ["separate" as const, "equals" as const] },
-  { key: "flag" as const, names: ["--no-pager", "--paginate", "--literal-pathspecs"], arity: "flag" as const },
+  { key: "flag" as const, names: ["--no-pager", "--paginate", "--literal-pathspecs", "--no-optional-locks"], arity: "flag" as const },
 ]);
 
 const GIT_GLOBAL_CONTRACT: SegmentContract<GitGlobalKey> = Object.freeze({
@@ -215,6 +215,10 @@ const GIT_INSPECT = new Set([
   "fsck", "describe", "check-attr", "check-ignore", "help",
 ]);
 
+const GIT_OPAQUE_INSPECT = new Set([
+  "status", "diff", "log", "show", "rev-list",
+]);
+
 const GIT_MODIFY = new Set([
   "add", "rm", "commit", "push", "checkout", "switch", "restore", "merge", "rebase", "tag", "reset",
   "fetch", "pull", "clone", "init", "remote", "mv", "cherry-pick", "revert", "apply", "gc", "submodule",
@@ -317,6 +321,7 @@ export function analyzeGitProgram(args: readonly ShellWord[]): ProgramSemantic {
   }
 
   const globalOptions = globalParsed.options;
+  const suppressesOptionalLocks = globalOptions.some((option) => option.name === "--no-optional-locks");
   for (const opt of globalOptions) {
     if (opt.kind === "valued") {
       const val = opt.value;
@@ -678,14 +683,17 @@ export function analyzeGitProgram(args: readonly ShellWord[]): ProgramSemantic {
   }
 
   const hasWritePath = paths.some((value) => value.path.role === "target");
+  const statusMayRefreshIndex = subcommand === "status" && !suppressesOptionalLocks;
+  const helperSensitiveInspect = GIT_OPAQUE_INSPECT.has(subcommand) ||
+    (subcommand === "stash" && rawOperands[0]?.text === "show");
   const effects: ProgramSemantic["effects"] = commandClass === "inspect"
-    ? hasWritePath ? ["read", "write"] : ["read"]
+    ? hasWritePath || statusMayRefreshIndex ? ["read", "write"] : ["read"]
     : commandClass === "destroy" ? ["delete"] : ["read", "write"];
 
   return result(commandClass, effects, paths, {
     cwdChanges,
     recursive: true,
-    opaque: unsafeGlobalOption || hasUncanonicalizedRepositoryLocation || hasUnknownSubcommandOption,
+    opaque: unsafeGlobalOption || hasUncanonicalizedRepositoryLocation || hasUnknownSubcommandOption || helperSensitiveInspect,
     hardBoundary: hardBoundary || missingOptionValue,
   });
 }

@@ -83,11 +83,12 @@ test("path-form interpreter information calls remain executable and opaque", () 
   }
 });
 
-test("Git helper-capable commands remain hard-boundary while inspect commands are admitted", () => {
+test("Git helper-capable commands preserve hard boundaries while live inspections are opaque", () => {
   for (const subcommand of ["status", "diff", "log", "show"]) {
     const semantic = analyzeProgramCommand({ executable: "git", arguments: [word(subcommand, 0)] });
     assert.ok(semantic);
     assert.equal(semantic.commandClass, "inspect", subcommand);
+    assert.equal(semantic.opaque, true, subcommand);
     assert.equal(semantic.hardBoundary, false, subcommand);
   }
   for (const subcommand of ["push", "config", "help", "grep", "blame", "gc"]) {
@@ -111,8 +112,9 @@ test("Git status supports -u and --untracked-files while rejecting invalid modes
     const semantic = analyzeProgramCommand({ executable: "git", arguments: [word("status", 0), word(flag, 7)] });
     assert.ok(semantic, flag);
     assert.equal(semantic.commandClass, "inspect", flag);
+    assert.equal(semantic.opaque, true, flag);
     assert.equal(semantic.hardBoundary, false, flag);
-    assert.deepEqual(semantic.effects, ["read"], flag);
+    assert.deepEqual(semantic.effects, ["read", "write"], flag);
   }
 
   for (const bad of ["-uevil", "--untracked-files=evil", "--untracked-files="]) {
@@ -127,23 +129,27 @@ test("Git stash supports read-only list and show while rejecting mutating action
   const list = analyzeProgramCommand({ executable: "git", arguments: [word("stash", 0), word("list", 6)] });
   assert.ok(list);
   assert.equal(list.commandClass, "inspect");
+  assert.equal(list.opaque, false);
   assert.equal(list.hardBoundary, false);
   assert.deepEqual(list.effects, ["read"]);
 
   const show = analyzeProgramCommand({ executable: "git", arguments: [word("stash", 0), word("show", 6)] });
   assert.ok(show);
   assert.equal(show.commandClass, "inspect");
+  assert.equal(show.opaque, true);
   assert.equal(show.hardBoundary, false);
   assert.deepEqual(show.effects, ["read"]);
 
   const showRev = analyzeProgramCommand({ executable: "git", arguments: [word("stash", 0), word("show", 6), word("stash@{0}", 11)] });
   assert.ok(showRev);
   assert.equal(showRev.commandClass, "inspect");
+  assert.equal(showRev.opaque, true);
   assert.equal(showRev.hardBoundary, false);
 
   const showWithStat = analyzeProgramCommand({ executable: "git", arguments: [word("stash", 0), word("show", 6), word("--stat", 11)] });
   assert.ok(showWithStat);
   assert.equal(showWithStat.commandClass, "inspect");
+  assert.equal(showWithStat.opaque, true);
   assert.equal(showWithStat.hardBoundary, false);
 
   // Mutating or invalid actions trigger hardBoundary
@@ -367,7 +373,7 @@ test("redirection to or from /dev/null is treated as a discard stream without pa
     executable: "git",
     wrappers: [],
     commandClass: "inspect",
-    effects: ["read"],
+    effects: ["read", "write"],
     paths: [{ text: ".", role: "source" }],
   });
   assert.deepEqual(analyzeShellCommand("printf ok > /dev/null"), {
@@ -427,39 +433,17 @@ test("source and target paths retain their command order", () => {
   assert.equal(policyContract.referenceStatus, "newly-adopted");
 });
 
-test("Git inspect commands are bounded repository reads", () => {
-  assert.deepEqual(analyzeShellCommand("git status"), {
-    kind: "complete",
-    executable: "git",
-    wrappers: [],
-    commandClass: "inspect",
-    effects: ["read"],
-    paths: [{ text: ".", role: "source" }],
-  });
-  assert.deepEqual(analyzeShellCommand("git status -sb"), {
-    kind: "complete",
-    executable: "git",
-    wrappers: [],
-    commandClass: "inspect",
-    effects: ["read"],
-    paths: [{ text: ".", role: "source" }],
-  });
-  assert.deepEqual(analyzeShellCommand("git status -s -b"), {
-    kind: "complete",
-    executable: "git",
-    wrappers: [],
-    commandClass: "inspect",
-    effects: ["read"],
-    paths: [{ text: ".", role: "source" }],
-  });
-  assert.deepEqual(analyzeShellCommand("git status --porcelain -b"), {
-    kind: "complete",
-    executable: "git",
-    wrappers: [],
-    commandClass: "inspect",
-    effects: ["read"],
-    paths: [{ text: ".", role: "source" }],
-  });
+test("Git inspect commands retain repository path facts and status metadata writes", () => {
+  for (const command of ["git status", "git status -sb", "git status -s -b", "git status --porcelain -b"]) {
+    assert.deepEqual(analyzeShellCommand(command), {
+      kind: "complete",
+      executable: "git",
+      wrappers: [],
+      commandClass: "inspect",
+      effects: ["read", "write"],
+      paths: [{ text: ".", role: "source" }],
+    }, command);
+  }
   assert.deepEqual(analyzeShellCommand("git diff -b"), {
     kind: "complete",
     executable: "git",
@@ -481,6 +465,36 @@ test("Git inspect commands are bounded repository reads", () => {
   });
 });
 
+test("helper-sensitive Git inspections expose opaque execution and status metadata writes", () => {
+  const status = complete("git status --short");
+  assert.equal(status.commandClass, "inspect");
+  assert.deepEqual(status.effects, ["read", "write"]);
+  assert.equal(status.semantic.opaquePathAccess, true);
+  assert.equal(status.semantic.hardBoundary, false);
+
+  const nonLockingStatus = complete("git --no-optional-locks status --short");
+  assert.equal(nonLockingStatus.commandClass, "inspect");
+  assert.deepEqual(nonLockingStatus.effects, ["read"]);
+  assert.equal(nonLockingStatus.semantic.opaquePathAccess, true);
+  assert.equal(nonLockingStatus.semantic.hardBoundary, false);
+
+  for (const command of ["git diff", "git log -5 --oneline", "git show HEAD", "git rev-list -3 HEAD", "git stash show"]) {
+    const analysis = complete(command);
+    assert.equal(analysis.commandClass, "inspect", command);
+    assert.deepEqual(analysis.effects, ["read"], command);
+    assert.equal(analysis.semantic.opaquePathAccess, true, command);
+    assert.equal(analysis.semantic.hardBoundary, false, command);
+  }
+
+  for (const command of ["git branch --show-current", "git rev-parse --show-toplevel", "git stash list"]) {
+    const analysis = complete(command);
+    assert.equal(analysis.commandClass, "inspect", command);
+    assert.deepEqual(analysis.effects, ["read"], command);
+    assert.equal(analysis.semantic.opaquePathAccess, false, command);
+    assert.equal(analysis.semantic.hardBoundary, false, command);
+  }
+});
+
 test("Git diff rename and copy detection flags remain bounded inspect options", () => {
   for (const variant of [
     gitDiffCommand(),
@@ -489,7 +503,7 @@ test("Git diff rename and copy detection flags remain bounded inspect options", 
     const analysis = complete(variant);
     assert.equal(analysis.commandClass, "inspect", variant);
     assert.deepEqual(analysis.effects, ["read"], variant);
-    assert.equal(analysis.semantic.opaquePathAccess, false, variant);
+    assert.equal(analysis.semantic.opaquePathAccess, true, variant);
     assert.equal(analysis.semantic.hardBoundary, false, variant);
     assert.deepEqual(analysis.paths.map((entry) => entry.text), [
       ".",
@@ -1255,69 +1269,25 @@ test("chmod rejects privilege-elevation special bits with security-boundary", ()
   }
 });
 
-test("Git inspect subcommands accept safe display and filter options without becoming opaque or emitting pseudo-paths", () => {
-  const logSearch = complete("git log -S needle --oneline");
-  assert.equal(logSearch.commandClass, "inspect");
-  assert.deepEqual(logSearch.effects, ["read"]);
-  assert.deepEqual(logSearch.paths, [{ text: ".", role: "source" }]);
-  assert.equal(logSearch.semantic.opaquePathAccess, false);
-  assert.equal(logSearch.semantic.hardBoundary, false);
-
-  const logFilters = complete("git log -G ^feat --grep=docs --author=alice --since=2026-01-01 --until=2026-12-31 -n 10 --format=oneline");
-  assert.equal(logFilters.commandClass, "inspect");
-  assert.deepEqual(logFilters.effects, ["read"]);
-  assert.deepEqual(logFilters.paths, [{ text: ".", role: "source" }]);
-  assert.equal(logFilters.semantic.opaquePathAccess, false);
-  assert.equal(logFilters.semantic.hardBoundary, false);
-
-  const logFlags = complete("git log --graph --no-merges --topo-order --reverse -p");
-  assert.equal(logFlags.commandClass, "inspect");
-  assert.deepEqual(logFlags.effects, ["read"]);
-  assert.deepEqual(logFlags.paths, [{ text: ".", role: "source" }]);
-  assert.equal(logFlags.semantic.opaquePathAccess, false);
-  assert.equal(logFlags.semantic.hardBoundary, false);
-
-  const diffFilter = complete("git diff --diff-filter=ACMRT");
-  assert.equal(diffFilter.commandClass, "inspect");
-  assert.deepEqual(diffFilter.effects, ["read"]);
-  assert.deepEqual(diffFilter.paths, [{ text: ".", role: "source" }]);
-  assert.equal(diffFilter.semantic.opaquePathAccess, false);
-  assert.equal(diffFilter.semantic.hardBoundary, false);
-
-  const diffSummary = complete("git diff --summary");
-  assert.equal(diffSummary.commandClass, "inspect");
-  assert.deepEqual(diffSummary.effects, ["read"]);
-  assert.deepEqual(diffSummary.paths, [{ text: ".", role: "source" }]);
-  assert.equal(diffSummary.semantic.opaquePathAccess, false);
-  assert.equal(diffSummary.semantic.hardBoundary, false);
-
-  const diffRevisionSummary = complete("git diff origin/main..main --summary");
-  assert.equal(diffRevisionSummary.commandClass, "inspect");
-  assert.deepEqual(diffRevisionSummary.effects, ["read"]);
-  assert.deepEqual(diffRevisionSummary.paths, [{ text: ".", role: "source" }]);
-  assert.equal(diffRevisionSummary.semantic.opaquePathAccess, false);
-  assert.equal(diffRevisionSummary.semantic.hardBoundary, false);
-
-  const logSummary = complete("git log --summary");
-  assert.equal(logSummary.commandClass, "inspect");
-  assert.deepEqual(logSummary.effects, ["read"]);
-  assert.deepEqual(logSummary.paths, [{ text: ".", role: "source" }]);
-  assert.equal(logSummary.semantic.opaquePathAccess, false);
-  assert.equal(logSummary.semantic.hardBoundary, false);
-
-  const logNumeric = complete("git log -5 --oneline");
-  assert.equal(logNumeric.commandClass, "inspect");
-  assert.deepEqual(logNumeric.effects, ["read"]);
-  assert.deepEqual(logNumeric.paths, [{ text: ".", role: "source" }]);
-  assert.equal(logNumeric.semantic.opaquePathAccess, false);
-  assert.equal(logNumeric.semantic.hardBoundary, false);
-
-  const revListNumeric = complete("git rev-list -3 HEAD");
-  assert.equal(revListNumeric.commandClass, "inspect");
-  assert.deepEqual(revListNumeric.effects, ["read"]);
-  assert.deepEqual(revListNumeric.paths, [{ text: ".", role: "source" }]);
-  assert.equal(revListNumeric.semantic.opaquePathAccess, false);
-  assert.equal(revListNumeric.semantic.hardBoundary, false);
+test("Git inspect options retain bounded facts while helper-sensitive commands remain opaque", () => {
+  for (const command of [
+    "git log -S needle --oneline",
+    "git log -G ^feat --grep=docs --author=alice --since=2026-01-01 --until=2026-12-31 -n 10 --format=oneline",
+    "git log --graph --no-merges --topo-order --reverse -p",
+    "git diff --diff-filter=ACMRT",
+    "git diff --summary",
+    "git diff origin/main..main --summary",
+    "git log --summary",
+    "git log -5 --oneline",
+    "git rev-list -3 HEAD",
+  ]) {
+    const analysis = complete(command);
+    assert.equal(analysis.commandClass, "inspect", command);
+    assert.deepEqual(analysis.effects, ["read"], command);
+    assert.deepEqual(analysis.paths, [{ text: ".", role: "source" }], command);
+    assert.equal(analysis.semantic.opaquePathAccess, true, command);
+    assert.equal(analysis.semantic.hardBoundary, false, command);
+  }
 
   const branchShowCurrent = complete("git branch --show-current");
   assert.equal(branchShowCurrent.commandClass, "inspect");
@@ -1327,10 +1297,17 @@ test("Git inspect subcommands accept safe display and filter options without bec
   assert.equal(branchShowCurrent.semantic.hardBoundary, false);
 });
 
-test("Git local read-only display options remain bounded and non-opaque", () => {
+test("Git local display options preserve helper sensitivity and metadata-only exemptions", () => {
+  for (const command of ["git log --oneline -8 --decorate", "git diff --check"]) {
+    const analysis = complete(command);
+    assert.equal(analysis.commandClass, "inspect", command);
+    assert.deepEqual(analysis.effects, ["read"], command);
+    assert.deepEqual(analysis.paths, [{ text: ".", role: "source" }], command);
+    assert.equal(analysis.semantic.opaquePathAccess, true, command);
+    assert.equal(analysis.semantic.hardBoundary, false, command);
+  }
+
   for (const command of [
-    "git log --oneline -8 --decorate",
-    "git diff --check",
     "git rev-parse --show-toplevel",
     "git rev-parse --abbrev-ref --symbolic-full-name '@{upstream}'",
   ]) {
@@ -1402,7 +1379,7 @@ test("generalized /dev/null discard redirection emits no target path or write ef
 
   const statusWithDiscard = complete("git status 2>> /dev/null");
   assert.equal(statusWithDiscard.commandClass, "inspect");
-  assert.deepEqual(statusWithDiscard.effects, ["read"]);
+  assert.deepEqual(statusWithDiscard.effects, ["read", "write"]);
   assert.deepEqual(statusWithDiscard.paths, [{ text: ".", role: "source" }]);
 
   const attachedDiscard = complete("echo test 2>/dev/null");

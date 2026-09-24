@@ -30,12 +30,14 @@ When the change affects UI or human-observable behavior, verify the result direc
 
 ### 5. Verify Working Tree Scope
 
+Live Git inspection remains helper-sensitive and uses the `opaque` policy axis. When policy admits it, run:
+
 ```bash
-git status --short
+git --no-optional-locks status --short
 git diff --stat
 ```
 
-Confirm modified paths match the intended change scope and no unintended files remain.
+`--no-optional-locks` suppresses Git's optional index refresh; it does not sandbox configured helpers. If policy denies or approval is unavailable, report working-tree verification as blocked instead of retrying or wrapping the commands. Otherwise confirm modified paths match the intended change scope and no unintended files remain.
 
 ## Handoff
 

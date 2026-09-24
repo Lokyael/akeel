@@ -11,7 +11,6 @@ import {
   createCompileEnvironment,
   createLinuxPathEvidence,
 } from "../../../../packages/access-gate/src/access-gate/access-decision/core/compilation/index";
-import { gitDiffCommand } from "../../fixtures";
 
 const unifiedPolicy = Symbol("unified-policy");
 type TestPolicy = Readonly<Record<string, unknown>> & Readonly<{ [unifiedPolicy]: ReturnType<typeof freezeUnifiedPolicySnapshot> }>;
@@ -341,7 +340,7 @@ test("read-write redirection follows the write-side policy contract", () => {
   assert.deepEqual(evaluateShellAdmission(admission("printf x <> output.txt"), writeAllowed), { kind: "allow" });
 });
 
-test("redirection to /dev/null is admitted under review without write policy or path violation", () => {
+test("discard redirection does not erase live Git status side effects", () => {
   const reviewPolicy = freezeShellPolicySnapshot({
     read: "allow",
     write: "deny",
@@ -358,7 +357,7 @@ test("redirection to /dev/null is admitted under review without write policy or 
 
   assert.deepEqual(
     evaluateShellAdmission(admission("git status 2>/dev/null"), reviewPolicy),
-    { kind: "allow" },
+    { kind: "deny", code: "policy-denied" },
   );
   assert.deepEqual(
     evaluateShellAdmission(admission("printf ok > /dev/null"), reviewPolicy),
@@ -691,7 +690,51 @@ test("trusted path-form Git mutations retain path and helper boundaries", () => 
   });
 });
 
-test("Git inspect commands are admitted under develop and review while helper commands remain hard-boundary", () => {
+test("helper-sensitive live Git inspection follows opaque policy while metadata queries remain review-safe", () => {
+  const develop = freezeShellPolicySnapshot({
+    ...policy,
+    inspect: "allow",
+    write: "allow",
+    opaque: "allow",
+    allowedRoots: ["/workspace/project"],
+    blockedRoots: [],
+  });
+  const review = freezeShellPolicySnapshot({
+    ...policy,
+    inspect: "allow",
+    write: "deny",
+    opaque: "deny",
+    allowedRoots: ["/workspace/project"],
+    blockedRoots: [],
+  });
+  const guided = freezeShellPolicySnapshot({
+    ...policy,
+    inspect: "allow",
+    write: "ask",
+    opaque: "ask",
+    allowedRoots: ["/workspace/project"],
+    blockedRoots: [],
+  });
+
+  for (const command of ["git status --short", "git --no-optional-locks status --short", "git diff", "git log -5 --oneline", "git show HEAD", "git rev-list -3 HEAD", "git stash show"]) {
+    assert.deepEqual(evaluateShellAdmission(admission(command), develop), { kind: "allow" }, command);
+    assert.deepEqual(evaluateShellAdmission(admission(command), review), {
+      kind: "deny",
+      code: "policy-denied",
+    }, command);
+    assert.deepEqual(evaluateShellAdmission(admission(command, true), guided), {
+      kind: "ask",
+      executed: false,
+    }, command);
+  }
+
+  for (const command of ["git branch --show-current", "git rev-parse --show-toplevel", "git stash list"]) {
+    assert.deepEqual(evaluateShellAdmission(admission(command), review), { kind: "allow" }, command);
+    assert.deepEqual(evaluateShellAdmission(admission(command), guided), { kind: "allow" }, command);
+  }
+});
+
+test("Git metadata inspection stays review-safe while mutations and helper commands retain their boundaries", () => {
   const develop = freezeShellPolicySnapshot({
     ...policy,
     inspect: "allow",
@@ -712,13 +755,7 @@ test("Git inspect commands are admitted under develop and review while helper co
   });
 
   for (const command of [
-    "git status",
-    "git diff -- src/app.ts",
-    gitDiffCommand(),
-    "git log",
-    "git show",
-    "git log --oneline -8 --decorate",
-    "git diff --check",
+    "git branch --show-current",
     "git rev-parse --show-toplevel",
     "git rev-parse --abbrev-ref --symbolic-full-name '@{upstream}'",
   ]) {
@@ -920,11 +957,13 @@ test("Git helper boundaries win over command-local paths", () => {
   }
 });
 
-test("Git inspect commands with command-local paths are admitted when within allowed roots", () => {
+test("live Git inspection with command-local paths is admitted by an opaque-capable policy within allowed roots", () => {
   const scoped = freezeShellPolicySnapshot({
     ...policy,
     inspect: "allow",
     modify: "allow",
+    write: "allow",
+    opaque: "allow",
     allowedRoots: ["/workspace/project/subdir"],
     blockedRoots: [],
   });
@@ -1555,7 +1594,7 @@ test("bounded chmod admits workspace files under develop, prompts in guided, den
   });
 });
 
-test("Git inspect subcommands with safe filter options are allowed across develop, review, and guided presets", () => {
+test("Git inspect options remain bounded while helper sensitivity follows each preset", () => {
   const developPolicy = freezeShellPolicySnapshot({
     read: "allow",
     write: "allow",
@@ -1598,24 +1637,24 @@ test("Git inspect subcommands with safe filter options are allowed across develo
     blockedPaths: ["/etc/passwd"],
   });
 
-  // 1. git log -S under review, develop, and guided: all allow because inspect is allow, read is allow, not opaque!
-  assert.deepEqual(evaluateShellAdmission(admission("git log -S needle --oneline", false), reviewPolicy), {
-    kind: "allow",
-  });
-  assert.deepEqual(evaluateShellAdmission(admission("git log -S needle --oneline", false), developPolicy), {
-    kind: "allow",
-  });
-  assert.deepEqual(evaluateShellAdmission(admission("git log -S needle --oneline", false), guidedPolicy), {
-    kind: "allow",
-  });
-
-  // 2. Complex filters are allowed under review
-  assert.deepEqual(evaluateShellAdmission(admission("git log -G feat --grep=docs --author=alice -n 10", false), reviewPolicy), {
-    kind: "allow",
-  });
-  assert.deepEqual(evaluateShellAdmission(admission("git log -5 --oneline", false), reviewPolicy), {
-    kind: "allow",
-  });
+  // 1. Git log filters retain inspect semantics but helper sensitivity follows opaque policy.
+  for (const command of [
+    "git log -S needle --oneline",
+    "git log -G feat --grep=docs --author=alice -n 10",
+    "git log -5 --oneline",
+  ]) {
+    assert.deepEqual(evaluateShellAdmission(admission(command, false), reviewPolicy), {
+      kind: "deny",
+      code: "policy-denied",
+    }, command);
+    assert.deepEqual(evaluateShellAdmission(admission(command, false), developPolicy), {
+      kind: "allow",
+    }, command);
+    assert.deepEqual(evaluateShellAdmission(admission(command, true), guidedPolicy), {
+      kind: "ask",
+      executed: false,
+    }, command);
+  }
   assert.deepEqual(evaluateShellAdmission(admission("git branch --show-current", false), reviewPolicy), {
     kind: "allow",
   });
@@ -1632,7 +1671,7 @@ test("Git inspect subcommands with safe filter options are allowed across develo
     code: "hard-boundary",
   });
 
-  // 5. git status -u variants and clustered short flags (-sb) are admitted across review, develop, and guided
+  // 5. Status variants remain bounded but carry opaque execution and metadata-write risk.
   for (const cmd of [
     "git status -u",
     "git status -uno",
@@ -1642,16 +1681,29 @@ test("Git inspect subcommands with safe filter options are allowed across develo
     "git status --porcelain -b",
     "git status && git log -n 5 --oneline && git status -sb",
   ]) {
-    assert.deepEqual(evaluateShellAdmission(admission(cmd, false), reviewPolicy), { kind: "allow" }, cmd);
+    assert.deepEqual(evaluateShellAdmission(admission(cmd, false), reviewPolicy), {
+      kind: "deny",
+      code: "policy-denied",
+    }, cmd);
     assert.deepEqual(evaluateShellAdmission(admission(cmd, false), developPolicy), { kind: "allow" }, cmd);
-    assert.deepEqual(evaluateShellAdmission(admission(cmd, false), guidedPolicy), { kind: "allow" }, cmd);
+    assert.deepEqual(evaluateShellAdmission(admission(cmd, true), guidedPolicy), {
+      kind: "ask",
+      executed: false,
+    }, cmd);
   }
 
-  // 6. git stash list and show are admitted across review, develop, and guided
-  for (const cmd of ["git stash list", "git stash show", "git stash show 'stash@{0}'"]) {
-    assert.deepEqual(evaluateShellAdmission(admission(cmd, false), reviewPolicy), { kind: "allow" }, cmd);
+  // 6. Stash list is metadata-only; stash show follows opaque policy.
+  assert.deepEqual(evaluateShellAdmission(admission("git stash list"), reviewPolicy), { kind: "allow" });
+  for (const cmd of ["git stash show", "git stash show 'stash@{0}'"]) {
+    assert.deepEqual(evaluateShellAdmission(admission(cmd, false), reviewPolicy), {
+      kind: "deny",
+      code: "policy-denied",
+    }, cmd);
     assert.deepEqual(evaluateShellAdmission(admission(cmd, false), developPolicy), { kind: "allow" }, cmd);
-    assert.deepEqual(evaluateShellAdmission(admission(cmd, false), guidedPolicy), { kind: "allow" }, cmd);
+    assert.deepEqual(evaluateShellAdmission(admission(cmd, true), guidedPolicy), {
+      kind: "ask",
+      executed: false,
+    }, cmd);
   }
 
   // 7. Invalid status mode and mutating stash commands remain hard-boundary
@@ -1875,9 +1927,10 @@ test("bounded pipelines evaluate under policy presets with mandatory boundaries 
   });
 
   assert.deepEqual(evaluateShellAdmission(admission("cat README.md | head -n 5"), review), { kind: "allow" });
-  assert.deepEqual(evaluateShellAdmission(admission("git log -5 | grep fix"), review), { kind: "allow" });
-  assert.deepEqual(evaluateShellAdmission(admission("git diff origin/main..main | grep -E pattern"), review), { kind: "allow" });
-  assert.deepEqual(evaluateShellAdmission(admission("git diff origin/main..main --summary"), review), { kind: "allow" });
+  assert.deepEqual(evaluateShellAdmission(admission("git diff origin/main..main --summary"), review), {
+    kind: "deny",
+    code: "policy-denied",
+  });
   assert.deepEqual(evaluateShellAdmission(admission("cat README.md | tee"), review), { kind: "allow" });
 
   assert.deepEqual(evaluateShellAdmission(admission("cat README.md | tee out.txt"), develop), { kind: "allow" });
