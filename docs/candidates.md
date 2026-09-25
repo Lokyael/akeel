@@ -223,4 +223,11 @@
 - Boundary / Out of Scope: 本候选未被促进前不改变当前两个 bounded diff 选项的准入、不恢复 `--find-copies-harder`、不新增 OS sandbox 或独立 network policy，不在 Access Gate 中包装 Shell/Git 进程，也不把测试模板或静态命令字节预算描述为运行时资源控制。
 - Revisit condition: 出现可复现的 Git rename/copy 检测超时、CPU/内存耗尽，或不可信大型仓库/高频自动审查成为受支持工作负载；并且 Pi/宿主提供可测试的进程执行、超时取消和资源结果接缝，足以验证拒绝、终止、输出截断与策略 verdict 的一致性。
 
-## C-060: 待创建
+## C-060: Session Handoff 胶囊可表示性与历史语义压缩
+
+- Why Not Now: 当前只有边界探针证明合法 Semantic Unit 可被 ledger 接受、却因固定 Capsule 预算或跨接力累积的 closed unit 而无法转交；尚无真实 Task Owner session 因正常 `record` / `close` / 多跳 handoff 工作流触发该失败，也没有已采纳合同裁决“所有已接受 ledger 状态必须始终可转交”与“超限时保留 source 并 fail-closed”之间的边界。改变规范化 Capsule 或历史 entry 恢复语义还会触及 D-092/D-093 的 no-silent-drop、source authority 与既有 session 兼容合同，不能由单纯字段限长替代。
+- Revisit condition: 出现由受支持的 `record` / `close` / 多跳 handoff 流程产生的真实持久 session 或版本化 fixture，其中合法语义累积可重复导致 `/handoff` 容量失败，且现有 materialization、closure 与 source 恢复路径不能完成正式 successor 转交。
+- Scope / Exploration Direction: 独立评估 ledger transition 与 bounded Capsule 之间是否需要可表示性不变量，并核对规范化 JSON 中 live semantics、closure tombstones、完整 `units` 副本、跨 successor 恢复和状态查询各自必须保留的最小语义；区分单条输入预算、累计 live 预算、已关闭历史压缩、转交前容量诊断与兼容迁移，不预先采纳具体 schema 或阈值。
+- Boundary / Out of Scope: 本候选不把 Pi append-only session 的正常增长或模型已持久化的 tool-call 参数重新定性为安全型磁盘 DoS；不因容量压力静默截断、丢弃或伪造 captured semantics，也不改变 custom entries 不进入 LLM context、超限在 replacement 前 fail-closed、source session 继续保留 authority 与冷归档恢复面的现行边界。
+
+## C-061: 待创建

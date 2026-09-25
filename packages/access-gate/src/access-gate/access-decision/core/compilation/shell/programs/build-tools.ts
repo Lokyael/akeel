@@ -16,6 +16,12 @@ export const BUILD_TOOLS = new Set([
   "javac",
 ]);
 
+function indeterminateBuildTool(): ProgramSemantic {
+  // An unknown option may precede and hide a destructive target. It must not
+  // degrade to policy-controlled opaque execution.
+  return result("unknown", ["execute"], [], { opaque: true, hardBoundary: true });
+}
+
 // ---------------------------------------------------------------------------
 // Cargo
 // ---------------------------------------------------------------------------
@@ -81,6 +87,9 @@ function analyzeCargo(args: readonly ShellWord[]): ProgramSemantic {
   const parsed = parseSegment(args, CARGO_CONTRACT, { stopAtFirstOperand: false, interspersed: true });
   if (parsed.kind === "malformed") {
     return result("unknown", ["execute"], [], { opaque: true, hardBoundary: true });
+  }
+  if (parsed.kind === "indeterminate" && !parsed.operands.some((operand) => operand.text === "clean")) {
+    return indeterminateBuildTool();
   }
 
   const isUnknown = parsed.kind === "indeterminate";
@@ -163,6 +172,9 @@ function analyzeGo(args: readonly ShellWord[]): ProgramSemantic {
   const parsed = parseSegment(args, GO_CONTRACT, { stopAtFirstOperand: false, interspersed: true });
   if (parsed.kind === "malformed") {
     return result("unknown", ["execute"], [], { opaque: true, hardBoundary: true });
+  }
+  if (parsed.kind === "indeterminate" && !parsed.operands.some((operand) => operand.text === "clean")) {
+    return indeterminateBuildTool();
   }
 
   const isUnknown = parsed.kind === "indeterminate";
@@ -276,6 +288,9 @@ function analyzeMake(args: readonly ShellWord[]): ProgramSemantic {
   const parsed = parseSegment(args, MAKE_CONTRACT, { stopAtFirstOperand: false, interspersed: true });
   if (parsed.kind === "malformed") {
     return result("unknown", ["execute"], [], { opaque: true, hardBoundary: true });
+  }
+  if (parsed.kind === "indeterminate" && !parsed.operands.some((operand) => isMakeDestroyTarget(operand.text))) {
+    return indeterminateBuildTool();
   }
 
   const isUnknown = parsed.kind === "indeterminate";
@@ -399,6 +414,9 @@ function analyzeMaven(args: readonly ShellWord[]): ProgramSemantic {
   const parsed = parseSegment(args, MAVEN_CONTRACT, { stopAtFirstOperand: false, interspersed: true });
   if (parsed.kind === "malformed") {
     return result("unknown", ["execute"], [], { opaque: true, hardBoundary: true });
+  }
+  if (parsed.kind === "indeterminate" && !parsed.operands.some((operand) => isMavenCleanGoal(operand.text))) {
+    return indeterminateBuildTool();
   }
 
   const isUnknown = parsed.kind === "indeterminate";
@@ -528,6 +546,9 @@ function analyzeGradle(args: readonly ShellWord[]): ProgramSemantic {
   const parsed = parseSegment(args, GRADLE_CONTRACT, { stopAtFirstOperand: false, interspersed: true });
   if (parsed.kind === "malformed") {
     return result("unknown", ["execute"], [], { opaque: true, hardBoundary: true });
+  }
+  if (parsed.kind === "indeterminate" && !parsed.operands.some((operand) => isGradleCleanTask(operand.text))) {
+    return indeterminateBuildTool();
   }
 
   const isUnknown = parsed.kind === "indeterminate";

@@ -1,8 +1,13 @@
 import { spawnSync } from "node:child_process";
 import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, symlinkSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { join, resolve, sep } from "node:path";
 import { tmpdir } from "node:os";
-import { discoverAndLoadExtensions } from "@earendil-works/pi-coding-agent";
+import {
+  DefaultPackageManager,
+  DefaultResourceLoader,
+  discoverAndLoadExtensions,
+  SettingsManager,
+} from "@earendil-works/pi-coding-agent";
 
 type PackageManifest = Readonly<{
   readonly name: string;
@@ -127,6 +132,39 @@ function stageHostDependencies(installRoot: string): void {
   }
 }
 
+async function assertInstalledSkills(installedRoot: string, installRoot: string, agentDir: string): Promise<void> {
+  const settingsManager = SettingsManager.create(installRoot, agentDir);
+  const packageManager = new DefaultPackageManager({ cwd: installRoot, agentDir, settingsManager });
+  const resolved = await packageManager.resolveExtensionSources([installedRoot], { temporary: true });
+  if (resolved.skills.length === 0) {
+    throw new Error(`${installedRoot}: Pi package manager did not discover any declared skills`);
+  }
+
+  const resourceLoader = new DefaultResourceLoader({
+    cwd: installRoot,
+    agentDir,
+    noExtensions: true,
+    noPromptTemplates: true,
+    noThemes: true,
+    noContextFiles: true,
+  });
+  resourceLoader.extendResources({
+    skillPaths: resolved.skills.map(({ path, metadata }) => ({ path, metadata })),
+  });
+  const { skills, diagnostics } = resourceLoader.getSkills();
+  if (diagnostics.length > 0) {
+    throw new Error(`${installedRoot}: Pi skill loader diagnostics: ${diagnostics.map((diagnostic) => diagnostic.message).join("; ")}`);
+  }
+
+  const packagePrefix = `${resolve(installedRoot)}${sep}`;
+  for (const expected of ["survey-context", "test-driven-development"]) {
+    const discovered = skills.find((skill) => skill.name === expected);
+    if (!discovered || !resolve(discovered.filePath).startsWith(packagePrefix)) {
+      throw new Error(`${installedRoot}: Pi skill loader did not discover packaged ${expected}`);
+    }
+  }
+}
+
 async function assertInstalledPackage(packageRoot: string): Promise<void> {
   const packageTemp = mkdtempSync(join(tmpdir(), "akeel-package-archive-"));
   const archiveTemp = join(packageTemp, "archives");
@@ -143,6 +181,10 @@ async function assertInstalledPackage(packageRoot: string): Promise<void> {
 
     const manifest = readPackageManifest(packageRoot);
     const installedRoot = join(installRoot, "node_modules", manifest.name);
+    if (manifest.pi?.skills?.length) {
+      await assertInstalledSkills(installedRoot, installRoot, process.env.PI_CODING_AGENT_DIR);
+      console.log(`${manifest.name}: Pi discovered Guidance skills from the installed package`);
+    }
     const extensionPaths = (manifest.pi?.extensions ?? []).map((path) => join(installedRoot, path.replace(/^\.\//u, "")));
     const result = await discoverAndLoadExtensions(extensionPaths, installRoot, process.env.PI_CODING_AGENT_DIR);
     if (result.errors.length > 0) {
