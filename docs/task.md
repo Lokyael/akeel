@@ -208,9 +208,9 @@ Detailed Windows path, DACL, encoding, locale and maintenance procedures remain 
 
 ### Current Checkpoint
 
-- Windows bootstrap and executor exist but still require Slice 1 ownership, fail-closed active-set and cwd-binding corrections.
-- The native tracer exists as an executor smoke; packed Pi metadata and argument-passing acceptance have not run.
-- `akeel-platform-runtime` exists only as a draft package skeleton; its structural contracts are not accepted and must be replaced in Slice 3.
+- Slice 1 source hardening is implemented: exact extension-path ownership, fail-closed active tools, bounded diagnostics, and call/command/cwd/workspace/lifecycle ticket binding have platform-neutral tests. Packed Pi metadata remains a native Slice 2 gate.
+- The native tracer now carries Unicode, empty, spaced and trailing-backslash Node/npm argv plus Git path vectors; it has not run on native Windows.
+- `akeel-platform-runtime` remains a draft package skeleton; its structural contracts are not accepted and must be replaced in Slice 3.
 - No Windows support claim is active.
 
 ### Scope Boundary

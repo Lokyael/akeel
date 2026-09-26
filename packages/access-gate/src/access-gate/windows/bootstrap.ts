@@ -1,6 +1,7 @@
 import { execFile } from "node:child_process";
 import { access, constants } from "node:fs/promises";
-import { win32 } from "node:path";
+import { resolve, win32 } from "node:path";
+import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import type {
   ExtensionAPI,
@@ -17,9 +18,9 @@ import {
 import { issuePowerShellExecutionTicket, type PowerShellExecutionTicket } from "./ticket";
 
 const execFileAsync = promisify(execFile);
+const ACCESS_GATE_ENTRY_PATH = fileURLToPath(new URL("../index.ts", import.meta.url));
 
 export const WINDOWS_DIRECT_SURFACES = Object.freeze(["read", "write", "edit", "grep", "find", "ls"] as const);
-const WINDOWS_BLOCKED_SURFACES = new Set<string>(["bash", ...WINDOWS_DIRECT_SURFACES]);
 
 export const WINDOWS_BOOTSTRAP_BLOCK_REASON =
   "Blocked because the native Windows profile is still initializing; ordinary PowerShell execution is unavailable.";
@@ -83,7 +84,8 @@ export type ResolvePowerShellOptions = Readonly<{
 export type WindowsBootstrapOptions = Readonly<{
   readonly resolvePowerShell?: () => Promise<VerifiedPowerShellExecutable>;
   readonly executor?: PowerShellExecutor;
-  readonly ownerPathPattern?: RegExp;
+  readonly ownerEntryPath?: string;
+  readonly onInitializationError?: (message: string) => void;
 }>;
 
 export type WindowsBootstrapState = Readonly<{
@@ -150,8 +152,16 @@ export function issueTracerExecutionTicket(
   toolCallId: string,
   command: string,
   workspaceIdentity: string,
+  cwd = workspaceIdentity,
+  lifecycleGeneration = 1,
 ): PowerShellExecutionTicket {
-  return issuePowerShellExecutionTicket({ toolCallId, command, workspaceIdentity });
+  return issuePowerShellExecutionTicket({
+    toolCallId,
+    command,
+    cwd,
+    workspaceIdentity,
+    lifecycleGeneration,
+  });
 }
 
 type WindowsPowerShellToolDetails = Readonly<{
@@ -170,6 +180,7 @@ type WindowsPowerShellInput = { readonly command: string; readonly timeout?: num
 export function createWindowsPowerShellTool(
   executorForTool: () => PowerShellExecutor | undefined,
   ticketForCall: (toolCallId: string) => PowerShellExecutionTicket | undefined,
+  lifecycleGenerationForTool: () => number,
 ): ToolDefinition<typeof windowsPowerShellParameters, WindowsPowerShellToolDetails> {
   return {
     name: "powershell",
@@ -178,7 +189,7 @@ export function createWindowsPowerShellTool(
     promptSnippet: "Execute PowerShell commands",
     promptGuidelines: ["The Windows profile accepts only commands with an AKeel execution ticket."],
     parameters: windowsPowerShellParameters,
-    execute: async (toolCallId, params, signal, onUpdate, context) => {
+    execute: async (toolCallId, params, signal, onUpdate, _context) => {
       const executor = executorForTool();
       const ticket = ticketForCall(toolCallId);
       if (!executor || !ticket) {
@@ -191,10 +202,7 @@ export function createWindowsPowerShellTool(
       const result = await executor.execute(ticket, {
         toolCallId,
         command: input.command,
-        cwd: context.cwd,
-        // The bootstrap has no Windows WorkspaceIdentity authority yet; the
-        // temporary adapter binds the ticket to the session cwd explicitly.
-        workspaceIdentity: context.cwd,
+        lifecycleGeneration: lifecycleGenerationForTool(),
         timeoutMs: input.timeout,
         signal,
         onData: (chunk) => onUpdate?.({ content: [{ type: "text", text: chunk }], details: { exitCode: null, truncated: false } }),
@@ -204,34 +212,41 @@ export function createWindowsPowerShellTool(
   };
 }
 
-type WindowsToolMetadata = Readonly<{
-  readonly name: string;
-  readonly sourceInfo?: Readonly<{ readonly path: string; readonly source: string }>;
+type WindowsToolSourceInfo = Readonly<{
+  readonly path: string;
+  readonly source: string;
+  readonly scope: "user" | "project" | "temporary";
+  readonly origin: "package" | "top-level";
+  readonly baseDir?: string;
 }>;
 
-const AKEEL_PACKAGE_PATH_PATTERN = /(?:^|[/\\])(?:packages[/\\](?:access-gate|guidance|context-pruner)|node_modules[/\\](?:@[^/\\]+[/\\])?akeel-(?:access-gate|guidance|context-pruner))(?:[/\\]|$)/iu;
-const AKEEL_SUPPORT_TOOL_NAME_PATTERN = /^akeel_/u;
+type WindowsToolMetadata = Readonly<{
+  readonly name: string;
+  readonly sourceInfo?: WindowsToolSourceInfo;
+}>;
 
 export function isOwnedWindowsPowerShellTool(
   tool: WindowsToolMetadata,
-  ownerPathPattern = /(?:^|[/\\])(?:packages[/\\]access-gate|node_modules[/\\](?:@[^/\\]+[/\\])?akeel-access-gate)(?:[/\\]|$)/iu,
+  ownerEntryPath = ACCESS_GATE_ENTRY_PATH,
 ): boolean {
-  return tool.name === "powershell" && isOwnedAkeelToolPath(tool.sourceInfo, ownerPathPattern);
+  if (tool.name !== "powershell" || tool.sourceInfo === undefined ||
+    !isSourceText(tool.sourceInfo.path) || !isSourceText(tool.sourceInfo.source) ||
+    !["user", "project", "temporary"].includes(tool.sourceInfo.scope) ||
+    !["package", "top-level"].includes(tool.sourceInfo.origin) ||
+    !isSourceText(tool.sourceInfo.baseDir)) return false;
+  const expected = normalizeToolSourcePath(ownerEntryPath);
+  const base = normalizeToolSourcePath(tool.sourceInfo.baseDir);
+  return normalizeToolSourcePath(tool.sourceInfo.path) === expected &&
+    (expected === base || expected.startsWith(`${base.replace(/\/$/u, "")}/`));
 }
 
-function isOwnedWindowsSupportTool(tool: WindowsToolMetadata): boolean {
-  return AKEEL_SUPPORT_TOOL_NAME_PATTERN.test(tool.name) && isOwnedAkeelToolPath(tool.sourceInfo, AKEEL_PACKAGE_PATH_PATTERN);
+function isSourceText(value: unknown): value is string {
+  return typeof value === "string" && value.length > 0 && !value.includes("\u0000");
 }
 
-function isOwnedAkeelToolPath(
-  sourceInfo: WindowsToolMetadata["sourceInfo"],
-  pathPattern: RegExp,
-): boolean {
-  if (sourceInfo === undefined || (sourceInfo.source !== "local" && sourceInfo.source !== "package")) return false;
-  pathPattern.lastIndex = 0;
-  const matched = pathPattern.test(sourceInfo.path);
-  pathPattern.lastIndex = 0;
-  return matched;
+function normalizeToolSourcePath(value: string): string {
+  if (/^[A-Za-z]:[\\/]/u.test(value)) return win32.normalize(value).replace(/\\/gu, "/").toLowerCase();
+  return resolve(value);
 }
 
 export function installWindowsBootstrap(pi: ExtensionAPI, options: WindowsBootstrapOptions = {}): void {
@@ -241,7 +256,11 @@ export function installWindowsBootstrap(pi: ExtensionAPI, options: WindowsBootst
   let lifecycleGeneration = 0;
   const tickets = new Map<string, PowerShellExecutionTicket>();
 
-  pi.registerTool(createWindowsPowerShellTool(() => executor, (toolCallId) => tickets.get(toolCallId)));
+  pi.registerTool(createWindowsPowerShellTool(
+    () => executor,
+    (toolCallId) => tickets.get(toolCallId),
+    () => lifecycleGeneration,
+  ));
 
   const initialize = async (): Promise<void> => {
     if (initializing !== undefined) return initializing;
@@ -257,17 +276,11 @@ export function installWindowsBootstrap(pi: ExtensionAPI, options: WindowsBootst
           const tool = tools.find((candidate) => candidate.name === name);
           return tool?.sourceInfo.source === "builtin" && tool.sourceInfo.path === `<builtin:${name}>`;
         });
-        if (!powershell || !isOwnedWindowsPowerShellTool(powershell, options.ownerPathPattern) || !directToolsValid) {
+        if (!powershell || !isOwnedWindowsPowerShellTool(powershell, options.ownerEntryPath) || !directToolsValid) {
           throw new Error("Windows tool ownership or Direct tool source verification failed");
         }
 
-        const directNames = new Set<string>(WINDOWS_DIRECT_SURFACES);
-        const supportTools = pi.getActiveTools()
-          .filter((name) => name !== "bash" && name !== "powershell" && !directNames.has(name))
-          .map((name) => tools.find((tool) => tool.name === name))
-          .filter((tool): tool is typeof tools[number] => tool !== undefined && isOwnedWindowsSupportTool(tool))
-          .map((tool) => tool.name);
-        const expectedActiveTools = [...new Set([...supportTools, ...WINDOWS_DIRECT_SURFACES, "powershell"])] as string[];
+        const expectedActiveTools = [...WINDOWS_DIRECT_SURFACES, "powershell"] as string[];
         pi.setActiveTools(expectedActiveTools);
         const finalActiveTools = new Set(pi.getActiveTools());
         if (finalActiveTools.size !== expectedActiveTools.length || expectedActiveTools.some((name) => !finalActiveTools.has(name))) {
@@ -276,10 +289,15 @@ export function installWindowsBootstrap(pi: ExtensionAPI, options: WindowsBootst
         if (generation !== lifecycleGeneration) return;
         executor = candidateExecutor;
         initialized = true;
-      } catch {
+      } catch (error) {
         if (generation !== lifecycleGeneration) return;
         executor = undefined;
         initialized = false;
+        const message = error instanceof Error && error.message.length > 0
+          ? error.message
+          : "Windows bootstrap initialization failed";
+        if (options.onInitializationError) options.onInitializationError(message);
+        else console.error(`AKeel Windows bootstrap initialization failed: ${message}`);
       }
     })();
     let tracked: Promise<void>;
@@ -299,6 +317,7 @@ export function installWindowsBootstrap(pi: ExtensionAPI, options: WindowsBootst
     tickets.clear();
     executor = undefined;
     initialized = false;
+    pi.setActiveTools([]);
     return initialize();
   });
   pi.on("session_shutdown", () => {
@@ -308,8 +327,7 @@ export function installWindowsBootstrap(pi: ExtensionAPI, options: WindowsBootst
     executor = undefined;
     initialized = false;
   });
-  pi.on("tool_call", (event: ToolCallEvent): ToolCallEventResult | undefined => {
-    if (!WINDOWS_BLOCKED_SURFACES.has(event.toolName) && event.toolName !== "powershell") return undefined;
+  pi.on("tool_call", (_event: ToolCallEvent): ToolCallEventResult => {
     if (!initialized) return { block: true, reason: WINDOWS_BOOTSTRAP_UNAVAILABLE_REASON };
     return { block: true, reason: WINDOWS_BOOTSTRAP_BLOCK_REASON };
   });

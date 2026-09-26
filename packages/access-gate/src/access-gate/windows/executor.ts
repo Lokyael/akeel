@@ -13,12 +13,15 @@ export type PowerShellProcessResult = Readonly<{
 export type PowerShellExecutionRequest = Readonly<{
   readonly toolCallId: string;
   readonly command: string;
-  readonly cwd: string;
-  /** Session-bound workspace identity; the bootstrap currently derives it from cwd. */
-  readonly workspaceIdentity: string;
+  readonly lifecycleGeneration: number;
   readonly timeoutMs?: number;
   readonly signal?: AbortSignal;
   readonly onData?: (chunk: string) => void;
+}>;
+
+export type PowerShellProcessRequest = PowerShellExecutionRequest & Readonly<{
+  readonly cwd: string;
+  readonly workspaceIdentity: string;
 }>;
 
 export interface PowerShellExecutor {
@@ -28,7 +31,7 @@ export interface PowerShellExecutor {
 export type PowerShellProcessRunner = (
   executable: string,
   script: string,
-  request: PowerShellExecutionRequest,
+  request: PowerShellProcessRequest,
   environment: NodeJS.ProcessEnv,
 ) => Promise<PowerShellProcessResult>;
 
@@ -50,15 +53,17 @@ export function createPowerShellExecutor(
       const bound = consumePowerShellExecutionTicket(ticket, {
         toolCallId: request.toolCallId,
         command: request.command,
-        workspaceIdentity: request.workspaceIdentity,
+        lifecycleGeneration: request.lifecycleGeneration,
       });
       if (bound === undefined) throw new Error("PowerShell execution ticket is missing, replayed, or mismatched");
 
-      // Execute the immutable command captured by the ticket, not a later
-      // request object. The digest check remains a defence-in-depth check for
-      // callers that present a separately decoded command string.
+      const processRequest: PowerShellProcessRequest = Object.freeze({
+        ...request,
+        cwd: bound.cwd,
+        workspaceIdentity: bound.workspaceIdentity,
+      });
       const script = `${trustedPrefix};${bound.command}`;
-      return runner(executable.path, script, request, {
+      return runner(executable.path, script, processRequest, {
         ...process.env,
         AKEEL_VERIFIED_PWSH: executable.path,
         AKEEL_PWSH_IDENTITY: executable.identity,
@@ -70,7 +75,7 @@ export function createPowerShellExecutor(
 async function runPowerShellProcess(
   executable: string,
   script: string,
-  request: PowerShellExecutionRequest,
+  request: PowerShellProcessRequest,
   environment: NodeJS.ProcessEnv,
 ): Promise<PowerShellProcessResult> {
   const child = spawn(executable, [

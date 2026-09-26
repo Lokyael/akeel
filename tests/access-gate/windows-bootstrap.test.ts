@@ -104,36 +104,51 @@ test("PowerShell resolution only considers pwsh.exe and freezes the verified ide
   assert.equal(shimResolved.path, "C:\\Users\\dev\\scoop\\apps\\powershell\\current\\pwsh.exe");
 });
 
-test("execution tickets bind call id, command, and workspace and are single-use", async () => {
-  const calls: Array<{ executable: string; script: string }> = [];
-  const executor = createPowerShellExecutor(verified, "$trusted = $true", async (executable, script) => {
-    calls.push({ executable, script });
+test("execution tickets bind call, command, cwd, workspace, and lifecycle and are single-use", async () => {
+  const calls: Array<{ executable: string; script: string; cwd: string }> = [];
+  const executor = createPowerShellExecutor(verified, "$trusted = $true", async (executable, script, request) => {
+    calls.push({ executable, script, cwd: request.cwd });
     return { exitCode: 0, output: "ok", truncated: false };
   });
   const ticket = issuePowerShellExecutionTicket({
     toolCallId: "call-1",
     command: "Write-Output ok",
+    cwd: "C:\\approved",
     workspaceIdentity: "C:\\workspace",
+    lifecycleGeneration: 7,
   });
 
   assert.deepEqual(await executor.execute(ticket, {
     toolCallId: "call-1",
     command: "Write-Output ok",
-    cwd: "C:\\workspace",
-    workspaceIdentity: "C:\\workspace",
+    lifecycleGeneration: 7,
   }), { exitCode: 0, output: "ok", truncated: false });
-  assert.equal(calls.length, 1);
-  assert.equal(calls[0]?.executable, verified.path);
-  assert.match(calls[0]?.script ?? "", /^\$trusted = \$true;Write-Output ok/u);
+  assert.deepEqual(calls, [{
+    executable: verified.path,
+    script: "$trusted = $true;Write-Output ok",
+    cwd: "C:\\approved",
+  }]);
   await assert.rejects(() => executor.execute(ticket, {
-    toolCallId: "call-1", command: "Write-Output ok", cwd: "C:\\workspace", workspaceIdentity: "C:\\workspace",
+    toolCallId: "call-1", command: "Write-Output ok", lifecycleGeneration: 7,
   }), /missing, replayed, or mismatched/u);
 
   const mutated = issuePowerShellExecutionTicket({
-    toolCallId: "call-2", command: "Write-Output ok", workspaceIdentity: "C:\\workspace",
+    toolCallId: "call-2", command: "Write-Output ok", cwd: "C:\\approved",
+    workspaceIdentity: "C:\\workspace", lifecycleGeneration: 7,
   });
   await assert.rejects(() => executor.execute(mutated, {
-    toolCallId: "call-2", command: "Write-Output changed", cwd: "C:\\workspace", workspaceIdentity: "C:\\workspace",
+    toolCallId: "call-2", command: "Write-Output changed", lifecycleGeneration: 7,
+  }), /missing, replayed, or mismatched/u);
+  await assert.rejects(() => executor.execute(mutated, {
+    toolCallId: "call-2", command: "Write-Output ok", lifecycleGeneration: 7,
+  }), /missing, replayed, or mismatched/u);
+
+  const stale = issuePowerShellExecutionTicket({
+    toolCallId: "call-3", command: "Write-Output ok", cwd: "C:\\approved",
+    workspaceIdentity: "C:\\workspace", lifecycleGeneration: 7,
+  });
+  await assert.rejects(() => executor.execute(stale, {
+    toolCallId: "call-3", command: "Write-Output ok", lifecycleGeneration: 8,
   }), /missing, replayed, or mismatched/u);
   assert.equal(calls.length, 1);
 });
@@ -148,42 +163,55 @@ test("executor rejects unbounded command and timeout inputs before spawn", async
   const oversizedTicket = issuePowerShellExecutionTicket({
     toolCallId: "bounded-command",
     command: oversized,
+    cwd: "C:\\workspace",
     workspaceIdentity: "C:\\workspace",
+    lifecycleGeneration: 1,
   });
   await assert.rejects(() => executor.execute(oversizedTicket, {
     toolCallId: "bounded-command",
     command: oversized,
-    cwd: "C:\\workspace",
-    workspaceIdentity: "C:\\workspace",
+    lifecycleGeneration: 1,
   }), /bounded input size/u);
   const timeoutTicket = issuePowerShellExecutionTicket({
     toolCallId: "bounded-timeout",
     command: "Write-Output ok",
+    cwd: "C:\\workspace",
     workspaceIdentity: "C:\\workspace",
+    lifecycleGeneration: 1,
   });
   await assert.rejects(() => executor.execute(timeoutTicket, {
     toolCallId: "bounded-timeout",
     command: "Write-Output ok",
-    cwd: "C:\\workspace",
-    workspaceIdentity: "C:\\workspace",
+    lifecycleGeneration: 1,
     timeoutMs: MAX_POWER_SHELL_TIMEOUT_MS + 1,
   }), /bounded range/u);
   assert.equal(spawned, 0);
 });
 
-test("Windows bootstrap owns powershell, removes bash, and remains fail-closed", async () => {
+test("Windows bootstrap verifies exact ownership, controls the active set, and remains fail-closed", async () => {
   const handlers = new Map<string, (event: ToolCallEvent) => unknown>();
-  const tools = new Map<string, { name: string; description: string; parameters: object; sourceInfo: { path: string; source: string } }>();
-  for (const name of [...WINDOWS_DIRECT_SURFACES, "bash"]) {
-    tools.set(name, { name, description: name, parameters: {}, sourceInfo: { path: `<builtin:${name}>`, source: "builtin" } });
-  }
-  tools.set("powershell", { name: "powershell", description: "builtin", parameters: {}, sourceInfo: { path: "<builtin:powershell>", source: "builtin" } });
-  let active = ["read", "bash"];
+  type SourceInfo = { path: string; source: string; scope: "user" | "project" | "temporary"; origin: "package" | "top-level"; baseDir?: string };
+  type Tool = { name: string; description: string; parameters: object; sourceInfo: SourceInfo };
+  const builtin = (name: string): Tool => ({
+    name, description: name, parameters: {},
+    sourceInfo: { path: `<builtin:${name}>`, source: "builtin", scope: "temporary", origin: "top-level" },
+  });
+  const ownerEntryPath = "C:\\repo\\packages\\access-gate\\src\\access-gate\\index.ts";
+  const ownerSource: SourceInfo = {
+    path: ownerEntryPath,
+    source: "npm:akeel-access-gate@0.1.0",
+    scope: "user",
+    origin: "package",
+    baseDir: "C:\\repo\\packages\\access-gate\\src\\access-gate",
+  };
+  const tools = new Map<string, Tool>();
+  for (const name of [...WINDOWS_DIRECT_SURFACES, "bash", "powershell"]) tools.set(name, builtin(name));
+  let active: string[] = ["read", "bash"];
   let registered: { name: string; execute: (...args: any[]) => Promise<unknown> } | undefined;
   const pi = {
     registerTool(tool: { name: string; execute: (...args: any[]) => Promise<unknown> }) {
       registered = tool;
-      tools.set("powershell", { name: tool.name, description: "akeel", parameters: {}, sourceInfo: { path: "./packages/access-gate/src/access-gate", source: "local" } });
+      tools.set("powershell", { name: tool.name, description: "akeel", parameters: {}, sourceInfo: ownerSource });
     },
     getAllTools: () => [...tools.values()],
     getActiveTools: () => active,
@@ -196,57 +224,61 @@ test("Windows bootstrap owns powershell, removes bash, and remains fail-closed",
 
   let resolutionCount = 0;
   let releaseSecondStart: (() => void) | undefined;
+  const initializationErrors: string[] = [];
   installWindowsBootstrap(pi, {
+    ownerEntryPath,
     resolvePowerShell: async () => {
       resolutionCount++;
-      if (resolutionCount === 2) {
-        await new Promise<void>((resolve) => { releaseSecondStart = resolve; });
-      }
+      if (resolutionCount === 2) await new Promise<void>((resolve) => { releaseSecondStart = resolve; });
+      if (resolutionCount === 3) throw new Error("probe failed");
       return verified;
     },
     executor: createPowerShellExecutor(verified, "$true", async () => ({ exitCode: 0, output: "", truncated: false })),
+    onInitializationError: (message) => initializationErrors.push(message),
   });
   assert.ok(registered);
   tools.set("third_party", {
-    name: "third_party",
-    description: "third party",
-    parameters: {},
-    sourceInfo: { path: "./third-party/index.ts", source: "local" },
+    name: "third_party", description: "third party", parameters: {},
+    sourceInfo: { path: "C:\\repo\\third-party\\index.ts", source: "local", scope: "project", origin: "top-level" },
   });
   active.push("third_party");
-  assert.equal(isOwnedWindowsPowerShellTool(tools.get("powershell")!), true);
+  assert.equal(isOwnedWindowsPowerShellTool(tools.get("powershell")!, ownerEntryPath), true);
   assert.equal(isOwnedWindowsPowerShellTool({
     name: "powershell",
-    sourceInfo: { path: "./attacker/access-gate/index.ts", source: "local" },
-  }), false);
+    sourceInfo: { ...ownerSource, path: "C:\\evil\\packages\\access-gate\\index.ts" },
+  }, ownerEntryPath), false);
 
-  const beforeStart = handlers.get("tool_call")!({ type: "tool_call", toolName: "powershell", toolCallId: "x", input: { command: "Get-ChildItem" } });
-  assert.deepEqual(beforeStart, { block: true, reason: WINDOWS_BOOTSTRAP_UNAVAILABLE_REASON });
-  await handlers.get("session_start")!({ type: "session_start", reason: "startup" } as never);
-  assert.equal(active.includes("bash"), false);
-  assert.equal(active.includes("third_party"), false);
-  assert.equal(active.includes("powershell"), true);
+  assert.deepEqual(handlers.get("tool_call")!({ type: "tool_call", toolName: "third_party", toolCallId: "x", input: {} }), {
+    block: true,
+    reason: WINDOWS_BOOTSTRAP_UNAVAILABLE_REASON,
+  });
+  const firstStart = handlers.get("session_start")!({ type: "session_start", reason: "startup" } as never);
+  assert.equal(active.length, 0);
+  await firstStart;
+  assert.deepEqual(active, [...WINDOWS_DIRECT_SURFACES, "powershell"]);
   assert.deepEqual(handlers.get("tool_call")!({ type: "tool_call", toolName: "powershell", toolCallId: "x", input: { command: "Get-ChildItem" } }), {
     block: true,
     reason: WINDOWS_BOOTSTRAP_BLOCK_REASON,
   });
 
-  // A session reload may arrive without a preceding shutdown. The old
-  // initialized state must not survive while the new executable is pending.
   const secondStart = handlers.get("session_start")!({ type: "session_start", reason: "reload" } as never);
-  assert.deepEqual(handlers.get("tool_call")!({ type: "tool_call", toolName: "powershell", toolCallId: "x", input: { command: "Get-ChildItem" } }), {
+  assert.equal(active.length, 0);
+  assert.deepEqual(handlers.get("tool_call")!({ type: "tool_call", toolName: "read", toolCallId: "x", input: { path: "file.txt" } }), {
     block: true,
     reason: WINDOWS_BOOTSTRAP_UNAVAILABLE_REASON,
   });
   releaseSecondStart?.();
   await secondStart;
-  assert.deepEqual(handlers.get("tool_call")!({ type: "tool_call", toolName: "powershell", toolCallId: "x", input: { command: "Get-ChildItem" } }), {
+  assert.deepEqual(active, [...WINDOWS_DIRECT_SURFACES, "powershell"]);
+
+  active.push("third_party");
+  const failedStart = handlers.get("session_start")!({ type: "session_start", reason: "reload" } as never);
+  assert.equal(active.length, 0);
+  await failedStart;
+  assert.equal(active.length, 0);
+  assert.deepEqual(initializationErrors, ["probe failed"]);
+  assert.deepEqual(handlers.get("tool_call")!({ type: "tool_call", toolName: "third_party", toolCallId: "x", input: {} }), {
     block: true,
-    reason: WINDOWS_BOOTSTRAP_BLOCK_REASON,
+    reason: WINDOWS_BOOTSTRAP_UNAVAILABLE_REASON,
   });
-  assert.deepEqual(handlers.get("tool_call")!({ type: "tool_call", toolName: "read", toolCallId: "x", input: { path: "file.txt" } }), {
-    block: true,
-    reason: WINDOWS_BOOTSTRAP_BLOCK_REASON,
-  });
-  assert.equal(handlers.get("tool_call")!({ type: "tool_call", toolName: "unowned", toolCallId: "x", input: {} }), undefined);
 });

@@ -25,6 +25,7 @@ export {
   MAX_POWER_SHELL_TIMEOUT_MS,
   type PowerShellExecutionRequest,
   type PowerShellExecutor,
+  type PowerShellProcessRequest,
   type PowerShellProcessResult,
   type PowerShellProcessRunner,
 } from "./executor";

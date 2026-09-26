@@ -13,32 +13,39 @@ export type PowerShellExecutionTicket = object & {
 type TicketRecord = Readonly<{
   readonly toolCallId: string;
   readonly commandDigest: string;
-  readonly workspaceIdentity: string;
   readonly command: string;
+  readonly cwd: string;
+  readonly workspaceIdentity: string;
+  readonly lifecycleGeneration: number;
 }> & { consumed: boolean };
 
 type IssueInput = Readonly<{
   readonly toolCallId: string;
   readonly command: string;
+  readonly cwd: string;
   readonly workspaceIdentity: string;
+  readonly lifecycleGeneration: number;
 }>;
 
 type ConsumeInput = Readonly<{
   readonly toolCallId: string;
   readonly command: string;
-  readonly workspaceIdentity: string;
+  readonly lifecycleGeneration: number;
 }>;
 
 export function issuePowerShellExecutionTicket(input: IssueInput): PowerShellExecutionTicket {
-  if (!isNonEmptyText(input.toolCallId) || !isNonEmptyText(input.command) || !isNonEmptyText(input.workspaceIdentity)) {
-    throw new TypeError("PowerShell execution ticket fields must be non-empty");
+  if (!isNonEmptyText(input.toolCallId) || !isNonEmptyText(input.command) || !isNonEmptyText(input.cwd) ||
+    !isNonEmptyText(input.workspaceIdentity) || !isLifecycleGeneration(input.lifecycleGeneration)) {
+    throw new TypeError("PowerShell execution ticket fields must be valid");
   }
   const ticket = Object.freeze({}) as PowerShellExecutionTicket;
   ticketRecords.set(ticket, {
     toolCallId: input.toolCallId,
     commandDigest: commandDigest(input.command),
-    workspaceIdentity: input.workspaceIdentity,
     command: input.command,
+    cwd: input.cwd,
+    workspaceIdentity: input.workspaceIdentity,
+    lifecycleGeneration: input.lifecycleGeneration,
     consumed: false,
   });
   return ticket;
@@ -47,17 +54,33 @@ export function issuePowerShellExecutionTicket(input: IssueInput): PowerShellExe
 export function consumePowerShellExecutionTicket(
   ticket: PowerShellExecutionTicket,
   input: ConsumeInput,
-): Readonly<{ readonly toolCallId: string; readonly command: string }> | undefined {
-  if (!isRecord(ticket) || !isNonEmptyText(input.toolCallId) || !isNonEmptyText(input.command) || !isNonEmptyText(input.workspaceIdentity)) return undefined;
+): Readonly<{
+  readonly toolCallId: string;
+  readonly command: string;
+  readonly cwd: string;
+  readonly workspaceIdentity: string;
+}> | undefined {
+  if (!isRecord(ticket) || !isNonEmptyText(input.toolCallId) || !isNonEmptyText(input.command) ||
+    !isLifecycleGeneration(input.lifecycleGeneration)) return undefined;
   const record = ticketRecords.get(ticket);
   if (record === undefined || record.consumed) return undefined;
-  if (record.toolCallId !== input.toolCallId || record.commandDigest !== commandDigest(input.command) || record.workspaceIdentity !== input.workspaceIdentity) return undefined;
   record.consumed = true;
-  return Object.freeze({ toolCallId: record.toolCallId, command: record.command });
+  if (record.toolCallId !== input.toolCallId || record.commandDigest !== commandDigest(input.command) ||
+    record.lifecycleGeneration !== input.lifecycleGeneration) return undefined;
+  return Object.freeze({
+    toolCallId: record.toolCallId,
+    command: record.command,
+    cwd: record.cwd,
+    workspaceIdentity: record.workspaceIdentity,
+  });
 }
 
 function isNonEmptyText(value: unknown): value is string {
   return typeof value === "string" && value.length > 0 && !value.includes("\u0000");
+}
+
+function isLifecycleGeneration(value: unknown): value is number {
+  return typeof value === "number" && Number.isSafeInteger(value) && value > 0;
 }
 
 function isRecord(value: unknown): value is object {

@@ -1,4 +1,7 @@
 import assert from "node:assert/strict";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import {
   discoverVerifiedPowerShell,
   issueTracerExecutionTicket,
@@ -13,6 +16,7 @@ import type { PowerShellExecutionTicket } from "../packages/access-gate/src/acce
 
 const TRACER_TIMEOUT_MS = Math.min(30_000, MAX_POWER_SHELL_TIMEOUT_MS);
 const workspaceIdentity = process.cwd();
+const lifecycleGeneration = 1;
 
 const RUNTIME_VECTOR = [
   "if ($PSNativeCommandArgumentPassing -ne 'Standard' -or $OutputEncoding.CodePage -ne 65001 -or [Console]::InputEncoding.CodePage -ne 65001 -or [Console]::OutputEncoding.CodePage -ne 65001 -or $PSDefaultParameterValues['*:Encoding'] -ne 'utf8NoBOM') { exit 97 }",
@@ -21,17 +25,19 @@ const RUNTIME_VECTOR = [
 
 const FIXED_VECTORS = [
   { name: "runtime", command: RUNTIME_VECTOR, expected: /akeel-runtime-ok/u },
-  { name: "git", command: "git.exe --version", expected: /git version /iu },
-  { name: "node", command: "node.exe --version", expected: /^v\d+\.\d+/u },
-  { name: "npm", command: "npm.cmd --version", expected: /^\d+\.\d+/u },
+  { name: "git-version", command: "git.exe --version", expected: /git version /iu },
+  { name: "node-version", command: "node.exe --version", expected: /^v\d+\.\d+/u },
+  { name: "npm-version", command: "npm.cmd --version", expected: /^\d+\.\d+/u },
 ] as const;
 
-function request(toolCallId: string, command: string, identity = workspaceIdentity) {
+const ARGUMENT_VECTOR = ["", "space value", "中文", "trailing\\"] as const;
+const ARGUMENT_COMMAND_SUFFIX = "'' 'space value' '中文' 'trailing\\'";
+
+function request(toolCallId: string, command: string, generation = lifecycleGeneration) {
   return {
     toolCallId,
     command,
-    cwd: workspaceIdentity,
-    workspaceIdentity: identity,
+    lifecycleGeneration: generation,
     timeoutMs: TRACER_TIMEOUT_MS,
   };
 }
@@ -41,9 +47,10 @@ async function executeVector(
   name: string,
   command: string,
   expected: RegExp,
-): Promise<void> {
+  cwd = workspaceIdentity,
+): Promise<string> {
   const toolCallId = `windows-tracer-${name}`;
-  const ticket = issueTracerExecutionTicket(toolCallId, command, workspaceIdentity);
+  const ticket = issueTracerExecutionTicket(toolCallId, command, workspaceIdentity, cwd, lifecycleGeneration);
   const result = await executor.execute(ticket, request(toolCallId, command));
   assert.equal(result.exitCode, 0, `${name} vector exited unsuccessfully: ${result.output}`);
   assert.match(result.output, expected, `${name} vector did not produce expected output`);
@@ -54,6 +61,50 @@ async function executeVector(
     /missing, replayed, or mismatched/u,
     `${name} ticket was replayable`,
   );
+  return result.output;
+}
+
+function assertArgumentVector(name: string, output: string): void {
+  const line = output.split(/\r?\n/u).find((candidate) => candidate.startsWith("AKEEL_ARGV:"));
+  assert.ok(line, `${name} did not emit argument evidence: ${output}`);
+  assert.deepEqual(JSON.parse(line.slice("AKEEL_ARGV:".length)), ARGUMENT_VECTOR, `${name} changed native arguments`);
+}
+
+async function executeArgumentVectors(executor: PowerShellExecutor, root: string): Promise<void> {
+  writeFileSync(join(root, "argv-probe.cjs"),
+    "process.stdout.write('AKEEL_ARGV:' + JSON.stringify(process.argv.slice(2)) + '\\n');\n", "utf8");
+  writeFileSync(join(root, "package.json"), JSON.stringify({
+    private: true,
+    scripts: { "argv-probe": "node.exe argv-probe.cjs" },
+  }), "utf8");
+
+  const nodeOutput = await executeVector(
+    executor,
+    "node-argv",
+    `node.exe argv-probe.cjs ${ARGUMENT_COMMAND_SUFFIX}`,
+    /AKEEL_ARGV:/u,
+    root,
+  );
+  assertArgumentVector("node.exe", nodeOutput);
+
+  const npmOutput = await executeVector(
+    executor,
+    "npm-argv",
+    `npm.cmd run argv-probe -- ${ARGUMENT_COMMAND_SUFFIX}`,
+    /AKEEL_ARGV:/u,
+    root,
+  );
+  assertArgumentVector("npm.cmd", npmOutput);
+
+  await executeVector(executor, "git-init", "git.exe init --quiet 'repo 中文'", /^$/u, root);
+  const gitOutput = await executeVector(
+    executor,
+    "git-path",
+    "git.exe -C 'repo 中文' rev-parse --show-toplevel",
+    /repo 中文/iu,
+    root,
+  );
+  assert.match(gitOutput.replace(/\\/gu, "/"), /\/repo 中文\s*$/u, "git.exe changed the spaced Unicode path");
 }
 
 async function main(): Promise<void> {
@@ -63,10 +114,16 @@ async function main(): Promise<void> {
 
   const executable = await discoverVerifiedPowerShell();
   const executor = createPowerShellExecutor(executable, WINDOWS_RUNTIME_PREFIX);
+  const tracerRoot = mkdtempSync(join(tmpdir(), "akeel-windows-tracer-"));
   console.log(`verified pwsh: ${executable.path}`);
 
-  for (const vector of FIXED_VECTORS) {
-    await executeVector(executor, vector.name, vector.command, vector.expected);
+  try {
+    for (const vector of FIXED_VECTORS) {
+      await executeVector(executor, vector.name, vector.command, vector.expected);
+    }
+    await executeArgumentVectors(executor, tracerRoot);
+  } finally {
+    rmSync(tracerRoot, { recursive: true, force: true });
   }
 
   const mutationCommand = "Write-Output 'tracer-original'";
@@ -84,18 +141,18 @@ async function main(): Promise<void> {
     "mutated command reached the executor",
   );
 
-  const workspaceTicket = issueTracerExecutionTicket(
-    "windows-tracer-workspace",
-    "Write-Output 'workspace'",
+  const lifecycleTicket = issueTracerExecutionTicket(
+    "windows-tracer-lifecycle",
+    "Write-Output 'lifecycle'",
     workspaceIdentity,
   );
   await assert.rejects(
     () => executor.execute(
-      workspaceTicket,
-      request("windows-tracer-workspace", "Write-Output 'workspace'", `${workspaceIdentity}-changed`),
+      lifecycleTicket,
+      request("windows-tracer-lifecycle", "Write-Output 'lifecycle'", lifecycleGeneration + 1),
     ),
     /missing, replayed, or mismatched/u,
-    "workspace mutation reached the executor",
+    "stale lifecycle ticket reached the executor",
   );
 
   await assert.rejects(
