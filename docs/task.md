@@ -41,17 +41,17 @@ Keep production package peer dependencies open (`*`) because Pi supplies its cor
 
 ### Background & Goal
 
-Establish and maintain a first-class native Windows 11 profile without weakening or conditionally rewriting the existing Linux profile. The Windows profile uses Windows Terminal and PowerShell 7 throughout its supported human and model execution path. This record is the temporary authority for the transition and remains active until implementation, verification, user documentation, and durable architecture records are complete.
+Establish and maintain a first-class native Windows 11 profile without weakening or conditionally rewriting the existing Linux profile. The Windows profile uses Windows Terminal and PowerShell Core `>=7.4 <8` throughout its supported human and model execution path. This record is the temporary authority for the transition and remains active until implementation, verification, user documentation, and durable architecture records are complete.
 
 The current production Access Gate remains Linux-only. This Task defines the approved Windows destination and the gates that must pass before AKeel may claim Windows support.
 
 ### Requirements
 
 - Support native Windows 11 as an independent platform profile; the supported profile runs directly on Windows 11 and does not route through a compatibility environment.
-- Use Windows Terminal as the supported terminal and PowerShell 7 (`pwsh.exe`) as the only model-facing Shell on Windows. The Shell constraint applies to Pi's host execution surface; PowerShell-launched external executables and helpers remain governed by Access Gate command/effect/path evidence.
+- Use Windows Terminal as the supported terminal and PowerShell Core `>=7.4 <8` (`pwsh.exe`) as the only model-facing Shell on Windows. The Shell constraint applies to Pi's host execution surface; PowerShell-launched external executables and helpers remain governed by Access Gate command/effect/path evidence.
 - Require UTF-8 without BOM for Windows source, fixtures, generated text, PowerShell file output, and captured text artifacts. Prefer the modern cross-platform contract; legacy Windows PowerShell or old-tool compatibility is not a reason to add a BOM. PowerShell file operations and tests must select `utf8NoBOM` explicitly.
 - Configure Pi's Windows model tool set explicitly around Direct tools and `powershell`; do not activate or document a Windows model `bash` tool and do not configure Pi `shellPath`. Pi `!` / `!!`, RPC `bash`, low-level SDK Bash calls, and third-party Bash backends are not part of the normal AKeel Windows workflow or its support claim; no additional host interception is required unless real usage demonstrates that configuration isolation is insufficient.
-- Require PowerShell 7 to be present and positively identified. Pi's fallback to Windows PowerShell does not satisfy the AKeel Windows profile.
+- Require PowerShell 7.4 or newer within major version 7 to be present and positively identified. Pi's fallback to Windows PowerShell does not satisfy the AKeel Windows profile; the selected executable is frozen for the session and shared by the syntax/evidence host and model-command executor.
 - Preserve Linux Bash behavior and evidence independently. Windows support must not broaden the Linux parser, merge path dialects, or make Linux behavior conditional on Windows compatibility.
 - Share platform-neutral authorization policy, verdicts, effects, display contracts, and package capabilities where their semantics are genuinely common; keep path evidence, Shell compilation, filesystem control, process lifecycle, and platform tests separate.
 - Keep each platform's physical checkout, dependency installation, Pi agent directory, session directory, policy file, credentials, temporary resources, caches, and generated artifacts independent. Source changes cross platforms through Git history, not shared runtime state.
@@ -71,7 +71,7 @@ A native AKeel configuration target is:
 }
 ```
 
-The final supported list remains subject to native path-contract verification for every Direct tool; the Shell boundary does not depend on Pi's default tool selection. Git maintenance uses native `git.exe`; the exact Windows Git distribution is an environment choice, provided Pi's model tool set remains PowerShell-only and the required repository, worktree, credential, and package flows pass.
+The Windows composition does not trust settings alone as enforcement. It registers an AKeel-owned `powershell` replacement, verifies the final tool source and active set at session start, removes model `bash`, and keeps `bash` blocked even when Access Gate is off. The final Direct list remains subject to native path-contract verification for every tool. Git maintenance uses native `git.exe`; the exact Windows Git distribution is an environment choice, provided the required repository, worktree, credential, and package flows pass.
 
 ### Current AKeel Gaps
 
@@ -86,101 +86,134 @@ The final supported list remains subject to native path-contract verification fo
 
 ### Design
 
-#### Platform composition
+#### Platform runtime and composition
 
-Select one platform composition at extension initialization and inject its ports into the common authorization chain. The common core must not rediscover the host platform or interpret native path strings. The two compositions are:
+Select one platform composition exactly once when the extension runtime loads. The common authorization core does not inspect `process.platform`, parse native path strings, or call platform filesystem APIs. Linux and Windows each own host adaptation, native path evidence, Shell syntax, executable identity, runtime roots, filesystem control, and process lifecycle; they share only sealed Canonical/Admission facades, command classes, effects, policy modes, verdicts, and display contracts.
 
-| Profile | Managed Shell | Path evidence | Filesystem control |
-|---|---|---|---|
-| Linux | Bash | Linux pathname and symlink semantics | UID/GID and mode evidence |
-| Windows 11 | PowerShell 7 | Windows pathname and reparse-point semantics | SID/owner/DACL evidence |
+Introduce a first-party support package with no `pi.extensions` surface:
 
-Direct and Shell compilation remain private semantic lanes and converge only after each platform has issued verified Canonical facts. Canonical path values carry their platform domain so a Windows path cannot enter a Linux comparer or vice versa.
+```text
+packages/platform-runtime/
+  src/contracts/       # platform-tagged path, private-filesystem, process and runtime-root ports
+  src/linux/           # current Linux pathname, UID/GID/mode and lifecycle behavior
+  src/windows/         # bounded client and protocol for the Windows host service
+  native/windows/      # managed Win32 evidence assembly and reproducible build inputs
+```
 
-#### Windows path evidence
+The three user-installable capability packages remain Guidance, Access Gate, and Context Pruner. `akeel-platform-runtime` is an internal runtime dependency used by Guidance and Access Gate so Windows evidence and controlled-resource semantics have one implementation instead of cross-package copies.
 
-The Windows filesystem baseline is local NTFS, rooted by a fully qualified native path. Other storage forms are not part of the initial verification scope. Windows evidence must explicitly classify and either prove or fail closed on:
+#### Windows initialization and model Shell ownership
 
-- drive-absolute, UNC, namespace, device, drive-relative, and rooted-without-drive forms;
-- case-insensitive identity and separator normalization without losing the original literal form used for display;
-- reserved device names, alternate data streams, trailing spaces or periods, and per-drive current-directory behavior;
-- symbolic links, junctions, and other reparse points, including bounded traversal and loop detection;
-- short-name aliases, hard-link identity, and canonical root comparison where they can affect credential, capability, blocked-path, or anti-tamper boundaries;
-- path-length behavior and errors from tools that do not participate in the long-path contract.
+The Windows composition registers an AKeel-owned `powershell` tool with the same name as Pi's built-in and owns its execution. At `session_start` it resolves only `pwsh.exe`, runs a positive handshake, and freezes a `VerifiedPowerShellExecutable` after confirming PowerShell Core `>=7.4 <8`, executable identity, FullLanguage mode, and the supported argument-passing capability. It then verifies through Pi tool source metadata that the final `powershell` definition is AKeel-owned, removes model `bash`, activates the verified PowerShell tool, and verifies each admitted Direct tool remains the expected Pi built-in. A missing/mismatched tool or executable leaves the Windows profile uninitialized and all governed surfaces fail closed; `bash` remains blocked even when Access Gate is off.
 
-The initial implementation may reject path classes that do not yet have complete evidence. It must never translate foreign path syntax centrally and then reuse the result as Windows authorization evidence.
+Every governed PowerShell call is approved against the original model command and receives a single-use execution ticket bound to tool-call ID, command digest and workspace identity. The AKeel executor consumes that exact ticket before spawning the frozen executable. This prevents a post-decision input mutation from becoming the executed command. User/RPC Bash and arbitrary third-party backends remain outside the product workflow rather than being relabeled as governed PowerShell.
 
-#### PowerShell compilation
+The executor prepends one fixed, trusted setup in the same fresh `pwsh.exe` process, before the already-compiled model command. The setup positively checks the version/profile and sets UTF-8 no BOM console/file defaults plus `$PSNativeCommandArgumentPassing = 'Standard'`; it re-reads those values and stops before the model command if any assertion fails. The model command cannot reset the setup because assignments, dynamic invocation and nested shells are outside the admitted subset.
 
-Build a dedicated bounded PowerShell lane rather than translating Bash semantics. Start from a closed, testable subset and fail closed on unsupported language forms. The lane must distinguish native cmdlets, aliases, external executables, scripts, providers, redirections, pipelines, invocation operators, dot sourcing, script blocks, subexpressions, nested shell execution, dynamic command names, and process-launching forms before any of them can receive a less restrictive classification.
+#### Windows evidence host
 
-Program analyzers may project the same platform-neutral command classes and effects already consumed by Policy, but only after the PowerShell lane has consumed the full relevant option and argument contract. Runtime opacity must remain explicit; approval does not create filesystem confinement.
+A session-owned Windows host service supplies evidence without executing model commands:
+
+```text
+TypeScript WindowsHostClient
+  └── bounded versioned JSONL over private stdio
+       └── no-profile/non-interactive verified pwsh.exe host
+            ├── System.Management.Automation.Language.Parser
+            └── AKeel.Windows.Runtime.dll (AnyCPU Win32 P/Invoke)
+```
+
+The managed assembly provides handle-based path, volume, file-ID, reparse, owner/SID/DACL, process-start-time and atomic-filesystem operations that Node does not expose. The PowerShell host provides the official parser available in the required runtime. It returns only bounded protocol DTOs; arbitrary AST graphs, localized diagnostics and executable suggestions never cross the boundary. Request-size, response-size, time, queue and traversal budgets are fixed. Protocol mismatch, timeout, host exit or malformed evidence fails closed. The host starts from `session_start`, is reference-counted/idempotently disposed, and is never started by package discovery or archive validation alone.
+
+Path and filesystem evidence acquisition becomes asynchronous. Authorization remains a synchronous pure projection after all evidence has been issued; preserving the current synchronous compiler is not a reason to use repeated `spawnSync` probes.
+
+#### Opaque path proof and root catalog
+
+Replace public canonical path strings with a sealed `PlatformPathProof`. It carries a platform-domain token, original literal for display, canonical display location, traversed object identities, optional terminal `(volume, file-id, link-count)` identity, canonical basename/components, path-risk flags and relations to a bounded session `RootCatalog`. It does not expose a cross-platform pathname comparer.
+
+The catalog is compiled once after the platform starts and contains stable IDs for the access root, staging/runtime roots, credential roots, capability roots, and the union of every preset's allowed roots, blocked roots and blocked paths. One path resolution computes `equal`, `descendant`, `ancestor` and `traversed` relations to those IDs. Admission carries only the sealed proof and relation IDs; Mandatory Boundary and Policy perform set/relation operations and never rebuild a path from request text. Recursive blocked-descendant checks use the `ancestor` relation. A policy snapshot or persisted workspace identity from another platform domain is invalid.
+
+The Windows v1 path behavior is closed:
+
+| Input/evidence class | Windows v1 behavior |
+|---|---|
+| relative and drive-absolute filesystem paths | admit for evidence; resolve relative paths against fixed session cwd |
+| `/` or `\\` separators | accept while preserving literal display and issuing one canonical identity |
+| UNC, drive-relative, rooted-without-drive, device and namespace input | reject |
+| ADS, reserved device names, control characters, trailing space/period | reject |
+| local non-NTFS volume or case-sensitive NTFS directory | reject |
+| symbolic link/junction with known supported tag | bounded traversal with lexical and final evidence |
+| unknown reparse tag, loop or traversal-budget overflow | reject |
+| 8.3 alias | admit only when final long-name and object evidence are complete |
+| existing hard-linked file | record file identity and link count; any mutation of a multi-link file is hard-denied in v1 |
+| missing leaf | prove the deepest existing ancestor and validate the remaining lexical components |
+| long path | use internal namespace-safe evidence; each executing tool must still pass its own native long-path contract |
+
+Input namespace forms are rejected even though the private Windows host may use namespace-safe paths internally. Existing credential artifacts are matched by object identity as well as canonical location. The conservative multi-link mutation rule prevents an out-of-root hard link from becoming an anti-tamper bypass without enumerating an installed capability tree. The gate retains its documented TOCTOU limitation: evidence is authoritative for the decision snapshot but no file descriptor is passed to Pi's later Direct operation.
+
+#### PowerShell Canonical lane
+
+Use `System.Management.Automation.Language.Parser.ParseInput` in the evidence host and project its result to a bounded `PowerShellSyntaxIR`. The frontend accepts only AST node kinds whose full invocation, literal arguments, parameters, source extents and redirections are represented; it never executes command discovery or serializes arbitrary AST objects. TypeScript semantic analyzers consume this IR.
+
+The initial admitted language is one simple command with fixed literal arguments. Double-quoted text is literal only when the AST reports no interpolation. The lane supports a small registry of module-qualified filesystem inspection cmdlets using `-LiteralPath`, plus verified external applications required for ordinary Git, Node, npm, package/build and final Herdr workflows. Cross-platform CLI analyzers consume a new platform-neutral `ProgramInvocation` only when the external CLI contract is genuinely shared; GNU utilities, Bash flow and `/dev/null` remain Linux-private, while cmdlets, providers, Windows shims and PowerShell language forms remain Windows-private.
+
+Pipelines, redirections, compound statements, assignments, variables, wildcard paths, aliases, functions, providers, invocation operators, dot sourcing, script blocks, subexpressions, `.ps1`, unknown `.cmd`/`.bat`, `Start-Process`, nested shells and destructive cmdlets are v1 rejection cases. Their acceptance tests prove stable fail-closed behavior, not support. Exact known `.cmd` shims such as the verified npm entry may be admitted only after the `Standard` argument-passing tracer and full option contract pass. An exact unknown `.exe` may reach the existing `commands.opaque` axis, but opaque approval still provides no filesystem, network or descendant-process confinement.
 
 #### Windows runtime resources
 
-Derive staging and workflow roots from the native runtime environment rather than a fixed physical path. Controlled-directory proof uses Windows owner/SID/DACL and reparse-point evidence, not POSIX mode bits. Session locks, process liveness, no-clobber publication, rename/link behavior, cleanup, open-file failures, and crash retention require native Windows contract tests.
+The runtime authority derives a platform root from local user state rather than `/tmp`; the Windows target is a verified local-NTFS `%LOCALAPPDATA%/AKeel/runtime` with separate `sessions/` and `runs/` ownership. It creates a protected DACL owned by the current user SID, grants only that SID and `SYSTEM` full control, disables inheritance, rejects a reparse root, and verifies the exact descriptor whenever an existing root is adopted. This closed template replaces generic attempts to interpret arbitrary safe DACLs.
 
-Session Handoff remains embedded in Pi session entries. Any persisted cwd or path-bearing receipt remains platform-tagged and valid only in its originating platform profile unless a future contract explicitly defines a portable representation.
+Session locks store PID and process creation time, and liveness requires both to match so PID reuse cannot authorize retention. Access-denied/uncertain liveness is treated as live and retained. Artifact publication creates a no-clobber temporary file in the destination directory, writes UTF-8 no BOM, flushes it, performs same-volume no-replace/write-through rename, and publishes the receipt last with the same protocol. Sharing violations, antivirus/indexer interference and cleanup failures never produce success; exact residue is retained for bounded retry/retention. Session Handoff remains entirely in Pi entries, while persisted cwd/receipt values include the originating platform and are revalidated on resume.
 
-#### Platform isolation
+Guidance consumes exact role paths returned by Artifact Exchange instead of spelling a physical runtime root. Skills do not mandate `xdg-open` or `Start-Process`; when no host viewer exists they report the returned path. Context Pruner uses separate Bash and PowerShell positive recognizers and only projects an independent supported test command/result whose runner evidence is complete.
 
-- Use separate physical checkouts on Linux and Windows; never run both platforms against one working tree or Git index.
-- Install dependencies independently; never copy `node_modules` or generated executable shims between platforms.
-- Keep `PI_CODING_AGENT_DIR`, `PI_CODING_AGENT_SESSION_DIR`, AKeel policy, credentials, package storage, temporary roots, and workflow runs platform-local.
-- Keep absolute policy paths native to the platform that owns the policy file. Cross-machine synchronization may share templates but not resolved roots, credentials, sessions, or runtime artifacts.
-- Parse policy paths with Windows-native path rules and preserve a canonical Windows identity. Drive-relative and device/stream forms require explicit handling before admission; path values remain platform-scoped and cannot be consumed by a Linux session.
-- Include OS, architecture, runtime version, and lockfile identity in CI/cache boundaries.
+#### Platform isolation, repository portability and locale
 
-#### Repository portability
-
-Commit a root `.gitattributes` that normalizes repository text to LF in both worktrees and marks any future binary assets explicitly. Do not rely on a contributor's `core.autocrlf`; Windows maintenance uses LF working-tree text so source, Markdown, JSON, YAML and PowerShell fixtures produce no cross-platform line-ending diff. PowerShell-generated file tests must explicitly select UTF-8 no BOM rather than inherit locale or redirection defaults.
-
-Add a repository portability validator that checks tracked paths for Windows case collisions and invalid Win32 names, and rejects mixed line endings or any BOM in tracked text. Symlinks and unusually long paths are validated when introduced rather than prohibited in advance. The pre-change source-tree probe was clean: 144 tracked paths, all LF, no BOM, no tracked symlink, no case-fold collision or invalid Windows path, and the longest tracked relative path was 104 UTF-16 code units; `.gitattributes` and the future validator become additional tracked inputs.
-
-#### PowerShell configuration, locale, and encoding
-
-The Windows profile supports English and Simplified Chinese Windows through one deterministic PowerShell 7 execution configuration. Pi starts the tool with `-NoProfile`, so AKeel must not rely on a user's profile. The Windows composition must inject a bounded runtime setup that selects UTF-8 for console input/output, `$OutputEncoding`, supported file-writing cmdlets, and `$PSNativeCommandArgumentPassing = 'Standard'`. Source, fixtures, generated text, and captured artifacts use UTF-8 without BOM. This is a required modern contract, not a legacy compatibility preference. The setup must be applied and positively verified for every managed invocation; documentation or a user profile alone is not activation.
-
-Use current PowerShell 7 behavior rather than legacy Windows PowerShell compatibility. `Standard` is the only supported native argument-passing mode for the Windows profile; `Windows` and `Legacy` modes are outside the support contract. A native executable that requires a compatibility mode does not silently change the profile or pass the Windows gate. Any English/Chinese difference that would require incompatible product behavior, configuration, or guarantees must be reported to the user with evidence before the support boundary is decided.
-
-The shared locale matrix covers PowerShell cmdlet and native-process stdout/stderr, explicit `utf8NoBOM` file encoding, LF/no-BOM enforcement, Chinese and ASCII paths/content, localized diagnostics without exact-message coupling, Windows Terminal CJK input/IME, package loading, session persistence, and Context Pruner behavior. Other locale environments are outside the current validation matrix.
+- Linux and Windows use separate checkout/index, dependencies, Pi directories, policies, credentials, runtime resources, caches and generated artifacts; only Git history crosses the boundary.
+- Absolute policy strings are decoded asynchronously by the active path authority into platform-tagged root IDs. Templates may be shared; resolved snapshots may not.
+- CI/cache identity includes OS, architecture, Node, PowerShell/host-runtime version and lockfile identity.
+- Root `.gitattributes` fixes LF. A tracked-path validator reads the Git index, rejects invalid UTF-8 names, Windows-invalid components, conservative Unicode case-fold collisions, BOM and mixed/CR line endings; binary assets must remain explicitly classified.
+- Source, fixture, generated text, PowerShell output and captured artifacts use UTF-8 no BOM. `Standard` is the only native argument-passing mode; `Windows` and `Legacy` do not form compatibility fallbacks.
+- Automated culture tests cover English and Simplified Chinese process culture, encoding, paths/content and non-message-coupled diagnostics. Release evidence uses separate ephemeral native Windows 11 x64 environments for en-US and zh-CN. Windows Terminal rendering, IME, hardware cursor and shortcuts are human release checks, not headless CI claims.
+- A hosted Windows runner is an early smoke/contract surface, not a substitute for the native Windows 11 release runners. Any English/Chinese behavioral incompatibility is returned to the user before changing the single product contract.
 
 ### Plan
 
-1. Align the current Decisions, CONTEXT, README, and external-source record with the approved Windows profile while preserving the current Linux-only runtime claim.
-2. Make repository build, package validation, documentation validation, and platform-neutral tests pass on a native Windows runner without changing product behavior.
-3. Extract explicit platform ports for path evidence, filesystem control, process/session lifecycle, home/runtime roots, and platform composition; retain the Linux implementation behind those ports.
-4. Implement and contract-test Windows Direct path admission and capability/credential/anti-tamper boundaries.
-5. Port Artifact Exchange, Continuation Capsule cwd validation, temporary resources, and retention to native Windows evidence.
-6. Implement the bounded PowerShell 7 Canonical lane and host composition; keep unsupported forms fail-closed.
-7. Add repository portability gates and the shared English/Simplified Chinese PowerShell configuration and locale matrix, then extend Context Pruner and applicable Guidance to the Windows tool/result and runtime-path contracts.
-8. Present any evidence that English and Chinese require incompatible behavior to the user for an explicit support-boundary decision.
-9. Run native Herdr workflow validation only in the final acceptance phase, then validate packaged extensions on native Windows 11 and Linux, update user-facing installation and policy documentation, and clear this Task after durable records are complete.
+1. **Windows execution tracer** — prove packaged same-name tool replacement, final tool ownership, exact PowerShell Core `>=7.4 <8` identity, fixed setup verification, execution tickets, no model `bash`, and `Standard` behavior for `git.exe`, `node.exe`, `npm.cmd` and required shims on real Windows. Stop and return incompatible evidence to the user before broader implementation.
+2. **Platform runtime foundation** — add the non-Pi support package, contracts, reproducible managed helper, bounded Windows host protocol, Linux adapters and package/archive loading tests.
+3. **Linux parity migration** — move current path, runtime-root, process and controlled-filesystem behavior behind the new contracts; make evidence acquisition async; introduce opaque path proof/root catalogs; retain all Linux/Bash behavior and full-suite meaning.
+4. **Windows Direct and policy path admission** — implement the closed native-NTFS path matrix, policy root decode, case/reparse/file-ID evidence, three-domain credential/capability/workspace rules and Direct-tool source/path contracts.
+5. **Windows runtime resources** — implement protected DACL roots, session lifecycle/retention, PID-start-time locks, atomic no-clobber publication, sharing/open-file failure behavior, platform-tagged Artifact Owner and Continuation Capsule identity.
+6. **PowerShell Canonical and executor** — implement official-AST syntax projection, v1 rejection grammar, cmdlet/external registries, cross-platform `ProgramInvocation`, literal display/approval and the ticket-consuming AKeel tool executor.
+7. **Repository, Context Pruner and Guidance portability** — add the tracked-file gate, PowerShell positive test projection, role-based runtime paths and platform-neutral viewer/Herdr instructions without weakening Prompt Surface rules.
+8. **CI and locale gates** — split platform-neutral, Linux-contract and Windows-contract suites; run hosted smoke plus native Windows 11 en-US/zh-CN packaged acceptance; record terminal/IME checks separately and present any incompatible locale requirement to the user.
+9. **Final workflow and release** — only after core gates stabilize, validate native Herdr reserve→packet→bind→PowerShell child→publish→collect and worktree cleanup, rerun packaged Linux/Windows suites, update user installation/policy/residual-risk documentation, complete durable records and clear this Task.
 
 ### Acceptance Gates
 
-- A real Windows 11 CI runner installs the packed packages and passes the platform-neutral suite plus Windows-specific path, ACL, reparse-point, lifecycle, Direct, PowerShell, and host-composition tests.
-- The Windows package profile starts with PowerShell 7 positively identified and exposes no model `bash` tool; ordinary AKeel workflows complete without Bash.
-- Windows path-policy tests run on local NTFS and cover case aliases, reserved/device forms, alternate streams, junction/reparse traversal, blocked descendants, credentials, capability assets, temporary roots, long-path behavior, and paths containing spaces and non-ASCII text.
-- PowerShell tests cover the admitted subset and hard or opaque boundaries for dynamic invocation, nested shells, scripts, providers, pipelines, redirection, process launch, and destructive forms.
-- The Windows composition injects and positively verifies the bounded UTF-8 no-BOM and `Standard` native argument-passing setup for every managed PowerShell invocation; it does not depend on a user profile or persistent shell state.
-- Runtime tests prove Windows controlled-directory ownership/ACL checks, no-clobber artifact publication, process-liveness handling, cleanup, retention, cancellation, and open-file failure behavior.
+- Hosted Windows smoke passes, and separate ephemeral native Windows 11 x64 en-US and zh-CN release runners install the packed packages and pass the platform-neutral suite plus Windows-specific path, ACL, reparse-point, lifecycle, Direct, PowerShell and host-composition tests; a Windows Server hosted runner alone is not release evidence.
+- The Windows package profile starts with an AKeel-owned replacement tool backed by a positively identified PowerShell Core `>=7.4 <8`, verifies supported Direct tool sources, exposes no model `bash`, and ordinary AKeel workflows complete without Bash.
+- Every governed PowerShell execution consumes a single-use ticket bound to the approved tool-call ID, command digest and workspace identity; a missing, replayed or post-decision-mutated ticket fails before spawn.
+- Windows path-policy tests run on local NTFS and prove the closed v1 behavior matrix for relative/drive-absolute paths, rejected UNC/namespace/device/drive-relative/rooted-without-drive/ADS forms, case aliases, reserved names, case-sensitive directories, junction/reparse traversal, 8.3 aliases, hard-link mutation, missing leaves, blocked descendants, credentials, capability assets, runtime roots, long paths, spaces and non-ASCII text.
+- PowerShell tests use the official parser projection and cover the admitted single-command literal subset plus stable rejection or opaque boundaries for aliases, assignments, variables, dynamic invocation, nested shells, scripts, providers, pipelines, redirection, process launch and destructive forms.
+- The Windows composition and evidence host use the same frozen `pwsh.exe`; every model invocation injects and positively verifies the bounded UTF-8 no-BOM and `Standard` native argument-passing setup before the user command and does not depend on a user profile or persistent shell state.
+- Runtime tests prove exact protected-DACL ownership, reparse-root rejection, PID-plus-start-time liveness, same-volume flush/no-replace publication with receipt-last recovery, cleanup, retention, cancellation, sharing violations and open-file failure behavior.
 - Repository portability validation proves deterministic LF text, no case-fold collision, no invalid Windows tracked path, and no BOM or mixed EOL in tracked text; symlink and long-path cases are tested when present.
-- The shared modern PowerShell 7 configuration passes on English and Simplified Chinese Windows for cmdlet/native-process UTF-8, explicit `utf8NoBOM` file encoding, LF/no-BOM enforcement, ASCII/Chinese paths and content, localized diagnostics, IME, package loading and test-result projection. Any incompatible requirement is held for the user's explicit decision rather than resolved by silently splitting support.
+- The shared modern PowerShell Core `>=7.4 <8` configuration passes on native en-US and zh-CN Windows 11 for cmdlet/native-process UTF-8, explicit `utf8NoBOM` file encoding, LF/no-BOM enforcement, ASCII/Chinese paths and content, diagnostics without exact localized-message coupling, package loading and test-result projection. Windows Terminal/IME/font/cursor/shortcut behavior has separate human release evidence. Any incompatible product requirement is held for the user's explicit decision rather than resolved by silently splitting support.
 - Native Herdr reserve→packet→bind→child PowerShell session→publish→collect and worktree/cwd behavior are checked last and do not block earlier core platform slices.
 - Linux tests remain unchanged in meaning and pass without importing Windows semantics into the Linux compilation lane.
 - README and CONTEXT make no Windows support claim before all gates pass; after release they describe exactly the verified profile and residual risks.
 
 ### Durable Update Checklist
 
-- [ ] Windows composition owns and injects the bounded PowerShell 7 runtime configuration: UTF-8 no BOM and `Standard` native argument passing.
-- [ ] Native Windows tests positively verify the configuration on every managed invocation without relying on user profiles or persistent shell state.
+- [ ] Windows composition owns the AKeel `powershell` replacement, frozen PowerShell Core identity, execution-ticket boundary and bounded UTF-8 no-BOM/`Standard` runtime configuration.
+- [ ] Native Windows tests positively verify tool source, executable identity, ticket consumption and runtime configuration on every managed invocation without relying on user profiles or persistent shell state.
+- [ ] The internal platform-runtime package, Windows host service, managed helper and package dependency/release mapping are documented and validated from packed installs.
 - [ ] `docs/decisions.md` and `CONTEXT.md` contain only the verified Windows contract and its residual boundaries.
 - [ ] README documents Windows installation and support only after all acceptance gates pass.
 - [ ] Clear T-0168 in the same completion change after durable records and user documentation are synchronized.
 
 ### Scope Boundary
 
-The Windows profile is native Windows 11 with Windows Terminal and PowerShell 7. No other Windows terminal or Shell profile is part of this Task. Platform-independent dependency and language-runtime choices remain governed by their existing repository contracts and are not duplicated here.
+The Windows profile is native Windows 11 with Windows Terminal and PowerShell Core `>=7.4 <8`. No other Windows terminal or Shell profile is part of this Task. Platform-independent dependency and language-runtime choices remain governed by their existing repository contracts and are not duplicated here.
 
 ## T-0169: 待创建

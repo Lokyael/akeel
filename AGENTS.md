@@ -6,11 +6,12 @@
 
 AKeel 是 [pi](https://pi.dev) 的插件包：以 **扩展（extensions）** 注入工程原则与访问控制，以 **skills** 按需加载工程纪律与工作流，用于在用户项目中管理工程实践。它本身也是一个 TypeScript 开发仓库，包含用于构建与验证自身的开发内容。这三类内容在同一目录树中并存，维护时必须区分对待。
 
-## 三类内容区分
+## 四类内容区分
 
 | 类别 | 位置 | 是什么 | 分发方式 | 维护对象 |
 |------|------|--------|----------|----------|
-| **扩展（插件）** | `packages/guidance/src/bootstrap/`、`packages/guidance/src/record-containers/`、`packages/access-gate/src/access-gate/`、`packages/context-pruner/src/context-pruner/` | Session 原则注入、Project Record 容器校验、`policy.yaml` 驱动的访问控制与测试输出上下文裁剪 | 各 package 的 `pi.extensions` | 运行时行为；改动需同步测试与文档 |
+| **扩展（插件）** | `packages/guidance/src/bootstrap/`、`packages/guidance/src/record-containers/`、`packages/access-gate/src/access-gate/`、`packages/context-pruner/src/context-pruner/` | Session 原则注入、Project Record 容器校验、`policy.yaml` 驱动的访问控制与测试输出上下文裁剪 | 各 capability package 的 `pi.extensions` | 运行时行为；改动需同步测试与文档 |
+| **运行时支持库** | `packages/platform-runtime/`（目标，T-0168 实施时创建） | Guidance 与 Access Gate 共用的平台标记 path/private-filesystem/process/runtime-root contracts、Linux adapters 与 Windows host assets；不拥有 Policy 或 lifecycle | 普通 npm dependency；无 `pi.extensions`/`pi.skills` | 平台证据单一来源；改动需双消费方 contract tests |
 | **Skills** | `packages/guidance/skills/disciplines/`、`packages/guidance/skills/workflows/` | 按需加载的技能，含 SKILL.md 与配套文件；两目录表达作者职责，不定义 Pi 加载机制（D-073） | `package.json` 的 `pi.skills` | 技能内容与流程；只引用权威文档，不重复定义规则 |
 | **开发内容（dev）** | `tests/`、`scripts/`、`types/`、`tsconfig.json`、`package.json` 脚本 | AKeel 自身的构建、测试、类型声明与技能校验 | 不进入用户项目分发 | 开发质量；改动随对应功能同步 |
 
@@ -28,6 +29,7 @@ packages/access-gate/src/access-gate/        # 扩展：policy.yaml adapter、Ca
   access-decision/adapters/            # 外部 Pi/tool/policy.yaml 合同单次适配
   access-decision/runtime/             # Gate Session、Project/staging 生命周期与 Pi host approval composition
   */index.ts                           # 目录公共表面：跨目录引用统一走目录 index，不深入实现文件
+packages/platform-runtime/             # 目标支持库：平台证据 contracts/adapters/Windows host assets（无 Pi manifest）
 packages/guidance/skills/    # skills：两目录按作者职责组织（D-073）
   disciplines/            #   可复用工程方法（TDD、代码审查、领域建模等）
   workflows/              #   端到端编排（survey-context、implement-work 等）
@@ -41,7 +43,7 @@ CONTEXT.md              # 当前事实、术语、架构与 Active Decisions 索
 ## 维护约定
 
 - **测试入口**：`npm test` 依次运行 `validate-docs`、`validate-skills`、TypeScript 检查和 access-gate/validator 测试；它是全量验证入口。单文件测试使用 `npm run test:file -- <path>`，不要使用 `npm test <file>`（该写法仍会运行全套测试）。修改扩展代码必须保持测试通过。
-- **分发声明**：只有 `package.json` 的 `pi.extensions` 与 `pi.skills` 声明的路径进入用户项目；其余是仓库自身开发内容。
+- **分发声明**：只有 capability package manifest 的 `pi.extensions` 与 `pi.skills` 声明路径进入 Pi resource discovery；普通 npm dependencies（含目标 `akeel-platform-runtime`）可随包安装，但不因此成为 Pi extension/skill。`tests/`、`scripts/`、`types/` 等仍仅是仓库开发内容。
 - **修改边界（工作区源 vs 安装副本）**：内容只在仓库源 checkout 中修改；已安装的全局副本（pi 分发到 agent 目录的技能与扩展）是分发产物，只读，拒绝直接修改——改动分发走正常安装/更新机制。
 - **路径可移植性**：文档、注释、示例与测试不写死本机具体路径（如 `/home/<user>/...` 绝对路径、本机工作区目录名）；用相对路径、角色化表述或占位符（`~`、`$HOME`）——本机路径随环境迁移或他人开发失效。
 - **文档边界**：长期决策写 `docs/decisions.md`，当前事实写 `CONTEXT.md`（安全承诺与残余风险在 decisions.md 安全条目与 CONTEXT Negative Space），第三方来源与许可证写 `docs/traceability.md`；AGENTS.md 不承接这些职责。

@@ -170,19 +170,30 @@ Out of Scope:
 
 Reversal surface: user-boundary
 
-Decision: AKeel 采用两个互不替代的平台 profile：Linux profile 继续以 Arch Linux 的 GNU 工具链与 Bash 语义为基线；Windows profile 以原生 Windows 11、Windows Terminal、PowerShell 7 和本地 NTFS 为支持组合。平台在 extension 初始化时选择一次 composition；路径证据、Shell 编译、文件系统控制与进程生命周期由各自平台实现，只有平台无关的授权策略、effect、verdict 与展示合同可以共享。Windows profile 不通过兼容层继承 Linux 语义，Linux profile 也不因 Windows 支持而扩展为方言并集。PowerShell 7 是受管 host Shell；它调用的 external executable、helper 或子进程仍由 Canonical/Mandatory Boundary/Policy 的已知或 opaque 合同治理，不要求整个 descendant process tree 只包含 PowerShell 进程。Windows profile 使用同一套现代 UTF-8 no BOM、`Standard` native argument-passing PowerShell execution contract 支持英语和简体中文环境；该合同由 Windows composition 在每次受管调用中注入，不依赖 `-NoProfile` 下不会加载的用户 profile，也不为旧版 Windows PowerShell、旧软件或旧参数传递行为而添加兼容分支。若实证表明两种环境需要冲突的产品行为，必须先向用户说明差异和取舍，再决定支持边界。
+Decision: AKeel 采用两个互不替代的平台 profile：Linux profile 继续以 Arch Linux 的 GNU 工具链与 Bash 语义为基线；Windows profile 以原生 Windows 11、Windows Terminal、PowerShell Core `>=7.4 <8` 和本地 NTFS 为支持组合。平台在 extension runtime 加载时选择一次 composition；公共授权核心不检查宿主平台、不解析 native path string，也不调用平台文件系统。路径证据、Shell 编译、模型 Shell 执行、文件系统控制与进程生命周期由各自平台实现，只有 sealed Canonical/Admission、授权策略、effect、verdict 与展示合同可以共享。
 
-Why: Linux pathname/Bash/mode 与 Windows pathname/PowerShell/ACL 是不同外部合同。把它们合并为一个可切换 parser 或中央路径转换层会让授权事实依赖含混方言；独立 composition 可在共享 Policy Kernel 的同时保持每个平台的安全证明和回归面封闭。
+Windows composition 注册并拥有同名 `powershell` replacement tool，不把 Pi built-in 的 `pwsh.exe`→Windows PowerShell fallback 当作支持合同。Session 初始化只解析并正向验证 `pwsh.exe`，冻结 executable identity，核对最终 tool source 和 active tool set，移除模型 `bash`；每个获准调用发行绑定 tool-call ID、command digest 与 workspace identity 的单次 execution ticket，Executor 在同一 fresh PowerShell 进程中消费 ticket、注入并正向复核 UTF-8 no BOM 与 `$PSNativeCommandArgumentPassing = 'Standard'` 固定设置后才执行原命令。Gate off 仍保留模型 `bash` 阻断和受管 PowerShell executable/configuration 边界。
 
-Impact: 当前生产实现和安全承诺仍是 Linux-only，直至 T-0168 的原生 Windows 验收门禁完成；Windows 目标合同已被采纳，但未完成的 adapter、测试或文档不得被描述为现有支持。此前独立记录的 Linux-only PowerShell 拒绝由本决策吸收：Linux composition 继续拒绝 `powershell`，未来 Windows composition 只治理 `powershell` 并拒绝模型 `bash`。Windows 验收以本地 NTFS 为文件系统基线；其他存储形态不扩大首个支持合同。平台 profile 使用独立 checkout、Pi 目录、session、policy、credentials、临时资源、依赖安装、cache 与生成物，只通过 Git history 交换源码。
+Windows profile 使用一个不会执行模型命令的 session-owned evidence host：经验证的 `pwsh.exe` 以 no-profile/non-interactive 模式承载官方 PowerShell AST parser，并加载 AKeel 自有 AnyCPU managed assembly 取得 Win32 handle、volume/file ID、reparse、owner/SID/DACL、process-start-time 与原子文件系统证据。TypeScript client 只通过私有 stdio 上的版本化、有界 JSONL 协议调用该 host；协议错误、预算超限、超时或 host 退出均 fail-closed。模型命令在独立短生命周期 PowerShell 进程执行，绝不进入 evidence host。
+
+PowerShell lane 直接从官方 AST 建立封闭 `PowerShellSyntaxIR`，不翻译 Bash、不手写等价 tokenizer，也不把第三方 parser 当授权 oracle。首个 admitted subset 只接受完整表示的单个 fixed-literal command、少量 module-qualified filesystem inspect cmdlet 和已证明的 external executable/shim；pipeline、redirection、compound statement、assignment、dynamic value/invocation、provider、script、nested shell 和 process-launch forms 以独立负向合同 fail-closed。真正跨平台的 Git/Node/package/build CLI analyzer 可消费 platform-neutral `ProgramInvocation`；GNU/Bash 与 cmdlet/PowerShell 语义保持各自私有。
+
+Windows profile 使用同一套现代 UTF-8 no BOM、`Standard` native argument-passing 合同支持英语和简体中文环境，不依赖用户 profile 或 persistent shell state，也不为旧版 Windows PowerShell、旧软件或旧参数传递行为添加兼容分支。自动化语言矩阵与 Windows Terminal/IME 人工发布核查分离；若实证表明两种环境需要冲突的产品行为，必须先向用户说明证据和取舍，再决定支持边界。
+
+Why: Linux pathname/Bash/mode 与 Windows pathname/PowerShell/ACL 是不同外部合同。把它们合并为可切换 parser、中央路径转换层或纯 Node 字符串适配器，会让授权事实依赖含混方言且无法证明 Windows object identity 与 DACL；仅拦截 Pi built-in PowerShell 又无法保证 executable、固定设置与实际执行输入。独立 composition、官方 AST、handle-based host evidence 和 AKeel-owned executor 可在共享 Policy Kernel 的同时封闭每个平台的安全证明与回归面。
+
+Impact: 当前生产实现和安全承诺仍是 Linux-only，直至原生 Windows 发布门禁完成；已采纳目标、未完成 adapter 或测试不得描述为现有支持。Linux composition 继续拒绝 `powershell`，Windows composition 只治理 `powershell` 并拒绝模型 `bash`。Windows 基线仅覆盖本地 NTFS；平台 profile 使用独立 checkout、Pi 目录、session、policy、credentials、runtime resources、依赖安装、cache 与生成物，只通过 Git history 交换源码。
 
 Rejected:
 
 - **中央转换路径或 Shell 文本后复用另一平台授权结果：** 转换后的字符串可能交给不同语义的工具，不能证明实际访问对象和副作用。
-- **运行时按命令猜测方言并切换 analyzer：** 命令执行宿主、路径域和文件系统证据不能由命令外观可靠推出。
-- **保守双解析取并集：** 会引入额外路径/effect 事实并扩大误报或授权面。
+- **运行时按命令猜测方言、保守双解析取并集：** 命令执行宿主、路径域和文件系统证据不能由命令外观可靠推出，并集会扩大事实与授权面。
+- **继续放行 Pi built-in PowerShell：** Pi 的 fallback、可执行解析与 execution prefix 不满足正向身份和每调用设置保证。
+- **手写 PowerShell tokenizer或以 tree-sitter 作为授权事实：** 会平行实现语言合同并与真实 runtime parser 漂移。
+- **只依赖 Node `path`/`fs` 或本地化 CLI 输出：** 无法提供完整 SID/DACL、file identity、reparse tag 和稳定非本地化证据。
+- **Node native addon：** 可提供 Win32 API，但会引入 Node ABI/架构预编译矩阵；必需的 PowerShell runtime 已能加载单一 AnyCPU managed evidence assembly。
 
-Out of Scope: macOS、BSD、网络文件系统和跨宿主远程执行不因双平台 profile 获得支持；每项都需独立外部合同与验收。
+Out of Scope: macOS、BSD、网络文件系统和跨宿主远程执行；Windows user/RPC Bash、第三方 Shell backend、OS sandbox、fd passing、TOCTOU 消除及 descendant-process/network confinement。
 
 ## D-037: Shell wrapper 链由语义入口统一解析
 
@@ -770,13 +781,13 @@ Impact: package skill 分发包含 `instruction-editing`；AKeel prompt 内容�
 
 Reversal surface: user-boundary
 
-Decision: 测试输出维持三种相互独立的表示：session file 保存原始 `bash` tool result；模型 context 使用裁剪后的投影；TUI 在同一条模型 `bash` 工具结果中并列显示原始输出和裁剪后的模型视图。模型视图只在渲染时由纯投影函数生成，不成为 session entry、message 或 tool result details。用户 `!`/`!!` 产生的 `bashExecution` 保持既有行为，不裁剪、不生成模型视图。
+Decision: 测试输出维持三种相互独立的表示：session file 保存原始 model Shell tool result；模型 context 使用裁剪后的投影；TUI 在同一条模型 Shell 工具结果中并列显示原始输出和裁剪后的模型视图。模型视图只在渲染时由纯投影函数生成，不成为 session entry、message 或 tool result details。当前 Linux profile 支持 `bash`；Windows profile 发布时支持 AKeel-owned `powershell`。用户 `!`/`!!` 产生的 `bashExecution` 保持既有行为，不裁剪、不生成模型视图。
 
-模型调用的独立 `npm test` / `npm run test` 结果只有在宿主结果明确成功、且输出包含受支持测试运行器的正向成功摘要时，才可把逐条通过输出投影为短成功消息。仅有命令返回成功（如 `exitCode === 0` 或 `isError === false`）不足以证明测试实际运行并通过；零测试、跳过、todo、警告和未识别格式保持原始结果。测试失败、取消、截断和无法可靠归类的结果继续沿用原始或失败保留路径。
+每个平台由独立 positive command recognizer 证明模型调用是受支持的单一测试命令：Bash 识别独立 `npm test` / `npm run test`，PowerShell 只识别官方 AST subset 内的 `npm.cmd test` / `npm.cmd run test` 等已验收固定入口。结果只有在宿主明确成功、且输出包含受支持测试运行器的正向成功摘要时，才可把逐条通过输出投影为短成功消息。仅有命令返回成功（如 `exitCode === 0` 或 `isError === false`）不足以证明测试实际运行并通过；零测试、跳过、todo、警告和未识别格式保持原始结果。测试失败、取消、截断和无法可靠归类的结果继续沿用原始或失败保留路径。
 
 Display contract:
 
-- 仅对模型调用内置 `bash` 工具、且实际发生裁剪的独立 `npm test` / `npm run test` 结果显示模型视图，并明确标记为发送给模型的版本。
+- 仅对活动 profile 的受支持 model Shell、且实际发生裁剪的 positive-recognized 独立测试结果显示模型视图，并明确标记为发送给模型的版本。
 - 原始输出保持现有工具结果展示；取消、截断、非测试命令和不确定失败不产生模型视图。
 - 用户 `!`/`!!` 的 `bashExecution` 不裁剪、不生成模型视图，保持既有 TUI、session 和 context 行为。
 - 模型视图属于人类 TUI 展示，不通过命令打开，不追加自定义会话消息，不写入 session file，也不进入 system prompt、tool description 或模型 context。
@@ -784,13 +795,13 @@ Display contract:
 
 Data boundaries:
 
-- 恢复会话时从原始 `toolResult` 和关联的 `bash` tool call 重新计算模型视图，不读取或保存裁剪副本。
+- 恢复会话时从原始 `toolResult` 和关联的受支持 model Shell tool call 重新计算模型视图，不读取或保存裁剪副本。
 - 正常模型请求只接收裁剪后的 context projection。
-- 模型另行通过 `read` 或 `bash` 读取 session file 时读取的是原始内容，该视图不提供额外文件权限保护。
+- 模型另行通过 `read` 或活动 profile Shell 读取 session file 时读取的是原始内容，该视图不提供额外文件权限保护。
 
-Why: 用户需要在模型测试结果所在位置核对完整过程与模型实际收到的信息，而不是浏览整轮上下文。保留原文、临时派生模型视图可避免会话文件膨胀，同时使对照内容准确对应本次请求。同时，`npm test` 可能是 no-op 或在退出码为 0 时包含跳过和警告；正向运行器摘要兼顾了成功裁剪收益与“不得把未知结果说成成功”的安全不变量。
+Why: 用户需要在模型测试结果所在位置核对完整过程与模型实际收到的信息，而不是浏览整轮上下文。保留原文、临时派生模型视图可避免会话文件膨胀，同时使对照内容准确对应本次请求。Bash 与 PowerShell 的 compound-command grammar 不同，单一字符串过滤器会产生 false positive；每 profile 的 positive recognizer 配合正向 runner summary，兼顾成功裁剪收益与“不得把未知结果说成成功”的安全不变量。
 
-Impact: `context-pruner` 从关联的 `bash` tool call 与 `toolResult` 适配输入，由纯投影函数完成裁剪，并增加成功投影的正向证据守卫，不引入通用工具输出过滤器。通过项和普通成功噪声可以删除，但模型仍会看到明确的成功结论。测试覆盖受支持摘要、任意成功文本、零测试、跳过/todo/警告和原始消息不变性。
+Impact: `context-pruner` 从关联的 model Shell call 与 `toolResult` 适配输入，由 profile-specific positive recognizer 和共享纯投影函数完成裁剪，不引入通用工具输出过滤器，也不把 Bash grammar 用于 PowerShell。当前生产只激活 Bash adapter；Windows adapter 随 Windows profile 验收。通过项和普通成功噪声可以删除，但模型仍会看到明确的成功结论。测试覆盖受支持摘要、任意成功文本、零测试、跳过/todo/警告和原始消息不变性。
 
 Rejected:
 
@@ -814,22 +825,25 @@ Out of Scope:
 
 Reversal surface: user-boundary
 
-Decision: AKeel 的分发面由三个可独立安装的 Pi package 组成：`akeel-guidance`（bootstrap、skills 与 workflow artifact/handoff transport）、`akeel-access-gate`（Access Gate）和 `akeel-context-pruner`（测试输出上下文裁剪）。仓库根 `akeel` 保留为全量分发入口，一次加载三类能力且不重复加载资源。运行时职责可以继续在包内保持独立，但不因此增加额外的可安装包边界；`principles.md` 继续只有 Guidance package 中的单一来源。
+Decision: AKeel 的用户能力分发面由三个可独立安装的 Pi package 组成：`akeel-guidance`（bootstrap、skills 与 workflow artifact/handoff transport）、`akeel-access-gate`（Access Gate）和 `akeel-context-pruner`（测试输出上下文裁剪）。仓库根 `akeel` 保留为全量分发入口，一次加载三类能力且不重复加载资源。`akeel-platform-runtime` 是无 `pi.extensions`/`pi.skills` manifest 的第一方内部支持 package，只向 Guidance 与 Access Gate 提供平台标记 path/private-filesystem/process/runtime-root contracts、Linux adapters 和 Windows host assets；它不构成第四项用户能力或独立 Prompt Surface。`principles.md` 继续只有 Guidance package 中的单一来源。
 
-Why: Guidance 中的 bootstrap、skills 与其正式 artifact/handoff transport 共同构成可执行工程工作流；拆开会使委托 skill 在 `review` 下缺少正式结果通道。Artifact Exchange 自行验证 narrow capability，不进入 Access Gate Policy；Access Gate 和 context-pruner 的触发事件、风险边界和依赖仍独立。保留全量入口维持现有一条命令安装体验。
+Why: Guidance 中的 bootstrap、skills 与正式 artifact/handoff transport 共同构成可执行工程工作流；Access Gate 与 Guidance 又必须对 Windows native path、controlled directory、process identity 和 runtime roots 消费同一证据合同。把这些宿主能力复制进两个 capability package 会产生安全双源，让 Guidance 依赖 Access Gate 则会破坏独立安装。无 Pi manifest 的支持 package 可以集中运行时事实，同时保持三项用户能力、触发事件和安装选择独立。
 
-Impact: 每个 package root 必须拥有自己的 `pi` manifest 和运行时依赖声明；根 manifest 负责全量组合。资源过滤仍可作为 Pi 原生的高级加载方式，但不替代独立 package。未安装 Access Gate 时，AKeel 不提供工具调用准入保证；未安装 context-pruner 时，不提供测试输出上下文裁剪。
+Impact: 三个 capability package root 各自拥有 `pi` manifest；support package 只声明普通 npm 依赖和平台资产。Guidance 与 Access Gate 显式依赖兼容版本的 support package，根 manifest 负责全量组合，packed-install 验证必须从最终安装解析该依赖并加载 Windows host assets。未安装 Access Gate 时不提供工具调用准入保证；未安装 context-pruner 时不提供测试输出上下文裁剪；单独安装 Guidance 或 Access Gate 仍能获得其需要的平台 runtime dependency。
 
 Rejected:
 
 - **将 bootstrap 与 skills 发布为两个包：** 会把同一 Guidance 能力拆散，并使 skills 缺少其引用的原则来源。
 - **把 context-pruner 合并进 Access Gate：** 两者没有代码依赖，触发点和职责不同，合并只会扩大安装耦合。
 - **只保留一个包并要求用户使用 resource filtering：** 能选择加载内容，但不能提供独立的包身份、依赖和版本边界。
+- **在 Guidance 与 Access Gate 复制 platform runtime：** path/ACL/process 的安全语义会形成两个实现与两套修复面。
+- **让 Guidance 依赖 Access Gate：** Artifact Exchange 与 handoff 必须在未安装 Gate 时仍保持独立能力和自己的 narrow authority。
+- **把 support package 暴露为第四个 Pi package：** 它没有独立用户触发、Prompt Surface 或能力选择价值，只会增加错误安装组合。
 
 Out of Scope:
 
-- **发布流水线与版本联动：** 当前先建立可发布 package root 和 manifest 合同；接入真实 registry 发布时再定义自动化策略。
-- **各能力的领域语义变更：** 本决策只定义分发边界；Access Gate、Artifact Exchange、bootstrap 或 context-pruner 的行为分别由其领域决策拥有。
+- **公开 registry 的版本联动策略：** package compatibility 与 packed-install 门禁现在必须成立；真实 registry 的自动发布顺序在接入发布流水线时确定。
+- **各能力的领域语义变更：** 本决策只定义分发与依赖边界；Access Gate、Artifact Exchange、bootstrap 或 context-pruner 的行为分别由其领域决策拥有。
 
 ## D-087: Access Gate 双语义车道与单一授权信任链
 
@@ -839,13 +853,15 @@ Decision: Access Gate 在 D-059 的 `core ← adapters ← runtime` 外层依赖
 
 Admission 后固定经过不可配置放宽的 Mandatory Boundary Stage，再进入 Configured Policy Kernel；credential、destroy/delete、blocked traversal 和 recursive blocked descendant 等系统边界由前者集中拥有，opaque access 的未证明风险由后者消费 `AdmissionPlan + PolicySnapshot` 中独立的 `commands.opaque` 策略决定。两阶段通过一个 Authorization facade 发行统一的 `allow | approval-required | deny` verdict，共享路径事实语义、决策优先级和 tool-call 粒度聚合。`hasUI`、confirm 能力和 `no-ui` 映射属于 Pi host composition，不进入 managed request 的领域事实、Canonical compilation、Admission 或 Policy Kernel；`approval-required` 本身不执行工具。
 
-Canonical compiler 通过受信任、不可由 policy 或用户配置替换的活动 Platform Profile Path Evidence port 获取 pathname facts；同一 CWD 状态与 source token 对应的语义路径事实只解析一次，后续 CWD 转移、Admission 和 Display 复用已发行结果。当前 Linux profile 由 Linux Path Evidence 发行事实；目标 Windows profile 必须由独立 Windows Path Evidence 发行，不得把 Windows path 转写后交给 Linux port。每个平台的 Shell program registry 保持封闭且只负责 dispatch；程序族 analyzer 以显式不可变事实表达 path base、cwd change、recursive、opaque 和 hard-boundary 语义，不再以多个 WeakMap/WeakSet sidecar 隐藏同一阶段元数据。
+Canonical compiler 通过受信任、不可由 policy 或用户配置替换的活动 Platform Profile Path Authority 异步取得证据；同一 CWD 状态与 source token 对应的语义路径只解析一次，后续 Admission、Mandatory Boundary、Policy 和 Display 复用 sealed `PlatformPathProof`。Proof 以 platform-domain token 防止跨 profile 消费，保留 literal/display、canonical location、traversed/terminal object identity、risk flags，并携带它与 bounded session `RootCatalog` 中根 ID 的 `equal/descendant/ancestor/traversed` 关系。Catalog 在 session 初始化时编译 access/staging/runtime、credential、capability 与全部 preset path roots 的并集；Policy Kernel 只做 root-ID 关系运算，不解释 native string 或调用平台 comparer。Evidence acquisition 可异步，证据发行后的授权投影保持同步纯函数。
+
+当前 Linux profile 由 Linux Path Authority 发行相同抽象的 proof；Windows profile 由独立、handle-based Windows Path Authority 发行，不得把 Windows path 转写后交给 Linux port。每个平台的 Shell registry 保持封闭且只负责 dispatch；只有外部 CLI 合同真实相同的程序族可消费 platform-neutral `ProgramInvocation`。程序 analyzer 以显式不可变事实表达 path base、cwd change、recursive、opaque 和 hard-boundary 语义，不再以多个 WeakMap/WeakSet sidecar 隐藏同一阶段元数据。
 
 配置 adapter 对一个外部输入只执行一次严格 decode，发行 disabled 或 enabled 的不可变配置结果；enabled 结果包含完整 preset registry、活动 snapshot 和当前 path/command policy（包括独立 `commands.opaque`），不再为 Direct/Shell 重复构造独立 policy snapshot。Runtime 以单一 session aggregate 拥有固定 Access Root、session-start `$HOME`、policy state、credential boundary 和生命周期资源；策略切换原子替换活动 snapshot。`akeel-access-gate` 的稳定外部表面保持 Pi extension，compiler、parser、resolver、fact accessor 和测试辅助 seam 不从 package root 作为并列产品 API 暴露。
 
 Why: 当前实现虽有正确的分层方向，却在层内形成 Direct/Shell 双 Canonical、双 Admission、双 Policy Snapshot/Kernel 和 runtime 双分支；系统硬边界又分散在 service 与不同 evaluator 中。新增共同安全规则因此容易发生只修改一个车道的 shotgun surgery。私有语义车道保留 Direct 结构化合同与 Shell 语言复杂度的 locality，单一信任链则把共同的路径事实、强制边界、政策优先级和结果合同集中到高 leverage seam。将 UI 能力移出授权域，可使同一授权结论不依赖宿主展示能力；一次配置 decode、一次 pathname fact acquisition 和显式 analyzer facts 则减少重复解释与隐藏状态。
 
-Impact: Access Gate 的结构重构以新信任链旁路构建、依据当前 Decisions 和外部合同验证，并在完整链路就绪后原子切换生产入口；迁移期间不让新旧 compiler、Admission、Kernel 或 config 交叉组成生产路径。现有 managed/passthrough surface、Policy schema 与 preset、hard boundary、Access Root、tilde、Guidance、disabled mode 和 host-visible allow/confirm/block 行为保持不变。内部测试改为围绕 Canonical facade、Admission facade、Authorization facade、program-family seam 和 Pi composition 验证；无生产消费者的浅层转发与宽 barrel export 可删除。
+Impact: Access Gate 的结构重构以新信任链旁路构建、依据当前 Decisions 和外部合同验证，并在完整链路就绪后原子切换生产入口；迁移期间不让新旧 compiler、Admission、Kernel、path proof 或 config 交叉组成生产路径。Linux 的 managed/passthrough surface、Policy schema 与 preset、hard boundary、Access Root、tilde、Guidance、disabled mode 和 host-visible allow/confirm/block 行为保持不变；Windows 可异步等待 native evidence，但不把 host UI 或执行结果带入授权域。内部测试围绕 Canonical facade、Admission facade、Authorization facade、Root Catalog、program-family seam 和 Pi composition 验证；无生产消费者的浅层转发与宽 barrel export 可删除。
 
 Rejected:
 
@@ -853,53 +869,56 @@ Rejected:
 - **Direct 与 Shell 各自保留完整垂直 Policy Kernel：** locality 收益不足以抵消共同 hard boundary、路径优先级和 verdict 继续双源的风险。
 - **让 Policy Kernel 读取 `hasUI` 或直接执行确认：** 宿主能力会污染授权事实，同一请求会因展示环境而得到不同的领域 verdict。
 - **通过用户可配置规则 DSL 或动态 analyzer plugin 扩展系统边界：** 会使 hard-boundary 单调性和 analyzer 信任来源无法由封闭代码合同证明。
-- **在现有 Access Gate 内顺带加入 OS broker/sandbox：** 这会改变执行所有权和安全承诺，不是本模块结构重构。
+- **把 Windows evidence host 称为 sandbox 或执行 broker：** 它只解析语法和发行 OS evidence，不执行模型命令、不传递已验证 fd，也不扩大 Gate 的执行期控制承诺。
 
-Out of Scope: 新增或放宽 Shell 语法、程序族、destroy/delete、网络或路径能力；改变 `policy.yaml` 用户 schema、内置 preset、凭据分类、Access Root、staging lifecycle 或 D-097 定义的 `accessGate: off` 语义；OS sandbox、fd broker、TOCTOU 消除、执行期子进程/网络隔离；Static Flow、Explanation Replay、Runtime Audit、Runtime Content Flow 和 delegated child policy。
+Out of Scope: 未经独立合同新增或放宽 Shell 语法、程序族、destroy/delete、网络或路径能力；改变 `policy.yaml` 用户 schema、内置 preset、凭据分类、Access Root 或 D-097 定义的 `accessGate: off` 语义；OS sandbox、authorized-fd passing、TOCTOU 消除、执行期子进程/网络隔离；Static Flow、Explanation Replay、Runtime Audit、Runtime Content Flow 和 delegated child policy。
 
 ## D-088: Session-owned Staging 生命周期与保留策略
 
 Reversal surface: engineering
 
-Decision: Access Gate runtime 为每个 Pi session 创建 `/tmp/akeel/sessions/session-<random>/` envelope，其中 `session.json` 声明受管身份，`lock.json` 记录进程，`staging/` 是该 session 唯一的 `stagingRoot`。Session 正常 shutdown 删除整个 envelope；异常退出留下的合法、无主 session envelope 由后续 session 启动时非阻塞回收。
+Decision: Access Gate runtime 通过活动 Platform Runtime Authority 为每个 Pi session 创建 `sessions/session-<random>/` envelope，其中 `session.json` 声明受管身份，`lock.json` 记录 PID 与 process creation identity，`staging/` 是该 session 唯一的 `stagingRoot`。Linux 物理根继续是 `/tmp/akeel`；Windows 物理根由本地用户环境派生为经证明的 local-NTFS `%LOCALAPPDATA%/AKeel/runtime`。物理路径不进入共享领域合同或 Guidance。Session 正常 shutdown 精确删除整个 envelope；异常退出留下的合法、无主 envelope 由后续 session 启动时非阻塞回收。
 
-回收只认领 `sessions/` 中 manifest 身份匹配、非活跃、非当前且 provenance 可验证的 `session-*` 目录；未知、malformed、symlink 或归属不明内容保留。合法 crash residue 默认保留 7 天，并受 200 个目录和 500MB 总量配额约束，超额时按最后修改时间优先淘汰最旧项；调度每日至多一次。
+Linux controlled directory 使用现有 owner/mode/非 symlink 证据。Windows authority 创建并复核 current-user owner、protected DACL、仅 current-user SID 与 `SYSTEM` Full Control、禁用继承且 root 非 reparse 的封闭模板；不以 POSIX mode 或“看起来安全”的任意 ACL 代替。Windows lock 只有 PID 和 creation time 同时匹配才认作同一进程，access-denied/不确定存活保守视为 active。回收只认领 manifest 身份匹配、非活跃、非当前且 provenance 可验证的 `session-*`；未知、malformed、link/reparse 或归属不明内容保留。合法 crash residue 默认保留 7 天，并受 200 个目录和 500MB 总量配额约束，超额时按最后修改时间优先淘汰最旧项；调度每日至多一次。
 
-Why: Staging 没有独立生命周期，属于创建它的 Pi session；session envelope 使 metadata、lock、staging 和回收 owner 保持局部一致。Workflow run 与 handoff 具有不同 owner 和保留条件，不能进入同一回收扫描。TTL 与双配额兼顾异常排查和磁盘边界，manifest/provenance 守卫防止按前缀认领未知内容。
+Why: Staging 没有独立生命周期，属于创建它的 Pi session；session envelope 使 metadata、lock、staging 和回收 owner 保持局部一致。POSIX mode 与 Windows SID/DACL/process identity 不是同一外部合同，必须由同一平台 authority 对创建与重新认领发行证据。Workflow run 与 handoff 具有不同 owner 和保留条件，不能进入同一回收扫描。TTL、双配额和 provenance 守卫兼顾异常排查、磁盘边界与防误删。
 
-Impact: GateSession 继续把实际 `stagingRoot` 加入默认允许根；其路径为 `/tmp/akeel/sessions/session-<random>/staging/`。Access Gate package 只拥有 `sessions/`，不扫描或清理 Guidance package 的 workflow run 与 handoff。
+Impact: GateSession 把活动 profile 发行的实际 `stagingRoot` 和 runtime role root 加入 Root Catalog，而不是写死 `/tmp/akeel`。Access Gate 只拥有 `sessions/`，不扫描或清理 Guidance 的 workflow run；Windows sharing/open-file cleanup failure 留给同一 retention 合同，不能被报告为已删除。
 
 Rejected:
 
-- **独立顶层 `staging/` 目录：** 隐藏了真实 lifecycle owner，并使 metadata 与暂存内容缺乏统一 envelope。
+- **独立顶层 `staging/` 目录：** 隐藏真实 lifecycle owner，并使 metadata 与暂存内容缺乏统一 envelope。
 - **把 staging 放入 workflow run：** 一个 session 可创建多个 run，一个 run 也可包含多个 child session；错误的一对一关系会造成过早删除或无限保留。
 - **按名称认领或同步删除全部历史目录：** 无法证明未知目录归属，且会破坏 crash 现场。
+- **Windows 继续使用 mode bits 或只检查路径存在：** Node mode 在 Windows 不提供 DACL 证明，且无法排除 reparse/owner 漂移。
 - **无配额上限的纯时间保留：** 短期大量暂存数据仍可耗尽磁盘。
 
-Out of Scope: Workflow run、handoff、跨机器同步和操作系统全局临时文件系统调度；这些资源不进入 session retention。
+Out of Scope: Workflow run、handoff、跨机器同步、操作系统全局临时文件系统调度和对管理员取回所有权的 OS sandbox 防护；这些资源或威胁不进入 session retention。
 
 ## D-089: Capability Artifact Exchange 与临时资源分类
 
 Reversal surface: user-boundary
 
-Decision: Guidance package 提供独立于 Access Gate Policy 的 Artifact Exchange 与 Session Handoff。Artifact Exchange 为结果返回同一 Task Owner 的 bounded workflow 创建 `/tmp/akeel/runs/run-<random>/`：可信 `control/` 保存 immutable manifest、Herdr binding 与 publication receipt，`packet/` 保存 Owner 输入，`artifacts/` 保存 child 结果，`quarantine/` 保存不可自动消费的恢复残留，`transport/herdr/` 只保存 bounded 执行诊断。Session Handoff 完全采用会话内嵌存储（D-092），不再在 `/tmp/akeel/` 创建独立的 `handoffs/` 物理目录，彻底消除孤儿目录与跨重启易失风险。
+Decision: Guidance package 提供独立于 Access Gate Policy 的 Artifact Exchange 与 Session Handoff。Artifact Exchange 通过活动 Platform Runtime Authority 在 `runs/run-<random>/` 角色根下为结果返回同一 Task Owner 的 bounded workflow 创建 run：可信 `control/` 保存 immutable manifest、Herdr binding 与 publication receipt，`packet/` 保存 Owner 输入，`artifacts/` 保存 child 结果，`quarantine/` 保存不可自动消费的恢复残留，`transport/herdr/` 只保存 bounded 执行诊断。Linux 当前物理根是 `/tmp/akeel/runs`，Windows 物理根位于经证明的 local-NTFS user runtime root；工具返回 exact role path，skills 不拼接平台物理路径。Session Handoff 完全采用会话内嵌存储（D-092），不创建独立 `handoffs/` 物理目录。
 
 Child artifact slot 使用预定、单 slot、单次、24 小时有效的 opaque capability；raw capability 不落盘，manifest 只保存 digest。Owner 把 slot 绑定到确切 Herdr workspace、pane 和 Agent，child Pi 通过 `--akeel-artifact-capability` 激活唯一 publisher，参数封闭为单一 `content` 字符串。每 slot 上限 1 MiB、每 run 最多 4 slots、每 Owner session 最多 8 runs。Publisher 在校验 capability、binding、Pi/Herdr identity 和预算后 no-clobber 发布 artifact，最后发行包含 digest 与长度的 receipt；Owner collect 在同一次调用中重新核验并返回内容。Herdr settle、完成文本或 terminal read 不是 receipt。
 
-生产临时资源按 lifecycle owner 分为两类顶级命名空间：Access Gate 拥有 `sessions/`，Artifact Exchange 拥有 `runs/`。新目录默认 `0700`、文件 `0600`；受控 root 必须为当前用户所有、非 symlink 且不可由 group/other 写入。生产临时资源严格限定在上述两类顶级命名空间；未建模目录或未知内容不自动认领与清理，测试 fixture 与第三方工具缓存不占用生产命名空间。
+生产临时资源按 lifecycle owner 分为两类顶级角色命名空间：Access Gate 拥有 `sessions/`，Artifact Exchange 拥有 `runs/`。Linux 使用 owner/mode/非 symlink 证据；Windows 使用 D-088 的 owner/SID/protected-DACL/非 reparse 证据。平台 authority 只提供共同证据与原子文件操作，不取得 session/run 的领域 owner 或清理权。未建模目录或未知内容不自动认领与清理，测试 fixture 与第三方工具缓存不占用生产命名空间。
+
+Publication 采用 receipt-last no-clobber 协议。Linux 保留已证明的原子实现；Windows 在同一受控目录以 create-new 临时文件、UTF-8 no BOM 写入、flush、same-volume no-replace/write-through rename 发布 content，再以同样协议最后发布 receipt。Sharing violation、open-file、杀毒/索引干扰或 cleanup failure 不得发行成功；相同 owner/publisher/digest 可幂等恢复，其他已有目标一律拒绝并保留可追踪 residue。
 
 Artifact tools 是独立自授权的 Pi custom tool surfaces，不改变 Access Gate 的 path/command Policy，也不扩展普通文件访问权限。Run 不执行自动 GC，保留至用户批准清理。Session Handoff 与会话文件（JSONL）生命周期 100% 绑定，随会话清理一并销毁。
 
 Why: 普通 `write` 的 Gate 只拥有执行前准入，不能保证单次 capability、原子 no-clobber、receipt 或 verified collect；放宽 `review` 会扩大所有写权限。Herdr 0.9.0 只提供 Agent 状态和终端读取，没有结构化 artifact API。Pi custom tool 与 custom flag 可把复杂度封装在窄接口内，同时保持 Herdr 负责执行拓扑、AKeel 负责结果 transport。按 owner/lifecycle 分类避免 staging GC 删除未裁决结果，也避免把跨 session handoff 的 authority transfer 泄漏进普通 run。
 
-Impact: Guidance package 除 bootstrap/skills 外加载 Artifact Exchange extension；正式 delegation 使用 reserve→packet→bind→capability start→publish→status/collect。Session Handoff 按 D-092 完全内嵌于 Pi 会话条目，不占用 `/tmp/akeel` 外部目录，状态由会话 append-only entries 表达，不进入普通 workflow run，也不等同于 Task acceptance。Quarantine 归所属 run 且非空时阻止未来自动清理；transport diagnostics 和 `herdr agent read` 不能进入 result authority。
+Impact: Guidance package 除 bootstrap/skills 外加载 Artifact Exchange extension；正式 delegation 使用 reserve→packet→bind→capability start→publish→status/collect。Reservation/status 返回 exact platform role paths，Guidance 不假设 `/tmp` 或 opener。Session Handoff 按 D-092 完全内嵌于 Pi 会话条目，状态由会话 append-only entries 表达，不进入普通 workflow run，也不等同于 Task acceptance。Quarantine 归所属 run且非空时阻止未来自动清理；transport diagnostics 和 `herdr agent read` 不能进入 result authority。
 
 Rejected:
 
 - **允许普通 write 写特定 `/tmp` 路径：** host write 不由 AKeel 执行，无法提供发布与 receipt 原子性。
 - **复用 session staging：** session 与 workflow 是多对多关系且 retention 不同。
 - **抓取 terminal output 或 Herdr plugin 作为结果协议：** 终端可能截断或混入 UI，plugin 又引入额外 runtime dependency 和宽系统权限。
-- **单一全局 TemporaryResourceManager：** 会耦合三个独立安装 package，并把不同 owner/lifecycle 变成浅 dispatcher。
+- **让共享 Platform Runtime Authority 成为全局 TemporaryResourceManager：** 支持 package 只发行平台证据与 primitive；若取得 session/run owner、retention 或 cleanup 路由，会耦合独立 capability package 并把不同 lifecycle 变成浅 dispatcher。
 - **把 handoff 作为普通 run kind：** successor ownership transfer 会迫使所有 run 承担 adoption 状态和跨 session authority。
 
 Out of Scope: 自动 run/handoff/Herdr resource GC、Task accepted/abandoned 状态、无人值守跨 Owner adoption、异步 mailbox、binary/streaming/multipart artifact、多用户或恶意同 uid 隔离、OS sandbox、fd broker 和完整 filesystem TOCTOU 消除。D-092 的用户显式原生 session replacement 只转移同一 Task 的唯一 Owner authority，不构成后台或并行 adoption。
@@ -911,7 +930,7 @@ Reversal surface: user-boundary
 Decision: Access Gate 路径准入采用三域正交模型（Three-Tier Path Domain Model）：
 1. **凭据域（Credential Domain，D-070）**：宿主拥有且保存实时凭据的工件（`auth.json` 及其衍生变体）与相交递归搜索，享有绝对最高优先级拦截权，任何其他域不可豁免，一律永久 hard-deny。
 2. **能力资产域（Capability Domain）**：只覆盖 Pi 的已安装分发存储与全局分发资源，不覆盖所有被 Pi 加载的项目源码。标准根包括全局 `agentDir/git`、`agentDir/npm`、`agentDir/node_modules`、`agentDir/extensions`、`agentDir/skills`、全局 `$HOME/.agents/skills`，以及当前 session 项目的 `.pi/git` 与 `.pi/npm`。这些根由 `pi-composition` 按 session cwd 计算；对该域下的 Direct `read` 与非递归 Direct `ls` 赋予隐式只读准入，不要求路径位于工作区 `allowedRoots` 内；对 Direct `write`、`edit` 以及 Shell 中带有写或删除副作用（`write`/`delete`）的变异操作，一律触发系统级防篡改硬拒绝（`hard-boundary`），任何 preset 不得放宽。严禁将 `agentDir` 根自身纳入能力资产根，防止凭据与会话隐私泛化。
-3. **工作区主域（Workspace Domain，D-072 / D-069）**：覆盖会话 `accessRoot (cwd)`、stagingRoot、`/tmp/akeel` 与项目源码资源（包括 `.pi/extensions`、`.pi/skills`、`.agents/skills`），完整受内置与自定义 Preset（`review`、`guided`、`develop`）管辖。
+3. **工作区主域（Workspace Domain，D-072 / D-069）**：覆盖会话 `accessRoot (cwd)`、活动 Platform Runtime Authority 发行的 staging/runtime role roots 与项目源码资源（包括 `.pi/extensions`、`.pi/skills`、`.agents/skills`），完整受内置与自定义 Preset（`review`、`guided`、`develop`）管辖。物理 runtime path 不进入共享 Policy 语义。
 
 `createMandatoryBoundaries` 接收并密封冻结 `capabilityRoots`；`createGateSession` 校验并传递该集合，工作区 `defaultRoots` 保持纯净；能力根按 session cwd 重新装配，不实现动态包扫描器。Pi 资源发现规则之外的宿主自定义资源路径继续由显式宿主集成提供 capability roots。
 
