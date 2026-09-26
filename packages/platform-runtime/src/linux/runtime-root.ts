@@ -10,10 +10,11 @@ import type {
 } from "../contracts";
 import type { PlatformValueIssuer } from "../internal/sealed-values";
 
-const SESSIONS_BASE = "/tmp/akeel/sessions";
-const RUNS_BASE = "/tmp/akeel/runs";
+export const LINUX_SESSIONS_BASE = "/tmp/akeel/sessions";
+export const LINUX_RUNS_BASE = "/tmp/akeel/runs";
 
-function requireControlledDirectory(path: string): void {
+export function requireControlledDirectory(path: string, create = false): void {
+  if (create) mkdirSync(path, { recursive: true, mode: 0o700 });
   const stats = lstatSync(path);
   if (!stats.isDirectory() || stats.isSymbolicLink() || (stats.mode & 0o022) !== 0 ||
     (typeof process.getuid === "function" && stats.uid !== process.getuid())) {
@@ -21,7 +22,9 @@ function requireControlledDirectory(path: string): void {
   }
 }
 
-function isControlledDirectory(path: string): boolean {
+export const ensureControlledDirectory = requireControlledDirectory;
+
+export function isControlledDirectory(path: string): boolean {
   try {
     requireControlledDirectory(path);
     return true;
@@ -40,7 +43,7 @@ export function createLinuxRuntimeRootAuthority(
   const getCatalog = async (workspace: WorkspaceIdentity) => {
     let pending = catalogCache.get(workspace);
     if (!pending) {
-      pending = pathAuthority.compileRootCatalog(workspace, [SESSIONS_BASE, RUNS_BASE]);
+      pending = pathAuthority.compileRootCatalog(workspace, [LINUX_SESSIONS_BASE, LINUX_RUNS_BASE]);
       catalogCache.set(workspace, pending);
     }
     return pending;
@@ -51,7 +54,7 @@ export function createLinuxRuntimeRootAuthority(
     async create(role: RuntimeRole, workspace: WorkspaceIdentity): Promise<RuntimeRoot> {
       requireOpen();
       if (issuer.readWorkspace(workspace) === undefined) throw new TypeError("invalid workspace");
-      const parent = role === "session-envelope" ? SESSIONS_BASE : RUNS_BASE;
+      const parent = role === "session-envelope" ? LINUX_SESSIONS_BASE : LINUX_RUNS_BASE;
       const prefix = role === "session-envelope" ? "session-" : "run-";
       mkdirSync(parent, { recursive: true, mode: 0o700 });
       requireControlledDirectory(parent);
@@ -87,7 +90,7 @@ export function createLinuxRuntimeRootAuthority(
       const facts = issuer.readPathProof(root.path);
       if (!facts) return false;
       const display = facts.canonicalDisplay;
-      const expectedParent = root.role === "session-envelope" ? SESSIONS_BASE : RUNS_BASE;
+      const expectedParent = root.role === "session-envelope" ? LINUX_SESSIONS_BASE : LINUX_RUNS_BASE;
       if (!display.startsWith(`${expectedParent}/`)) return false;
       return isControlledDirectory(display);
     },
@@ -96,7 +99,7 @@ export function createLinuxRuntimeRootAuthority(
       const facts = issuer.readPathProof(root.path);
       if (!facts) return false;
       const display = facts.canonicalDisplay;
-      const expectedParent = root.role === "session-envelope" ? SESSIONS_BASE : RUNS_BASE;
+      const expectedParent = root.role === "session-envelope" ? LINUX_SESSIONS_BASE : LINUX_RUNS_BASE;
       if (!display.startsWith(`${expectedParent}/`)) return false;
       try {
         if (!isControlledDirectory(display)) return false;

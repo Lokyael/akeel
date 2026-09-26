@@ -53,6 +53,29 @@ function sha256Digest(content: string): string {
   return `sha256:${createHash("sha256").update(content, "utf8").digest("hex")}`;
 }
 
+export function atomicWriteTextNoClobber(
+  path: string,
+  content: string,
+  random: (bytes: number) => Buffer = randomBytes,
+): void {
+  const targetDir = dirname(path);
+  mkdirSync(targetDir, { recursive: true, mode: 0o700 });
+
+  const tempPath = join(targetDir, `.tmp-${random(12).toString("hex")}`);
+  let fd: number | undefined;
+  try {
+    fd = openSync(tempPath, "wx", 0o600);
+    writeFileSync(fd, content, "utf8");
+    fsyncSync(fd);
+    closeSync(fd);
+    fd = undefined;
+    linkSync(tempPath, path);
+  } finally {
+    if (fd !== undefined) closeSync(fd);
+    try { unlinkSync(tempPath); } catch { /* best-effort cleanup */ }
+  }
+}
+
 export function createLinuxFilesystemAuthorities(
   issuer: PlatformValueIssuer,
   runtimeAuthority: RuntimeRootAuthority,
@@ -108,23 +131,7 @@ export function createLinuxFilesystemAuthorities(
         throw new Error("target already exists with conflicting content");
       }
 
-      const targetDir = dirname(targetPath);
-      mkdirSync(targetDir, { recursive: true, mode: 0o700 });
-
-      const tempPath = join(targetDir, `.tmp-${randomBytes(12).toString("hex")}`);
-      let fd: number | undefined;
-      try {
-        fd = openSync(tempPath, "wx", 0o600);
-        writeFileSync(fd, input.content, "utf8");
-        fsyncSync(fd);
-        closeSync(fd);
-        fd = undefined;
-        linkSync(tempPath, targetPath);
-      } finally {
-        if (fd !== undefined) closeSync(fd);
-        try { unlinkSync(tempPath); } catch { /* best-effort cleanup */ }
-      }
-
+      atomicWriteTextNoClobber(targetPath, input.content, randomBytes);
       return Object.freeze({ status: "published", bytes, digest });
     },
   });
