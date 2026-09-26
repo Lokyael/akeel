@@ -101,16 +101,20 @@ export function isSupportedPowerShellHandshake(value: unknown): value is PowerSh
 }
 
 export function freezeVerifiedPowerShellExecutable(
-  executable: string,
+  launcher: string,
   handshake: PowerShellHandshake,
 ): VerifiedPowerShellExecutable {
   if (!isSupportedPowerShellHandshake(handshake)) throw new TypeError("unsupported PowerShell handshake");
-  const selected = normalizeWindowsExecutablePath(executable);
+  if (!isPwshExecutablePath(launcher) || !isPwshExecutablePath(handshake.processPath)) {
+    throw new TypeError("PowerShell executable identity is not a fully-qualified pwsh.exe");
+  }
+  // The PATH entry may be a package-manager shim (for example Scoop). The
+  // PowerShell process reports the final executable identity; freeze that path
+  // and never spawn the mutable shim after the handshake.
   const reported = normalizeWindowsExecutablePath(handshake.processPath);
-  if (selected !== reported) throw new TypeError("PowerShell executable identity mismatch");
   return Object.freeze({
-    path: executable,
-    identity: `${selected}|Core|7.${handshake.minor}|FullLanguage|Standard`,
+    path: handshake.processPath,
+    identity: `${reported}|Core|7.${handshake.minor}|FullLanguage|Standard`,
     version: Object.freeze({ major: 7 as const, minor: handshake.minor }),
     languageMode: "FullLanguage" as const,
     argumentPassing: "Standard" as const,
@@ -288,6 +292,10 @@ function toPowerShellToolResult(result: PowerShellProcessResult): {
     content: [{ type: "text", text: result.output }],
     details: { exitCode: result.exitCode, truncated: result.truncated },
   };
+}
+
+function isPwshExecutablePath(value: string): boolean {
+  return win32.isAbsolute(value) && !value.startsWith("\\\\") && win32.basename(value).toLowerCase() === "pwsh.exe";
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

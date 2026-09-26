@@ -43,8 +43,8 @@ test("PowerShell handshake is closed and requires Core 7.4 FullLanguage Standard
   }), false);
   assert.throws(() => freezeVerifiedPowerShellExecutable("C:\\pwsh.exe", {
     edition: "Core", major: 7, minor: 4, languageMode: "FullLanguage",
-    processPath: "C:\\other\\pwsh.exe", argumentPassing: "Standard",
-  }), /identity mismatch/u);
+    processPath: "C:\\other\\powershell.exe", argumentPassing: "Standard",
+  }), /fully-qualified pwsh\.exe/u);
 });
 
 test("PowerShell resolution only considers pwsh.exe and freezes the verified identity", async () => {
@@ -69,6 +69,17 @@ test("PowerShell resolution only considers pwsh.exe and freezes the verified ide
   });
   assert.equal(discovered.path, "C:\\PowerShell\\7\\pwsh.exe");
   assert.equal(discovered.identity, "c:/powershell/7/pwsh.exe|Core|7.5|FullLanguage|Standard");
+
+  const shimResolved = await discoverVerifiedPowerShell({
+    pathEnv: "C:\\Users\\dev\\scoop\\shims",
+    pathExists: async () => true,
+    probe: async () => ({
+      edition: "Core", major: 7, minor: 4, languageMode: "FullLanguage",
+      processPath: "C:\\Users\\dev\\scoop\\apps\\powershell\\current\\pwsh.exe",
+      argumentPassing: "Standard",
+    }),
+  });
+  assert.equal(shimResolved.path, "C:\\Users\\dev\\scoop\\apps\\powershell\\current\\pwsh.exe");
 });
 
 test("execution tickets bind call id, command, and workspace and are single-use", async () => {

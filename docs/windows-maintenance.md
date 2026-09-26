@@ -32,6 +32,8 @@ Windows session 必须正向确认实际 executable 是 PowerShell Core `>=7.4 <
 
 Direct 工具只有在各自 Windows native path 合同通过验收、且最终 Pi tool source 仍为预期 built-in 后才进入支持清单。模型工具集中不得出现 `bash`，Windows 维护环境不配置 Pi `shellPath`。Settings 提供初始 loadout，Windows composition 在 session start 再核对/收敛 active tools；Access Gate off 也不重新暴露模型 `bash`。
 
+依赖来源与包管理器不是 Windows profile 合同的一部分。WinGet、Scoop、Chocolatey、官方 MSI 或其他主流来源均可使用，前提是最终 executable、版本、参数传递和文件系统证据通过同一套正向验证；不要因为包管理器名称改变授权语义。Scoop 等来源可能通过 shim 暴露 `pwsh.exe`，resolver 会先执行 PATH 入口完成握手，再冻结 PowerShell 报告的最终 `pwsh.exe` 路径，后续不再重新解析可变 shim。
+
 Pi 0.87.1 中，模型只有在 `bash` tool 激活时才会调用 Bash，同名 extension tool 可以替换 built-in。Windows profile 不信任配置作为唯一 enforcement：AKeel 拥有最终 `powershell` definition，并为获准调用发行绑定 tool-call ID、command digest 与 workspace identity 的单次 execution ticket；executor 必须消费 exact ticket 才能 spawn。交互式 `!` / `!!`、RPC `bash`、低层 SDK Bash API 和第三方 Bash backend 不属于普通 AKeel Windows 工作流或其支持保证。
 
 PowerShell-only 约束只指定 Pi 的 host Shell。由已准入 PowerShell 命令启动的 `git.exe`、编译器、构建工具、script host 或 helper 继续由 Access Gate 的程序语义、路径 facts、Mandatory Boundary 与 opaque policy 管理。
@@ -39,6 +41,7 @@ PowerShell-only 约束只指定 Pi 的 host Shell。由已准入 PowerShell 命�
 ## Windows 主机预检
 
 - Windows Terminal profile 直接启动 PowerShell Core `>=7.4 <8`，并以 `$PSVersionTable.PSEdition`、`$PSVersionTable.PSVersion`、`[Environment]::ProcessPath` 与 LanguageMode 正向验证当前进程；只看到 `powershell.exe`、Desktop edition、旧版本或非 FullLanguage 时停止。
+- 可使用 WinGet、Scoop、Chocolatey、官方 MSI 等来源安装 Node.js、Git 和 PowerShell；来源无关，但同一台验收机不要同时用多个来源安装同一个 executable。
 - 启用 Windows Developer Mode 和 Win32 long paths，为 reparse/symlink 与长路径 contract tests 提供现代 Windows 基线；具体工具仍以实测结果为准。
 - repository 位于本地 NTFS，并与 Linux 使用独立 checkout。
 - Git maintenance 使用 native `git.exe`；分发方式只需通过 AKeel 必需的 repository、worktree、credential 和 package 流程。
