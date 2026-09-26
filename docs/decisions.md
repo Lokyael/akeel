@@ -166,26 +166,23 @@ Out of Scope:
 - **合并触发场景互斥的 skill**：各 skill 的全量消费与独立触发边界仍需保持；只有实际触发重合时才重新评估。
 - **token 基线和提示词行为测量**：当前没有可重复的理解度评测合同；结构性引用和 skill 检查仍由可执行校验覆盖。
 
-## D-035: 平台边界收窄为仅 Linux
+## D-035: 平台语义按独立 composition 维护
 
 Reversal surface: user-boundary
 
-Decision: 平台支持边界从“仅支持 POSIX”收窄为**仅保证支持 Linux，以 Arch Linux 为基准工具链**：选项解析固定按 Arch Linux 的 GNU 工具链语义处理（GNU coreutils / GNU git / npm 生态常用选项），不提供按平台或发行版检测方言并切换选项表的机制。Windows、macOS、BSD 均不在支持范围，不建模其路径语义与选项方言；其他发行版的工具链版本差异不在保证范围——选项表以 Arch Linux（滚动发布、工具链最新）为准。BSD 工具与 GNU 的选项歧义（`stat -f` 为格式参数、`du -d` 在 BSD 无对应、`df -t` 在 BSD 为 flag）造成的解析差异不承诺消除，BSD 平台上的命令语义不在承诺范围。
+Decision: AKeel 采用两个互不替代的平台 profile：Linux profile 继续以 Arch Linux 的 GNU 工具链与 Bash 语义为基线；Windows profile 以原生 Windows 11、Windows Terminal、PowerShell 7 和本地 NTFS 为支持组合。平台在 extension 初始化时选择一次 composition；路径证据、Shell 编译、文件系统控制与进程生命周期由各自平台实现，只有平台无关的授权策略、effect、verdict 与展示合同可以共享。Windows profile 不通过兼容层继承 Linux 语义，Linux profile 也不因 Windows 支持而扩展为方言并集。PowerShell 7 是受管 host Shell；它调用的 external executable、helper 或子进程仍由 Canonical/Mandatory Boundary/Policy 的已知或 opaque 合同治理，不要求整个 descendant process tree 只包含 PowerShell 进程。Windows profile 使用同一套现代 UTF-8 no BOM、`Standard` native argument-passing PowerShell execution contract 支持英语和简体中文环境；该合同由 Windows composition 在每次受管调用中注入，不依赖 `-NoProfile` 下不会加载的用户 profile，也不为旧版 Windows PowerShell、旧软件或旧参数传递行为而添加兼容分支。若实证表明两种环境需要冲突的产品行为，必须先向用户说明差异和取舍，再决定支持边界。
 
-Why: 单一 GNU 语义基线可以避免方言检测、双维护和误报，同时使支持边界与实际验证环境一致。
+Why: Linux pathname/Bash/mode 与 Windows pathname/PowerShell/ACL 是不同外部合同。把它们合并为一个可切换 parser 或中央路径转换层会让授权事实依赖含混方言；独立 composition 可在共享 Policy Kernel 的同时保持每个平台的安全证明和回归面封闭。
 
-Impact: `CONTEXT.md` 的 Negative Space 明确仅保证 Linux，并列出 Windows、macOS、BSD 的排除范围。代码和策略不提供跨平台命令语义切换。
+Impact: 当前生产实现和安全承诺仍是 Linux-only，直至 T-0168 的原生 Windows 验收门禁完成；Windows 目标合同已被采纳，但未完成的 adapter、测试或文档不得被描述为现有支持。此前独立记录的 Linux-only PowerShell 拒绝由本决策吸收：Linux composition 继续拒绝 `powershell`，未来 Windows composition 只治理 `powershell` 并拒绝模型 `bash`。Windows 验收以本地 NTFS 为文件系统基线；其他存储形态不扩大首个支持合同。平台 profile 使用独立 checkout、Pi 目录、session、policy、credentials、临时资源、依赖安装、cache 与生成物，只通过 Git history 交换源码。
 
 Rejected:
 
-- **按宿主平台检测方言并切换选项表：** gate 分析宿主不一定是命令执行宿主，并会产生多套方言维护面。
-- **保守双解析取并集：** 会引入额外路径意图和误报，对仅支持 Linux 的承诺没有收益。
-- **宿主检测加用户配置覆盖：** 会为未声明的跨平台场景增加配置与审计负担。
+- **中央转换路径或 Shell 文本后复用另一平台授权结果：** 转换后的字符串可能交给不同语义的工具，不能证明实际访问对象和副作用。
+- **运行时按命令猜测方言并切换 analyzer：** 命令执行宿主、路径域和文件系统证据不能由命令外观可靠推出。
+- **保守双解析取并集：** 会引入额外路径/effect 事实并扩大误报或授权面。
 
-Out of Scope:
-
-- Windows `\` 路径与 macOS 路径/选项方言：已在 Negative Space，不因 stat/du/df 同为 BSD 方言而把 macOS 纳入支持。
-- 跨宿主场景（ssh、容器）的命令语义方言：静态分类不做执行环境探测（同 D-067 无 filesystem 检查边界）。
+Out of Scope: macOS、BSD、网络文件系统和跨宿主远程执行不因双平台 profile 获得支持；每项都需独立外部合同与验收。
 
 ## D-037: Shell wrapper 链由语义入口统一解析
 
@@ -842,7 +839,7 @@ Decision: Access Gate 在 D-059 的 `core ← adapters ← runtime` 外层依赖
 
 Admission 后固定经过不可配置放宽的 Mandatory Boundary Stage，再进入 Configured Policy Kernel；credential、destroy/delete、blocked traversal 和 recursive blocked descendant 等系统边界由前者集中拥有，opaque access 的未证明风险由后者消费 `AdmissionPlan + PolicySnapshot` 中独立的 `commands.opaque` 策略决定。两阶段通过一个 Authorization facade 发行统一的 `allow | approval-required | deny` verdict，共享路径事实语义、决策优先级和 tool-call 粒度聚合。`hasUI`、confirm 能力和 `no-ui` 映射属于 Pi host composition，不进入 managed request 的领域事实、Canonical compilation、Admission 或 Policy Kernel；`approval-required` 本身不执行工具。
 
-Canonical compiler 通过受信任、不可由 policy 或用户配置替换的 Linux Path Evidence port 获取 pathname facts；同一 CWD 状态与 source token 对应的语义路径事实只解析一次，后续 CWD 转移、Admission 和 Display 复用已发行结果。Shell program registry 保持封闭且只负责 dispatch；Git、解释器、Python 工具、uv 和 package manager 分别拥有局部 analyzer，并以显式不可变事实表达 path base、cwd change、recursive、opaque 和 hard-boundary 语义，不再以多个 WeakMap/WeakSet sidecar 隐藏同一阶段元数据。
+Canonical compiler 通过受信任、不可由 policy 或用户配置替换的活动 Platform Profile Path Evidence port 获取 pathname facts；同一 CWD 状态与 source token 对应的语义路径事实只解析一次，后续 CWD 转移、Admission 和 Display 复用已发行结果。当前 Linux profile 由 Linux Path Evidence 发行事实；目标 Windows profile 必须由独立 Windows Path Evidence 发行，不得把 Windows path 转写后交给 Linux port。每个平台的 Shell program registry 保持封闭且只负责 dispatch；程序族 analyzer 以显式不可变事实表达 path base、cwd change、recursive、opaque 和 hard-boundary 语义，不再以多个 WeakMap/WeakSet sidecar 隐藏同一阶段元数据。
 
 配置 adapter 对一个外部输入只执行一次严格 decode，发行 disabled 或 enabled 的不可变配置结果；enabled 结果包含完整 preset registry、活动 snapshot 和当前 path/command policy（包括独立 `commands.opaque`），不再为 Direct/Shell 重复构造独立 policy snapshot。Runtime 以单一 session aggregate 拥有固定 Access Root、session-start `$HOME`、policy state、credential boundary 和生命周期资源；策略切换原子替换活动 snapshot。`akeel-access-gate` 的稳定外部表面保持 Pi extension，compiler、parser、resolver、fact accessor 和测试辅助 seam 不从 package root 作为并列产品 API 暴露。
 
@@ -1022,34 +1019,20 @@ Rejected:
 
 Out of Scope: Candidate、Decision、Artifact Exchange verified collect、Session Handoff reconciliation 与 Git 历史中的既有 Task 状态。
 
-## D-096: Linux-only host boundary rejects Pi PowerShell
-
-Reversal surface: user-boundary
-
-Decision: AKeel explicitly rejects Pi's `powershell` tool as an unsupported host surface on the Linux-only product boundary. It does not implement a PowerShell semantic lane or treat PowerShell as an unknown passthrough surface. Other genuinely unknown Direct surfaces retain the existing passthrough contract.
-
-Why: Pi 0.86 exposes PowerShell as a first-class built-in execution tool, so leaving it in the generic unknown-tool passthrough would create a new file and process execution path outside AKeel's Canonical → Admission → Policy chain. Implementing a second shell-language analyzer would expand the supported platform and semantic contract beyond the Linux/Bash boundary. Explicit static rejection preserves fail-closed behavior without pretending to authorize or analyze PowerShell.
-
-Impact: The host adapter and production integration tests must classify `powershell` as an unsupported governed surface and return bounded static rejection. README, CONTEXT Negative Space, and the Access Gate boundary documentation must distinguish this explicit rejection from passthrough of genuinely unknown tools. The change does not alter `user_bash`, custom tool backends, or the Linux Bash semantic lane.
-
-Rejected: Implementing a PowerShell parser and policy lane; allowing PowerShell through `commands.opaque`; disabling it only through active-tool selection; treating it as an ordinary unknown passthrough.
-
-Out of Scope: Windows or PowerShell support, PowerShell path/command semantics, PowerShell script analysis, and enforcement of user-entered `!`/`!!` commands.
-
 ## D-097: Access Gate off mode retains mandatory host boundaries
 
 Reversal surface: user-boundary
 
-Decision: `accessGate: off` and `/policy off` disable AKeel's configurable Operation Admission, path policy, and credential checks for ordinary model `tool_call` surfaces, while mandatory host-surface boundaries remain active. In particular, Pi `powershell` remains an explicitly unsupported surface on AKeel's Linux-only boundary and is statically blocked even when Access Gate is off. Principles and skills continue to operate; genuinely unknown tools and ordinary managed calls passthrough in off mode.
+Decision: `accessGate: off` and `/policy off` disable AKeel's configurable Operation Admission, path policy, and credential checks for ordinary model `tool_call` surfaces, while mandatory host-surface boundaries remain active. Each platform composition retains its unsupported model-shell boundary while off: Linux rejects `powershell`; the accepted Windows profile rejects `bash`. Principles and skills continue to operate; genuinely unknown tools and ordinary managed calls passthrough in off mode.
 
-Why: D-096 establishes PowerShell as a host-surface boundary rather than a configurable policy decision. Allowing the off switch to bypass that boundary would contradict the Linux-only product contract and make the newly explicit unsupported surface behave as an accidental capability. Separating mandatory host admission from configurable operation/path policy preserves the intended off-mode flexibility without converting an unsupported execution path into an allowed one.
+Why: Platform-shell admission is a host-surface boundary rather than a configurable policy decision. Allowing the off switch to expose an unsupported Shell would create a file and process execution path outside that platform's Canonical → Admission → Policy chain. Separating mandatory host admission from configurable operation/path policy preserves the intended off-mode flexibility without converting an unsupported execution path into an allowed one.
 
-Impact: Runtime composition must evaluate the explicit unsupported-host surface before the off-mode passthrough branch. User documentation must say that off removes ordinary Access Gate guarantees but does not enable unsupported Pi execution surfaces. D-096 remains the PowerShell-specific boundary; future mandatory host boundaries must state whether they survive off mode.
+Impact: Runtime composition evaluates explicit unsupported-host surfaces before the off-mode passthrough branch. User documentation must say that off removes ordinary Access Gate guarantees but does not enable a Shell outside the active platform profile; future mandatory host boundaries must state whether they survive off mode.
 
 Rejected:
 
-- **Make off passthrough every tool call:** would bypass the explicit Linux-only PowerShell boundary.
-- **Treat PowerShell as ordinary unknown passthrough in off mode:** would make host classification depend on policy state and violate D-096.
+- **Make off passthrough every tool call:** would bypass the active platform's unsupported-shell boundary.
+- **Treat the other platform's Shell as ordinary unknown passthrough in off mode:** would make host classification depend on policy state.
 - **Disable only through active-tool selection:** active tool loadout is not an authorization boundary.
 
 Out of Scope: OS sandbox, container isolation, user-entered `!`/`!!` commands, custom tool backends, later extension input mutation, and configurable policy/path/credential checks while off.

@@ -1,0 +1,13 @@
+# Keep repository text byte-stable across Linux and native Windows worktrees.
+* text=auto eol=lf
+
+# Binary assets must be explicit when introduced.
+*.bmp binary
+*.gif binary
+*.ico binary
+*.jpeg binary
+*.jpg binary
+*.pdf binary
+*.png binary
+*.webp binary
+*.zip binary

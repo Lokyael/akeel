@@ -5,7 +5,8 @@
 - **Access Gate**：拦截受管辖的 Pi `tool_call`，执行 Canonical → Admission → Mandatory Boundary → Configured Policy → host composition；未受管辖的工具 passthrough。
 - **Access Root**：AKeel 绑定到 Pi 会话创建时 `cwd` 的固定访问边界；不要求 Git root，不因 Shell `cd` 改变，也不向下猜测子仓库。
 - **Tilde Expansion Authority**：Shell 中受限 tilde expansion 使用的唯一 home 来源；当前为会话初始化时 Pi 进程的 `$HOME`，不是额外的 Pi `home` 字段。
-- **Greenfield Semantic Rebuild**：新决策链只从 Pi/Bash/Linux 外部合同、明确政策语义和安全不变量设计；旧实现仅保留为 Git 历史参考。
+- **Greenfield Semantic Rebuild**：新决策链只从 Pi 与活动平台的外部合同、明确政策语义和安全不变量设计；旧实现仅保留为 Git 历史参考。
+- **Platform Profile**：AKeel 对一个原生宿主组合的封闭支持合同；Linux profile 使用 Bash/Linux 路径与 mode 证据，目标 Windows profile 使用 Windows 11、Windows Terminal、PowerShell 7、本地 NTFS 路径与 SID/DACL/reparse 证据，并以同一现代 UTF-8 no BOM、`Standard` native argument-passing 配置支持英语与简体中文环境；配置由 Windows composition 在受管调用中注入，不依赖用户 profile。平台在 extension 初始化时选择一次 composition，运行时资产和授权证据不跨 profile 混用。
 - **Canonical Compilation**：对一个请求执行一次有界解释后发行的 opaque、不可变、可验真的编译制品；内部事实不作为公共 DTO 暴露。
 - **Verified Candidate**：Herdr 讨论完成问题处理与事实核对后生成、等待 Task Owner Session 导入确认的临时候选制品。
 - **Admission Plan**：Canonical Compilation 向授权域投影的最小 sealed 输入；以私有 Direct/Shell 判别变体保存 Mandatory Boundary 与 Configured Policy 实际消费的事实，不包含 host UI、配置格式或展示数据。
@@ -59,9 +60,9 @@
 
 - **系统分发与组件拓扑（Distribution & Packaging，D-086, D-090）**：AKeel 分为三个可独立安装的 package：`akeel-guidance`（bootstrap、skills、Artifact Exchange、Handoff Store 与 Record Containers 校验工具）、`akeel-access-gate`（Access Gate 准入引擎）和 `akeel-context-pruner`（测试输出上下文裁剪）；根 `akeel` package 提供三者的全量 manifest。外部通过 Pi 宿主标准接口（`pi.extensions` 与 `pi.skills`）集成；各包分发目录归入能力资产域实施防篡改硬拦截，工作区源码 checkout 是唯一合法修改源。
 - **提示词面与工程纪律注入（Prompt Surface & Guidance，D-030, D-053, D-073, D-084）**：`packages/guidance/src/bootstrap/` 通过 `before_agent_start` 原生注入包含工程原则的系统提示词 sections，天然具备会话转录持久化与 compaction 继承能力，Project Records 规范遵循宿主对称性（Host Symmetry Invariant），自仓与用户项目平等消费 guidance 提供的确定性容器校验工具；`packages/context-pruner/src/context-pruner/` 在构建模型 context 时无模型介入地将携带受支持运行器正向摘要的 `npm test` 成功输出进行正向证据投影裁剪，用户终端执行（`bashExecution`）与原始会话无损保留，TUI 呈现受限于临时 Human-only 视图（D-084）。Skills 严格按作者职责划分为 `disciplines/`（可复用方法）与 `workflows/`（端到端编排），按需全量加载；Policy Snapshot、配置文件与活动策略状态严格对 LLM 隔离（D-053），模型仅在失败路径接触静态有界的引导文案（D-023）。
-- **Access Gate 单一授权信任链（Single Trust Chain Pipeline，D-059, D-060, D-087）**：模型发起的受管工具（Direct `read`/`write`/`edit`/`find`/`grep`/`ls` 与 Shell `bash`）统一进入单向信任链：`compileManagedCall` facade 封装 Direct 与 Shell 私有语义车道，对请求执行一次权威、有界解释并发行 opaque `CanonicalCompilation`；compiler 内部可在固定预算内采用确定性的多阶段或常数次线性遍历，下游不得从原始请求重建同一事实。同一制品向授权域单次投影 sealed `AdmissionPlan`，依次经 `Mandatory Boundary`（不可放宽的硬安全截断，违规附带 terminate 熔断）与 `Configured Policy`（消费 Admission 与 Policy Snapshot 的纯函数内核）求值发行动作结论；Pi 宿主独占将审批要求映射为确认或静态 no-UI 阻断。未受管工具直通。
-- **三域正交路径模型与强制安全硬边界（Three-Tier Path Domain & Mandatory Boundaries，D-070, D-071, D-090）**：路径准入划分为三个正交域：凭据域（实时凭据工件受管读写列搜一律硬阻断，D-070）、能力资产域（Pi 安装分发存储与全局分发资源隐式只读准入，项目安装根按 session cwd 计算，写删副作用实施不可放宽的防篡改硬拦截，D-090）与工作区主域（绑定会话启动时 `cwd` 的 `accessRoot`、受管 `stagingRoot` 及项目源码资源，受 Preset 策略管辖，D-072, D-088）。破坏性删除（`destroy`）默认永久硬拒绝；仅显式非递归且具备完备路径证明的单文件裸 `rm` 接入知情同意（D-071）。
-- **Shell 分析器注册表与有界执行流（Shell Analyzers & Execution Flows，D-067, D-087, D-091）**：封闭分析器注册表（`programs/`）为已知程序族提供专有选项与路径事实提取；Git argv 与路径事实保持有界，但 `status`、`diff`、`log`、`show`、`rev-list` 和 `stash show` 因运行期 config/helper 风险进入 opaque policy，`status` 同时携带 metadata write effect（显式 `--no-optional-locks` 仅移除该 effect），metadata-only 查询仍走普通 inspect。分层多命令程序采用共享分段语法与程序私有 Invocation Plan / 语义投影，平坦命令保留专用分析器；规范系统路径命中已知程序时复用裸名语义，自定义路径作为 source 纳入 Mandatory Boundary 并按 opaque execute 处理；支持 `/dev/null` 丢弃流、确定性 inspect 与深度为 2 的静态管道，多语言构建工具族对破坏性 `clean` 实施硬拦截（D-091）；未建模语法、无界修改与外部/网络 transport 严格 fail-closed。
+- **Access Gate 单一授权信任链（Single Trust Chain Pipeline，D-059, D-060, D-087）**：模型发起的受管 Direct 工具与活动 Platform Profile 的受管 Shell 统一进入单向信任链：`compileManagedCall` facade 封装 Direct 与 Shell 私有语义车道，对请求执行一次权威、有界解释并发行 opaque `CanonicalCompilation`；compiler 内部可在固定预算内采用确定性的多阶段或常数次线性遍历，下游不得从原始请求重建同一事实。同一制品向授权域单次投影 sealed `AdmissionPlan`，依次经 `Mandatory Boundary`（不可放宽的硬安全截断，违规附带 terminate 熔断）与 `Configured Policy`（消费 Admission 与 Policy Snapshot 的纯函数内核）求值发行动作结论；Pi 宿主独占将审批要求映射为确认或静态 no-UI 阻断。未受管工具直通。当前生产 composition 仅实现 Linux/Bash；Windows 目标在 T-0168 完成验收前不构成运行时支持。
+- **三域正交路径模型与强制安全硬边界（Three-Tier Path Domain & Mandatory Boundaries，D-070, D-071, D-090）**：路径准入划分为三个正交域：凭据域（实时凭据工件受管读写列搜一律硬阻断，D-070）、能力资产域（Pi 安装分发存储与全局分发资源隐式只读准入，项目安装根按 session cwd 计算，写删副作用实施不可放宽的防篡改硬拦截，D-090）与工作区主域（绑定会话启动时 `cwd` 的 `accessRoot`、受管 `stagingRoot` 及项目源码资源，受 Preset 策略管辖，D-072, D-088）。三域政策意图可跨 profile 共享，但 canonical path、别名/链接 traversal 与 controlled-directory 证明由活动平台发行。当前 Linux profile 对破坏性删除默认永久硬拒绝，仅显式非递归且具备完备路径证明的单文件裸 `rm` 接入知情同意（D-071）；Windows destroy 合同仍待 T-0168 独立证明。
+- **Shell 分析器注册表与有界执行流（Shell Analyzers & Execution Flows，D-067, D-087, D-091）**：每个 Platform Profile 拥有封闭 Shell 编译车道，已知程序族可把平台已证明的选项、路径和 effect 投影到共享 Policy Kernel；未建模语法、动态执行、无界修改与外部/网络 transport 严格 fail-closed。当前 Linux/Bash 车道的注册表覆盖有界 Git、基础工具、构建工具与 `/dev/null`/静态管道合同；目标 Windows 车道必须从 PowerShell 7 的 cmdlet、external executable、provider、pipeline、redirection、script、dynamic invocation 与 process launch 外部合同独立建立，不复用 Bash parser 或路径事实。
 - **编译期三层正交预算守卫（Static Resource & Analysis Budget Guard）**：Canonical 编译期实行三层硬预算防御，超限在语法解析层直接拒绝（`resource-limit`）且不进入后续授权内核：POSIX 路径边界管辖 Direct 路径、CWD 与搜索模式（`MAX_PATH_BYTES`）；对称数据载荷信封统筹 Direct `write` 与 `edit` 的内容与全部替换块总量（`MAX_DIRECT_PAYLOAD_BYTES`）；算法复杂度守卫维持命令行长度（`MAX_SHELL_COMMAND_BYTES`）、命令总数、条件流 CWD 状态分支数及 edit 替换块数的紧凑防线。
 - **策略预设与会话暂存区生命周期（Policy Presets & Session Lifecycle，D-069, D-088, D-097）**：生产入口仅读取全局 `policy.yaml`，内置 `review`、`guided`、`develop` 并支持自定义 preset；每个 preset 声明独立 path scope，系统硬边界始终优先。`/policy` 提供临时选择面板、动态切换与状态查询；支持显式关闭 Access Gate（`off` 模式，D-097）。每个会话在受管临时资源目录下拥有专属的 `Session Resource Envelope`（含元数据、锁与唯一 `stagingRoot`），正常退出自动清理，异常残留遵循 retention 配额并由新会话异步回收（D-088）。
 - **任务权威上下文、Session 接力与委托协作模型（Context Admission & Delegation Runtime，D-075, D-089, D-092）**：Task Owner Session 持有用户意图、需求、架构决策与最终验收的唯一 Authority Context；同一 Owner 的 session 接力通过 Pi custom-entry semantic ledger、Continuation Capsule、会话内嵌收据、原生 replacement 与 successor reconciliation 转移 captured live semantics（D-092）。隔离探索通过 Herdr 同步子代理执行；只读 child 以 Owner packet 固定的 status、diff、untracked inventory、refs 与 OID 作为 Git authority，不重新执行 live Git，具备有效写能力的 child 则进入独立 worktree 并受其 effective policy 管辖（D-075）。结果通过 `Capability Artifact Exchange` 的绑定、receipt、长度与摘要核验后原子 collect（D-089）。
@@ -75,7 +76,7 @@
 - [D-023 决策渲染、静态 Guidance 与知情同意（literal form）](docs/decisions.md#d-023-决策渲染静态-guidance-与知情同意literal-form)
 - [D-028 统一 Project Record 模型与 Candidate 显式复审](docs/decisions.md#d-028-统一-project-record-模型与-candidate-显式复审)
 - [D-030 提示词体系边界与原则部署（Prompt Surface）](docs/decisions.md#d-030-提示词体系边界与原则部署prompt-surface)
-- [D-035 平台边界收窄为仅 Linux](docs/decisions.md#d-035-平台边界收窄为仅-linux)
+- [D-035 平台语义按独立 composition 维护](docs/decisions.md#d-035-平台语义按独立-composition-维护)
 - [D-037 Shell wrapper 链由语义入口统一解析](docs/decisions.md#d-037-shell-wrapper-链由语义入口统一解析)
 - [D-044 测试组织镜像 src 分层](docs/decisions.md#d-044-测试组织镜像-src-分层)
 - [D-045 Shell 条件流的有界 CWD 结果集](docs/decisions.md#d-045-shell-条件流的有界-cwd-结果集)
@@ -113,20 +114,19 @@
 - [D-093 Session Handoff 采用 source intent 与 successor receipt 的单向两阶段交接](docs/decisions.md#d-093-session-handoff-采用-source-intent-与-successor-receipt-的单向两阶段交接)
 - [D-094 `which` PATH 查询的未界定根硬边界](docs/decisions.md#d-094-which-path-查询的未界定根硬边界)
 - [D-095 Task 生命周期收敛为验证证据与原子清档](docs/decisions.md#d-095-task-生命周期收敛为验证证据与原子清档)
-- [D-096 Linux-only host boundary rejects Pi PowerShell](docs/decisions.md#d-096-linux-only-host-boundary-rejects-pi-powershell)
 
 ## Negative Space
 
 - 不提供 OS-level sandbox、容器、VM、seccomp、Landlock、network namespace 或独立 network policy 轴。
-- 仅保证支持 Linux 平台及默认大小写敏感的本地文件系统语义；不提供 Windows、macOS、BSD 支持，不建模其路径和选项方言，也不覆盖 casefold 目录或 CIFS/VFAT/NTFS 挂载点上的大小写别名语义。
+- 当前发布运行时仅保证 Linux 平台及默认大小写敏感的本地文件系统语义；原生 Windows 11 profile 已采纳为目标但在 T-0168 验收完成前不构成产品支持。Windows 验收以本地 NTFS 为文件系统基线，其他存储形态不扩大首个支持合同。macOS、BSD 与跨宿主远程执行不在支持范围；Linux profile 也不覆盖 casefold 目录或 CIFS/VFAT/NTFS 挂载点上的大小写别名语义。
 - 不承诺 pathname check 与实际文件操作之间的 TOCTOU 消除；gate 只做纯决策，不执行文件操作或传递 fd。
-- 不拦截 `user_bash`、`shellCommandPrefix`、Bash `spawnHook`、tool override、custom tool backend、未知 Direct tool surface 或其他 Extension 的直接操作；Pi `powershell` 是显式 unsupported surface，按 Linux-only 边界阻断，不属于未知 surface passthrough。
+- 当前 Linux profile 不拦截用户直接 Shell 命令、`shellCommandPrefix`、Shell `spawnHook`、tool override、custom tool backend、未知 Direct tool surface 或其他 Extension 的直接操作。活动 Platform Profile 以外的模型 Shell 是显式 unsupported surface，不属于未知 surface passthrough：Linux composition 阻断模型 `powershell`，目标 Windows composition 阻断模型 `bash`。PowerShell 启动的 external executable/helper 仍按已知或 opaque 调用链治理；未进入普通 AKeel Windows 工作流的用户/RPC/SDK Bash 入口不因本 profile 获得支持保证。
 - 审批后的实际文件操作由操作系统权限决定；gate 不控制执行后的行为，也不提供完整 security log scrubbing。
 - Policy Preset 只通过 `/policy` 的临时 human-only 选择面板、显式命令和状态查询使用；自定义 preset 不通过 UI 创建或编辑。
 - 不提供 AKeel 管理的 delegated child 能力分层、父子权限钳制或子代理 preset 继承；按任务类型的能力与风险边界仍属 C-009 候选范围。
 - Access Gate 可由用户显式禁用；禁用时不拦截 managed tool call，故不提供路径、Shell 或操作准入保证。bootstrap 与 skills 仍然分发和运行。
 - 旧 `config.yaml`、Profile、命令覆盖、继承和子代理字段不属于新 Policy Snapshot 输入；当前只读取全局 `policy.yaml` 的静态策略字段、preset 绑定或显式 `accessGate` 禁用标志。
-- Shell 只支持显式定义、可静态证明且资源有界的子集；管道仅支持深度为 2 的有界静态管道（上游纯只读 inspect 且零写副作用，下游受限过滤器或 tee 流式写入），不提供任意多级管道链、后台并发管道（`&`）、管道内目录切换或向未知程序/解释器的数据流管道。设备文件只在 Shell 重定向目标为字面 `/dev/null` 时作为无害丢弃流豁免 target 路径与写入副作用，不向操作系统开放其它设备节点（如 `/dev/sda`、`/dev/zero`、`/dev/pts/*`），作为命令常规操作数的 `/dev/null` 以及向外部非 `/dev/null` 路径的重定向继续受路径边界硬拦截。`core/compilation/shell/programs/` 中的已知程序仍需提供 bounded path 事实；解释器脚本、uv run、npm/pnpm/yarn 执行、npx、pytest 和未知子命令等委托执行继续保持 opaque；内置 `review`/`guided`/`develop` 分别 deny/ask/allow。未建立完备证明的破坏操作（包括递归删除、目录删除、未知选项、未建模破坏命令与路径形式破坏可执行文件）永久 hard-deny；仅显式非递归且通过 Mandatory Boundary 核验的裸 `rm` 命令受管进入 Policy Kernel 评估（在内置 `guided`/`develop` 下为需知情同意的 `ask`，无 UI 时 fail-closed）。`commands.destroy: allow` 仅可作为自定义 preset 的合法配置值，不放宽未证明操作。Git local transport 仅接受可解析的项目内 `file://` path；HTTPS/SSH 等外部 transport、host、alias、间接 config、ext transport 和其他未建模形态继续 hard-boundary。`commands.opaque: allow` 不提供运行期 sandbox、路径强制或网络隔离；未建模的命令副作用不单独建模。
+- 当前 Linux Shell 只支持显式定义、可静态证明且资源有界的 Bash 子集；管道、`/dev/null`、已知程序、destroy、Git transport 和 opaque 的具体边界仍由现有 Linux 合同定义。目标 Windows Shell 只支持未来独立证明的 PowerShell 7 子集；在 T-0168 完成前不存在可复用的 PowerShell 准入结论。任何 profile 的 `commands.opaque: allow` 都不提供运行期 sandbox、路径强制、network 或 descendant-process confinement；未建模的命令副作用不单独建模。
 - 不把短期 Task Record、实施过程或审查报告作为永久当前知识；Task checkpoint 留在 Git 历史，正文落地后从当前树清除。
 - Continuation Capsule 的固定 wrapper 与 delimiter 拒绝只保护文档结构和 authority 标记，不构成对其中自然语言的提示词注入隔离；reconciliation 证明 captured semantic ID 覆盖而不证明模型理解或遵从。来自外部不可信内容的 provenance/enforcement 仍属 C-038，不能因 Session Handoff 获得可信指令权。
 - 不在 T-069 实现 Static Flow Graph、Explanation Replay 或 Runtime Audit Event，也不提供通用 Runtime Content Flow；D-084 仅覆盖模型 `bash` 工具结果行内的人类专用模型视图，不覆盖用户 `!`/`!!` 的 `bashExecution`。
@@ -145,3 +145,4 @@
 - [`docs/decisions.md`](docs/decisions.md)：长期决策寄存器。
 - [`docs/task.md`](docs/task.md)：活跃任务记录。
 - [`docs/traceability.md`](docs/traceability.md)：外部来源、采用方式、文件映射和许可证义务。
+- [`docs/windows-maintenance.md`](docs/windows-maintenance.md)：T-0168 期间的原生 Windows 11 维护入口、环境隔离、上游 Pi 基线与验收清单。
