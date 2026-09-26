@@ -215,6 +215,7 @@ Detailed Windows path, DACL, encoding, locale and maintenance procedures remain 
 - Slice 5 unified GateSession composition implemented: session start synchronizes with platform-runtime Linux path session, compiles a global RootCatalog, maps RootReferences into MandatoryBoundaries and policy snapshots, and verifies relations-based authorization end-to-end.
 - Slice 6 Guidance runtime resources implemented: Artifact Exchange consumes platform-runtime primitives for controlled directories, atomic no-clobber publication, and platform runs roots rather than constructing /tmp paths locally.
 - Slice 7 Windows evidence host client implemented: bounded versioned JSONL protocol, request/response budget guards, fail-closed timeout/exit/desync handling, and PowerShell host driver script are implemented and verified with mock process testing.
+- Slice 8 Windows path and security adapters implemented: strict closed v1 rejection matrix (UNC, namespace/device, drive-relative, rooted-without-drive, ADS, reserved names, trailing dots/spaces, forbidden chars), case-insensitive RootCatalog relations matching, path proof issuance, and protected DACL template validation are verified.
 - Slice 10 portability gates implemented: Context Pruner independently recognizes closed Bash and PowerShell test commands without platform-runtime dependency; repository portability gate strictly enforces LF line endings, no UTF-8 BOM, no Windows illegal characters, and zero case-fold collisions across all 169 tracked files.
 - No Windows support claim is active.
 
