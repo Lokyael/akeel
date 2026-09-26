@@ -19,7 +19,7 @@
     "packages/*"
   ],
   "scripts": {
-    "test": "tsx scripts/validate-docs.ts && tsx scripts/validate-skills.ts && npm run validate:package-archives && tsc --noEmit && tsx --test \"tests/access-gate/**/*.test.ts\" \"tests/context-pruner/**/*.test.ts\" \"tests/guidance/**/*.test.ts\" \"tests/pi-host/**/*.test.ts\" \"tests/platform-runtime/**/*.test.ts\" \"tests/validate-docs.test.ts\" \"tests/validate-packages.test.ts\" \"tests/validate-skills.test.ts\"",
+    "test": "tsx scripts/validate-docs.ts && tsx scripts/validate-skills.ts && tsx scripts/validate-repository-portability.ts && npm run validate:package-archives && tsc --noEmit && tsx --test \"tests/access-gate/**/*.test.ts\" \"tests/context-pruner/**/*.test.ts\" \"tests/guidance/**/*.test.ts\" \"tests/pi-host/**/*.test.ts\" \"tests/platform-runtime/**/*.test.ts\" \"tests/validate-docs.test.ts\" \"tests/validate-packages.test.ts\" \"tests/validate-skills.test.ts\" \"tests/validate-portability.test.ts\"",
     "test:file": "tsx --test",
     "test:windows-tracer": "tsx scripts/windows-bootstrap-tracer.ts",
     "validate:package-archives": "tsx scripts/validate-package-archives.ts",

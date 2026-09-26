@@ -475,6 +475,70 @@ test("failed model bash tests without a reliable failure block retain the origin
   assert.notEqual(result, messages);
 });
 
+function powershellToolCall(id: string, command: string): Record<string, unknown> {
+  return {
+    role: "assistant",
+    content: [{ type: "toolCall", id, name: "powershell", arguments: { command } }],
+    timestamp: 1,
+  };
+}
+
+function powershellToolResult(
+  id: string,
+  output: string,
+  overrides: Record<string, unknown> = {},
+): Record<string, unknown> {
+  return {
+    role: "toolResult",
+    toolCallId: id,
+    toolName: "powershell",
+    content: [{ type: "text", text: output }],
+    isError: false,
+    timestamp: 2,
+    ...overrides,
+  };
+}
+
+test("context projection trims verified model powershell test result", () => {
+  const output = `${successfulNodeTest}\n\nCommand exited with code 0`;
+  const messages = [
+    powershellToolCall("call-pwsh-1", "npm.cmd test"),
+    powershellToolResult("call-pwsh-1", output),
+  ];
+
+  const result = pruneTestContext(messages);
+
+  assert.deepEqual(result, [
+    powershellToolCall("call-pwsh-1", "npm.cmd test"),
+    powershellToolResult("call-pwsh-1", "All tests passed\n\nCommand exited with code 0"),
+  ]);
+});
+
+test("powershell compound, pipelined, or variable commands are not pruned", () => {
+  for (const command of [
+    "npm.cmd test; Get-Process",
+    "npm.cmd test | Out-String",
+    "npm.cmd test & Write-Output ok",
+    "npm.cmd test > out.txt",
+    "$x = 1; npm.cmd test",
+    "npm.cmd test `n Write-Output 1",
+  ]) {
+    const messages = [
+      powershellToolCall("call-bad", command),
+      powershellToolResult("call-bad", `${successfulNodeTest}\n\nCommand exited with code 0`),
+    ];
+    assert.deepEqual(pruneTestContext(messages), messages);
+  }
+});
+
+test("mismatched tool surface between call and result is not pruned", () => {
+  const messages = [
+    powershellToolCall("call-mismatch", "npm.cmd test"),
+    bashToolResult("call-mismatch", `${successfulNodeTest}\n\nCommand exited with code 0`),
+  ];
+  assert.deepEqual(pruneTestContext(messages), messages);
+});
+
 test("the extension registers only the context transformation", async () => {
   let handler: ((event: { messages: unknown[] }) => unknown) | undefined;
   const pi = {

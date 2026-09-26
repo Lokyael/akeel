@@ -6,11 +6,13 @@ const DIAGNOSTIC_CONTEXT_RADIUS = 1;
 type ContextMessage = Readonly<Record<string, unknown>>;
 type MessageRecord = Record<string, unknown>;
 type TextContent = Readonly<{ readonly type: "text"; readonly text: string }>;
-type BashToolCall = Readonly<{ readonly id: string; readonly command: string }>;
+export type SupportedShell = "bash" | "powershell";
+type ShellToolCall = Readonly<{ readonly id: string; readonly command: string; readonly shell: SupportedShell }>;
 
 export type TestOutputInput = Readonly<{
   readonly command: string;
   readonly output: string;
+  readonly shell?: SupportedShell;
   readonly exitCode?: number;
   readonly cancelled?: boolean;
   readonly truncated?: boolean;
@@ -24,7 +26,8 @@ export type TestOutputProjection = Readonly<{
 
 export function projectTestOutput(input: TestOutputInput): TestOutputProjection | undefined {
   if (input.cancelled || input.truncated || input.exitCode === undefined) return undefined;
-  if (!isTestCommand(input.command)) {
+  const shell = input.shell ?? (input.command.startsWith("npm.cmd") ? "powershell" : "bash");
+  if (!isTestCommand(input.command, shell)) {
     return { original: input.output, model: input.output, changed: false };
   }
 
@@ -35,13 +38,13 @@ export function projectTestOutput(input: TestOutputInput): TestOutputProjection 
 }
 
 /**
- * Reduces model-invoked bash test output before it is sent to the model.
+ * Reduces model-invoked bash or powershell test output before it is sent to the model.
  * User-entered `!`/`!!` messages are intentionally outside this path.
  * Returning the original message preserves information when classification is uncertain.
  */
 export function pruneTestContext(messages: readonly unknown[]): unknown[] {
-  const bashCalls = collectBashToolCalls(messages);
-  return messages.map((message) => pruneMessage(message, bashCalls));
+  const shellCalls = collectShellToolCalls(messages);
+  return messages.map((message) => pruneMessage(message, shellCalls));
 }
 
 export default function contextPruner(pi: ExtensionAPI): void {
@@ -50,12 +53,12 @@ export default function contextPruner(pi: ExtensionAPI): void {
   }));
 }
 
-function pruneMessage(message: unknown, bashCalls: ReadonlyMap<string, BashToolCall>): unknown {
-  if (!isBashToolResult(message)) return message;
-  const call = bashCalls.get(message.toolCallId);
-  if (!call) return message;
+function pruneMessage(message: unknown, shellCalls: ReadonlyMap<string, ShellToolCall>): unknown {
+  if (!isShellToolResult(message)) return message;
+  const call = shellCalls.get(message.toolCallId);
+  if (!call || call.shell !== message.toolName) return message;
 
-  const input = adaptBashToolResult(message, call.command);
+  const input = adaptShellToolResult(message, call.command, call.shell);
   if (!input) return message;
   const projection = projectTestOutput(input.input);
   if (!projection?.changed) return message;
@@ -67,39 +70,51 @@ function pruneMessage(message: unknown, bashCalls: ReadonlyMap<string, BashToolC
   return { ...message, content };
 }
 
-function collectBashToolCalls(messages: readonly unknown[]): ReadonlyMap<string, BashToolCall> {
-  const calls = new Map<string, BashToolCall>();
+function collectShellToolCalls(messages: readonly unknown[]): ReadonlyMap<string, ShellToolCall> {
+  const calls = new Map<string, ShellToolCall>();
   for (const message of messages) {
     if (!isAssistantMessage(message)) continue;
     for (const block of message.content) {
-      if (!isBashToolCall(block)) continue;
+      if (!isShellToolCall(block)) continue;
       const argumentsValue = block.arguments as MessageRecord;
-      calls.set(block.id, { id: block.id, command: argumentsValue.command as string });
+      calls.set(block.id, {
+        id: block.id,
+        command: argumentsValue.command as string,
+        shell: block.name as SupportedShell,
+      });
     }
   }
   return calls;
 }
 
-type AdaptedBashToolResult = Readonly<{
+type AdaptedShellToolResult = Readonly<{
   readonly input: TestOutputInput;
   readonly status?: string;
 }>;
 
-function adaptBashToolResult(message: BashToolResult, command: string): AdaptedBashToolResult | undefined {
+function adaptShellToolResult(
+  message: ShellToolResult,
+  command: string,
+  shell: SupportedShell,
+): AdaptedShellToolResult | undefined {
   const output = getSingleTextContent(message.content)?.text;
   if (output === undefined || isTruncatedDetails(message.details)) return undefined;
 
   const cancelled = output.endsWith("\n\nCommand aborted");
   if (cancelled) {
-    return { input: { command, output, cancelled: true, truncated: false } };
+    return { input: { command, output, shell, cancelled: true, truncated: false } };
   }
 
   const exitMatch = output.match(/\n\nCommand exited with code (-?\d+)$/u);
-  const exitCode = exitMatch ? Number(exitMatch[1]) : 0;
+  let exitCode = exitMatch ? Number(exitMatch[1]) : 0;
+  if (!exitMatch && message.details && typeof message.details === "object" &&
+    typeof (message.details as MessageRecord).exitCode === "number") {
+    exitCode = (message.details as MessageRecord).exitCode as number;
+  }
   if (message.isError && (!exitMatch || exitCode === 0)) return undefined;
   const rawOutput = exitMatch ? output.slice(0, exitMatch.index) : output;
   return {
-    input: { command, output: rawOutput, exitCode, cancelled: false, truncated: false },
+    input: { command, output: rawOutput, shell, exitCode, cancelled: false, truncated: false },
     status: exitMatch?.[0].slice(2),
   };
 }
@@ -114,8 +129,9 @@ function isAssistantMessage(message: unknown): message is ContextMessage & { rea
   return isRecordWithContent(message) && message.role === "assistant";
 }
 
-function isBashToolCall(block: unknown): block is Readonly<{
+function isShellToolCall(block: unknown): block is Readonly<{
   readonly id: string;
+  readonly name: SupportedShell;
   readonly arguments: MessageRecord;
 }> {
   if (!block || typeof block !== "object") return false;
@@ -123,7 +139,7 @@ function isBashToolCall(block: unknown): block is Readonly<{
   const argumentsValue = candidate.arguments;
   return (
     candidate.type === "toolCall" &&
-    candidate.name === "bash" &&
+    (candidate.name === "bash" || candidate.name === "powershell") &&
     typeof candidate.id === "string" &&
     !!argumentsValue &&
     typeof argumentsValue === "object" &&
@@ -131,10 +147,11 @@ function isBashToolCall(block: unknown): block is Readonly<{
   );
 }
 
-function isBashToolResult(message: unknown): message is ContextMessage & BashToolResult {
+function isShellToolResult(message: unknown): message is ContextMessage & ShellToolResult {
   if (!isRecordWithContent(message)) return false;
   const candidate = message as MessageRecord;
-  return candidate.role === "toolResult" && candidate.toolName === "bash" &&
+  return candidate.role === "toolResult" &&
+    (candidate.toolName === "bash" || candidate.toolName === "powershell") &&
     typeof candidate.toolCallId === "string" && typeof candidate.isError === "boolean";
 }
 
@@ -152,20 +169,53 @@ function isRecordWithContent(message: unknown): message is ContextMessage & { re
   return Array.isArray(candidate.content);
 }
 
-type BashToolResult = Readonly<{
+type ShellToolResult = Readonly<{
   readonly toolCallId: string;
-  readonly toolName: "bash";
+  readonly toolName: SupportedShell;
   readonly content: readonly unknown[];
   readonly isError: boolean;
   readonly details?: unknown;
 }>;
 
-function isTestCommand(command: string): boolean {
-  const trimmed = command.trim();
-  return /^npm\s+(?:test|run\s+test)(?:\s|$)/u.test(trimmed) && !containsShellOperator(trimmed);
+function isTestCommand(command: string, shell: SupportedShell): boolean {
+  return shell === "bash"
+    ? isBashTestCommand(command)
+    : isPowerShellTestCommand(command);
 }
 
-function containsShellOperator(command: string): boolean {
+function isBashTestCommand(command: string): boolean {
+  const trimmed = command.trim();
+  return /^npm\s+(?:test|run\s+test)(?:\s|$)/u.test(trimmed) && !containsBashShellOperator(trimmed);
+}
+
+function isPowerShellTestCommand(command: string): boolean {
+  const trimmed = command.trim();
+  return /^(?:npm\.cmd|npm)\s+(?:test|run\s+test)(?:\s|$)/u.test(trimmed) && !containsPowerShellOperator(trimmed);
+}
+
+function containsPowerShellOperator(command: string): boolean {
+  // Reject pipeline, redirections, statement separators, dynamic calls, assignments, subexpressions
+  let quote: "'" | '"' | undefined;
+  for (let i = 0; i < command.length; i++) {
+    const char = command[i]!;
+    if (quote !== undefined) {
+      if (char === quote) {
+        quote = undefined;
+        continue;
+      }
+      if (quote === '"' && (char === "`" || char === "$")) return true;
+      continue;
+    }
+    if (char === "'" || char === '"') {
+      quote = char;
+      continue;
+    }
+    if (";|&><$(){}[]`\r\n,".includes(char)) return true;
+  }
+  return quote !== undefined;
+}
+
+function containsBashShellOperator(command: string): boolean {
   let quote: "'" | '"' | undefined;
   let escaped = false;
 
