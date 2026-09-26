@@ -1,4 +1,5 @@
 import type { DecodedPolicyConfiguration } from "../adapters/index";
+import type { RootReference } from "akeel-platform-runtime";
 import {
   authorizeAdmission,
   createMandatoryBoundaries,
@@ -44,13 +45,44 @@ function isAbsolutePath(value: unknown): value is string {
   return typeof value === "string" && value.length > 0 && value.startsWith("/") && !value.includes("\u0000");
 }
 
-function effectivePolicy(snapshot: UnifiedPolicySnapshot, roots: readonly string[]): UnifiedPolicySnapshot {
-  return snapshot.paths.allowedRoots.length > 0
-    ? snapshot
-    : freezeUnifiedPolicySnapshot({
-        paths: { ...snapshot.paths, allowedRoots: roots },
-        commands: snapshot.commands,
-      });
+function effectivePolicy(
+  snapshot: UnifiedPolicySnapshot,
+  roots: readonly string[],
+  rootRefByPath?: ReadonlyMap<string, RootReference>,
+): UnifiedPolicySnapshot {
+  const allowedRoots = snapshot.paths.allowedRoots.length > 0 ? snapshot.paths.allowedRoots : roots;
+  let allowedRootRefs: Set<RootReference> | undefined;
+  let blockedRootRefs: Set<RootReference> | undefined;
+  let blockedPathRefs: Set<RootReference> | undefined;
+
+  if (rootRefByPath) {
+    allowedRootRefs = new Set();
+    for (const root of allowedRoots) {
+      const ref = rootRefByPath.get(root);
+      if (ref) allowedRootRefs.add(ref);
+    }
+    blockedRootRefs = new Set();
+    for (const root of snapshot.paths.blockedRoots) {
+      const ref = rootRefByPath.get(root);
+      if (ref) blockedRootRefs.add(ref);
+    }
+    blockedPathRefs = new Set();
+    for (const path of snapshot.paths.blockedPaths) {
+      const ref = rootRefByPath.get(path);
+      if (ref) blockedPathRefs.add(ref);
+    }
+  }
+
+  return freezeUnifiedPolicySnapshot({
+    paths: {
+      ...snapshot.paths,
+      allowedRoots,
+      ...(allowedRootRefs ? { allowedRootRefs } : {}),
+      ...(blockedRootRefs ? { blockedRootRefs } : {}),
+      ...(blockedPathRefs ? { blockedPathRefs } : {}),
+    },
+    commands: snapshot.commands,
+  });
 }
 
 export function createGateSession(input: unknown): GateSession {
@@ -68,9 +100,31 @@ export function createGateSession(input: unknown): GateSession {
     home: input.home,
     pathEvidence: input.pathEvidence,
   });
+  const rootRefByPath = input.rootRefByPath instanceof Map
+    ? (input.rootRefByPath as ReadonlyMap<string, RootReference>)
+    : undefined;
+  let credentialRootRefs: Set<RootReference> | undefined;
+  let capabilityRootRefs: Set<RootReference> | undefined;
+  if (rootRefByPath) {
+    credentialRootRefs = new Set();
+    for (const root of input.credentialRoots) {
+      const ref = rootRefByPath.get(root);
+      if (ref) credentialRootRefs.add(ref);
+    }
+    if (Array.isArray(input.capabilityRoots)) {
+      capabilityRootRefs = new Set();
+      for (const root of input.capabilityRoots) {
+        const ref = rootRefByPath.get(root);
+        if (ref) capabilityRootRefs.add(ref);
+      }
+    }
+  }
+
   const mandatory = createMandatoryBoundaries({
     credentialRoots: input.credentialRoots,
     capabilityRoots: input.capabilityRoots as readonly string[] | undefined,
+    ...(credentialRootRefs ? { credentialRootRefs } : {}),
+    ...(capabilityRootRefs ? { capabilityRootRefs } : {}),
   });
   const defaultRoots = Object.freeze([
     (input.accessRoot as string | undefined) ?? input.cwd,
@@ -81,7 +135,7 @@ export function createGateSession(input: unknown): GateSession {
     Object.fromEntries(
       Object.entries(configuration.snapshots).map(([name, snapshot]) => [
         name,
-        effectivePolicy(snapshot, defaultRoots),
+        effectivePolicy(snapshot, defaultRoots, rootRefByPath),
       ]),
     ),
   );

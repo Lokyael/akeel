@@ -8,6 +8,7 @@ import {
   resolveAgentDir,
 } from "../adapters/index";
 import type { DecodedPolicyConfiguration } from "../adapters/index";
+import { createLinuxPathSession, type LinuxPathSession, type RootReference } from "akeel-platform-runtime";
 import { createLinuxPathEvidence } from "../core/compilation/index";
 import { handleGateSessionToolCall } from "./host-composition";
 import { renderHostBlock } from "./host-render";
@@ -148,6 +149,7 @@ function installComposition(
 ): void {
   let session: GateSession | undefined;
   let project: ProjectLifecycle | undefined;
+  let pathSession: LinuxPathSession | undefined;
   let sessionHome: string | undefined;
   let currentConfiguration: DecodedPolicyConfiguration | undefined = policyProvider();
   const pathEvidence = createLinuxPathEvidence();
@@ -308,6 +310,8 @@ function installComposition(
     session = undefined;
     project = undefined;
     sessionHome = undefined;
+    pathSession?.close();
+    pathSession = undefined;
     for (const unsubscribe of subscriptions.splice(0)) {
       try {
         unsubscribe();
@@ -320,9 +324,11 @@ function installComposition(
   rememberSubscription(pi.on("session_start", (_event, context) => {
     session?.close();
     project?.dispose();
+    pathSession?.close();
     context.ui.setStatus(POLICY_STATUS_ID, undefined);
     session = undefined;
     project = undefined;
+    pathSession = undefined;
     sessionHome = captureSessionHome();
     currentConfiguration = policyProvider();
     if (currentConfiguration === undefined) {
@@ -335,13 +341,52 @@ function installComposition(
     try {
       const sessionProject = createSessionProject(context.cwd);
       if ("dispose" in sessionProject) project = sessionProject as ProjectLifecycle;
+      pathSession = createLinuxPathSession({
+        purpose: "access-gate",
+        cwd: sessionProject.context.cwd,
+        home: sessionHome,
+      });
+
+      const accessRoot = sessionProject.context.projectRoot;
+      const stagingRoot = sessionProject.context.stagingRoot;
+      const capabilityRoots = capabilityRootsForSession(agentDir, sessionProject.context.cwd, sessionHome, configuredCapabilityRoots);
+
+      const allRoots = new Set<string>([
+        accessRoot,
+        stagingRoot,
+        "/tmp/akeel",
+        ...protectedRoots,
+        ...capabilityRoots,
+      ]);
+
+      if (currentConfiguration.kind === "enabled") {
+        for (const snapshot of Object.values(currentConfiguration.snapshots)) {
+          for (const root of snapshot.paths.allowedRoots) allRoots.add(root);
+          for (const root of snapshot.paths.blockedRoots) allRoots.add(root);
+          for (const p of snapshot.paths.blockedPaths) allRoots.add(p);
+        }
+      }
+
+      const rootsList = [...allRoots];
+      let rootRefByPath: Map<string, RootReference> | undefined;
+      try {
+        const catalog = pathSession.compileCatalogSync(rootsList);
+        rootRefByPath = new Map<string, RootReference>();
+        for (let i = 0; i < rootsList.length; i++) {
+          rootRefByPath.set(rootsList[i]!, catalog.roots[i]!);
+        }
+      } catch {
+        // Fallback to pathname strings if catalog compilation fails on dynamic paths
+      }
+
       session = createGateSession({
         cwd: sessionProject.context.cwd,
-        accessRoot: sessionProject.context.projectRoot,
-        stagingRoot: sessionProject.context.stagingRoot,
+        accessRoot,
+        stagingRoot,
         home: sessionHome,
         credentialRoots: protectedRoots,
-        capabilityRoots: capabilityRootsForSession(agentDir, sessionProject.context.cwd, sessionHome, configuredCapabilityRoots),
+        capabilityRoots,
+        rootRefByPath,
         configuration: currentConfiguration,
         pathEvidence,
       });
@@ -350,6 +395,8 @@ function installComposition(
       session = undefined;
       project?.dispose();
       project = undefined;
+      pathSession?.close();
+      pathSession = undefined;
     }
   }));
 

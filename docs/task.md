@@ -212,6 +212,7 @@ Detailed Windows path, DACL, encoding, locale and maintenance procedures remain 
 - The native tracer now carries Unicode, empty, spaced and trailing-backslash Node/npm argv plus Git path vectors; it has not run on native Windows.
 - Slice 3 foundation is implemented: the support package exports sealed domain/workspace/root/path/object/process/runtime values, narrow lifecycle/evidence ports and explicit session factories; forgery, cross-domain, no-Pi-surface and packed dependency tests pass.
 - Slice 4 Linux adapters implemented: Linux path session, process authority, runtime root authority, and private filesystem/publication authorities are verified in platform-runtime; Access Gate compilation retains path proofs, and authorization implements pure Root Catalog relations matching for credentials, capability boundaries, allowed/blocked roots, and recursive ancestor blocks.
+- Slice 5 unified GateSession composition implemented: session start synchronizes with platform-runtime Linux path session, compiles a global RootCatalog, maps RootReferences into MandatoryBoundaries and policy snapshots, and verifies relations-based authorization end-to-end.
 - Slice 6 Guidance runtime resources implemented: Artifact Exchange consumes platform-runtime primitives for controlled directories, atomic no-clobber publication, and platform runs roots rather than constructing /tmp paths locally.
 - No Windows support claim is active.
 

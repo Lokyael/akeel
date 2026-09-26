@@ -368,3 +368,64 @@ test("Capability Domain does not exempt Direct search from path scope or search 
   }), { kind: "deny", code: "hard-boundary" });
 });
 
+test("GateSession binds RootCatalog references to evaluate path proof relations end-to-end", async () => {
+  const createGateSession = (runtime as Record<string, unknown>).createGateSession as Function;
+  const { createPlatformValueIssuer } = await import("../../../../packages/platform-runtime/src/internal/sealed-values");
+
+  const issuer = createPlatformValueIssuer("linux");
+  const catalog = issuer.issueRootCatalog(["/workspace", "/tmp/akeel-stage", "/home/user/.pi/agent"]);
+  const rootRefByPath = new Map<string, unknown>([
+    ["/workspace", catalog.roots[0]],
+    ["/tmp/akeel-stage", catalog.roots[1]],
+    ["/home/user/.pi/agent", catalog.roots[2]],
+  ]);
+
+  const credentialProof = issuer.issuePathProof({
+    literal: "anything",
+    canonicalDisplay: "/random/location/auth.json",
+    nativeIdentity: "dev:1:ino:999",
+    catalog,
+    relations: [{ rootIndex: 2, relations: ["descendant"] }],
+  });
+
+  const session = createGateSession({
+    cwd: "/workspace",
+    stagingRoot: "/tmp/akeel-stage",
+    credentialRoots: ["/home/user/.pi/agent"],
+    rootRefByPath,
+    configuration: decodePolicyConfiguration({
+      paths: {
+        read: "allow",
+        write: "allow",
+        edit: "allow",
+        list: "allow",
+        search: "allow",
+        allowedRoots: ["/workspace"],
+        blockedRoots: [],
+        blockedPaths: [],
+      },
+      commands: {
+        inspect: "allow",
+        modify: "allow",
+        execute: "allow",
+        opaque: "allow",
+        destroy: "allow",
+        unknown: "allow",
+      },
+    }),
+    pathEvidence: {
+      resolve() {
+        return {
+          candidate: "/random/location/auth.json",
+          traversed: ["/random/location/auth.json"],
+          proof: credentialProof,
+        };
+      },
+    },
+  });
+
+  // Proof with relations pointing to credential root must be hard-denied regardless of path string
+  const result = session.evaluate({ surface: "read", arguments: { path: "fake" } });
+  assert.deepEqual(result, { kind: "deny", code: "hard-boundary" });
+});
+
