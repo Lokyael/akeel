@@ -210,7 +210,8 @@ Detailed Windows path, DACL, encoding, locale and maintenance procedures remain 
 
 - Slice 1 source hardening is implemented: exact extension-path ownership, fail-closed active tools, bounded diagnostics, and call/command/cwd/workspace/lifecycle ticket binding have platform-neutral tests. Packed Pi metadata remains a native Slice 2 gate.
 - The native tracer now carries Unicode, empty, spaced and trailing-backslash Node/npm argv plus Git path vectors; it has not run on native Windows.
-- Slice 3 foundation is implemented: the support package exports sealed domain/workspace/root/path/object/process/runtime values, narrow lifecycle/evidence ports and explicit session factories; forgery, cross-domain, no-Pi-surface and packed dependency tests pass. Linux, Guidance and Windows adapters remain pending.
+- Slice 3 foundation is implemented: the support package exports sealed domain/workspace/root/path/object/process/runtime values, narrow lifecycle/evidence ports and explicit session factories; forgery, cross-domain, no-Pi-surface and packed dependency tests pass.
+- Slice 4 Linux adapters in progress: Linux path session, process authority, runtime root authority, and private filesystem/publication authorities are implemented and verified in platform-runtime; Access Gate path evidence now delegates to the platform runtime port.
 - No Windows support claim is active.
 
 ### Scope Boundary
