@@ -45,6 +45,16 @@ PowerShell-only 约束只指定 Pi 的 host Shell。由已准入 PowerShell 命�
 - Windows Terminal 保留 Pi 的 Windows 快捷键基线：`Ctrl+Q` 用于 follow-up。若需要 `Shift+Enter`，按 Pi Windows Terminal 文档发送扩展键序列，而不是依赖普通回车重写。
 - CJK IME 候选窗口或输入定位异常时启用 Pi `showHardwareCursor`; 该设置属于终端输入兼容，不改变 Access Gate 或 Shell 合同。
 
+## 迁移启动顺序
+
+首个 Windows tracer 不是对既有适配的预先验收。迁移先实现一个最小、默认 fail-closed 的 Windows bootstrap，再到独立原生 Windows checkout 验证该 bootstrap；不得把“尚未实现 Windows profile”误当成跳过 native evidence 的理由，也不得要求在任何代码存在前证明最终行为。
+
+1. **Bootstrap implementation**：加入一次性平台选择、AKeel-owned 同名 `powershell` replacement、final tool source/active-set 核对、`pwsh.exe` identity/version handshake、single-use execution-ticket primitive 与 bounded executor seam。平台无关部分和静态合同测试可在非 Windows checkout 编写。
+2. **Native tracer acceptance**：通过 Git 把已提交源码带入独立 Windows 11/NTFS checkout，pack/install 最终 package，并核对 replacement ownership、无 model `bash`、fixed setup、ticket missing/replay/mutation 的 pre-spawn rejection，以及固定 `git.exe`、`node.exe`、`npm.cmd`/必要 shim vectors 的 `Standard` 参数行为。
+3. **Broader migration**：只有 native tracer 证明 Pi host seam 与目标工具链兼容后，才开始 platform-runtime foundation、Linux parity migration、Windows path/runtime 和完整 PowerShell Canonical 集成；不兼容证据先返回用户裁决。
+
+Bootstrap 期间普通模型 PowerShell 调用保持拒绝。固定 tracer vectors 只能由 native contract-test harness 调用 executor seam，不得通过 production flag、环境变量或隐藏 policy 建立运行时 test mode。Tracer 通过只证明宿主接缝可行，不发行一般 Windows 支持结论；完整 Canonical/Admission 后续只能为成功授权的 exact input 发行 production ticket。
+
 ## 上游 Pi 事实基线
 
 当前开发依赖固定到 Pi `0.87.1`。截至该版本：
