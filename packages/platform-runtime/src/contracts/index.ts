@@ -13,6 +13,7 @@ export {
   isRootCatalog,
   isRuntimeRoot,
   isWorkspaceIdentity,
+  matchRootRelations,
   projectPathAuthorization,
   samePlatformObject,
   type PathAuthorizationView,

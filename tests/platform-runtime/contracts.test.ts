@@ -9,6 +9,7 @@ import {
   createPlatformRuntimeRegistry,
   isPlatformPathProof,
   isRuntimeRoot,
+  matchRootRelations,
   projectPathAuthorization,
   samePlatformObject,
   type PlatformRuntimeFactory,
@@ -34,7 +35,7 @@ function linuxEvidence() {
 }
 
 test("sealed platform evidence rejects copied shapes and freezes authorization projections", () => {
-  const { proof, terminal } = linuxEvidence();
+  const { proof, terminal, catalog } = linuxEvidence();
   assert.equal(isPlatformPathProof(proof), true);
   assert.equal(isPlatformPathProof({ ...proof }), false);
   assert.throws(() => PlatformDomain.issue(Symbol("forged"), "linux"), /unauthorized/u);
@@ -47,6 +48,12 @@ test("sealed platform evidence rejects copied shapes and freezes authorization p
   assert.equal(Object.isFrozen(view), true);
   assert.equal(Object.isFrozen(view.relations), true);
   assert.equal(Object.isFrozen(view.relations[0]?.relations), true);
+
+  const matched = matchRootRelations(view, new Set([catalog.roots[0]!]));
+  assert.equal(matched.has("descendant"), true);
+  assert.equal(matched.has("equal"), false);
+  const unmatched = matchRootRelations(view, new Set([catalog.roots[1]!]));
+  assert.equal(unmatched.size, 0);
 });
 
 test("platform values fail closed across domains", () => {

@@ -11,12 +11,14 @@ import type { ShellCommandAnalysis, ShellCommandClass, ShellEffect } from "./she
 import { nextReachableCommand, parseShellFlow } from "./shell/flow";
 import type { ShellCommandStatus } from "./shell/flow";
 import { isKnownProgram, resolveExecutableIdentity } from "./shell/programs/index";
+import { isPlatformPathProof, type PlatformPathProof } from "akeel-platform-runtime";
 
 export { createLinuxPathEvidence } from "./path-evidence";
 
 export type ResolvedPathEvidence = Readonly<{
   readonly candidate: string;
   readonly traversed: readonly string[];
+  readonly proof?: PlatformPathProof;
 }>;
 
 export type PathEvidencePort = Readonly<{
@@ -138,7 +140,8 @@ function isAbsolutePath(value: unknown): value is string {
 
 function validResolvedPath(value: unknown): value is ResolvedPathEvidence {
   return isRecord(value) && isAbsolutePath(value.candidate) && Array.isArray(value.traversed) &&
-    value.traversed.every(isAbsolutePath);
+    value.traversed.every(isAbsolutePath) &&
+    (!("proof" in value) || value.proof === undefined || isPlatformPathProof(value.proof));
 }
 
 function reject(code: "invalid-request" | "resource-limit"): UnifiedCanonicalReject {
@@ -252,9 +255,10 @@ export function compileManagedCall(
 
   const resolved = compileEnvironment.pathEvidence.resolve(compileEnvironment.cwd, path, { pathKind: "literal" });
   if (!validResolvedPath(resolved)) return reject("invalid-request");
-  const evidence = Object.freeze({
+  const evidence: ResolvedPathEvidence = Object.freeze({
     candidate: resolved.candidate,
     traversed: Object.freeze([...resolved.traversed]),
+    ...(resolved.proof ? { proof: resolved.proof } : {}),
   });
   return CanonicalCompilation.issue(COMPILATION_ISSUER, Object.freeze({ kind: "direct", operation: surface, path: evidence }));
 }
@@ -484,6 +488,7 @@ function resolveEvidence(
   return Object.freeze({
     candidate: evidence.candidate,
     traversed: Object.freeze([...evidence.traversed]),
+    ...(evidence.proof ? { proof: evidence.proof } : {}),
   });
 }
 

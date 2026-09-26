@@ -306,6 +306,21 @@ export function samePlatformObject(left: unknown, right: unknown): boolean {
     leftFacts.nativeIdentity === rightFacts.nativeIdentity;
 }
 
+export function matchRootRelations(
+  view: PathAuthorizationView,
+  rootRefs: ReadonlySet<RootReference>,
+): ReadonlySet<RootRelation> {
+  const matched = new Set<RootRelation>();
+  for (const entry of view.relations) {
+    if (rootRefs.has(entry.root)) {
+      for (const relation of entry.relations) {
+        matched.add(relation);
+      }
+    }
+  }
+  return Object.freeze(matched);
+}
+
 export type PlatformValueIssuer = Readonly<{
   readonly domain: PlatformDomain;
   issueWorkspace(canonicalDisplay: string, nativeIdentity: string): WorkspaceIdentity;
