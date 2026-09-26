@@ -354,7 +354,6 @@ function installComposition(
       const allRoots = new Set<string>([
         accessRoot,
         stagingRoot,
-        "/tmp/akeel",
         ...protectedRoots,
         ...capabilityRoots,
       ]);

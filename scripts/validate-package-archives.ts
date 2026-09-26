@@ -27,9 +27,9 @@ type ArchiveResult = Readonly<{
 }>;
 
 const root = resolve(import.meta.dirname!, "..");
-const packageRoots = ["packages/guidance", "packages/access-gate", "packages/context-pruner"] as const;
+const packageRoots = [".", "packages/guidance", "packages/access-gate", "packages/context-pruner"] as const;
 const platformRuntimeRoot = "packages/platform-runtime" as const;
-const platformRuntimeConsumers = new Set<string>(["packages/guidance", "packages/access-gate"]);
+const platformRuntimeConsumers = new Set<string>([".", "packages/guidance", "packages/access-gate"]);
 const FORBIDDEN_ARCHIVE_PATH = /(?:^|\/)node_modules(?:\/|$)|(?:^|\/)tests(?:\/|$)|(?:^|\/)(?:package-lock|npm-shrinkwrap)\.json$|\.test\.[cm]?[jt]sx?$/u;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -63,8 +63,14 @@ function readPackageManifest(packageRoot: string): PackageManifest {
   return value as PackageManifest;
 }
 
+function packagePackArgs(packageRoot: string, ...args: string[]): string[] {
+  return packageRoot === "."
+    ? ["pack", ...args]
+    : ["pack", ...args, "--workspace", packageRoot];
+}
+
 function readArchiveResult(packageRoot: string): ArchiveResult {
-  const npmArgs = ["pack", "--dry-run", "--json", "--workspace", packageRoot];
+  const npmArgs = packagePackArgs(packageRoot, "--dry-run", "--json");
   let parsed: unknown;
   try {
     parsed = JSON.parse(runNpm(npmArgs, root));
@@ -109,7 +115,7 @@ function assertArchive(packageRoot: string): void {
 }
 
 function archiveFile(packageRoot: string, destination: string): string {
-  const output = runNpm(["pack", "--json", "--workspace", packageRoot, "--pack-destination", destination], root);
+  const output = runNpm(packagePackArgs(packageRoot, "--json", "--pack-destination", destination), root);
   let parsed: unknown;
   try {
     parsed = JSON.parse(output);

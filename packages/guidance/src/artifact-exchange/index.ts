@@ -105,12 +105,16 @@ function validIdentity(value: string): boolean {
   return value.length > 0 && value.length <= 128 && !/[\u0000-\u001f\u007f]/.test(value);
 }
 
+function isAbsoluteRuntimePath(value: string): boolean {
+  return value.startsWith("/") || /^[A-Za-z]:[\\/]/u.test(value);
+}
+
 function ownerKey(owner: Owner): string {
   return `${owner.sessionId}\u0000${owner.cwd}`;
 }
 
 function validateOwner(owner: Owner): void {
-  if (!isRecord(owner) || !validIdentity(owner.sessionId) || typeof owner.cwd !== "string" || !owner.cwd.startsWith("/")) invalid();
+  if (!isRecord(owner) || !validIdentity(owner.sessionId) || typeof owner.cwd !== "string" || !isAbsoluteRuntimePath(owner.cwd)) invalid();
 }
 
 function validateContent(content: string): number {
@@ -157,7 +161,7 @@ function exactKeys(value: Record<string, unknown>, keys: readonly string[]): boo
 }
 
 export function createArtifactExchange(options: ArtifactExchangeOptions): ArtifactExchange {
-  if (!isRecord(options) || typeof options.root !== "string" || !options.root.startsWith("/")) invalid();
+  if (!isRecord(options) || typeof options.root !== "string" || !isAbsoluteRuntimePath(options.root)) invalid();
   const now = options.now ?? Date.now;
   const random = options.random ?? randomBytes;
   const sessionRunCounts = new Map<string, number>();

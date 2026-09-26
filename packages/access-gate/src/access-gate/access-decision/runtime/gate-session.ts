@@ -129,7 +129,6 @@ export function createGateSession(input: unknown): GateSession {
   const defaultRoots = Object.freeze([
     (input.accessRoot as string | undefined) ?? input.cwd,
     input.stagingRoot,
-    "/tmp/akeel",
   ]);
   const effectiveSnapshots = Object.freeze(
     Object.fromEntries(

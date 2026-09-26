@@ -294,6 +294,10 @@ export function validateSemanticUnit(value: unknown): SemanticUnit {
   });
 }
 
+function isAbsoluteRuntimePath(value: string): boolean {
+  return value.startsWith("/") || /^[A-Za-z]:[\\/]/u.test(value);
+}
+
 function stringList(value: readonly string[], requireNonEmpty = false, identifiers = false): readonly string[] {
   if (!Array.isArray(value) || (requireNonEmpty && value.length === 0) ||
     value.some((item) => identifiers ? !semanticId(item) : !safeText(item))) invalid();
@@ -304,7 +308,7 @@ function stringList(value: readonly string[], requireNonEmpty = false, identifie
 
 export function createContinuationCapsule(input: ContinuationCapsuleInput): ContinuationCapsule {
   if (!input || typeof input !== "object" || !input.checkpoint || !input.workspace || !safeText(input.taskRef) ||
-    !safeText(input.workspace.cwd) || !input.workspace.cwd.startsWith("/") ||
+    !safeText(input.workspace.cwd) || !isAbsoluteRuntimePath(input.workspace.cwd) ||
     !safeText(input.checkpoint.currentSlice) || !safeText(input.checkpoint.actualState) ||
     !semanticId(input.checkpoint.nextActionId) ||
     !["complete", "incomplete", "blocked"].includes(input.checkpoint.state)) invalid();

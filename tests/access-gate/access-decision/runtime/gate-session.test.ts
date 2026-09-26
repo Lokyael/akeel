@@ -224,7 +224,7 @@ test("GateSession close transitions state and unknown preset activation returns 
   });
 });
 
-test("default roots admit the session access root, staging root, and /tmp/akeel", () => {
+test("default roots admit only the session access root and staging root", () => {
   const createGateSession = (runtime as Record<string, unknown>).createGateSession;
   const configuration = decodePolicyConfiguration({
     presets: { develop: {} },
@@ -244,8 +244,12 @@ test("default roots admit the session access root, staging root, and /tmp/akeel"
     }),
   });
 
-  assert.deepEqual(session.evaluate({ surface: "write", arguments: { path: "/tmp/akeel/artifact.md", content: "ok" } }), {
+  assert.deepEqual(session.evaluate({ surface: "write", arguments: { path: "/tmp/akeel-stage/artifact.md", content: "ok" } }), {
     kind: "allow",
+  });
+  assert.deepEqual(session.evaluate({ surface: "write", arguments: { path: "/tmp/akeel/artifact.md", content: "ok" } }), {
+    kind: "deny",
+    code: "hard-boundary",
   });
 });
 

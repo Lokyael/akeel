@@ -26,6 +26,7 @@
     "test:index": "tsx --test tests/access-gate/index.test.ts"
   },
   "dependencies": {
+    "akeel-platform-runtime": "0.1.0",
     "yaml": "^2.9.0"
   },
   "peerDependencies": {

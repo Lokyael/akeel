@@ -33,7 +33,7 @@ A safe autonomous action is allowed only when all conditions hold:
 Apply the narrowest handling:
 
 - disposable residue in a dedicated temporary directory created by this run may be removed;
-- residue inside the repository must be moved, never deleted, to the exact `/tmp/akeel/runs/<run-id>/quarantine/` owned by that run, with a manifest containing its original path and content fingerprint;
+- residue inside the repository must be moved, never deleted, to the exact logical `runs/<run-id>/quarantine` path returned for the reserved run, with a manifest containing its original path and content fingerprint; never construct a physical runtime path;
 - possible credentials, sensitive material, ordinary untracked files, ambiguous residue, and any semantic change are reported without touching them and make the result `BLOCKED` when they affect the surface.
 
 When the run ledger, non-sensitive classification, recovery artifact, quarantine move, or post-action verification is unavailable, report the required action without modifying files. Deep cleanup requires separate authorization through `code-cleanup`.

@@ -1,6 +1,6 @@
 import { lstatSync, mkdirSync, mkdtempSync, realpathSync, rmSync, statSync } from "node:fs";
-import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { LINUX_SESSIONS_BASE } from "akeel-platform-runtime";
 import { createProjectContext } from "./project-context";
 import type { ProjectContext } from "./project-context";
 import { tryScheduleStagingRetention, writeSessionLock, writeSessionManifest } from "./staging-retention";
@@ -33,7 +33,7 @@ export function createProjectLifecycle(cwd: string): ProjectLifecycle {
     throw new TypeError("invalid project lifecycle");
   }
   const root = accessRoot(cwd);
-  const sessionsParent = join(tmpdir(), "akeel", "sessions");
+  const sessionsParent = LINUX_SESSIONS_BASE;
   mkdirSync(sessionsParent, { recursive: true, mode: 0o700 });
   requireControlledDirectory(sessionsParent);
   const sessionRoot = mkdtempSync(join(sessionsParent, "session-"));

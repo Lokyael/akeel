@@ -108,6 +108,7 @@ test("runtime packages declare only their own extension and required dependency"
   assert.deepEqual(contextPruner.pi?.extensions, ["./src/context-pruner"]);
   assert.equal(accessGate.dependencies?.yaml, "^2.9.0");
   assert.equal(accessGate.dependencies?.["akeel-platform-runtime"], "0.1.0");
+  assert.equal(accessGate.peerDependencies?.typebox, "*");
   assert.equal(guidance.dependencies?.["akeel-platform-runtime"], "0.1.0");
   assert.equal(contextPruner.dependencies?.["akeel-platform-runtime"], undefined);
   assert.equal(contextPruner.dependencies?.yaml, undefined);
@@ -128,6 +129,7 @@ test("root akeel manifest loads each capability exactly once", () => {
   const manifest = readPackage("package.json");
   assertPiCorePeer(".", manifest);
   assert.equal(manifest.peerDependencies?.["@earendil-works/pi-ai"], "*");
+  assert.equal(manifest.dependencies?.["akeel-platform-runtime"], "0.1.0");
   assertNodeEngine(".", manifest);
   assert.deepEqual(manifest.files, ["packages", "README.md", "LICENSE"]);
   assert.deepEqual(manifest.pi?.extensions, [
