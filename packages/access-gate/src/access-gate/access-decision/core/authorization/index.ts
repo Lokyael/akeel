@@ -125,7 +125,9 @@ function isMode(value: unknown): value is AuthorizationMode {
 }
 
 function isAbsolutePath(value: unknown): value is string {
-  return typeof value === "string" && value.length > 0 && value.startsWith("/") && !value.includes("\u0000");
+  return typeof value === "string" && value.length > 0 &&
+    (value.startsWith("/") || /^[A-Za-z]:[\\/]/u.test(value)) &&
+    !value.includes("\u0000");
 }
 
 function readModes<T extends readonly string[]>(value: unknown, fields: T): Record<T[number], AuthorizationMode> {
@@ -220,7 +222,15 @@ export function projectUnifiedAdmission(compilation: unknown): UnifiedAdmissionP
 }
 
 function pathWithinRoot(candidate: string, root: string): boolean {
-  return root === "/" || candidate === root || candidate.startsWith(`${root}/`);
+  if (root === "/" || candidate === root) return true;
+  let c = candidate.replace(/\\/gu, "/");
+  let r = root.replace(/\\/gu, "/");
+  if (/^[A-Za-z]:\//u.test(c) || /^[A-Za-z]:\//u.test(r)) {
+    c = c.toLowerCase();
+    r = r.toLowerCase();
+  }
+  if (c === r) return true;
+  return c.startsWith(`${r.replace(/\/$/u, "")}/`);
 }
 
 function violatesPathBoundary(candidate: string, policy: PathPolicy): boolean {

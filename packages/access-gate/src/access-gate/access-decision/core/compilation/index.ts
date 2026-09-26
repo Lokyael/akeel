@@ -12,6 +12,7 @@ import { nextReachableCommand, parseShellFlow } from "./shell/flow";
 import type { ShellCommandStatus } from "./shell/flow";
 import { isKnownProgram, resolveExecutableIdentity } from "./shell/programs/index";
 import { isPlatformPathProof, type PlatformPathProof } from "akeel-platform-runtime";
+import { analyzePowerShellCommand } from "./powershell/invocation";
 
 export { createLinuxPathEvidence } from "./path-evidence";
 
@@ -48,7 +49,7 @@ export type UnifiedCanonicalReject = Readonly<{
   readonly resourceClass: "input" | "syntax" | "security";
 }>;
 
-type CompileEnvironmentFacts = Readonly<{
+export type CompileEnvironmentFacts = Readonly<{
   readonly cwd: string;
   readonly home?: string;
   readonly pathEvidence: PathEvidencePort;
@@ -89,7 +90,7 @@ type ShellCompilationPath = Readonly<{
   readonly evidence: ResolvedPathEvidence;
 }>;
 
-type ShellCompilationOperation = Readonly<{
+export type ShellCompilationOperation = Readonly<{
   readonly commandClass: ShellCommandClass;
   readonly effects: readonly ShellEffect[];
   readonly paths: readonly ShellCompilationPath[];
@@ -135,7 +136,9 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function isAbsolutePath(value: unknown): value is string {
-  return typeof value === "string" && value.length > 0 && value.startsWith("/") && !value.includes("\u0000");
+  return typeof value === "string" && value.length > 0 &&
+    (value.startsWith("/") || /^[A-Za-z]:[\\/]/u.test(value)) &&
+    !value.includes("\u0000");
 }
 
 function validResolvedPath(value: unknown): value is ResolvedPathEvidence {
@@ -206,6 +209,7 @@ export function compileManagedCall(
     return reject("invalid-request");
   }
   if (request.surface === "bash") return compileShellCall(request.arguments, compileEnvironment);
+  if (request.surface === "powershell") return compilePowerShellCall(request.arguments, compileEnvironment);
   if (!["read", "write", "edit", "list", "search"].includes(request.surface as string)) return reject("invalid-request");
 
   const surface = request.surface as DirectManagedCall["surface"];
@@ -277,6 +281,37 @@ type CompiledPipelineCommand = Readonly<{
 }>;
 
 type CompiledCommand = CompiledSimpleCommand | CompiledPipelineCommand;
+
+function isCanonicalReject(value: unknown): value is UnifiedCanonicalReject {
+  return typeof value === "object" && value !== null && "kind" in value &&
+    (value as { readonly kind: string }).kind === "reject";
+}
+
+function compilePowerShellCall(
+  argumentsValue: Record<string, unknown>,
+  environment: CompileEnvironmentFacts,
+): CanonicalCompilation | UnifiedCanonicalReject {
+  const argumentKeys = Reflect.ownKeys(argumentsValue);
+  if (!hasAllowedKeys(argumentsValue, ["command"], ["command", "timeout"]) ||
+    typeof argumentsValue.command !== "string" || argumentsValue.command.length === 0 ||
+    argumentsValue.command.includes("\u0000") ||
+    argumentKeys.includes("timeout") && !isPositiveNumber(argumentsValue.timeout)) {
+    return rejectShell("invalid-request", 0);
+  }
+  const command = argumentsValue.command;
+  if (exceedsShellCommandBudget(command, environment.cwd, environment.home ?? "")) {
+    return rejectShell("resource-limit", command.length);
+  }
+
+  const analysis = analyzePowerShellCommand(command, environment);
+  if (isCanonicalReject(analysis)) return analysis;
+
+  return CanonicalCompilation.issue(COMPILATION_ISSUER, Object.freeze({
+    kind: "shell",
+    command,
+    operations: analysis,
+  }));
+}
 
 const ALLOWED_PIPELINE_FILTERS = new Set([
   "grep", "rg", "head", "tail", "wc", "cut", "sort", "uniq", "tr", "cat", "od",
