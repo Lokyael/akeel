@@ -39,15 +39,18 @@ const HANDSHAKE_SCRIPT = [
   "} | ConvertTo-Json -Compress",
 ].join("; ");
 
-const RUNTIME_PREFIX = [
+export const WINDOWS_RUNTIME_PREFIX = [
   "$ErrorActionPreference = 'Stop'",
   "if ([Environment]::ProcessPath -ne $env:AKEEL_VERIFIED_PWSH) { throw 'PowerShell executable identity changed' }",
   "if ($PSVersionTable.PSEdition -ne 'Core' -or $PSVersionTable.PSVersion.Major -ne 7 -or $PSVersionTable.PSVersion.Minor -lt 4) { throw 'Unsupported PowerShell runtime' }",
   "if ($ExecutionContext.SessionState.LanguageMode -ne 'FullLanguage') { throw 'Unsupported PowerShell language mode' }",
+  "$utf8NoBom = [System.Text.UTF8Encoding]::new($false)",
   "$PSNativeCommandArgumentPassing = 'Standard'",
-  "[Console]::InputEncoding = [System.Text.UTF8Encoding]::new($false)",
-  "[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)",
-  "if ($PSNativeCommandArgumentPassing -ne 'Standard' -or [Console]::OutputEncoding.CodePage -ne 65001) { throw 'Unsupported PowerShell runtime configuration' }",
+  "[Console]::InputEncoding = $utf8NoBom",
+  "[Console]::OutputEncoding = $utf8NoBom",
+  "$OutputEncoding = $utf8NoBom",
+  "$PSDefaultParameterValues['*:Encoding'] = 'utf8NoBOM'",
+  "if ($PSNativeCommandArgumentPassing -ne 'Standard' -or $OutputEncoding.CodePage -ne 65001 -or [Console]::InputEncoding.CodePage -ne 65001 -or [Console]::OutputEncoding.CodePage -ne 65001 -or $utf8NoBom.GetPreamble().Length -ne 0 -or $PSDefaultParameterValues['*:Encoding'] -ne 'utf8NoBOM') { throw 'Unsupported PowerShell runtime configuration' }",
 ].join("; ");
 
 const MAX_HANDSHAKE_OUTPUT_BYTES = 16 * 1024;
@@ -189,6 +192,9 @@ export function createWindowsPowerShellTool(
         toolCallId,
         command: input.command,
         cwd: context.cwd,
+        // The bootstrap has no Windows WorkspaceIdentity authority yet; the
+        // temporary adapter binds the ticket to the session cwd explicitly.
+        workspaceIdentity: context.cwd,
         timeoutMs: input.timeout,
         signal,
         onData: (chunk) => onUpdate?.({ content: [{ type: "text", text: chunk }], details: { exitCode: null, truncated: false } }),
@@ -198,58 +204,108 @@ export function createWindowsPowerShellTool(
   };
 }
 
+type WindowsToolMetadata = Readonly<{
+  readonly name: string;
+  readonly sourceInfo?: Readonly<{ readonly path: string; readonly source: string }>;
+}>;
+
+const AKEEL_PACKAGE_PATH_PATTERN = /(?:^|[/\\])(?:packages[/\\](?:access-gate|guidance|context-pruner)|node_modules[/\\](?:@[^/\\]+[/\\])?akeel-(?:access-gate|guidance|context-pruner))(?:[/\\]|$)/iu;
+const AKEEL_SUPPORT_TOOL_NAME_PATTERN = /^akeel_/u;
+
 export function isOwnedWindowsPowerShellTool(
-  tool: Readonly<{ readonly name: string; readonly sourceInfo?: Readonly<{ readonly path: string; readonly source: string }> }>,
-  ownerPathPattern = /(?:^|[/\\])(?:access-gate|akeel-access-gate)(?:[/\\]|$)/iu,
+  tool: WindowsToolMetadata,
+  ownerPathPattern = /(?:^|[/\\])(?:packages[/\\]access-gate|node_modules[/\\](?:@[^/\\]+[/\\])?akeel-access-gate)(?:[/\\]|$)/iu,
 ): boolean {
-  return tool.name === "powershell" && tool.sourceInfo !== undefined &&
-    (tool.sourceInfo.source === "local" || tool.sourceInfo.source === "package") &&
-    ownerPathPattern.test(tool.sourceInfo.path);
+  return tool.name === "powershell" && isOwnedAkeelToolPath(tool.sourceInfo, ownerPathPattern);
+}
+
+function isOwnedWindowsSupportTool(tool: WindowsToolMetadata): boolean {
+  return AKEEL_SUPPORT_TOOL_NAME_PATTERN.test(tool.name) && isOwnedAkeelToolPath(tool.sourceInfo, AKEEL_PACKAGE_PATH_PATTERN);
+}
+
+function isOwnedAkeelToolPath(
+  sourceInfo: WindowsToolMetadata["sourceInfo"],
+  pathPattern: RegExp,
+): boolean {
+  if (sourceInfo === undefined || (sourceInfo.source !== "local" && sourceInfo.source !== "package")) return false;
+  pathPattern.lastIndex = 0;
+  const matched = pathPattern.test(sourceInfo.path);
+  pathPattern.lastIndex = 0;
+  return matched;
 }
 
 export function installWindowsBootstrap(pi: ExtensionAPI, options: WindowsBootstrapOptions = {}): void {
-  let executable: VerifiedPowerShellExecutable | undefined;
   let executor: PowerShellExecutor | undefined;
   let initialized = false;
   let initializing: Promise<void> | undefined;
+  let lifecycleGeneration = 0;
   const tickets = new Map<string, PowerShellExecutionTicket>();
 
   pi.registerTool(createWindowsPowerShellTool(() => executor, (toolCallId) => tickets.get(toolCallId)));
 
   const initialize = async (): Promise<void> => {
     if (initializing !== undefined) return initializing;
-    initializing = (async () => {
+    const generation = lifecycleGeneration;
+    const work = (async () => {
       try {
-        executable = await (options.resolvePowerShell ?? (() => discoverVerifiedPowerShell()))();
-        executor = options.executor ?? createPowerShellExecutor(executable, RUNTIME_PREFIX);
+        const candidateExecutable = await (options.resolvePowerShell ?? (() => discoverVerifiedPowerShell()))();
+        if (generation !== lifecycleGeneration) return;
+        const candidateExecutor = options.executor ?? createPowerShellExecutor(candidateExecutable, WINDOWS_RUNTIME_PREFIX);
         const tools = pi.getAllTools();
         const powershell = tools.find((tool) => tool.name === "powershell");
         const directToolsValid = WINDOWS_DIRECT_SURFACES.every((name) => {
           const tool = tools.find((candidate) => candidate.name === name);
-          return tool?.sourceInfo.source === "builtin";
+          return tool?.sourceInfo.source === "builtin" && tool.sourceInfo.path === `<builtin:${name}>`;
         });
         if (!powershell || !isOwnedWindowsPowerShellTool(powershell, options.ownerPathPattern) || !directToolsValid) {
           throw new Error("Windows tool ownership or Direct tool source verification failed");
         }
-        const active = pi.getActiveTools().filter((name) => name !== "bash");
-        pi.setActiveTools([...new Set([...active, ...WINDOWS_DIRECT_SURFACES, "powershell"])]);
+
+        const directNames = new Set<string>(WINDOWS_DIRECT_SURFACES);
+        const supportTools = pi.getActiveTools()
+          .filter((name) => name !== "bash" && name !== "powershell" && !directNames.has(name))
+          .map((name) => tools.find((tool) => tool.name === name))
+          .filter((tool): tool is typeof tools[number] => tool !== undefined && isOwnedWindowsSupportTool(tool))
+          .map((tool) => tool.name);
+        const expectedActiveTools = [...new Set([...supportTools, ...WINDOWS_DIRECT_SURFACES, "powershell"])] as string[];
+        pi.setActiveTools(expectedActiveTools);
+        const finalActiveTools = new Set(pi.getActiveTools());
+        if (finalActiveTools.size !== expectedActiveTools.length || expectedActiveTools.some((name) => !finalActiveTools.has(name))) {
+          throw new Error("Windows active tool set verification failed");
+        }
+        if (generation !== lifecycleGeneration) return;
+        executor = candidateExecutor;
         initialized = true;
       } catch {
-        executable = undefined;
+        if (generation !== lifecycleGeneration) return;
         executor = undefined;
         initialized = false;
       }
-    })().finally(() => {
-      initializing = undefined;
+    })();
+    let tracked: Promise<void>;
+    tracked = work.finally(() => {
+      if (initializing === tracked) initializing = undefined;
     });
-    return initializing;
+    initializing = tracked;
+    return tracked;
   };
 
-  pi.on("session_start", () => initialize());
-  pi.on("session_shutdown", () => {
+  pi.on("session_start", () => {
+    lifecycleGeneration++;
+    // Invalidate the previous session before discovery starts. This matters
+    // when Pi loads/reloads a session without delivering shutdown first: an
+    // old executor or ticket must never remain usable during the new session.
+    initializing = undefined;
     tickets.clear();
     executor = undefined;
-    executable = undefined;
+    initialized = false;
+    return initialize();
+  });
+  pi.on("session_shutdown", () => {
+    lifecycleGeneration++;
+    initializing = undefined;
+    tickets.clear();
+    executor = undefined;
     initialized = false;
   });
   pi.on("tool_call", (event: ToolCallEvent): ToolCallEventResult | undefined => {

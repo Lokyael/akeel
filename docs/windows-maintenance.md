@@ -52,11 +52,11 @@ PowerShell-only 约束只指定 Pi 的 host Shell。由已准入 PowerShell 命�
 
 首个 Windows tracer 不是对既有适配的预先验收。迁移先实现一个最小、默认 fail-closed 的 Windows bootstrap，再到独立原生 Windows checkout 验证该 bootstrap；不得把“尚未实现 Windows profile”误当成跳过 native evidence 的理由，也不得要求在任何代码存在前证明最终行为。
 
-1. **Bootstrap implementation**：加入一次性平台选择、AKeel-owned 同名 `powershell` replacement、final tool source/active-set 核对、`pwsh.exe` identity/version handshake、single-use execution-ticket primitive 与 bounded executor seam。平台无关部分和静态合同测试可在非 Windows checkout 编写。
-2. **Native tracer acceptance**：通过 Git 把已提交源码带入独立 Windows 11/NTFS checkout，pack/install 最终 package，并核对 replacement ownership、无 model `bash`、fixed setup、ticket missing/replay/mutation 的 pre-spawn rejection，以及固定 `git.exe`、`node.exe`、`npm.cmd`/必要 shim vectors 的 `Standard` 参数行为。
-3. **Broader migration**：只有 native tracer 证明 Pi host seam 与目标工具链兼容后，才开始 platform-runtime foundation、Linux parity migration、Windows path/runtime 和完整 PowerShell Canonical 集成；不兼容证据先返回用户裁决。
+1. **Bootstrap hardening**：收敛真实 Pi tool ownership、失败时 active-set、`pwsh.exe` handshake、固定 UTF-8/`Standard` setup，以及绑定 call/command/cwd/workspace/lifecycle 的单次 ticket；普通 Windows PowerShell 与 Direct 调用继续阻断。
+2. **Native tracer**：在独立 Windows 11/NTFS checkout 对 packed package 验证 replacement ownership、无 model `bash`、fixed setup、ticket rejection，以及包含 Unicode、空参数、空格、引号和尾反斜线的 `git.exe`、`node.exe`、`npm.cmd` 参数行为。
+3. **Unified migration**：platform-runtime sealed contracts 与 Linux migration 可并行推进；native tracer 仍是 Windows host/evidence/executor 集成的前置证据。任何不兼容先返回用户裁决。
 
-Bootstrap 期间普通模型 PowerShell 调用保持拒绝。固定 tracer vectors 只能由 native contract-test harness 调用 executor seam，不得通过 production flag、环境变量或隐藏 policy 建立运行时 test mode。Tracer 通过只证明宿主接缝可行，不发行一般 Windows 支持结论；完整 Canonical/Admission 后续只能为成功授权的 exact input 发行 production ticket。
+`npm run test:windows-tracer` 只是 native executor smoke，不替代 packed Pi metadata 或发布验收。Tracer 通过不发行 Windows 支持结论；只有完整 Canonical/Admission 可发行 production ticket。
 
 ## 上游 Pi 事实基线
 
@@ -73,7 +73,7 @@ Pi 没有发布带里程碑的 Windows roadmap。公开 Windows 反馈线程仍�
 
 ## Windows Platform Runtime Authority
 
-Windows profile 通过内部 `akeel-platform-runtime` support package 共享 path、private-filesystem、process 与 runtime-root contracts。该 package 不声明 Pi extension/skill，不增加用户能力入口；Access Gate 和 Guidance 仍分别拥有 Policy、session 与 run lifecycle。
+Access Gate 与 Guidance 各自通过内部 `akeel-platform-runtime` 获得同源的 path/private-filesystem/process/runtime-root primitives；该 package 无 Pi resources、不是跨 package 单例，也不拥有 Policy、session 或 run lifecycle。Context Pruner 不依赖它。
 
 每个活动 session 使用一个 private Windows evidence host：TypeScript client 通过有版本、预算与超时的 JSONL stdio 协议调用同一个 verified `pwsh.exe`，host 以 `-NoLogo -NoProfile -NonInteractive` 运行，使用官方 `System.Management.Automation.Language.Parser`，并加载 AKeel 自有 managed Win32 assembly 取得 handle-based final path、volume/file ID、reparse tag、SID/DACL、process creation identity 与原子文件操作。Host 不执行模型命令；模型命令由持有 execution ticket 的独立 PowerShell executor 在 fresh process 中运行。协议错误、host exit、超时、未知 Win32 evidence 或预算超限均 fail-closed。
 

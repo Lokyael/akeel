@@ -26,7 +26,7 @@ type IssueInput = Readonly<{
 type ConsumeInput = Readonly<{
   readonly toolCallId: string;
   readonly command: string;
-  readonly cwd: string;
+  readonly workspaceIdentity: string;
 }>;
 
 export function issuePowerShellExecutionTicket(input: IssueInput): PowerShellExecutionTicket {
@@ -48,10 +48,10 @@ export function consumePowerShellExecutionTicket(
   ticket: PowerShellExecutionTicket,
   input: ConsumeInput,
 ): Readonly<{ readonly toolCallId: string; readonly command: string }> | undefined {
-  if (!isRecord(ticket) || !isNonEmptyText(input.toolCallId) || !isNonEmptyText(input.command) || !isNonEmptyText(input.cwd)) return undefined;
+  if (!isRecord(ticket) || !isNonEmptyText(input.toolCallId) || !isNonEmptyText(input.command) || !isNonEmptyText(input.workspaceIdentity)) return undefined;
   const record = ticketRecords.get(ticket);
   if (record === undefined || record.consumed) return undefined;
-  if (record.toolCallId !== input.toolCallId || record.commandDigest !== commandDigest(input.command) || record.workspaceIdentity !== input.cwd) return undefined;
+  if (record.toolCallId !== input.toolCallId || record.commandDigest !== commandDigest(input.command) || record.workspaceIdentity !== input.workspaceIdentity) return undefined;
   record.consumed = true;
   return Object.freeze({ toolCallId: record.toolCallId, command: record.command });
 }

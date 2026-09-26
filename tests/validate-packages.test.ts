@@ -15,6 +15,7 @@ type PackageManifest = Readonly<{
   readonly peerDependencies?: Readonly<Record<string, string>>;
   readonly engines?: Readonly<Record<string, string>>;
   readonly files?: readonly string[];
+  readonly keywords?: readonly string[];
   readonly pi?: PiManifest;
 }>;
 
@@ -86,6 +87,15 @@ test("guidance owns bootstrap and skills without duplicating principles", () => 
   assert.deepEqual(principles, [join(root, "packages/guidance/src/bootstrap/principles.md")]);
 });
 
+test("platform runtime is a non-Pi support package", () => {
+  const manifest = readPackage("packages/platform-runtime/package.json");
+  assert.equal(manifest.name, "akeel-platform-runtime");
+  assert.equal(manifest.pi, undefined);
+  assert.equal(manifest.dependencies?.["akeel-platform-runtime"], undefined);
+  assert.equal(manifest.keywords, undefined);
+  assert.equal(readFileSync(join(root, "packages/platform-runtime/LICENSE"), "utf8"), readFileSync(join(root, "LICENSE"), "utf8"));
+});
+
 test("runtime packages declare only their own extension and required dependency", () => {
   const guidance = readPackage("packages/guidance/package.json");
   const accessGate = readPackage("packages/access-gate/package.json");
@@ -95,12 +105,15 @@ test("runtime packages declare only their own extension and required dependency"
   assert.deepEqual(accessGate.pi?.extensions, ["./src/access-gate"]);
   assert.deepEqual(contextPruner.pi?.extensions, ["./src/context-pruner"]);
   assert.equal(accessGate.dependencies?.yaml, "^2.9.0");
+  assert.equal(accessGate.dependencies?.["akeel-platform-runtime"], "0.1.0");
+  assert.equal(guidance.dependencies?.["akeel-platform-runtime"], "0.1.0");
+  assert.equal(contextPruner.dependencies?.["akeel-platform-runtime"], undefined);
   assert.equal(contextPruner.dependencies?.yaml, undefined);
 });
 
-test("each capability package carries the repository license", () => {
+test("each distributed package carries the repository license", () => {
   const license = readFileSync(join(root, "LICENSE"), "utf8");
-  for (const packageRoot of ["packages/guidance", "packages/access-gate", "packages/context-pruner"]) {
+  for (const packageRoot of ["packages/guidance", "packages/access-gate", "packages/context-pruner", "packages/platform-runtime"]) {
     assert.equal(
       readFileSync(join(root, packageRoot, "LICENSE"), "utf8"),
       license,

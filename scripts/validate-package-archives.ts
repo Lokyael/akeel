@@ -26,6 +26,8 @@ type ArchiveResult = Readonly<{
 
 const root = resolve(import.meta.dirname!, "..");
 const packageRoots = ["packages/guidance", "packages/access-gate", "packages/context-pruner"] as const;
+const platformRuntimeRoot = "packages/platform-runtime" as const;
+const platformRuntimeConsumers = new Set<string>(["packages/guidance", "packages/access-gate"]);
 const FORBIDDEN_ARCHIVE_PATH = /(?:^|\/)node_modules(?:\/|$)|(?:^|\/)tests(?:\/|$)|(?:^|\/)(?:package-lock|npm-shrinkwrap)\.json$|\.test\.[cm]?[jt]sx?$/u;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -176,6 +178,10 @@ async function assertInstalledPackage(packageRoot: string): Promise<void> {
 
   try {
     const archive = archiveFile(packageRoot, archiveTemp);
+    if (platformRuntimeConsumers.has(packageRoot)) {
+      const runtimeArchive = archiveFile(platformRuntimeRoot, archiveTemp);
+      runNpm(["install", "--ignore-scripts", "--omit=dev", "--legacy-peer-deps", "--prefix", installRoot, runtimeArchive], root);
+    }
     runNpm(["install", "--ignore-scripts", "--omit=dev", "--legacy-peer-deps", "--prefix", installRoot, archive], root);
     stageHostDependencies(installRoot);
 
@@ -198,5 +204,7 @@ async function assertInstalledPackage(packageRoot: string): Promise<void> {
   }
 }
 
+assertArchive(platformRuntimeRoot);
 for (const packageRoot of packageRoots) assertArchive(packageRoot);
+await assertInstalledPackage(platformRuntimeRoot);
 for (const packageRoot of packageRoots) await assertInstalledPackage(packageRoot);

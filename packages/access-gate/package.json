@@ -12,6 +12,7 @@
     "@earendil-works/pi-coding-agent": "*"
   },
   "dependencies": {
+    "akeel-platform-runtime": "0.1.0",
     "yaml": "^2.9.0"
   },
   "pi": {

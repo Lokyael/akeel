@@ -1,6 +1,8 @@
 import { spawn } from "node:child_process";
-import type { PowerShellExecutionTicket } from "./ticket";
-import { consumePowerShellExecutionTicket } from "./ticket";
+import { consumePowerShellExecutionTicket, type PowerShellExecutionTicket } from "./ticket";
+
+export const MAX_POWER_SHELL_COMMAND_BYTES = 16_384;
+export const MAX_POWER_SHELL_TIMEOUT_MS = 120_000;
 
 export type PowerShellProcessResult = Readonly<{
   readonly exitCode: number | null;
@@ -12,6 +14,8 @@ export type PowerShellExecutionRequest = Readonly<{
   readonly toolCallId: string;
   readonly command: string;
   readonly cwd: string;
+  /** Session-bound workspace identity; the bootstrap currently derives it from cwd. */
+  readonly workspaceIdentity: string;
   readonly timeoutMs?: number;
   readonly signal?: AbortSignal;
   readonly onData?: (chunk: string) => void;
@@ -35,14 +39,25 @@ export function createPowerShellExecutor(
 ): PowerShellExecutor {
   return Object.freeze({
     async execute(ticket: PowerShellExecutionTicket, request: PowerShellExecutionRequest): Promise<PowerShellProcessResult> {
+      if (Buffer.byteLength(request.command, "utf8") > MAX_POWER_SHELL_COMMAND_BYTES) {
+        throw new Error("PowerShell command exceeds the bounded input size");
+      }
+      if (!Number.isFinite(request.timeoutMs ?? MAX_POWER_SHELL_TIMEOUT_MS) ||
+        (request.timeoutMs ?? MAX_POWER_SHELL_TIMEOUT_MS) <= 0 ||
+        (request.timeoutMs ?? MAX_POWER_SHELL_TIMEOUT_MS) > MAX_POWER_SHELL_TIMEOUT_MS) {
+        throw new Error("PowerShell execution timeout is outside the bounded range");
+      }
       const bound = consumePowerShellExecutionTicket(ticket, {
         toolCallId: request.toolCallId,
         command: request.command,
-        cwd: request.cwd,
+        workspaceIdentity: request.workspaceIdentity,
       });
       if (bound === undefined) throw new Error("PowerShell execution ticket is missing, replayed, or mismatched");
 
-      const script = `${trustedPrefix};${request.command}`;
+      // Execute the immutable command captured by the ticket, not a later
+      // request object. The digest check remains a defence-in-depth check for
+      // callers that present a separately decoded command string.
+      const script = `${trustedPrefix};${bound.command}`;
       return runner(executable.path, script, request, {
         ...process.env,
         AKEEL_VERIFIED_PWSH: executable.path,
@@ -120,7 +135,7 @@ async function runPowerShellProcess(
       truncated,
     }));
 
-    const timeoutMs = request.timeoutMs ?? 120_000;
+    const timeoutMs = request.timeoutMs ?? MAX_POWER_SHELL_TIMEOUT_MS;
     timeout = setTimeout(() => child.kill(), timeoutMs);
     abortHandler = () => child.kill();
     request.signal?.addEventListener("abort", abortHandler, { once: true });

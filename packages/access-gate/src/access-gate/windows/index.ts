@@ -11,6 +11,7 @@ export {
   WINDOWS_BOOTSTRAP_BLOCK_REASON,
   WINDOWS_BOOTSTRAP_UNAVAILABLE_REASON,
   WINDOWS_DIRECT_SURFACES,
+  WINDOWS_RUNTIME_PREFIX,
   type PowerShellHandshake,
   type PowerShellProbe,
   type ResolvePowerShellOptions,
@@ -20,6 +21,8 @@ export {
 } from "./bootstrap";
 export {
   createPowerShellExecutor,
+  MAX_POWER_SHELL_COMMAND_BYTES,
+  MAX_POWER_SHELL_TIMEOUT_MS,
   type PowerShellExecutionRequest,
   type PowerShellExecutor,
   type PowerShellProcessResult,

@@ -1056,5 +1056,25 @@ Rejected:
 
 Out of Scope: OS sandbox, container isolation, user-entered `!`/`!!` commands, custom tool backends, later extension input mutation, and configurable policy/path/credential checks while off.
 
-## D-098: 待创建
+## D-098: Unified platform composition with native host realization
+
+Reversal surface: user-boundary
+
+Decision: Linux and Windows use one Access Gate authorization chain: Host Composition → Gate Session → private Direct/Shell frontend → Canonical → Admission → Mandatory Boundary → Policy → Verdict. Platform selection occurs once at extension load; session resources start at `session_start`. Common authorization code never parses native paths, calls native filesystems, or translates Shell languages.
+
+Host realization follows platform facts rather than forced symmetry. Direct tools remain Pi-native after authorization. Linux Bash remains Pi-native passthrough; Windows PowerShell is AKeel-owned and consumes a sealed single-use binding for the approved call, command, cwd, workspace and lifecycle. Unsupported model Shells remain blocked, including Gate off. Linux passthrough retains its documented post-decision and TOCTOU limits.
+
+`akeel-platform-runtime` is the sole implementation source for path, private-filesystem, process, runtime-root and atomic-publication evidence used by Access Gate and Guidance. It has no Pi resources or gallery identity, is not a cross-package singleton, and owns no Policy, GateSession, Artifact Exchange or Handoff lifecycle. Its platform-tagged values are runtime-authenticated and cross-domain fail-closed; Access Gate assigns policy meaning to sealed Root Catalog references. Context Pruner remains independent and owns closed Bash/PowerShell positive recognizers.
+
+This decision owns the cross-platform composition and support-package boundary. D-035 owns native profile contracts, D-086 distribution, and D-087 the authorization chain.
+
+Why: authorization invariants must not drift between profiles, while native path, filesystem, Shell and execution mechanisms cannot be made equivalent by string adapters or a broad god interface. A shared implementation package prevents evidence duplication without coupling independently installed capabilities through shared in-memory identity.
+
+Impact: Linux behavior migrates behind the new ports before common code drops pathname semantics. Windows joins the same authorization chain but retains its owned PowerShell executor. Guidance consumes runtime primitives for workflow roots and publication; Context Pruner adds a separate conservative PowerShell recognizer without the runtime dependency.
+
+Rejected: a shared native path/Shell parser; a permanent Windows bootstrap branch; forced cross-platform execution tickets; platform-owned Policy or capability lifecycles; a fourth user-facing Pi package; a shared runtime singleton.
+
+Out of Scope: macOS/BSD/network filesystems, OS sandboxing, fd passing, TOCTOU elimination, descendant-process/network confinement, new Policy schema, arbitrary PowerShell grammar and automatic workflow GC.
+
+## D-099: 待创建
 

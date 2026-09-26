@@ -1,0 +1,13 @@
+{
+  "name": "akeel-platform-runtime",
+  "version": "0.1.0",
+  "description": "AKeel platform evidence and runtime contracts",
+  "license": "MIT",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "files": ["src", "LICENSE"],
+  "engines": {
+    "node": ">=22.19.0"
+  }
+}
