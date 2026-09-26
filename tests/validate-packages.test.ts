@@ -16,6 +16,7 @@ type PackageManifest = Readonly<{
   readonly engines?: Readonly<Record<string, string>>;
   readonly files?: readonly string[];
   readonly keywords?: readonly string[];
+  readonly exports?: Readonly<Record<string, unknown>>;
   readonly pi?: PiManifest;
 }>;
 
@@ -93,6 +94,7 @@ test("platform runtime is a non-Pi support package", () => {
   assert.equal(manifest.pi, undefined);
   assert.equal(manifest.dependencies?.["akeel-platform-runtime"], undefined);
   assert.equal(manifest.keywords, undefined);
+  assert.deepEqual(Object.keys(manifest.exports ?? {}), ["."]);
   assert.equal(readFileSync(join(root, "packages/platform-runtime/LICENSE"), "utf8"), readFileSync(join(root, "LICENSE"), "utf8"));
 });
 

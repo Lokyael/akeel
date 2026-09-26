@@ -1,130 +1,128 @@
-export type PlatformId = "linux" | "windows";
+export {
+  PlatformDomain,
+  PlatformObjectIdentity,
+  PlatformPathProof,
+  ProcessIdentity,
+  RootCatalog,
+  RootReference,
+  RuntimeRoot,
+  WorkspaceIdentity,
+  isPlatformDomain,
+  isPlatformPathProof,
+  isProcessIdentity,
+  isRootCatalog,
+  isRuntimeRoot,
+  isWorkspaceIdentity,
+  projectPathAuthorization,
+  samePlatformObject,
+  type PathAuthorizationView,
+  type PathRisk,
+  type PlatformId,
+  type RootRelation,
+  type RootRelationEvidence,
+  type RuntimeRole,
+} from "../internal/sealed-values";
 
-export type RootRelation = "equal" | "descendant" | "ancestor" | "traversed";
-export type RuntimeRole = "session" | "staging" | "workflow";
-export type ProcessIdentity = Readonly<{
+import type {
+  PlatformDomain,
+  PlatformId,
+  PlatformPathProof,
+  ProcessIdentity,
+  RootCatalog,
+  RuntimeRoot,
+  RuntimeRole,
+  WorkspaceIdentity,
+} from "../internal/sealed-values";
+
+export const PLATFORM_RUNTIME_CONTRACT_VERSION = 1 as const;
+
+export type PlatformSessionPurpose = "access-gate" | "guidance";
+
+export type PlatformSessionInput = Readonly<{
+  readonly purpose: PlatformSessionPurpose;
+  readonly cwd: string;
+  readonly home?: string;
+}>;
+
+export type WorkspaceIdentityStamp = Readonly<{
+  readonly schemaVersion: 1;
+  readonly platform: PlatformId;
+  readonly canonicalDisplay: string;
+  readonly nativeIdentity: string;
+}>;
+
+export type ProcessIdentityStamp = Readonly<{
+  readonly schemaVersion: 1;
+  readonly platform: PlatformId;
   readonly pid: number;
-  readonly creationIdentity: object;
+  readonly creationIdentity: string;
 }>;
 
-declare const platformDomainBrand: unique symbol;
-declare const workspaceIdentityBrand: unique symbol;
-declare const pathProofBrand: unique symbol;
-declare const runtimeRootBrand: unique symbol;
-declare const rootCatalogBrand: unique symbol;
-declare const executionBindingBrand: unique symbol;
+export type ProcessLiveness = "alive" | "dead" | "unknown";
 
-export type PlatformDomain = Readonly<{
-  readonly platform: PlatformId;
-  readonly token: object;
-  readonly [platformDomainBrand]: true;
-}>;
+export type PathResolutionFailureCode =
+  | "invalid-input"
+  | "unsupported-path"
+  | "evidence-unavailable"
+  | "resource-limit";
 
-export type WorkspaceIdentity = Readonly<{
-  readonly platform: PlatformId;
-  readonly domain: PlatformDomain;
-  readonly token: object;
-  readonly [workspaceIdentityBrand]: true;
-}>;
-
-export type RootRelationEvidence = Readonly<{
-  readonly rootId: string;
-  readonly relations: readonly RootRelation[];
-}>;
-
-export type PlatformPathProof = Readonly<{
-  readonly platform: PlatformId;
-  readonly domain: PlatformDomain;
-  readonly display: string;
-  readonly relations: readonly RootRelationEvidence[];
-  readonly terminalObject?: object;
-  readonly traversedObjects: readonly object[];
-  readonly riskFlags: readonly string[];
-  readonly [pathProofBrand]: true;
-}>;
-
-export type RootCatalog = Readonly<{
-  readonly platform: PlatformId;
-  readonly domain: PlatformDomain;
-  readonly roots: readonly string[];
-  readonly [rootCatalogBrand]: true;
-}>;
-
-export type RuntimeRoot = Readonly<{
-  readonly platform: PlatformId;
-  readonly domain: PlatformDomain;
-  readonly role: RuntimeRole;
-  readonly workspace: WorkspaceIdentity;
-  readonly path: PlatformPathProof;
-  readonly [runtimeRootBrand]: true;
-}>;
-
-export type ExecutionBinding = Readonly<{
-  readonly platform: PlatformId;
-  readonly domain: PlatformDomain;
-  readonly workspace: WorkspaceIdentity;
-  readonly token: object;
-  readonly [executionBindingBrand]: true;
-}>;
+export type PathResolutionResult =
+  | Readonly<{ readonly kind: "resolved"; readonly proof: PlatformPathProof }>
+  | Readonly<{ readonly kind: "rejected"; readonly code: PathResolutionFailureCode }>;
 
 export type PathResolutionRequest = Readonly<{
   readonly workspace: WorkspaceIdentity;
+  readonly catalog: RootCatalog;
+  readonly base: WorkspaceIdentity | PlatformPathProof;
   readonly literal: string;
   readonly kind: "literal" | "home-relative";
 }>;
 
 export interface PathAuthority {
-  readonly platform: PlatformId;
   readonly domain: PlatformDomain;
-  readonly rootCatalog: RootCatalog;
-  resolve(request: PathResolutionRequest): Promise<PlatformPathProof | undefined>;
-}
-
-export interface PrivateFilesystemAuthority {
-  readonly platform: PlatformId;
-  readonly domain: PlatformDomain;
-  createRuntimeRoot(role: RuntimeRole, workspace: WorkspaceIdentity): Promise<RuntimeRoot>;
-  verifyRuntimeRoot(root: RuntimeRoot): Promise<boolean>;
-  removeRuntimeRoot(root: RuntimeRoot): Promise<boolean>;
+  compileRootCatalog(workspace: WorkspaceIdentity, nativeRoots: readonly string[]): Promise<RootCatalog>;
+  resolve(request: PathResolutionRequest): Promise<PathResolutionResult>;
+  stampWorkspace(workspace: WorkspaceIdentity): WorkspaceIdentityStamp;
+  revalidateWorkspace(stamp: WorkspaceIdentityStamp): Promise<WorkspaceIdentity | undefined>;
 }
 
 export interface ProcessAuthority {
-  readonly platform: PlatformId;
   readonly domain: PlatformDomain;
   current(): Promise<ProcessIdentity>;
-  isAlive(identity: ProcessIdentity): Promise<boolean>;
-}
-
-export type ExecutionRequest = Readonly<{
-  readonly binding: ExecutionBinding;
-  readonly toolCallId: string;
-  readonly input: unknown;
-  readonly cwd: WorkspaceIdentity;
-  readonly signal?: AbortSignal;
-}>;
-
-export type ExecutionResult = Readonly<{
-  readonly exitCode: number | null;
-  readonly output: string;
-  readonly truncated: boolean;
-}>;
-
-export interface ExecutionBridge {
-  readonly platform: PlatformId;
-  readonly domain: PlatformDomain;
-  bind(input: Readonly<{
-    readonly toolCallId: string;
-    readonly workspace: WorkspaceIdentity;
-    readonly approvedInput: unknown;
-  }>): Promise<ExecutionBinding | undefined>;
-  execute(request: ExecutionRequest): Promise<ExecutionResult>;
+  stamp(identity: ProcessIdentity): ProcessIdentityStamp;
+  liveness(stamp: ProcessIdentityStamp): Promise<ProcessLiveness>;
 }
 
 export interface RuntimeRootAuthority {
-  readonly platform: PlatformId;
   readonly domain: PlatformDomain;
-  readonly filesystem: PrivateFilesystemAuthority;
-  readonly process: ProcessAuthority;
-  createSessionRoot(workspace: WorkspaceIdentity): Promise<RuntimeRoot>;
-  createWorkflowRoot(workspace: WorkspaceIdentity): Promise<RuntimeRoot>;
+  create(role: RuntimeRole, workspace: WorkspaceIdentity): Promise<RuntimeRoot>;
+  verify(root: RuntimeRoot): Promise<boolean>;
+  remove(root: RuntimeRoot): Promise<boolean>;
+}
+
+export interface PrivateFilesystemAuthority {
+  readonly domain: PlatformDomain;
+  ensureDirectory(root: RuntimeRoot, relativeComponents: readonly string[]): Promise<void>;
+  readText(root: RuntimeRoot, relativeComponents: readonly string[], maxBytes: number): Promise<string | undefined>;
+}
+
+export type AtomicPublicationResult = Readonly<{
+  readonly status: "published" | "already-published";
+  readonly bytes: number;
+  readonly digest: string;
+}>;
+
+export interface AtomicTextPublicationAuthority {
+  readonly domain: PlatformDomain;
+  publish(input: Readonly<{
+    readonly root: RuntimeRoot;
+    readonly relativeComponents: readonly string[];
+    readonly content: string;
+  }>): Promise<AtomicPublicationResult>;
+}
+
+export interface PlatformSession {
+  readonly domain: PlatformDomain;
+  readonly workspace: WorkspaceIdentity;
+  close(): Promise<void>;
 }

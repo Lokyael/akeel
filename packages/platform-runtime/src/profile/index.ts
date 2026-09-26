@@ -1,43 +1,36 @@
 import type {
-  ExecutionBridge,
-  PathAuthority,
-  PlatformDomain,
   PlatformId,
-  PrivateFilesystemAuthority,
-  ProcessAuthority,
-  RuntimeRootAuthority,
+  PlatformSession,
+  PlatformSessionInput,
 } from "../contracts";
 
-export type PlatformProfile = Readonly<{
+export interface PlatformRuntimeFactory<TSession extends PlatformSession = PlatformSession> {
   readonly id: PlatformId;
-  readonly domain: PlatformDomain;
-  readonly path: PathAuthority;
-  readonly privateFilesystem: PrivateFilesystemAuthority;
-  readonly process: ProcessAuthority;
-  readonly runtime: RuntimeRootAuthority;
-  readonly execution: ExecutionBridge;
-  readonly modelShell: "bash" | "powershell";
-  readonly unsupportedModelShells: readonly string[];
-}>;
-
-export interface PlatformProfileFactory {
-  readonly id: PlatformId;
-  create(): Promise<PlatformProfile>;
+  openSession(input: PlatformSessionInput): Promise<TSession>;
 }
 
-export type PlatformProfileRegistry = Readonly<{
-  readonly profiles: readonly PlatformProfileFactory[];
-  find(id: PlatformId): PlatformProfileFactory | undefined;
+export type PlatformRuntimeRegistry = Readonly<{
+  readonly factories: readonly PlatformRuntimeFactory[];
+  find(id: PlatformId): PlatformRuntimeFactory | undefined;
 }>;
 
-export function createPlatformProfileRegistry(
-  profiles: readonly PlatformProfileFactory[],
-): PlatformProfileRegistry {
-  const frozen = Object.freeze([...profiles]);
+export function createPlatformRuntimeRegistry(
+  factories: readonly PlatformRuntimeFactory[],
+): PlatformRuntimeRegistry {
+  if (!Array.isArray(factories) || factories.length === 0) throw new TypeError("platform registry is empty");
+  const ids = new Set<PlatformId>();
+  for (const factory of factories) {
+    if (!factory || (factory.id !== "linux" && factory.id !== "windows") ||
+      typeof factory.openSession !== "function" || ids.has(factory.id)) {
+      throw new TypeError("invalid platform registry");
+    }
+    ids.add(factory.id);
+  }
+  const frozen = Object.freeze([...factories]);
   return Object.freeze({
-    profiles: frozen,
-    find(id: PlatformId): PlatformProfileFactory | undefined {
-      return frozen.find((profile) => profile.id === id);
+    factories: frozen,
+    find(id: PlatformId): PlatformRuntimeFactory | undefined {
+      return frozen.find((factory) => factory.id === id);
     },
   });
 }

@@ -1,7 +1,9 @@
 import { spawnSync } from "node:child_process";
 import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, symlinkSync } from "node:fs";
-import { join, resolve, sep } from "node:path";
+import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
+import { join, resolve, sep } from "node:path";
+import { pathToFileURL } from "node:url";
 import {
   DefaultPackageManager,
   DefaultResourceLoader,
@@ -167,6 +169,15 @@ async function assertInstalledSkills(installedRoot: string, installRoot: string,
   }
 }
 
+async function assertInstalledRuntimeDependency(installedRoot: string): Promise<void> {
+  const requireFromConsumer = createRequire(join(installedRoot, "package.json"));
+  const entry = requireFromConsumer.resolve("akeel-platform-runtime");
+  const runtime = await import(pathToFileURL(entry).href) as Record<string, unknown>;
+  if (runtime.PLATFORM_RUNTIME_CONTRACT_VERSION !== 1 || "createPlatformValueIssuer" in runtime) {
+    throw new Error(`${installedRoot}: invalid installed platform runtime public surface`);
+  }
+}
+
 async function assertInstalledPackage(packageRoot: string): Promise<void> {
   const packageTemp = mkdtempSync(join(tmpdir(), "akeel-package-archive-"));
   const archiveTemp = join(packageTemp, "archives");
@@ -187,6 +198,7 @@ async function assertInstalledPackage(packageRoot: string): Promise<void> {
 
     const manifest = readPackageManifest(packageRoot);
     const installedRoot = join(installRoot, "node_modules", manifest.name);
+    if (platformRuntimeConsumers.has(packageRoot)) await assertInstalledRuntimeDependency(installedRoot);
     if (manifest.pi?.skills?.length) {
       await assertInstalledSkills(installedRoot, installRoot, process.env.PI_CODING_AGENT_DIR);
       console.log(`${manifest.name}: Pi discovered Guidance skills from the installed package`);
