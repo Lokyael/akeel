@@ -1,9 +1,7 @@
 import { spawnSync } from "node:child_process";
 import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, symlinkSync } from "node:fs";
-import { createRequire } from "node:module";
-import { tmpdir } from "node:os";
 import { join, resolve, sep } from "node:path";
-import { pathToFileURL } from "node:url";
+import { tmpdir } from "node:os";
 import {
   DefaultPackageManager,
   DefaultResourceLoader,
@@ -27,9 +25,7 @@ type ArchiveResult = Readonly<{
 }>;
 
 const root = resolve(import.meta.dirname!, "..");
-const packageRoots = [".", "packages/guidance", "packages/access-gate", "packages/context-pruner"] as const;
-const platformRuntimeRoot = "packages/platform-runtime" as const;
-const platformRuntimeConsumers = new Set<string>([".", "packages/guidance", "packages/access-gate"]);
+const packageRoots = ["packages/guidance", "packages/access-gate", "packages/context-pruner"] as const;
 const FORBIDDEN_ARCHIVE_PATH = /(?:^|\/)node_modules(?:\/|$)|(?:^|\/)tests(?:\/|$)|(?:^|\/)(?:package-lock|npm-shrinkwrap)\.json$|\.test\.[cm]?[jt]sx?$/u;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -63,14 +59,8 @@ function readPackageManifest(packageRoot: string): PackageManifest {
   return value as PackageManifest;
 }
 
-function packagePackArgs(packageRoot: string, ...args: string[]): string[] {
-  return packageRoot === "."
-    ? ["pack", ...args]
-    : ["pack", ...args, "--workspace", packageRoot];
-}
-
 function readArchiveResult(packageRoot: string): ArchiveResult {
-  const npmArgs = packagePackArgs(packageRoot, "--dry-run", "--json");
+  const npmArgs = ["pack", "--dry-run", "--json", "--workspace", packageRoot];
   let parsed: unknown;
   try {
     parsed = JSON.parse(runNpm(npmArgs, root));
@@ -115,7 +105,7 @@ function assertArchive(packageRoot: string): void {
 }
 
 function archiveFile(packageRoot: string, destination: string): string {
-  const output = runNpm(packagePackArgs(packageRoot, "--json", "--pack-destination", destination), root);
+  const output = runNpm(["pack", "--json", "--workspace", packageRoot, "--pack-destination", destination], root);
   let parsed: unknown;
   try {
     parsed = JSON.parse(output);
@@ -175,15 +165,6 @@ async function assertInstalledSkills(installedRoot: string, installRoot: string,
   }
 }
 
-async function assertInstalledRuntimeDependency(installedRoot: string): Promise<void> {
-  const requireFromConsumer = createRequire(join(installedRoot, "package.json"));
-  const entry = requireFromConsumer.resolve("akeel-platform-runtime");
-  const runtime = await import(pathToFileURL(entry).href) as Record<string, unknown>;
-  if (runtime.PLATFORM_RUNTIME_CONTRACT_VERSION !== 1 || "createPlatformValueIssuer" in runtime) {
-    throw new Error(`${installedRoot}: invalid installed platform runtime public surface`);
-  }
-}
-
 async function assertInstalledPackage(packageRoot: string): Promise<void> {
   const packageTemp = mkdtempSync(join(tmpdir(), "akeel-package-archive-"));
   const archiveTemp = join(packageTemp, "archives");
@@ -195,16 +176,11 @@ async function assertInstalledPackage(packageRoot: string): Promise<void> {
 
   try {
     const archive = archiveFile(packageRoot, archiveTemp);
-    if (platformRuntimeConsumers.has(packageRoot)) {
-      const runtimeArchive = archiveFile(platformRuntimeRoot, archiveTemp);
-      runNpm(["install", "--ignore-scripts", "--omit=dev", "--legacy-peer-deps", "--prefix", installRoot, runtimeArchive], root);
-    }
     runNpm(["install", "--ignore-scripts", "--omit=dev", "--legacy-peer-deps", "--prefix", installRoot, archive], root);
     stageHostDependencies(installRoot);
 
     const manifest = readPackageManifest(packageRoot);
     const installedRoot = join(installRoot, "node_modules", manifest.name);
-    if (platformRuntimeConsumers.has(packageRoot)) await assertInstalledRuntimeDependency(installedRoot);
     if (manifest.pi?.skills?.length) {
       await assertInstalledSkills(installedRoot, installRoot, process.env.PI_CODING_AGENT_DIR);
       console.log(`${manifest.name}: Pi discovered Guidance skills from the installed package`);
@@ -222,7 +198,5 @@ async function assertInstalledPackage(packageRoot: string): Promise<void> {
   }
 }
 
-assertArchive(platformRuntimeRoot);
 for (const packageRoot of packageRoots) assertArchive(packageRoot);
-await assertInstalledPackage(platformRuntimeRoot);
 for (const packageRoot of packageRoots) await assertInstalledPackage(packageRoot);

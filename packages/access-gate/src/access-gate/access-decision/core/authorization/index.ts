@@ -1,6 +1,5 @@
 import { canonicalCompilationFacts } from "../compilation/index";
 import type { ResolvedPathEvidence } from "../compilation/index";
-import { matchRootRelations, projectPathAuthorization, type RootReference } from "akeel-platform-runtime";
 
 export type AuthorizationMode = "allow" | "ask" | "deny";
 export type AuthorizationVerdict =
@@ -66,9 +65,6 @@ type PathPolicy = Readonly<{
   readonly allowedRoots: readonly string[];
   readonly blockedRoots: readonly string[];
   readonly blockedPaths: readonly string[];
-  readonly allowedRootRefs?: ReadonlySet<RootReference>;
-  readonly blockedRootRefs?: ReadonlySet<RootReference>;
-  readonly blockedPathRefs?: ReadonlySet<RootReference>;
 }>;
 
 type CommandPolicy = Readonly<{
@@ -88,8 +84,6 @@ export type UnifiedPolicySnapshot = Readonly<{
 type MandatoryBoundaryFacts = Readonly<{
   readonly credentialRoots: readonly string[];
   readonly capabilityRoots: readonly string[];
-  readonly credentialRootRefs?: ReadonlySet<RootReference>;
-  readonly capabilityRootRefs?: ReadonlySet<RootReference>;
 }>;
 
 const BOUNDARY_ISSUER = Symbol("BOUNDARY_ISSUER");
@@ -125,9 +119,7 @@ function isMode(value: unknown): value is AuthorizationMode {
 }
 
 function isAbsolutePath(value: unknown): value is string {
-  return typeof value === "string" && value.length > 0 &&
-    (value.startsWith("/") || /^[A-Za-z]:[\\/]/u.test(value)) &&
-    !value.includes("\u0000");
+  return typeof value === "string" && value.length > 0 && value.startsWith("/") && !value.includes("\u0000");
 }
 
 function readModes<T extends readonly string[]>(value: unknown, fields: T): Record<T[number], AuthorizationMode> {
@@ -143,8 +135,7 @@ function readPaths(value: unknown): PathPolicy {
   const modeFields = ["read", "write", "edit", "list", "search"] as const;
   const arrayFields = ["allowedRoots", "blockedRoots", "blockedPaths"] as const;
   const expected = [...modeFields, ...arrayFields];
-  const stringKeys = Reflect.ownKeys(value).filter((key): key is string => typeof key === "string" && !key.endsWith("Refs"));
-  if (stringKeys.length !== expected.length || !expected.every((field) => Object.hasOwn(value, field))) {
+  if (Reflect.ownKeys(value).length !== expected.length || !expected.every((field) => Object.hasOwn(value, field))) {
     throw new TypeError("invalid policy snapshot");
   }
   const modes = readModes(Object.fromEntries(modeFields.map((field) => [field, value[field]])), modeFields);
@@ -154,16 +145,7 @@ function readPaths(value: unknown): PathPolicy {
     if (!Array.isArray(paths) || !paths.every(isAbsolutePath)) throw new TypeError("invalid policy snapshot");
     arrays[field] = Object.freeze([...paths]);
   }
-  const allowedRootRefs = value.allowedRootRefs instanceof Set ? Object.freeze(new Set(value.allowedRootRefs as Set<RootReference>)) : undefined;
-  const blockedRootRefs = value.blockedRootRefs instanceof Set ? Object.freeze(new Set(value.blockedRootRefs as Set<RootReference>)) : undefined;
-  const blockedPathRefs = value.blockedPathRefs instanceof Set ? Object.freeze(new Set(value.blockedPathRefs as Set<RootReference>)) : undefined;
-  return Object.freeze({
-    ...modes,
-    ...arrays,
-    ...(allowedRootRefs ? { allowedRootRefs } : {}),
-    ...(blockedRootRefs ? { blockedRootRefs } : {}),
-    ...(blockedPathRefs ? { blockedPathRefs } : {}),
-  });
+  return Object.freeze({ ...modes, ...arrays });
 }
 
 export function freezeUnifiedPolicySnapshot(input: unknown): UnifiedPolicySnapshot {
@@ -182,8 +164,7 @@ export function freezeUnifiedPolicySnapshot(input: unknown): UnifiedPolicySnapsh
 export function createMandatoryBoundaries(input: unknown): MandatoryBoundaries {
   if (!isRecord(input)) throw new TypeError("invalid mandatory boundaries");
   const keys = Reflect.ownKeys(input);
-  if (!keys.includes("credentialRoots") || keys.some((k) =>
-    k !== "credentialRoots" && k !== "capabilityRoots" && k !== "credentialRootRefs" && k !== "capabilityRootRefs")) {
+  if (!keys.includes("credentialRoots") || keys.some((k) => k !== "credentialRoots" && k !== "capabilityRoots")) {
     throw new TypeError("invalid mandatory boundaries");
   }
   if (!Array.isArray(input.credentialRoots) || input.credentialRoots.length === 0 || !input.credentialRoots.every(isAbsolutePath)) {
@@ -195,14 +176,7 @@ export function createMandatoryBoundaries(input: unknown): MandatoryBoundaries {
   }
   const credentialRoots = Object.freeze([...new Set(input.credentialRoots)]);
   const capabilityRoots = Object.freeze(rawCap === undefined ? [] : [...new Set(rawCap)]);
-  const credentialRootRefs = input.credentialRootRefs instanceof Set ? Object.freeze(new Set(input.credentialRootRefs as Set<RootReference>)) : undefined;
-  const capabilityRootRefs = input.capabilityRootRefs instanceof Set ? Object.freeze(new Set(input.capabilityRootRefs as Set<RootReference>)) : undefined;
-  return MandatoryBoundaries.issue(BOUNDARY_ISSUER, Object.freeze({
-    credentialRoots,
-    capabilityRoots,
-    ...(credentialRootRefs ? { credentialRootRefs } : {}),
-    ...(capabilityRootRefs ? { capabilityRootRefs } : {}),
-  }));
+  return MandatoryBoundaries.issue(BOUNDARY_ISSUER, Object.freeze({ credentialRoots, capabilityRoots }));
 }
 
 export function projectUnifiedAdmission(compilation: unknown): UnifiedAdmissionPlan | undefined {
@@ -222,15 +196,7 @@ export function projectUnifiedAdmission(compilation: unknown): UnifiedAdmissionP
 }
 
 function pathWithinRoot(candidate: string, root: string): boolean {
-  if (root === "/" || candidate === root) return true;
-  let c = candidate.replace(/\\/gu, "/");
-  let r = root.replace(/\\/gu, "/");
-  if (/^[A-Za-z]:\//u.test(c) || /^[A-Za-z]:\//u.test(r)) {
-    c = c.toLowerCase();
-    r = r.toLowerCase();
-  }
-  if (c === r) return true;
-  return c.startsWith(`${r.replace(/\/$/u, "")}/`);
+  return root === "/" || candidate === root || candidate.startsWith(`${root}/`);
 }
 
 function violatesPathBoundary(candidate: string, policy: PathPolicy): boolean {
@@ -300,62 +266,17 @@ function isCapabilityPath(candidate: string, capabilityRoots: readonly string[])
   return capabilityRoots.some((root) => pathWithinRoot(candidate, root));
 }
 
-function isCapabilityCandidate(
-  path: ResolvedPathEvidence,
-  mandatory: MandatoryBoundaryFacts,
-): boolean {
-  if (path.proof && mandatory.capabilityRootRefs) {
-    const view = projectPathAuthorization(path.proof);
-    if (view) {
-      const relations = matchRootRelations(view, mandatory.capabilityRootRefs);
-      return relations.has("equal") || relations.has("descendant");
-    }
-  }
-  return isCapabilityPath(path.candidate, mandatory.capabilityRoots);
-}
-
-function pathHitsCapabilityBoundary(
-  path: ResolvedPathEvidence,
-  mandatory: MandatoryBoundaryFacts,
-): boolean {
-  if (path.proof && mandatory.capabilityRootRefs) {
-    const view = projectPathAuthorization(path.proof);
-    if (view) {
-      const relations = matchRootRelations(view, mandatory.capabilityRootRefs);
-      return relations.has("equal") || relations.has("descendant") || relations.has("traversed");
-    }
-  }
-  return isCapabilityPath(path.candidate, mandatory.capabilityRoots) ||
-    path.traversed.some((candidate) => isCapabilityPath(candidate, mandatory.capabilityRoots));
+function pathHitsCapabilityBoundary(path: ResolvedPathEvidence, capabilityRoots: readonly string[]): boolean {
+  return isCapabilityPath(path.candidate, capabilityRoots) ||
+    path.traversed.some((candidate) => isCapabilityPath(candidate, capabilityRoots));
 }
 
 function pathHitsCredentialBoundary(
   path: ResolvedPathEvidence,
   mandatory: MandatoryBoundaryFacts,
 ): boolean {
-  if (path.proof && mandatory.credentialRootRefs) {
-    const view = projectPathAuthorization(path.proof);
-    if (view) {
-      const relations = matchRootRelations(view, mandatory.credentialRootRefs);
-      return relations.has("equal") || relations.has("descendant") || relations.has("traversed");
-    }
-  }
   return credentialArtifact(path.candidate, mandatory.credentialRoots) ||
     path.traversed.some((candidate) => credentialArtifact(candidate, mandatory.credentialRoots));
-}
-
-function recursiveSearchReachesCredential(
-  path: ResolvedPathEvidence,
-  mandatory: MandatoryBoundaryFacts,
-): boolean {
-  if (path.proof && mandatory.credentialRootRefs) {
-    const view = projectPathAuthorization(path.proof);
-    if (view) {
-      const relations = matchRootRelations(view, mandatory.credentialRootRefs);
-      return relations.has("ancestor");
-    }
-  }
-  return recursiveSearchReachesCredentialRoot(path.candidate, mandatory.credentialRoots);
 }
 
 function pathHitsPolicyBoundary(
@@ -363,26 +284,6 @@ function pathHitsPolicyBoundary(
   policy: PathPolicy,
   isCapability: boolean,
 ): boolean {
-  if (path.proof && policy.allowedRootRefs && policy.blockedRootRefs && policy.blockedPathRefs) {
-    const view = projectPathAuthorization(path.proof);
-    if (view) {
-      const blockedRelations = matchRootRelations(view, policy.blockedRootRefs);
-      if (blockedRelations.has("equal") || blockedRelations.has("descendant") || blockedRelations.has("traversed")) {
-        return true;
-      }
-      const blockedPathRelations = matchRootRelations(view, policy.blockedPathRefs);
-      if (blockedPathRelations.has("equal") || blockedPathRelations.has("traversed")) {
-        return true;
-      }
-      if (!isCapability) {
-        const allowedRelations = matchRootRelations(view, policy.allowedRootRefs);
-        if (!allowedRelations.has("equal") && !allowedRelations.has("descendant")) {
-          return true;
-        }
-      }
-      return false;
-    }
-  }
   if (isCapability) {
     return policy.blockedRoots.some((root) => pathWithinRoot(path.candidate, root)) ||
       policy.blockedPaths.includes(path.candidate) ||
@@ -390,20 +291,6 @@ function pathHitsPolicyBoundary(
   }
   return violatesPathBoundary(path.candidate, policy) ||
     path.traversed.some((candidate) => violatesTraversedBoundary(candidate, policy));
-}
-
-function recursiveSearchReachesBlocked(
-  path: ResolvedPathEvidence,
-  policy: PathPolicy,
-): boolean {
-  if (path.proof && policy.blockedRootRefs) {
-    const view = projectPathAuthorization(path.proof);
-    if (view) {
-      const blockedRelations = matchRootRelations(view, policy.blockedRootRefs);
-      return blockedRelations.has("ancestor");
-    }
-  }
-  return recursiveSearchReachesBlockedPath(path.candidate, policy);
 }
 
 export function authorizeAdmission(
@@ -425,15 +312,15 @@ function authorizeDirect(
   policy: UnifiedPolicySnapshot,
 ): AuthorizationVerdict {
   if (pathHitsCredentialBoundary(facts.path, mandatory) ||
-    (facts.operation === "search" && recursiveSearchReachesCredential(facts.path, mandatory))) {
+    (facts.operation === "search" && recursiveSearchReachesCredentialRoot(facts.path.candidate, mandatory.credentialRoots))) {
     return Object.freeze({ kind: "deny", code: "hard-boundary" });
   }
 
-  const isCapability = isCapabilityCandidate(facts.path, mandatory);
+  const isCapability = isCapabilityPath(facts.path.candidate, mandatory.capabilityRoots);
   const hasCapabilityReadExemption = isCapability &&
     (facts.operation === "read" || facts.operation === "list");
   const isCapabilityMutation = (facts.operation === "write" || facts.operation === "edit") &&
-    pathHitsCapabilityBoundary(facts.path, mandatory);
+    pathHitsCapabilityBoundary(facts.path, mandatory.capabilityRoots);
   if (isCapabilityMutation) {
     return Object.freeze({ kind: "deny", code: "hard-boundary" });
   }
@@ -443,7 +330,7 @@ function authorizeDirect(
   }
 
   if (pathHitsPolicyBoundary(facts.path, policy.paths, hasCapabilityReadExemption) ||
-    (facts.operation === "search" && recursiveSearchReachesBlocked(facts.path, policy.paths))) {
+    (facts.operation === "search" && recursiveSearchReachesBlockedPath(facts.path.candidate, policy.paths))) {
     return Object.freeze({ kind: "deny", code: "hard-boundary" });
   }
 
@@ -471,12 +358,15 @@ function authorizeShell(
 
     if (operation.paths.some((path) => pathHitsCredentialBoundary(path.evidence, mandatory)) ||
       (operation.recursive && operation.paths.some((path) =>
-        recursiveSearchReachesCredential(path.evidence, mandatory)
+        recursiveSearchReachesCredentialRoot(path.evidence.candidate, mandatory.credentialRoots)
       ))) {
       return Object.freeze({ kind: "deny", code: "hard-boundary" });
     }
 
-    if (isModifying && operation.paths.some((path) => pathHitsCapabilityBoundary(path.evidence, mandatory))) {
+    if (isModifying && operation.paths.some((path) =>
+      isCapabilityPath(path.evidence.candidate, mandatory.capabilityRoots) ||
+      path.evidence.traversed.some((candidate) => isCapabilityPath(candidate, mandatory.capabilityRoots))
+    )) {
       return Object.freeze({ kind: "deny", code: "hard-boundary" });
     }
 
@@ -485,10 +375,10 @@ function authorizeShell(
     }
 
     if (operation.paths.some((path) => {
-      const isCap = isCapabilityCandidate(path.evidence, mandatory);
+      const isCap = isCapabilityPath(path.evidence.candidate, mandatory.capabilityRoots);
       return pathHitsPolicyBoundary(path.evidence, policy.paths, isCap);
     }) || (operation.recursive && operation.paths.some((path) =>
-      recursiveSearchReachesBlocked(path.evidence, policy.paths)
+      recursiveSearchReachesBlockedPath(path.evidence.candidate, policy.paths)
     ))) {
       return Object.freeze({ kind: "deny", code: "hard-boundary" });
     }

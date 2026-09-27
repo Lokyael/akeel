@@ -1,9 +1,10 @@
+import { join } from "node:path";
+import { tmpdir } from "node:os";
 import { Type } from "typebox";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { StringEnum } from "@earendil-works/pi-ai";
 import { createArtifactExchange } from "./index";
 import type { ArtifactExchangeOptions, ArtifactOwner, ArtifactRunQuota } from "./index";
-import { LINUX_RUNS_BASE } from "akeel-platform-runtime";
 import { createHandoffStore } from "../handoff-store/index";
 import {
   createContinuationCapsule,
@@ -220,10 +221,7 @@ export type ArtifactExchangeCompositionOptions = Partial<ArtifactExchangeOptions
 }>;
 
 export function installArtifactExchange(pi: ExtensionAPI, options: ArtifactExchangeCompositionOptions = {}): void {
-  // Windows runtime-root/publication wiring is intentionally not active until
-  // the native profile is released. Never fall back to a Linux physical path
-  // on another host; callers receive a bounded failure instead.
-  const root = options.root ?? (process.platform === "linux" ? LINUX_RUNS_BASE : undefined);
+  const root = options.root ?? join(tmpdir(), "akeel", "runs");
   let sessionEntries: readonly unknown[] = [];
   const quota: ArtifactRunQuota = {
     count(owner: ArtifactOwner): number {
@@ -244,7 +242,7 @@ export function installArtifactExchange(pi: ExtensionAPI, options: ArtifactExcha
       ]);
     },
   };
-  const exchange = root === undefined ? undefined : createArtifactExchange({ ...options, root, quota });
+  const exchange = createArtifactExchange({ ...options, root, quota });
   const handoffs = createHandoffStore();
 
   pi.registerFlag(CAPABILITY_FLAG, {
@@ -264,7 +262,6 @@ export function installArtifactExchange(pi: ExtensionAPI, options: ArtifactExcha
     async execute(_toolCallId, rawParams, _signal, _onUpdate, context) {
       const params = rawParams as OwnerParams;
       const owner = ownerContext(context);
-      if (exchange === undefined) return staticFailure("Artifact operation unavailable on this platform.");
       try {
         let result: unknown;
         switch (params.action) {
@@ -536,7 +533,6 @@ export function installArtifactExchange(pi: ExtensionAPI, options: ArtifactExcha
     executionMode: "sequential",
     constrainedSampling: { type: "json_schema", strict: "prefer" },
     async execute(_toolCallId, params: { content: string }, _signal, _onUpdate, context) {
-      if (exchange === undefined) return staticFailure("Artifact publication unavailable on this platform.");
       try {
         const capability = pi.getFlag(CAPABILITY_FLAG);
         const workspaceId = process.env.HERDR_WORKSPACE_ID;
