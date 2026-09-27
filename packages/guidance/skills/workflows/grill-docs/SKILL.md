@@ -130,4 +130,4 @@ After approval, use the recorded server/session and verify the repository, works
 
 For an eligible child, run exact non-force removal in order: `herdr worktree remove --workspace <workspace-id>`, then, only after that worktree is gone, `git -C <owner-checkout> branch -d -- <branch>`. Never use `--force`, `-D`, or prefix-based discovery or deletion. Verify the exact workspace, checkout, and branch are absent. On retry, a missing worktree permits branch cleanup only when the unchanged record still proves repository identity, branch ownership, and branch tip; absence alone never authorizes deletion.
 
-Report updated record paths, unresolved questions, the cleanup result, the exact retained `/tmp/akeel/runs/<run-id>/` path, and the next action. Artifact Exchange never deletes the run directory.
+Report updated record paths, unresolved questions, the cleanup result, the exact retained run path returned by Artifact Exchange, and the next action. Never construct a physical runtime path. Artifact Exchange never deletes the run directory.

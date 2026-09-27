@@ -1,17 +1,11 @@
 import {
-  closeSync,
   existsSync,
-  fsyncSync,
-  linkSync,
-  lstatSync,
   mkdirSync,
-  openSync,
   readFileSync,
-  unlinkSync,
-  writeFileSync,
 } from "node:fs";
 import { createHash, randomBytes } from "node:crypto";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
+import { atomicWriteTextNoClobber, ensureControlledDirectory as requireControlledDir } from "akeel-platform-runtime";
 
 const MAX_ARTIFACT_BYTES = 1_048_576;
 const MAX_SLOTS = 4;
@@ -111,12 +105,16 @@ function validIdentity(value: string): boolean {
   return value.length > 0 && value.length <= 128 && !/[\u0000-\u001f\u007f]/.test(value);
 }
 
+function isAbsoluteRuntimePath(value: string): boolean {
+  return value.startsWith("/");
+}
+
 function ownerKey(owner: Owner): string {
   return `${owner.sessionId}\u0000${owner.cwd}`;
 }
 
 function validateOwner(owner: Owner): void {
-  if (!isRecord(owner) || !validIdentity(owner.sessionId) || typeof owner.cwd !== "string" || !owner.cwd.startsWith("/")) invalid();
+  if (!isRecord(owner) || !validIdentity(owner.sessionId) || typeof owner.cwd !== "string" || !isAbsoluteRuntimePath(owner.cwd)) invalid();
 }
 
 function validateContent(content: string): number {
@@ -131,25 +129,18 @@ function digest(value: string | Buffer): string {
 }
 
 function ensureControlledDirectory(path: string, create = false): void {
-  if (create) mkdirSync(path, { recursive: true, mode: 0o700 });
-  const stats = lstatSync(path);
-  if (!stats.isDirectory() || stats.isSymbolicLink() || (stats.mode & 0o022) !== 0) denied();
-  if (typeof process.getuid === "function" && stats.uid !== process.getuid()) denied();
+  try {
+    requireControlledDir(path, create);
+  } catch {
+    denied();
+  }
 }
 
 function atomicNoClobber(path: string, content: string, random: (bytes: number) => Buffer): void {
-  const temporary = join(dirname(path), `.tmp-${random(12).toString("hex")}`);
-  let fd: number | undefined;
   try {
-    fd = openSync(temporary, "wx", 0o600);
-    writeFileSync(fd, content, "utf8");
-    fsyncSync(fd);
-    closeSync(fd);
-    fd = undefined;
-    linkSync(temporary, path);
-  } finally {
-    if (fd !== undefined) closeSync(fd);
-    try { unlinkSync(temporary); } catch { /* exact temporary cleanup is best-effort */ }
+    atomicWriteTextNoClobber(path, content, random);
+  } catch {
+    denied();
   }
 }
 
@@ -170,7 +161,7 @@ function exactKeys(value: Record<string, unknown>, keys: readonly string[]): boo
 }
 
 export function createArtifactExchange(options: ArtifactExchangeOptions): ArtifactExchange {
-  if (!isRecord(options) || typeof options.root !== "string" || !options.root.startsWith("/")) invalid();
+  if (!isRecord(options) || typeof options.root !== "string" || !isAbsoluteRuntimePath(options.root)) invalid();
   const now = options.now ?? Date.now;
   const random = options.random ?? randomBytes;
   const sessionRunCounts = new Map<string, number>();

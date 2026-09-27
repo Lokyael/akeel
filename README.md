@@ -18,7 +18,7 @@ pi install npm:akeel-access-gate     # tool-call access decisions
 pi install npm:akeel-context-pruner  # test-output context pruning
 ```
 
-The `akeel` package is the full bundle. The capability package manifests are maintained under `packages/`; publishing them to npm is a release operation outside this repository change.
+The `akeel` package is the full bundle. The capability package manifests are maintained under `packages/`; publishing them to npm is a release operation outside this repository change. Guidance and Access Gate consume `akeel-platform-runtime` as an internal Linux-only support dependency; it has no Pi extension or skill surface and does not constitute Windows support.
 
 AKeel provides bootstrap principles and on-demand engineering skills. It does not create snapshots or provide a `/rollback` command.
 

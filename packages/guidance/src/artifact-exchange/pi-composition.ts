@@ -1,10 +1,9 @@
-import { join } from "node:path";
-import { tmpdir } from "node:os";
 import { Type } from "typebox";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { StringEnum } from "@earendil-works/pi-ai";
 import { createArtifactExchange } from "./index";
 import type { ArtifactExchangeOptions, ArtifactOwner, ArtifactRunQuota } from "./index";
+import { LINUX_RUNS_BASE } from "akeel-platform-runtime";
 import { createHandoffStore } from "../handoff-store/index";
 import {
   createContinuationCapsule,
@@ -221,7 +220,7 @@ export type ArtifactExchangeCompositionOptions = Partial<ArtifactExchangeOptions
 }>;
 
 export function installArtifactExchange(pi: ExtensionAPI, options: ArtifactExchangeCompositionOptions = {}): void {
-  const root = options.root ?? join(tmpdir(), "akeel", "runs");
+  const root = options.root ?? LINUX_RUNS_BASE;
   let sessionEntries: readonly unknown[] = [];
   const quota: ArtifactRunQuota = {
     count(owner: ArtifactOwner): number {

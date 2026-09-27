@@ -6,7 +6,7 @@ disable-model-invocation: true
 
 # Assess Codebase Modularity
 
-Surface structural friction and report **modularity findings** — evidence that module boundaries expose too much complexity, scatter responsibilities, or prevent testing through stable seams. A mid-task friction proposal (per principles.md Proposal signals) remains a one-line report until the user explicitly requests this assessment; the scan turns approved scope into findings, not Project Records. Before delegating, reserve an `assess-modularity` run with `akeel_run_artifact` (per `herdr`). The Task Owner publishes the fixed scope, captured Git status, staged and unstaged diffs, untracked inventory/content, refs and OIDs, and a bounded commit-history hot-spot summary in the immutable packet. The read-only child must not execute live Git; it explores source files and the captured repository evidence. The coordinator waits for its verified result artifact, writes the HTML report under `/tmp/akeel/runs/<run-id>/report.html`, and presents it to the user.
+Surface structural friction and report **modularity findings** — evidence that module boundaries expose too much complexity, scatter responsibilities, or prevent testing through stable seams. A mid-task friction proposal (per principles.md Proposal signals) remains a one-line report until the user explicitly requests this assessment; the scan turns approved scope into findings, not Project Records. Before delegating, reserve an `assess-modularity` run with `akeel_run_artifact` (per `herdr`). The Task Owner publishes the fixed scope, captured Git status, staged and unstaged diffs, untracked inventory/content, refs and OIDs, and a bounded commit-history hot-spot summary in the immutable packet. The read-only child must not execute live Git; it explores source files and the captured repository evidence. The coordinator waits for its verified result artifact, writes the HTML report to the exact report path reserved for that run, and presents it to the user. Never construct a physical runtime path.
 
 This workflow discovers unknown structural problems across repository boundaries. When a concrete module or interface question is ready for design, use `module-design` instead.
 
@@ -31,7 +31,7 @@ Read the project's `CONTEXT.md` and relevant entries in `docs/decisions.md` firs
 
 ### 2. Present Findings as HTML Report
 
-Write a self-contained HTML file to `/tmp/akeel/runs/<run-id>/report.html` under the reserved run. Open it for the user where a GUI is available (`xdg-open <path>` on Linux); in a headless environment, report the file path and ask the user to open it.
+Write a self-contained HTML file to the exact report path returned or reserved by Artifact Exchange. Open that exact path for the user where a GUI is available; in a headless environment, report the returned path and ask the user to open it. Do not assume Linux, `/tmp`, or a platform-specific opener.
 
 For each finding, render a card with:
 

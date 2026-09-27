@@ -4,6 +4,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, 
 import { dirname, join, relative } from "node:path";
 import { tmpdir } from "node:os";
 import { createProjectLifecycle } from "../../../../packages/access-gate/src/access-gate/access-decision/runtime/index";
+import { LINUX_SESSIONS_BASE } from "../../../../packages/platform-runtime/src/index";
 
 function project(): { readonly root: string; readonly nested: string; readonly cleanup: () => void } {
   const root = mkdtempSync(join(tmpdir(), "akeel-project-"));
@@ -41,7 +42,10 @@ test("project lifecycle places staging inside a session envelope", () => {
   const cwd = mkdtempSync(join(tmpdir(), "akeel-session-test-"));
   try {
     const lifecycle = createProjectLifecycle(cwd);
-    assert.match(lifecycle.context.stagingRoot, /[/\\\\]tmp[/\\\\]akeel[/\\\\]sessions[/\\\\]session-[A-Za-z0-9]+[/\\\\]staging$/);
+    assert.match(
+      lifecycle.context.stagingRoot,
+      new RegExp(`^${LINUX_SESSIONS_BASE.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\\\$&")}/session-[A-Za-z0-9]+/staging$`),
+    );
     lifecycle.dispose();
   } finally {
     rmSync(cwd, { recursive: true, force: true });
@@ -100,7 +104,7 @@ test("project lifecycle ignores Git file metadata", () => {
 
 test("project lifecycle rejects relative cwd before creating staging", () => {
   const fixture = project();
-  const sessionsParent = join(tmpdir(), "akeel", "sessions");
+  const sessionsParent = LINUX_SESSIONS_BASE;
   const entries = (): string[] => existsSync(sessionsParent)
     ? readdirSync(sessionsParent).filter((entry) => entry.startsWith("session-"))
     : [];

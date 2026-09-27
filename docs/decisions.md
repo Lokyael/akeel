@@ -1054,5 +1054,23 @@ Rejected:
 
 Out of Scope: OS sandbox, container isolation, user-entered `!`/`!!` commands, custom tool backends, later extension input mutation, and configurable policy/path/credential checks while off.
 
-## D-098: 待创建
+## D-098: Linux-only platform runtime remains an internal support package
+
+Reversal surface: user-boundary
+
+Decision: 在回到 Linux-only（Arch Linux 优先）产品边界后，保留 `akeel-platform-runtime` 作为无 Pi manifest 的内部支持 package，但只交付和激活 Linux adapter。它提供 sealed Linux path/object identity、Root Catalog relations、受控 runtime roots、process identity、private filesystem 与 atomic publication evidence；不包含 Windows profile、Windows host assets、PowerShell executor 或跨平台支持声明。Policy、GateSession、Artifact Exchange 和 Handoff lifecycle 仍由各消费者拥有。
+
+Why: 这些能力对 Linux 也有独立价值：它们把路径证据、临时资源隔离和原子发布的安全事实收敛为单一来源，避免 Access Gate 与 Guidance 各自复制。删除中间层会丢失该 Linux 安全边界或迫使消费者重新实现；保留 Windows 对等 profile 则会违反当前产品边界并继续制造未兑现的支持暗示。
+
+Impact: `akeel-platform-runtime` 作为普通 npm dependency 随消费者安装，不进入 `pi.extensions` 或 `pi.skills`，Arch Linux/GNU 语义仍是唯一产品基线。未来任何新平台必须提交独立的宿主证据、运行时合同和用户边界决策；本条不构成其准备支持承诺。
+
+Rejected:
+
+- **删除 runtime package 并把 Linux primitive 分散回消费者：** 丢失证据单一来源并重新引入跨包安全双源。
+- **保留 Windows contracts/assets 但不宣称支持：** 未使用代码仍增加维护面，并会产生与产品边界冲突的准备支持暗示。
+- **把 Policy 或 lifecycle 下沉到 runtime package：** 混淆平台证据与 Access Gate/Guidance 领域所有权。
+
+Out of Scope: Windows、macOS、BSD、远程宿主、OS sandbox、运行期 TOCTOU 消除以及未来平台的具体设计。
+
+## D-099: 待创建
 

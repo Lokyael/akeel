@@ -71,4 +71,4 @@ After verified collection, Owner disposition, and user approval, remove only the
   herdr workspace close <workspace-id>
   ```
 
-The child never cleans itself. Artifact Exchange does not delete run directories; report the exact `/tmp/akeel/runs/<run-id>/` path for explicit user-managed cleanup. Never infer ownership from a prefix or clean another run.
+The child never cleans itself. Artifact Exchange does not delete run directories; report the exact run path returned by Artifact Exchange for explicit user-managed cleanup. Never construct a physical runtime path, infer ownership from a prefix, or clean another run.
